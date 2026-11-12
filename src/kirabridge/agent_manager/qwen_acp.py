@@ -40,12 +40,23 @@ class QwenACPAdapter:
         resume_session=None,
         before_spawn=None,
         recovery_binding=None,
+        owned_session_proof=None,
     ) -> dict:
-        if resume_session is not None or args.resume_session:
+        if (resume_session is not None or args.resume_session) and owned_session_proof is None:
             raise BridgeError(
                 "agent_resume_unsupported",
                 "Qwen ACP resume has no verified persisted owner/task/CWD binding",
             )
+        if owned_session_proof is not None:
+            from kirabridge.agent_manager.qwen_session import QwenTeamSession
+
+            if (
+                not isinstance(owned_session_proof, QwenTeamSession)
+                or recovery_binding is not None
+                or resume_session != owned_session_proof.session_id
+            ):
+                raise BridgeError("agent_resume_denied", "Exclusive Qwen team proof required")
+            owned_session_proof.validate_effect(task, args, config)
         if args.local_tools and (
             not config.allow_local_tools
             or not config.bridge_tools
@@ -122,11 +133,23 @@ class QwenACPAdapter:
                 from kirabridge.agent_manager.qwen_mcp import task_server
 
                 servers = [
-                    resources.enter_context(task_server(self.bridge_config, task, args, timeout))
+                    resources.enter_context(
+                        task_server(
+                            self.bridge_config,
+                            task,
+                            args,
+                            timeout,
+                            team_scope=owned_session_proof.policy_scope()
+                            if owned_session_proof
+                            else None,
+                        )
+                    )
                 ]
             with PathScope(roots).directory(args.cwd) as fd:
                 if before_spawn is not None:
                     before_spawn()
+                if owned_session_proof is not None:
+                    owned_session_proof.validate_effect(task, args, config)
                 process = await spawn_process(
                     command,
                     fd,
@@ -143,6 +166,7 @@ class QwenACPAdapter:
         session = None
         prompt_sent = False
         turn_result = None
+        partial_observation = None
         binding = {
             "agent": args.agent,
             "task_id": task["id"],
@@ -222,12 +246,15 @@ class QwenACPAdapter:
                 if info.get("name") != "qwen-code" or info.get("version") != "0.27.2":
                     raise BridgeError("agent_version", "Qwen ACP requires verified version 0.27.2")
                 await progress({**binding, "event": "acp_initialized", "version": "0.27.2"})
-                if recovery_binding is not None:
+                if recovery_binding is not None or owned_session_proof is not None:
                     if init.get("agentCapabilities", {}).get("loadSession") is not True:
                         raise BridgeError(
                             "agent_resume_unsupported", "Qwen did not negotiate session/load"
                         )
-                    session = client.bind_session(recovery_binding.session_id)
+                    if owned_session_proof:
+                        owned_session_proof.validate_effect(task, args, config)
+                    target = owned_session_proof or recovery_binding
+                    session = client.bind_session(target.session_id)
                     client.on_activity = None
                     new = await client.request(
                         "session/load",
@@ -263,7 +290,14 @@ class QwenACPAdapter:
                             **binding,
                             "session_id": session,
                             "event": "session_loaded",
-                            "recovery_of": recovery_binding.original_core_task_id,
+                            **(
+                                {"recovery_of": recovery_binding.original_core_task_id}
+                                if recovery_binding
+                                else {
+                                    "team_id": owned_session_proof.team_id,
+                                    "session_generation": owned_session_proof.generation,
+                                }
+                            ),
                         }
                     )
                 else:
@@ -288,6 +322,8 @@ class QwenACPAdapter:
                 )
                 if mcp_enabled:
                     await self._mcp_ready(client, session, args.cwd, timeout, progress, binding)
+                if owned_session_proof:
+                    owned_session_proof.validate_effect(task, args, config)
                 prompt_sent = True
                 result = await client.request(
                     "session/prompt",
@@ -347,7 +383,16 @@ class QwenACPAdapter:
                         "requested_effort": config.qwen_reasoning_effort,
                         "effective_model_status": "unknown",
                         "session_id": session,
-                        "session_resumed": recovery_binding is not None,
+                        "session_resumed": recovery_binding is not None
+                        or owned_session_proof is not None,
+                        **(
+                            {
+                                "team_id": owned_session_proof.team_id,
+                                "session_generation": owned_session_proof.generation,
+                            }
+                            if owned_session_proof
+                            else {}
+                        ),
                         **(
                             {"recovery_of": recovery_binding.original_core_task_id}
                             if recovery_binding
@@ -372,6 +417,26 @@ class QwenACPAdapter:
                 )
                 return turn_result
         except (TimeoutError, UncertainExecution, OSError, ValueError) as exc:
+            if prompt_sent and client.text:
+                partial_observation = {
+                    **binding,
+                    "session_id": client.session_id,
+                    "text": client.text,
+                    "output_truncated": client.truncated,
+                    "completion_verified": False,
+                    "stop_reason": None,
+                    "error_code": getattr(exc, "code", type(exc).__name__),
+                }
+                try:
+                    await progress(
+                        {
+                            "event": "agent_partial_observation",
+                            **binding,
+                            "unconfirmed_observation": partial_observation,
+                        }
+                    )
+                except Exception:
+                    pass  # Observation failure must not replace the primary UNKNOWN.
             await client.cancel()
             if not prompt_sent:
                 error = BridgeError(
@@ -407,6 +472,7 @@ class QwenACPAdapter:
                                 cleanup_error, "cleanup_diagnostic", None
                             ),
                             "observed_result": turn_result,
+                            "unconfirmed_observation": partial_observation,
                         }
                     )
                 except Exception:

@@ -137,3 +137,17 @@ async def test_qwen_routing_pins_native_effort_without_cli_shim(tmp_path):
             AsyncMock(),
             AsyncMock(),
         )
+
+
+def test_qwen_defaults_preserve_other_agents_and_roundtrip_fingerprints():
+    from kirabridge.bridge_core.models import digest
+
+    for kind in ["codex", "grok_acp", "opencode_http", "qwen_acp"]:
+        extra = {"server_url": "http://127.0.0.1:19191"} if kind == "opencode_http" else {}
+        config = AgentConfig(kind=kind, **extra)
+        raw = config.model_dump()
+        assert digest(raw) == digest(
+            AgentConfig.model_validate_json(config.model_dump_json()).model_dump()
+        )
+        if kind != "qwen_acp":
+            assert not any(key.startswith("qwen_") for key in raw)

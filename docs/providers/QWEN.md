@@ -84,7 +84,12 @@ Große native Command-Resultate dürfen nur anhand eines tatsächlich beobachtet
 erfolgreichen Readresultats fortgesetzt werden: gleiche Basisargumente, Workspace,
 Command und Katalogrevision, beobachteter Digest und exakt nächster Resultatoffset.
 Diese Fortsetzung verbraucht das Aufrufbudget und prüft erneut die aktive
-Core-Aufgabe. Fremde Digests, übersprungene Seiten und Schreiboperationen bekommen
+Core-Aufgabe. Dasselbe gilt für den tatsächlich zurückgegebenen `next_offset`
+direkter `td_get_thread`-Notizfenster. Der vorhandene Core-Read `whiteboard_read`
+liest Beitragsindizes und einzelne Beiträge; leere Notes beweisen kein leeres
+Whiteboard. Nach einem genehmigten Indexread sind nur die dort tatsächlich
+beobachteten Entry-IDs desselben Boards jeweils einmal lesbar. Eine erneute
+Indexfreigabe bleibt ein eigener gezählter Aufruf. Fremde Digests, übersprungene Seiten und Schreiboperationen bekommen
 dadurch keine Freigabe.
 
 Large native read results may continue only at the observed next page, bound to
@@ -144,6 +149,13 @@ Timeout kommt aus dem validierten AgentInput; oberhalb des konfigurierten
 32 Calls; umfangreiche Fachaufträge benötigen ein entsprechend konfiguriertes
 Operatorprofil. Die engen Markerlimits sind kein Produktivlimit. Diese Grenzen
 sind keine Preisgarantie oder automatische Änderung eines Anbietertarifs.
+Ein Task kann bis zu 256 exakte Grants enthalten; die private serialisierte
+Policy bleibt auf 65536 Zeichen begrenzt und wird vor Prozessstart geprüft.
+Beobachtete Read-Fortsetzungen und deklarierte Dateioperationen vermeiden große
+Listen einzeln vorab erratener Requests. Große native Toolausgaben können vom SDK
+elidiert werden; nötigenfalls kleinere sichtbare Fenster lesen und Sichtlücken
+benennen. Qwen-Felder werden bei anderen Agentarten nicht serialisiert, damit
+bestehende Core-/AutoNext-Konfigurationsfingerprints erhalten bleiben.
 
 ## Sitzungen und Ergebnisbelege / Sessions and evidence
 
@@ -157,22 +169,39 @@ keine unabhängige Backendmodell-Attestierung.
 Received, started, `end_turn` and project acceptance are separate states. Results
 record native stop reason and task/session/CWD binding, with
 `project_completion_verified = false`. Thought content is never part of the
-returned answer. Cleanup failure preserves the already observed native result
+returned answer. Timeout, disconnect or missing final stop preserves the bounded
+non-thought text as an explicitly unconfirmed observation, never a completed
+result. Cleanup failure preserves the already observed native result
 or original exception while retaining an unconfirmed outcome.
 
-Automatisches allgemeines Qwen-Resume bleibt gesperrt. Der separate explizite
-`QwenRecoveryBinding` erlaubt nur eine nachgewiesen eigene Sitzung: historischer
-Receipt und Transcript-Hash vor dem Load, genaue Session/UID/CWD/Owner/Modell/Auth/
-Effort-/Handoffbindung und neuer gebundener Coreauftrag. Ein nativer 0644-Transcript
-wird nur mit intakter eigener Parentkette und privatem Vorfahren akzeptiert; es
-gibt kein chmod. Native History darf nach dem geprüften Load append-only wachsen.
-UNKNOWN-Altaufträge werden nicht nachträglich als completed umgeschrieben und
-keine Prompts automatisch wiederholt. Andere interaktive Sitzungen bleiben erhalten.
+Normale **IDLE-Folgearbeit** derselben Team-/Workerbindung setzt die Qwen-Sitzung
+über den bestehenden Core-/Team-Sitzungsspeicher fort. Vor dem Load werden der
+versiegelte neue Request, Owner, Agent, CWD, exklusives Work-Lease, Clear-Generation
+und das gespeicherte Modell-/Auth-/Effortprofil erneut geprüft. Der Adapter prüft
+diesen Beleg vor Spawn, Load und Prompt; jeder neue Turn erhält eine frische
+MCP-Policy mit seiner eigenen Task-ID und seinem Argumenthash. Der Proxy prüft bei
+normalem Resume zusätzlich vor jedem Toolcall das aktuelle Team-Lease. Ein Clear,
+eine fremde Work-ID oder veraltete Generation entzieht damit den weiteren Zugriff.
+Aktive und UNKNOWN-Slots werden nicht automatisch wiederverwendet; ein beliebiger
+`resume_session`-String ohne versiegelten Teambeleg bleibt gesperrt. Modellstart,
+Sitzungszulassung und Abschluss sind getrennt: Ein echtes `session/load`-ACK stoppt
+nur die bestehende Admission-Wache, es markiert weder Modellstart noch Abschluss.
 
-Qwen session IDs are inspectable through the existing team session contract, but
-an active or unknown Qwen session cannot silently cause a new prompt. Native
-Qwen subagent/workflow execution is not enabled or claimed by this restricted
-profile. A configured Core team alone is not proof of actual team collaboration.
+Die separate explizite `QwenRecoveryBinding` bleibt für nachgewiesen eigene
+historische Sitzungen verfügbar: Receipt und Transcript-Hash vor dem Load, genaue
+Session/UID/CWD/Owner/Modell/Auth/Effort-/Handoffbindung und neuer gebundener
+Coreauftrag. Native 0644-Transcripts benötigen eine intakte eigene Parentkette und
+einen privaten Vorfahren; kein chmod. Nach dem geprüften Load darf die native
+History wachsen. Historische UNKNOWN-Aufträge werden nicht als completed
+umgeschrieben. Ein ausdrücklich belegter abgeschlossener eigener Turn kann bei
+verlorenem privatem Store ebenfalls als historischer Continuation-Beleg dienen;
+das ersetzt nicht den normalen exklusiven IDLE-Pfad.
+
+Normal idle follow-ups use the existing exclusive sealed Team/Core session lease,
+with renewed task scopes and generation checks. Explicit historical recovery is
+separate. Neither path adopts arbitrary user session IDs or retries UNKNOWN
+work. Native Qwen subagent/workflow execution is not enabled by this restricted
+profile; a configured Core team alone is not proof of actual collaboration.
 
 ## Bisherige Prüfung / Evidence boundary
 
@@ -190,8 +219,16 @@ abgenommen. Die danach explizit fortgesetzte gleiche Qwen-Sitzung bestätigte
 technischer Teilerfolg, keine abgeschlossene Familienanalyse. Der folgende
 Fortsetzungsturn hat den direkten Plan-Read mit `success: true`, Revision 29,
 Offset 0 und `next_offset = 100000` belegt; daraus folgt noch keine vollständige
-Lektüre aller 872980 Zeichen oder fachliche Abnahme. Liveaktivierung und endgültige
-Abnahme koordiniert der verantwortliche Parent nach den bestehenden Gates.
+Lektüre aller 872980 Zeichen oder fachliche Abnahme. Anschließend haben drei echte
+Qwen-Worker eigene Teillieferungen mit end_turn und bestätigtem Cleanup geliefert;
+die ursprüngliche Hauptsitzung hat sie als expliziten Zwischenstand synthetisiert.
+Die fachlichen Lücken bleiben erhalten. Ein Protokollfixture prüft zwei normale
+versiegelte Teamturns einschließlich session/load, verworfenem History-Replay und
+echten MCP-Aufrufen mit erneuerten Task-Scopes; es ist kein behaupteter
+Liveanbieter-Codingpass. Reale Berichtswrites waren beim Quellencheckpoint noch
+nicht abgenommen; ein Schreibprofil zeigte die nun gezielt korrigierte
+session/load-Admission-Lücke, ohne empfangenen Append-Aufruf. Liveaktivierung und
+endgültige Abnahme koordiniert der Parent nach den bestehenden Gates.
 
 ## Gepinnte Primärquellen / Pinned primary sources
 

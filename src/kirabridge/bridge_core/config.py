@@ -104,7 +104,7 @@ class TeamWorkerConfig(BaseModel):
         "existing_visible_terminal"
     )
     local_tools: bool = False
-    mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=32)
+    mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=256)
     mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     mcp_operations: list[str] = Field(default_factory=list, max_length=32)
     routing: WorkerRouting | None = None
@@ -168,7 +168,7 @@ class AgentConfig(BaseModel):
     qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
     qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
-    qwen_max_timeout: float = Field(default=300, ge=1, le=3600)
+    qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
     qwen_max_tool_calls: int = Field(default=32, ge=1, le=4096)
     qwen_max_session_turns: int = Field(default=48, ge=1, le=2048)
     qwen_auth_type: (
@@ -193,6 +193,15 @@ class AgentConfig(BaseModel):
     server_url: str | None = Field(default=None, max_length=2048)
     server_username_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     server_password_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+
+    @model_serializer(mode="wrap")
+    def omit_foreign_qwen_defaults(self, handler):
+        value = handler(self)
+        if self.kind != "qwen_acp":
+            for key in list(value):
+                if key.startswith("qwen_"):
+                    value.pop(key)
+        return value
 
     @model_validator(mode="after")
     def explicit_full_access(self):

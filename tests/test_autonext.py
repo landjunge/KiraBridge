@@ -603,7 +603,27 @@ asyncio.run(b.autonext.tick())
     assert b.store.db.execute("SELECT claim_published FROM autonext_items").fetchone()[0] == 0
     b.autonext = AutoNextManager(b)
     await s["start"]()
-    await until(lambda: b.autonext.inspect()["state"] == "complete")
+    try:
+        await until(lambda: b.autonext.inspect()["state"] == "complete")
+    except TimeoutError:
+        pytest.fail(
+            json.dumps(
+                {
+                    "phase": "post_crash_recovery",
+                    "child_returncode": process.returncode,
+                    "run": b.autonext.inspect(),
+                    "items": [
+                        dict(row)
+                        for row in b.store.db.execute(
+                            "SELECT task_id,state,claim_published FROM autonext_items"
+                        )
+                    ],
+                    "tasks": [
+                        dict(row) for row in b.store.db.execute("SELECT id,state,error FROM tasks")
+                    ],
+                }
+            )
+        )
     assert [x["task_id"] for x in s["calls"]()] == ["one", "two"]
 
 

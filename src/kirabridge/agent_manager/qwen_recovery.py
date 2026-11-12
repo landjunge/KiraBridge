@@ -32,6 +32,8 @@ class QwenRecoveryBinding(BaseModel):
     receipt_path: str
     receipt_sha256: str
     source_handoff_sha256: str
+    source_handoff_path: str | None = None
+    completed_receipt: bool = False
 
     def validate_effect(self, task, args, config):
         if (
@@ -55,19 +57,40 @@ class QwenRecoveryBinding(BaseModel):
         if hashlib.sha256(receipt_raw).hexdigest() != self.receipt_sha256:
             raise BridgeError("agent_recovery_denied", "Original recovery receipt changed")
         receipt = json.loads(receipt_raw)
-        native = receipt.get("last_native_observation", {})
+        if self.completed_receipt:
+            work = receipt.get("worker", {})
+            result = receipt.get("result") or {}
+            native = result.get("evidence") or {}
+            if (
+                work.get("logical_task") != self.original_task_id
+                or work.get("core_task_id") != self.original_core_task_id
+                or work.get("core_state") != "completed"
+                or result.get("success") is not True
+                or native.get("stop_reason") != "end_turn"
+                or native.get("task_id") != self.original_core_task_id
+                or native.get("requested_model") != self.model
+                or native.get("session_reasoning_effort") != self.effort
+                or native != work.get("native")
+                or self.source_handoff_path is None
+                or hashlib.sha256(Path(self.source_handoff_path).read_bytes()).hexdigest()
+                != self.source_handoff_sha256
+            ):
+                raise BridgeError("agent_recovery_denied", "Completed owned turn is not proven")
+        else:
+            native = receipt.get("last_native_observation", {})
+            if (
+                receipt.get("task_id") != self.original_task_id
+                or receipt.get("core_task_id") != self.original_core_task_id
+                or receipt.get("core_state") != "unknown"
+                or receipt.get("source_handoff_sha256") != self.source_handoff_sha256
+            ):
+                raise BridgeError("agent_recovery_denied", "Historical receipt changed")
         if (
-            receipt.get("task_id") != self.original_task_id
-            or receipt.get("core_task_id") != self.original_core_task_id
-            or native.get("session_id") != self.session_id
+            native.get("session_id") != self.session_id
             or native.get("owner") != self.owner
             or native.get("cwd") != self.cwd
-            or receipt.get("core_state") != "unknown"
-            or receipt.get("source_handoff_sha256") != self.source_handoff_sha256
         ):
-            raise BridgeError(
-                "agent_recovery_denied", "Historical receipt does not prove this session"
-            )
+            raise BridgeError("agent_recovery_denied", "Historical session binding differs")
         path = Path(self.transcript_path)
         expected = (
             Path.home()

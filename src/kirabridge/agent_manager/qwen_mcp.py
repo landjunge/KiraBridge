@@ -15,7 +15,7 @@ from kirabridge.private_files import write_private
 
 
 @contextmanager
-def task_server(bridge_config, task, args, timeout):
+def task_server(bridge_config, task, args, timeout, *, team_scope=None):
     owner = task["principal"]
     policy = bridge_config.principals.get(owner) if bridge_config else None
     if (
@@ -28,7 +28,10 @@ def task_server(bridge_config, task, args, timeout):
         raise BridgeError(
             "agent_tools_denied", "MCP metadata requires the existing task owner grant"
         )
+    if team_scope is not None and "team.read" not in policy.capabilities:
+        raise BridgeError("agent_tools_denied", "Qwen resume needs the existing team read grant")
     binding = AgentTaskPolicy(
+        team_scope=team_scope,
         owner=owner,
         task_id=task["id"],
         agent=args.agent,
@@ -75,7 +78,10 @@ def task_server(bridge_config, task, args, timeout):
     server = bridge_server(bridge_config._source_path, owner)
     with TemporaryDirectory(prefix="kirabridge-qwen-mcp-") as temporary:
         path = Path(temporary) / "task-policy.json"
-        write_private(path, binding.model_dump_json())
+        encoded = binding.model_dump_json()
+        if len(encoded) > 65536:
+            raise BridgeError("agent_tools_denied", "MCP task scope exceeds the policy file budget")
+        write_private(path, encoded)
         server["args"] += ["--agent-task-policy", str(path)]
         yield {
             "name": "kirabridge",

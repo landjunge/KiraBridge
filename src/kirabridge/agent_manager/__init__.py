@@ -593,7 +593,8 @@ class AgentManager:
                             else "isolated_text_only",
                             "supports_local_tools": config.allow_local_tools
                             and config.bridge_tools,
-                            "supports_owned_resume": False,
+                            "supports_owned_resume": True,
+                            "resume_scope": "sealed_idle_team_session",
                             "mcp_tools": config.qwen_mcp_tools,
                         }
                         if config.kind == "qwen_acp"
@@ -676,11 +677,17 @@ class AgentManager:
                 "agent_resume_unsupported", "A turn cannot resume two different sessions"
             )
         resume_session = args.resume_session
+        qwen_proof = None
         if resume_session is not None:
             if config.kind == "codex":
                 owned_resume_session = resume_session
             elif config.kind in {"grok_acp", "opencode_http"}:
                 pass
+            elif config.kind == "qwen_acp":
+                guard = getattr(self, "qwen_session_guard", None)
+                if not separate_managed or guard is None:
+                    raise BridgeError("team_task_required", "Qwen resume needs sealed team proof")
+                qwen_proof = guard(task, args)
             elif config.kind in {"opencode", "opencode_acp"}:
                 raise BridgeError(
                     "agent_resume_unsupported",
@@ -696,7 +703,7 @@ class AgentManager:
             raise BridgeError(
                 "agent_resume_unsupported", "Owned workflow continuation requires Codex"
             )
-        extra = {}
+        extra = {"owned_session_proof": qwen_proof} if qwen_proof else {}
         if owned_resume_session is not None or handoff_reply:
             extra.update(
                 {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
@@ -706,6 +713,7 @@ class AgentManager:
             "opencode_acp",
             "opencode",
             "opencode_http",
+            "qwen_acp",
         }:
             extra["resume_session"] = resume_session
         try:

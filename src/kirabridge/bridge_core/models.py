@@ -163,7 +163,7 @@ class AgentToolGrant(Input):
 
 
 class AgentInput(Input):
-    mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=32)
+    mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=256)
     mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     mcp_operations: list[str] = Field(default_factory=list, max_length=32)
 

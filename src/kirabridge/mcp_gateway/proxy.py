@@ -401,6 +401,8 @@ async def connect_stdio(config, principal, *, task_policy=None):
                     await changed()
                     return result
                 result = await connection.call_tool(name, arguments)
+                if task_policy is not None:
+                    task_policy.observe_result(name, arguments, result)
                 await changed()
                 return result
             except BridgeError as exc:

@@ -1177,3 +1177,84 @@ def test_unknown_foreign_job_without_session_id_cannot_adopt_the_slot(domain):
     assert row["session_id"] == "s1"
     assert row["work_id"] == w1["id"]
     assert row["state"] == "active"
+
+
+def qwen_claimed_fixture(domain):
+    from kirabridge.bridge_core.models import AgentInput
+
+    domain.config.agents["codex"] = AgentConfig(
+        kind="qwen_acp",
+        model="fixture-model",
+        qwen_auth_type="qwen-subscription",
+        qwen_reasoning_effort="xhigh",
+    )
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    first = domain.delegate("local", work(idempotency_key="qwen-first"))
+    domain.record_session(
+        {**first, "state": "completed"}, {"adapter": "qwen_acp", "session_id": "known-qwen"}
+    )
+    second = domain.delegate("local", work(idempotency_key="qwen-second"))
+    claimed = domain.claim(second["id"])
+    assert claimed["resume_session"] == "known-qwen"
+    args = AgentInput(
+        agent="codex",
+        cwd=domain.config.team.workers["codex"].cwd,
+        prompt="continue fixture",
+        timeout=90,
+        resume_session="known-qwen",
+    )
+    request = TaskRequest(
+        task_id=claimed["core_task_id"],
+        idempotency_key=claimed["core_task_id"],
+        operation="agent.execute",
+        arguments=args.model_dump(),
+    )
+    domain.seal_request(claimed["id"], request)
+    domain.store.db.execute(
+        "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,state,"
+        "created,updated,attempt) "
+        "VALUES(?,?,?,?,?,?,'accepted',?,?,1)",
+        (
+            request.task_id,
+            "codex",
+            request.idempotency_key,
+            digest(request.model_dump()),
+            request.operation,
+            canonical(request.arguments),
+            time.time(),
+            time.time(),
+        ),
+    )
+    task = domain.store.get(request.task_id, "codex")
+    return domain.qwen_session_proof(task, args), task, args, claimed
+
+
+@pytest.mark.parametrize(
+    "fault", ["owner", "cwd", "session", "cleared", "generation", "other_work", "unknown", "model"]
+)
+def test_qwen_owned_idle_resume_revalidates_seal_and_generation(domain, fault):
+    proof, task, args, claimed = qwen_claimed_fixture(domain)
+    profile = domain.config.agents["codex"]
+    proof.validate_effect(task, args, profile)
+    if fault == "owner":
+        task = {**task, "principal": "grok"}
+    if fault == "cwd":
+        args = args.model_copy(update={"cwd": args.cwd + "/other"})
+    if fault == "session":
+        args = args.model_copy(update={"resume_session": "foreign"})
+    if fault == "cleared":
+        domain.clear_session(
+            "codex", TeamSessionClear(team_id="test-team", idempotency_key="qwen-clear")
+        )
+    if fault == "generation":
+        domain.store.db.execute(
+            "INSERT INTO team_session_generations VALUES('test-team','codex',1)"
+        )
+    if fault == "other_work":
+        domain.store.db.execute("UPDATE team_sessions SET work_id='different'")
+    if fault == "unknown":
+        domain.store.db.execute("UPDATE team_sessions SET state='unknown'")
+    if fault == "model":
+        domain.config.agents["codex"].model = "other"
+    with pytest.raises(BridgeError):
+        proof.validate_effect(task, args, profile)

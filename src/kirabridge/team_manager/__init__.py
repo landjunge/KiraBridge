@@ -11,7 +11,7 @@ import time
 import uuid
 from pathlib import Path
 
-from kirabridge.bridge_core.models import BridgeError, TaskRequest, canonical, digest
+from kirabridge.bridge_core.models import AgentInput, BridgeError, TaskRequest, canonical, digest
 from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS team_sessions (
  team_id TEXT NOT NULL REFERENCES teams(id), principal TEXT NOT NULL,
  agent TEXT NOT NULL, adapter TEXT NOT NULL, session_id TEXT NOT NULL,
  cwd TEXT NOT NULL, state TEXT NOT NULL, work_id TEXT, cleared REAL,
- generation INTEGER NOT NULL DEFAULT 0,
+ generation INTEGER NOT NULL DEFAULT 0, provider_binding TEXT NOT NULL DEFAULT '{}',
  created REAL NOT NULL, updated REAL NOT NULL,
  PRIMARY KEY(team_id,principal)
 );
@@ -95,7 +95,7 @@ SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 # Adapters whose provider session can actually be resumed through the durable
 # store. OpenCode CLI/ACP use an isolated per-task XDG profile and have no
 # persisted session store, so they are excluded.
-RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http"}
+RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http", "qwen_acp"}
 TRACKED_SESSION_ADAPTERS = RESUME_ADAPTERS | {"qwen_acp"}
 
 
@@ -202,6 +202,11 @@ class TeamManager:
             }
             if "cleared" not in session_columns:
                 self.store.db.execute("ALTER TABLE team_sessions ADD COLUMN cleared REAL")
+            if "provider_binding" not in session_columns:
+                self.store.db.execute(
+                    "ALTER TABLE team_sessions ADD COLUMN provider_binding "
+                    "TEXT NOT NULL DEFAULT '{}'"
+                )
             if "generation" not in session_columns:
                 self.store.db.execute(
                     "ALTER TABLE team_sessions ADD COLUMN generation INTEGER NOT NULL DEFAULT 0"
@@ -349,6 +354,7 @@ class TeamManager:
                 "work_id",
                 "created",
                 "updated",
+                "generation",
             )
         }
 
@@ -459,6 +465,10 @@ class TeamManager:
             or row["adapter"] != self._worker_adapter(worker)
         ):
             return None
+        if row["adapter"] == "qwen_acp" and row["state"] == "idle":
+            expected = self._qwen_profile(worker.agent, worker)
+            if json.loads(row["provider_binding"]) != expected:
+                raise BridgeError("agent_resume_denied", "Qwen model/auth/effort binding changed")
         # Only an idle session is resumable. Active (another turn's exclusive
         # lease), unknown (unconfirmed after a crash) and cleared (tombstone)
         # sessions are never reused.
@@ -473,6 +483,69 @@ class TeamManager:
             (work["id"], generation, time.time(), work["team_id"], work["assignee"]),
         )
         return row["session_id"]
+
+    def _qwen_profile(self, agent, worker=None):
+        profile = self.config.agents[agent]
+        return {
+            "model": (worker.routing.model or profile.model)
+            if worker and worker.routing
+            else profile.model,
+            "auth_type": profile.qwen_auth_type,
+            "effort": worker.routing.effort
+            if worker and worker.routing
+            else profile.qwen_reasoning_effort,
+        }
+
+    def qwen_session_proof(self, task, args):
+        """Revalidate the existing exclusive seal/generation before load and every effect."""
+        from kirabridge.agent_manager.qwen_session import QwenTeamSession
+
+        def verify():
+            stored_task = self.store.get(task["id"], task["principal"])
+            if stored_task["state"] not in {"accepted", "running"} or digest(
+                AgentInput.model_validate(stored_task["args"]).model_dump()
+            ) != digest(args.model_dump()):
+                raise BridgeError("agent_resume_denied", "Qwen Core task is no longer active")
+            self.authorize_execution(stored_task)
+            link = self.store.db.execute(
+                "SELECT id FROM team_work WHERE core_task_id=?", (task["id"],)
+            ).fetchone()
+            if link is None:
+                raise BridgeError("team_task_required", "Qwen resume needs sealed team work")
+            work = self._work(link["id"])
+            slot = self._session_row(work["team_id"], work["assignee"])
+            if (
+                slot is None
+                or slot["adapter"] != "qwen_acp"
+                or slot["state"] != "active"
+                or slot["work_id"] != work["id"]
+                or slot["principal"] != task["principal"]
+                or slot["agent"] != args.agent
+                or slot["cwd"] != args.cwd
+                or slot["session_id"] != args.resume_session
+                or work["resume_session"] != args.resume_session
+                or work["session_generation"] is None
+                or slot["generation"] != work["session_generation"]
+                or self._generation(work["team_id"], work["assignee"]) != slot["generation"]
+                or json.loads(slot["provider_binding"])
+                != self._qwen_profile(args.agent, self.config.team.workers[work["assignee"]])
+            ):
+                raise BridgeError("agent_resume_denied", "Qwen exclusive session binding changed")
+            return work, slot
+
+        work, slot = verify()
+        return QwenTeamSession(
+            core_task_id=task["id"],
+            team_id=work["team_id"],
+            work_id=work["id"],
+            session_id=slot["session_id"],
+            generation=slot["generation"],
+            owner=task["principal"],
+            agent=args.agent,
+            cwd=args.cwd,
+            **self._qwen_profile(args.agent, self.config.team.workers[work["assignee"]]),
+            validate=verify,
+        )
 
     def record_session(self, work, native):
         """Remember a provider session only from bounded native turn evidence."""
@@ -562,14 +635,17 @@ class TeamManager:
                 core = None
             if core and isinstance(core.get("args", {}).get("cwd"), str):
                 cwd = core["args"]["cwd"]
+        provider_binding = self._qwen_profile(worker.agent, worker) if adapter == "qwen_acp" else {}
         now = time.time()
         self.store.db.execute(
             "INSERT INTO team_sessions(team_id,principal,agent,adapter,session_id,cwd,state,"
-            "work_id,cleared,generation,created,updated) VALUES(?,?,?,?,?,?,?,?,NULL,?,?,?) "
+            "work_id,cleared,generation,provider_binding,created,updated) "
+            "VALUES(?,?,?,?,?,?,?,?,NULL,?,?,?,?) "
             "ON CONFLICT(team_id,principal) DO UPDATE SET agent=excluded.agent,"
             "adapter=excluded.adapter,session_id=excluded.session_id,cwd=excluded.cwd,"
             "state=excluded.state,work_id=excluded.work_id,cleared=NULL,"
-            "generation=excluded.generation,updated=excluded.updated",
+            "generation=excluded.generation,provider_binding=excluded.provider_binding,"
+            "updated=excluded.updated",
             (
                 work["team_id"],
                 work["assignee"],
@@ -580,6 +656,7 @@ class TeamManager:
                 state,
                 work["id"],
                 generation,
+                json.dumps(provider_binding, sort_keys=True),
                 existing["created"] if existing else now,
                 now,
             ),

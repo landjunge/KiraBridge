@@ -47,6 +47,8 @@ for line in sys.stdin:
   print(json.dumps({'jsonrpc':'2.0','method':'session/update','params':p}),flush=True)
   p['update']={'sessionUpdate':'agent_message_chunk','content':{'type':'text','text':'EXACT_QWEN_MARKER'}}
   print(json.dumps({'jsonrpc':'2.0','method':'session/update','params':p}),flush=True)
+  if mode=='disconnect_after_text':sys.exit(0)
+  if mode=='timeout_after_text':time.sleep(30)
   r={} if mode=='missing_stop' else {'stopReason':'cancelled' if mode=='cancelled' else 'end_turn'}
  else:continue
  print(json.dumps({'jsonrpc':'2.0','id':m['id'],'result':r}),flush=True)
@@ -108,8 +110,15 @@ async def test_bound_turn_and_permission_denial(tmp_path, mode):
 
 @pytest.mark.parametrize("mode", ["disconnect", "foreign", "missing_stop", "timeout"])
 async def test_unknown_never_reprompts(tmp_path, mode):
-    with pytest.raises(UncertainExecution):
+    with pytest.raises(BridgeError) as error:
         await turn(tmp_path, mode)
+    if mode != "timeout":
+        assert isinstance(error.value, UncertainExecution)
+    else:
+        assert (
+            isinstance(error.value, UncertainExecution)
+            or error.value.code == "qwen_handshake_failed"
+        )
 
 
 async def test_version_refuses_before_session_or_prompt(tmp_path):
@@ -142,7 +151,7 @@ async def test_manager_registers_and_keeps_owner_and_roots(bridge, config, tmp_p
         final = await bridge.tasks.wait("local", value.task_id)
     assert final["state"] == "completed"
     assert final["result"]["evidence"]["owner"] == "local"
-    assert bridge.agents.inventory(["qwen"])["agents"][0]["supports_owned_resume"] is False
+    assert bridge.agents.inventory(["qwen"])["agents"][0]["supports_owned_resume"] is True
     assert not final["result"]["project_completion_verified"]
 
 
@@ -544,3 +553,150 @@ async def test_legacy_thread_read_is_exact_and_requires_existing_right():
     with pytest.raises(BridgeError):
         await policy.authorize(connection, "td_get_thread", args, definition=tool)
     assert not policy.model_copy(update={"capabilities": []}).permits_tool(tool)
+
+
+@pytest.mark.parametrize("mode", ["missing_stop", "disconnect_after_text", "timeout_after_text"])
+async def test_unknown_preserves_non_thought_text_without_completion(tmp_path, mode):
+    args = AgentInput(agent="qwen", prompt="fixture", cwd=str(tmp_path), timeout=1)
+    progress = AsyncMock()
+    with pytest.raises(UncertainExecution):
+        await QwenACPAdapter().execute(
+            {"id": "task", "principal": "owner", "args": args.model_dump()},
+            args,
+            profile(tmp_path, mode),
+            [str(tmp_path)],
+            AsyncMock(),
+            progress,
+        )
+    partial = next(
+        c.args[0]["unconfirmed_observation"]
+        for c in progress.await_args_list
+        if c.args[0]["event"] == "agent_partial_observation"
+    )
+    assert partial["text"] == "EXACT_QWEN_MARKER"
+    assert partial["completion_verified"] is False and partial["stop_reason"] is None
+    assert "PRIVATE_THOUGHT" not in json.dumps(partial)
+    assert all(c.args[0]["event"] != "agent_turn_observed" for c in progress.await_args_list)
+
+
+async def test_native_board_index_grants_only_observed_entries_once():
+    from mcp.types import CallToolResult
+
+    parent, task = binding()
+    policy = parent.model_copy(
+        update={
+            "tools": ["whiteboard_read"],
+            "capabilities": ["threaddesk.read"],
+            "grants": [AgentToolGrant(tool="whiteboard_read", arguments={"thread_id": "known"})],
+            "max_calls": 8,
+        }
+    )
+    conn = SimpleNamespace(
+        call_tool=AsyncMock(return_value=SimpleNamespace(isError=False, structuredContent=task))
+    )
+    tool = Tool(
+        name="whiteboard_read",
+        inputSchema={"type": "object"},
+        annotations=ToolAnnotations(readOnlyHint=True),
+    )
+    entry = {"thread_id": "known", "entry_id": "entry-1"}
+    with pytest.raises(BridgeError):
+        await policy.authorize(conn, "whiteboard_read", entry, definition=tool)
+    await policy.authorize(conn, "whiteboard_read", {"thread_id": "known"}, definition=tool)
+    policy.observe_result(
+        "whiteboard_read",
+        {"thread_id": "known"},
+        CallToolResult(
+            content=[], structuredContent={"thread_id": "known", "entries": [{"id": "entry-1"}]}
+        ),
+    )
+    for changed in [{"thread_id": "foreign"}, {"entry_id": "unseen"}]:
+        with pytest.raises(BridgeError):
+            await policy.authorize(conn, "whiteboard_read", {**entry, **changed}, definition=tool)
+    await policy.authorize(conn, "whiteboard_read", entry, definition=tool)
+    with pytest.raises(BridgeError):
+        await policy.authorize(conn, "whiteboard_read", entry, definition=tool)
+
+
+async def test_direct_note_pages_follow_only_observed_next_offset():
+    from mcp.types import CallToolResult
+
+    parent, task = binding()
+    args = {"id": "known", "max_chars": 12000, "offset": 100000}
+    policy = parent.model_copy(
+        update={
+            "tools": ["td_get_thread"],
+            "capabilities": ["threaddesk.read"],
+            "grants": [AgentToolGrant(tool="td_get_thread", arguments=args)],
+            "max_calls": 8,
+        }
+    )
+    conn = SimpleNamespace(
+        call_tool=AsyncMock(return_value=SimpleNamespace(isError=False, structuredContent=task))
+    )
+    tool = Tool(
+        name="td_get_thread",
+        inputSchema={"type": "object"},
+        annotations=ToolAnnotations(readOnlyHint=True),
+    )
+    next_args = {**args, "offset": 112000}
+    with pytest.raises(BridgeError):
+        await policy.authorize(conn, "td_get_thread", next_args, definition=tool)
+    await policy.authorize(conn, "td_get_thread", args, definition=tool)
+    policy.observe_result(
+        "td_get_thread",
+        args,
+        CallToolResult(
+            content=[],
+            structuredContent={
+                "success": True,
+                "value": {
+                    "id": "known",
+                    "offset": 100000,
+                    "next_offset": 112000,
+                    "total_chars": 413560,
+                    "truncated": True,
+                },
+            },
+        ),
+    )
+    for changed in [{"offset": 124000}, {"id": "foreign"}, {"max_chars": 24000}]:
+        with pytest.raises(BridgeError):
+            await policy.authorize(conn, "td_get_thread", {**next_args, **changed}, definition=tool)
+    await policy.authorize(conn, "td_get_thread", next_args, definition=tool)
+    with pytest.raises(BridgeError):
+        await policy.authorize(conn, "td_get_thread", next_args, definition=tool)
+
+
+@pytest.mark.parametrize(
+    "change", [None, {"generation": 1}, {"work_id": "other"}, {"session_id": "foreign"}]
+)
+async def test_proxy_rechecks_current_team_lease_before_each_call(change):
+    parent, task = binding()
+    scope = {"team_id": "team", "work_id": "work", "session_id": "session", "generation": 0}
+    policy = AgentTaskPolicy.model_validate({**parent.model_dump(), "team_scope": scope})
+    slot = {
+        **scope,
+        "principal": parent.owner,
+        "agent": parent.agent,
+        "cwd": parent.cwd,
+        "state": "active",
+    }
+    if change is None:
+        slot = None
+    else:
+        slot.update(change)
+
+    async def call(name, args):
+        return SimpleNamespace(
+            isError=False, structuredContent=task if name == "task_get" else {"session": slot}
+        )
+
+    tool = Tool(
+        name="bridge_epoch",
+        inputSchema={"type": "object"},
+        annotations=ToolAnnotations(readOnlyHint=True),
+    )
+    with pytest.raises(BridgeError):
+        await policy.authorize(SimpleNamespace(call_tool=call), "bridge_epoch", {}, definition=tool)
+    assert policy._calls == 0

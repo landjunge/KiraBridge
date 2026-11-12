@@ -31,12 +31,22 @@ _TOOL_CAPABILITIES = {
     "policy_inspect": "policy.inspect",
     "read_query": None,
     "td_get_thread": "threaddesk.read",
+    "whiteboard_read": "threaddesk.read",
     "td_command_query": "threaddesk.read",
 }
 
 
+class TeamSessionScope(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    team_id: str
+    work_id: str
+    session_id: str
+    generation: int = Field(ge=0)
+
+
 class AgentTaskPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    team_scope: TeamSessionScope | None = None
     owner: str
     task_id: str
     agent: str
@@ -54,6 +64,8 @@ class AgentTaskPolicy(BaseModel):
     _calls: int = PrivateAttr(default=0)
     _used: dict[str, int] = PrivateAttr(default_factory=dict)
     _children: dict[str, str] = PrivateAttr(default_factory=dict)
+    _entry_ids: dict[str, set[str]] = PrivateAttr(default_factory=dict)
+    _note_pages: dict[str, int] = PrivateAttr(default_factory=dict)
     _pages: dict[str, tuple[str, int, int]] = PrivateAttr(default_factory=dict)
     _pending_reads: set[str] = PrivateAttr(default_factory=set)
     _lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
@@ -158,6 +170,32 @@ class AgentTaskPolicy(BaseModel):
             if response.isError:
                 raise BridgeError("agent_task_denied", "MCP task owner cannot be confirmed")
             self.validate_task(response.structuredContent)
+            if self.team_scope is not None:
+                response = await connection.call_tool(
+                    "team_session_get", {"team_id": self.team_scope.team_id}
+                )
+                data = response.structuredContent
+                slot = data.get("session") if isinstance(data, dict) else None
+                if (
+                    response.isError
+                    or not isinstance(slot, dict)
+                    or any(
+                        slot.get(k) != value
+                        for k, value in {
+                            "team_id": self.team_scope.team_id,
+                            "work_id": self.team_scope.work_id,
+                            "session_id": self.team_scope.session_id,
+                            "generation": self.team_scope.generation,
+                            "principal": self.owner,
+                            "agent": self.agent,
+                            "cwd": self.cwd,
+                            "state": "active",
+                        }.items()
+                    )
+                ):
+                    raise BridgeError(
+                        "agent_task_denied", "Team session lease is no longer current"
+                    )
             if name == "read_query" and self.operations:
                 from kirabridge.read_query import ReadQuery
 
@@ -182,6 +220,22 @@ class AgentTaskPolicy(BaseModel):
                     )
                 ):
                     raise BridgeError("agent_task_denied", "Read path exceeds the task scope")
+            elif (
+                name == "whiteboard_read"
+                and set(arguments or {}) == {"thread_id", "entry_id"}
+                and arguments["entry_id"] in self._entry_ids.get(arguments["thread_id"], set())
+            ):
+                self._entry_ids[arguments["thread_id"]].remove(arguments["entry_id"])
+            elif (
+                name == "td_get_thread"
+                and type((arguments or {}).get("offset")) is int
+                and self._note_pages.get(
+                    digest({k: v for k, v in arguments.items() if k != "offset"})
+                )
+                == arguments["offset"]
+            ):
+                self._note_pages.pop(digest({k: v for k, v in arguments.items() if k != "offset"}))
+                self._pending_reads.add(digest({"tool": name, "arguments": arguments}))
             elif name == "task_request":
                 self._child(arguments)
             elif name in {"task_get", "task_events"} and self.operations:
@@ -238,7 +292,7 @@ class AgentTaskPolicy(BaseModel):
                         )
                     self._used[key] = self._used.get(key, 0) + 1
                 if (
-                    name == "td_command_query"
+                    name in {"td_command_query", "whiteboard_read", "td_get_thread"}
                     and definition.annotations
                     and definition.annotations.readOnlyHint is True
                 ):
@@ -254,10 +308,48 @@ class AgentTaskPolicy(BaseModel):
         """
         actual = arguments or {}
         call = digest({"tool": name, "arguments": actual})
-        if name != "td_command_query" or call not in self._pending_reads:
+        if call not in self._pending_reads:
             return
         self._pending_reads.discard(call)
         data = response.structuredContent
+        if name == "whiteboard_read":
+            if (
+                not response.isError
+                and isinstance(data, dict)
+                and "error" not in data
+                and data.get("thread_id") == actual.get("thread_id")
+                and set(actual) == {"thread_id"}
+                and isinstance(data.get("entries"), list)
+                and len(data["entries"]) <= 10000
+            ):
+                self._entry_ids[actual["thread_id"]] = {
+                    row["id"]
+                    for row in data["entries"]
+                    if isinstance(row, dict)
+                    and isinstance(row.get("id"), str)
+                    and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", row["id"])
+                }
+            return
+        if name == "td_get_thread":
+            value = data.get("value") if isinstance(data, dict) else None
+            if (
+                not response.isError
+                and isinstance(data, dict)
+                and data.get("success") is True
+                and isinstance(value, dict)
+                and value.get("id") == actual.get("id")
+                and type(value.get("offset")) is int
+                and value["offset"] == actual.get("offset", 0)
+                and type(value.get("next_offset")) is int
+                and type(value.get("total_chars")) is int
+                and value["offset"] < value["next_offset"] <= value["total_chars"]
+                and value["next_offset"] <= value["offset"] + actual.get("max_chars", 100000)
+                and value.get("truncated") is True
+            ):
+                self._note_pages[digest({k: v for k, v in actual.items() if k != "offset"})] = (
+                    value["next_offset"]
+                )
+            return
         if response.isError or not isinstance(data, dict) or data.get("success") is not True:
             return
         page = data.get("value")
