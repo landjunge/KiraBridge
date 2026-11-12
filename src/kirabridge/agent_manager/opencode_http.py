@@ -232,7 +232,9 @@ class OpenCodeHTTPAdapter:
             before = await self._messages(client, session, directory)
             prior, _ = self._last_assistant(before)
             prior_id = prior.get("id") if prior is not None else None
-            message_id = uuid4().hex
+            # V1 message ids must start with "msg" (MessageID schema); the exact
+            # id stays with this attempt and is matched by the assistant parentID.
+            message_id = "msg_" + uuid4().hex
 
             await self._request(
                 client,

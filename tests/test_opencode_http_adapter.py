@@ -61,7 +61,10 @@ class Server:
             # and appends a new assistant message whose parent is exactly it.
             self._turns += 1
             body = json.loads(request.content) if request.content else {}
-            message_id = body.get("messageID", f"user_{self._turns}")
+            message_id = body.get("messageID", "")
+            if not isinstance(message_id, str) or not message_id.startswith("msg"):
+                # Mirror the real V1 MessageID schema: reject arbitrary ids.
+                return httpx.Response(400, json={"error": "invalid messageID"})
             self.user["info"]["id"] = message_id
             self.message["info"]["id"] = f"msg_{self._turns}"
             self.message["info"]["parentID"] = message_id
@@ -373,3 +376,11 @@ async def test_resume_from_initial_idle_still_detects_the_new_turn(tmp_path):
     result, _, _ = await execute(tmp_path, server, resume_session="ses_test")
     assert result["success"] and result["text"] == "Harmless answer"
     assert result["evidence"]["session_resumed"] is True
+
+
+async def test_prompt_message_id_is_v1_conformant(tmp_path):
+    server = Server()
+    result, _, _ = await execute(tmp_path, server)
+    assert result["success"]
+    prompt = server.body("POST", "/prompt_async")
+    assert prompt["messageID"].startswith("msg")
