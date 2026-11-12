@@ -177,7 +177,11 @@ class AgentConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def cli_credential_defaults(cls, value):
-        if isinstance(value, dict) and value.get("kind") in {"opencode_http", "opencode_http_v2"}:
+        if (
+            isinstance(value, dict)
+            and isinstance(value.get("kind"), str)
+            and value["kind"] in {"opencode_http", "opencode_http_v2"}
+        ):
             return {
                 "server_username_env": "OPENCODE_SERVER_USERNAME",
                 "server_password_env": "OPENCODE_SERVER_PASSWORD",
