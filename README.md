@@ -257,3 +257,17 @@ The shared header with five original icons is implemented and locally reviewed.
 The [design record](docs/FIVE-TOOL-DESIGN-20261107.md) describes status/version
 boundaries and passed browser checks; the installed native app remains unverified.
 This source delivery does not establish a new download or installed runtime.
+
+### Native family window switching (source)
+
+The fixed five-icon hosts can call `kirabridge --principal local family switch
+TARGET --source-pid OWN_NATIVE_PID`. The macOS broker reuses the installed native
+system helper and existing policy, without initializing the task database. It
+preserves allowed `roots` and state-directory exclusions before Launch/Reopen;
+registration and automatic capability grants cannot broaden path access. It
+checks registered installation/PID/start/UID and caller ancestry, transfers actual
+outer window bounds, confirms target focus, then hides only other registered
+family windows. Processes and UI state remain; 4AllPass lock policy is unchanged.
+Unknown effects are durably blocked from blind retry. Missing or ambiguous targets
+are errors. [Registration, exact JSON ABI and acceptance](docs/FAMILY-WINDOW-BROKER.md)
+remain separate from installation; current downloads are not changed by source.

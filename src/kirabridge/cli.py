@@ -15,7 +15,7 @@ from kirabridge import __version__
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
-from kirabridge.bridge_core.models import BridgeError, State, TaskRequest
+from kirabridge.bridge_core.models import BridgeError, State, TaskRequest, UncertainExecution
 
 
 def emit(value, *, stream=None):
@@ -34,6 +34,16 @@ def parse_request(path: str) -> TaskRequest:
 
 
 async def execute(args) -> None:
+    if args.command == "family":
+        from kirabridge.family_windows import execute_family, failure
+
+        try:
+            emit(await execute_family(args))
+        except (BridgeError, ValidationError, OSError, ValueError, TimeoutError) as exc:
+            emit(failure(exc, mutating=args.action == "switch"))
+            unknown = args.action == "switch" and isinstance(exc, UncertainExecution)
+            raise SystemExit(3 if unknown else 2) from None
+        return
     if args.command == "install":
         from kirabridge.installation import guided_install
         from kirabridge.local_runtime import default_config
@@ -725,6 +735,16 @@ def main() -> None:
     # Not required: --doctor/--repair are a flag-based entry point without a subcommand;
     # the fallback below defaults a missing command to "status".
     sub = parser.add_subparsers(dest="command")
+    family = sub.add_parser("family", help="Fixed native five-product window adapter; no Store")
+    family_actions = family.add_subparsers(dest="action", required=True)
+    family_actions.add_parser("registration", help="Print disabled registration; no writes")
+    family_path = family_actions.add_parser("path-check", help="Read-only native path scope check")
+    family_path.add_argument("target")
+    for action in ("switch", "inspect"):
+        command = family_actions.add_parser(action)
+        command.add_argument("target")
+        command.add_argument("--source-pid", required=True)
+        command.add_argument("--source-start")
     install = sub.add_parser("install", help="Guided local installation; --check changes nothing")
     install.add_argument("--check", action="store_true", help="Read-only prerequisite check")
     install.add_argument("--language", choices=["de", "en"], default="de")

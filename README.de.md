@@ -255,3 +255,18 @@ Der gemeinsame Header mit fünf Originalicons ist implementiert und lokal geprü
 Der [Designnachweis](docs/FIVE-TOOL-DESIGN-20261107.md) beschreibt Status-/Versionsgrenzen
 und die bestandene Browserprüfung; die installierte native App bleibt ungeprüft.
 Diese Quelllieferung belegt keinen neuen Download oder installierten Laufzeitstand.
+
+### Nativer Familienfensterwechsel (Quellstand)
+
+Die vorhandenen fünf Icon-Hosts können `kirabridge --principal local family switch
+TARGET --source-pid EIGENER_NATIVE_PID` aufrufen. Der macOS-Broker verwendet den
+installierten nativen Systemhelper und die bestehende Policy ohne Taskdatenbank.
+Vor Launch/Reopen gelten weiter die freigegebenen `roots` und State-Ausschlüsse;
+Registrierung und automatische Capabilities erweitern keinen Pfadzugriff.
+Er prüft registrierte Installation/PID/Start/UID und die tatsächliche Aufruferkette,
+überträgt äußere Fenstermaße, bestätigt den Zielfokus und verbirgt erst danach die
+anderen registrierten Familienfenster. Prozesse und UI-Zustände bleiben erhalten;
+die 4AllPass-Sperrregeln gelten weiter. UNKNOWN blockiert blinde Wiederholung;
+fehlende oder mehrdeutige Ziele bleiben Fehler. [Registrierung, JSON-ABI und
+Abnahme](docs/FAMILY-WINDOW-BROKER.md) sind von Installation und bestehenden
+Downloads getrennt.
