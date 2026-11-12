@@ -95,7 +95,7 @@ SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 # Adapters whose provider session can actually be resumed through the durable
 # store. OpenCode CLI/ACP use an isolated per-task XDG profile and have no
 # persisted session store, so they are excluded.
-RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http"}
+RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http", "opencode_http_v2"}
 
 
 def _bounded_text(text, limit):
