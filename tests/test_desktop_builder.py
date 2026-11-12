@@ -59,6 +59,8 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
             "SystemKeyboard.swift",
             "SystemShortcuts.swift",
             "SystemSpecialKeys.swift",
+            "FamilyWindowBroker.swift",
+            "FamilyWindowNative.swift",
         )
     ]
     for source in sources:
@@ -93,6 +95,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     )
     assert info["KiraBridgeSystemProtocol"] == 1
     assert info["KiraBridgeKeyboardProtocol"] == 1
+    assert info["KiraBridgeFamilyWindowProtocol"] == 1
     assert calls[0][-(len(sources) + 2) :] == [
         *map(str, sources),
         "-o",
