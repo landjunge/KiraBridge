@@ -199,9 +199,71 @@ func guardedAcquisitionFixture() throws {
 }
 
 @MainActor
+func appOwnedHelperFixture() throws {
+    // The blanket agent/bundle classification deliberately stays broad; only
+    // the exact target's own no-TTY helpers are exempt from the terminal route.
+    let bundle = "/Applications/OpenCode.app"
+    let main = bundle + "/Contents/MacOS/OpenCode"
+    func candidate(_ name: String, _ path: String?, tty: Bool = false) -> SystemServices.Record {
+        row(30, parent: 20, name: name, path: path, tty: tty)
+    }
+    func owned(_ record: SystemServices.Record, bundlePath: String = bundle,
+               executablePath: String = main) -> Bool {
+        SystemControl.isAppOwnedHelper(record: record, targetBundlePath: bundlePath,
+            targetExecutablePath: executablePath)
+    }
+    func guarded(_ record: SystemServices.Record) -> Bool {
+        SystemControl.requiresGuardedRoute(record, targetPID: 20, targetBundlePath: bundle,
+            targetExecutablePath: main)
+    }
+    let mainRecord = candidate("OpenCode", main)
+    let helpers = [
+        mainRecord,
+        candidate("OpenCode Helper", bundle + "/Contents/Frameworks/OpenCode Helper.app/Contents/MacOS/OpenCode Helper"),
+        candidate("OpenCode Helper ", bundle + "/Contents/Frameworks/OpenCode Helper (Renderer).app/Contents/MacOS/OpenCode Helper (Renderer)"),
+        candidate("OpenCode Helper", bundle + "/Contents/Frameworks/OpenCode Helper (GPU).app/Contents/MacOS/OpenCode Helper (GPU)"),
+        candidate("OpenCode Helper", bundle + "/Contents/Frameworks/OpenCode Helper (Plugin).app/Contents/MacOS/OpenCode Helper (Plugin)"),
+    ]
+    for helper in helpers {
+        try check(SystemServices.knownProtected(helper), "blanket agent/bundle classification disappeared")
+        try check(owned(helper), "app-owned helper was not recognized")
+        try check(!guarded(helper), "app-owned helper still required the terminal route")
+    }
+    let foreign = candidate("OpenCode Helper (Renderer)", "/Applications/Other.app/Contents/MacOS/OpenCode Helper (Renderer)")
+    try check(!owned(foreign) && guarded(foreign), "a foreign helper was exempted from the terminal route")
+    let prefixed = candidate("OpenCode Helper (Renderer)", "/Applications/OpenCode.app.backup/Contents/MacOS/OpenCode Helper (Renderer)")
+    try check(!owned(prefixed) && guarded(prefixed), "a similarly named bundle was mistaken for the target")
+    let escaped = candidate("OpenCode Helper (Renderer)", bundle + "/Contents/../../Evil.app/Contents/MacOS/OpenCode Helper (Renderer)")
+    try check(!owned(escaped) && guarded(escaped), "path traversal escaped the target bundle")
+    for agent in [
+        candidate("node", "/usr/local/bin/node"),
+        candidate("node", bundle + "/Contents/Resources/node"),
+        candidate("codex", bundle + "/Contents/MacOS/codex"),
+        candidate("opencode", bundle + "/Contents/Resources/bin/opencode"),
+        candidate("python3", "/usr/local/bin/python3"),
+    ] {
+        try check(SystemServices.knownProtected(agent), "hosted agent name lost protection")
+        try check(!owned(agent) && guarded(agent), "a hosted agent inside the bundle was exempted")
+    }
+    let ttyHelper = candidate("OpenCode Helper ", helpers[2].path, tty: true)
+    try check(!owned(ttyHelper) && guarded(ttyHelper), "a TTY helper was exempted from the terminal route")
+    let unknownPath = candidate("OpenCode Helper ", nil)
+    try check(!owned(unknownPath) && guarded(unknownPath), "an incomplete helper identity was exempted")
+    let firmlink = candidate("OpenCode", "/System/Volumes/Data" + main)
+    try check(owned(firmlink), "the data-volume firmlink form of the main executable was rejected")
+    try check(!owned(mainRecord, executablePath: ""), "a missing main executable identity was exempted")
+    try check(!owned(mainRecord, bundlePath: "/Applications/OpenCode"),
+              "a non-bundle directory was mistaken for an application bundle")
+    try check(!guarded(row(20, parent: 1, name: "OpenCode", path: main)),
+              "the target application itself required the descendant terminal route")
+    print("app-owned helper exemption checks passed; blanket agent/TTY/incomplete blocks intact")
+}
+
+@MainActor
 func runFixture() throws {
     try acquisitionFixture()
     try guardedAcquisitionFixture()
+    try appOwnedHelperFixture()
     let worker = row(10, parent: 11, name: "KiraBridge", path: "/private/KiraBridge")
     let core = row(11, parent: 12, name: "Python", path: "/opt/python3")
     let ancestor = row(12, name: "Supervisor", path: "/private/Supervisor")
