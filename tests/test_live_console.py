@@ -1,51 +1,45 @@
-"""KiraBridge Live page and authorized control endpoint expose the same projection."""
+"""KiraBridge Live page and the authorized control endpoint expose the real projection.
+
+The console endpoint runs the real ``project()``/``logs.live`` path; only the
+daemon socket transport is replaced with an in-process call, so a regression that
+stops projecting or drops the capability check fails here.
+"""
+
+from types import SimpleNamespace
 
 import httpx
 from test_keyboard_console import console
 
 from kirabridge.approval_console import ORIGIN
+from kirabridge.live_status import project
 
-PROJECTION = {
-    "ok": True,
-    "observed_at": 1700000000.0,
-    "count": 1,
-    "truncated": False,
-    "counts": {"working": 1},
-    "agents": [
-        {
-            "task_id": "t1",
-            "agent": "codex",
-            "family": "codex",
-            "transport": "codex",
-            "operation": "agent.execute",
-            "state": "working",
-            "step": "working",
-            "observed_at": 1700000000.0,
-            "age_seconds": 1.0,
-            "stale": False,
-            "unknown": False,
-            "source": "live_observation",
-        }
-    ],
-    "summary_text": "codex · working · working · t1",
-    "scope": "read-only live projection",
-}
+STABLE = ("task_id", "principal", "family", "state", "step", "source")
 
 
-def _console(bridge, config, monkeypatch):
+def _app(bridge, config, monkeypatch):
     app, _, _, headers = console(bridge, config, monkeypatch)
+    service = app.control_center.service
 
-    async def live_rpc(name, **_kwargs):
+    async def call(name, **_kwargs):
         if name == "live_status":
-            return PROJECTION
+            return project(bridge, "local")
         raise AssertionError(name)
 
-    monkeypatch.setattr(app.control_center.service, "rpc", live_rpc)
+    async def rpc(*args, **kwargs):
+        return await service.daemon.call(*args, **kwargs)
+
+    # The shared test helper replaces rpc with a keyboard fixture; restore the
+    # real daemon path so this test exercises project()/logs.live, not a mock.
+    service.daemon = SimpleNamespace(call=call)
+    service.rpc = rpc
+    if "logs.live" not in config.principals["local"].capabilities:
+        config.principals["local"].capabilities.append("logs.live")
     return app, headers
 
 
-async def test_live_page_assets_and_authorized_endpoint(bridge, config, monkeypatch):
-    app, headers = _console(bridge, config, monkeypatch)
+async def test_live_page_assets_and_real_projection(bridge, config, monkeypatch):
+    app, headers = _app(bridge, config, monkeypatch)
+    bridge.live_logs.open("t1", "local", operation="agent.execute", agent="codex")
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         page = await client.get("/live", headers=headers)
         assert page.status_code == 200 and "KiraBridge Live" in page.text
@@ -53,6 +47,18 @@ async def test_live_page_assets_and_authorized_endpoint(bridge, config, monkeypa
         assert (await client.get("/live.css", headers=headers)).status_code == 200
         assert (await client.get("/api/control/live")).status_code == 401
         result = await client.get("/api/control/live", headers=headers)
+        direct = project(bridge, "local")
         assert result.status_code == 200
-        assert result.json()["agents"][0]["family"] == "codex"
-        assert result.json()["summary_text"] == PROJECTION["summary_text"]
+        assert [{k: a[k] for k in STABLE} for a in result.json()["agents"]] == [
+            {k: a[k] for k in STABLE} for a in direct["agents"]
+        ]
+        assert result.json()["summary_text"] == direct["summary_text"]
+
+
+async def test_console_live_endpoint_denies_without_the_capability(bridge, config, monkeypatch):
+    app, headers = _app(bridge, config, monkeypatch)
+    config.principals["local"].capabilities.remove("logs.live")
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        denied = await client.get("/api/control/live", headers=headers)
+        assert denied.status_code == 503
+        assert denied.json()["error"]["code"] == "forbidden"

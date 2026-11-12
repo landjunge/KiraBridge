@@ -75,6 +75,14 @@
     }
     const at = new Date((value.observed_at || 0) * 1000);
     observed.textContent = `beobachtet ${at.toLocaleTimeString()}`;
+    const excluded = value.excluded_principals || [];
+    const scope = document.getElementById("live-scope");
+    if (scope) {
+      scope.textContent =
+        `Beobachtet: ${(value.observed_principals || []).join(", ")}` +
+        (excluded.length ? ` · nicht beobachtet: ${excluded.join(", ")}` : "") +
+        ` · ${value.text_scope || "nur lesende Live-Anzeige."}`;
+    }
   }
 
   refresh();
