@@ -886,7 +886,7 @@ async def serve(path):
                     last_summary = summary
                     await asyncio.sleep(0)  # let a pending stop signal run (see worker reports)
                 current_status["observed_at"] = time.time()
-                save(cfg.state_path / "status.json", current_status)
+                save(cfg.state_path / "status.json", current_status, durable=True)
                 if stop.is_set():
                     break
                 try:

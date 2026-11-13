@@ -131,7 +131,14 @@ def runtime(monkeypatch):
 
 
 async def exercise_loop(
-    runtime, tmp_path, monkeypatch, observations, *, result_state="sent", crash=False
+    runtime,
+    tmp_path,
+    monkeypatch,
+    observations,
+    *,
+    result_state="sent",
+    crash=False,
+    status_writes=None,
 ):
     """Run actual serve iterations against in-memory work, without agents or transports."""
     loop = asyncio.get_running_loop()
@@ -174,6 +181,8 @@ async def exercise_loop(
             self.completions = SimpleNamespace(wait=self.wait)
 
         async def wait(self, *args, **kwargs):
+            # Observe the completed iteration, independent of how it persists.
+            snapshots.append(json.loads((cfg.state_path / "status.json").read_text()))
             if current["index"] == len(observations) - 1:
                 handlers[signal.SIGTERM]()
             await asyncio.sleep(0)
@@ -262,9 +271,13 @@ async def exercise_loop(
     original_save = runtime.save
 
     def save(path, value, **kwargs):
+        if path.name == "status.json" and value.get("reporting"):
+            # Replacing a durable receipt file with an unsynced new inode
+            # would discard the earlier power-loss guarantee.
+            assert kwargs.get("durable") is True
         original_save(path, value, **kwargs)
-        if path.name == "status.json" and not kwargs.get("durable"):
-            snapshots.append(json.loads(path.read_text()))
+        if path.name == "status.json" and status_writes is not None:
+            status_writes.append((kwargs.get("durable"), json.loads(path.read_text())))
 
     monkeypatch.setattr(runtime, "Bridge", Bridge)
     monkeypatch.setattr(runtime, "socket", SimpleNamespace(socket=Socket))
@@ -542,3 +555,23 @@ async def test_new_semantic_change_preserves_previous_unknown_identity(
     assert unresolved[first_worker]["report_id"] == first_worker
     assert unresolved[first_worker]["automatic_retry"] is False
     assert snapshots[-1]["reporting"]["workers"]["work-a"]["report_id"] != first_worker
+
+
+@pytest.mark.asyncio
+async def test_polling_replacements_keep_report_receipts_durable(runtime, tmp_path, monkeypatch):
+    writes = []
+    observations = [{"state": state(), "workers": [work()]} for _ in range(3)]
+    reports, snapshots = await exercise_loop(
+        runtime, tmp_path, monkeypatch, observations, status_writes=writes
+    )
+    assert len(reports) == 2
+    assert len(snapshots) == 3
+    # Two reservations plus all three completed polling observations replace
+    # the same file. Every replacement must retain the durability guarantee.
+    assert len(writes) == 5
+    assert all(durable for durable, _ in writes)
+    identities = {row["report_id"] for row in snapshots[0]["reporting"]["workers"].values()}
+    identities.add(snapshots[0]["reporting"]["coordinator"]["report_id"])
+    for _, saved in writes[2:]:
+        rows = list(saved["reporting"]["workers"].values()) + [saved["reporting"]["coordinator"]]
+        assert {row["report_id"] for row in rows} == identities
