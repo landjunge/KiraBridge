@@ -5,8 +5,12 @@ import asyncio
 import json
 import logging
 import os
+import signal
+import socket
 import sys
+import threading
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -20,6 +24,87 @@ from kirabridge.bridge_core.models import BridgeError, State, TaskRequest, Uncer
 
 def emit(value, *, stream=None):
     print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout, flush=True)
+
+
+class _BridgeSignalHandling:
+    """Keep Uvicorn's graceful stop inside Bridge's async context."""
+
+    @contextmanager
+    def capture_signals(self):
+        if threading.current_thread() is not threading.main_thread():
+            yield
+            return
+        signals = [signal.SIGINT, signal.SIGTERM]
+        sigbreak = getattr(signal, "SIGBREAK", None)
+        if sigbreak is not None:
+            signals.append(sigbreak)
+        original_handlers = {}
+        try:
+            for signum in signals:
+                original_handlers[signum] = signal.signal(signum, self._request_shutdown)
+            yield
+        finally:
+            for signum, handler in original_handlers.items():
+                signal.signal(signum, handler)
+
+    def _request_shutdown(self, signum, _frame):
+        if self.should_exit and signum == signal.SIGINT:
+            self.force_exit = True
+        else:
+            self.should_exit = True
+
+
+def _bind_http_listener(config):
+    family = socket.AF_INET6 if ":" in config.host else socket.AF_INET
+    listener = socket.socket(family=family, type=socket.SOCK_STREAM)
+    try:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind((config.host, config.port))
+        listener.set_inheritable(True)
+    except OSError as exc:
+        listener.close()
+        raise BridgeError("bind_failed", "Unable to bind the configured HTTP listener") from exc
+    return listener
+
+
+async def _serve_http(config, principal):
+    # Bind before Bridge starts its dispatcher, so a port conflict cannot claim queued work.
+    listener = _bind_http_listener(config)
+    bridge = None
+    entered = False
+    try:
+        bridge = Bridge(config)
+        import uvicorn
+
+        from kirabridge.mcp_gateway.http import create_http_app
+
+        server_type = type("KiraBridgeUvicornServer", (_BridgeSignalHandling, uvicorn.Server), {})
+        server = server_type(
+            uvicorn.Config(
+                create_http_app(bridge),
+                host=config.host,
+                port=config.port,
+                ssl_certfile=config.tls_cert,
+                ssl_keyfile=config.tls_key,
+                access_log=False,
+                log_level="critical",
+                limit_concurrency=config.max_http_requests,
+                timeout_keep_alive=5,
+            )
+        )
+        async with bridge:
+            entered = True
+            await server.serve(sockets=[listener])
+    finally:
+        listener.close()
+        if bridge is not None and not entered:
+            try:
+                await bridge.system_modules.close()
+            finally:
+                try:
+                    await bridge.threaddesk.close()
+                finally:
+                    bridge.store.close()
 
 
 def parse_request(path: str) -> TaskRequest:
@@ -436,33 +521,15 @@ async def execute(args) -> None:
 
         load_service_credentials(config)
         config.validate_network()
+        await _serve_http(config, args.principal)
+        return
     bridge = Bridge(config)
     try:
         if args.command == "serve":
             from kirabridge.mcp_gateway.server import create_server
 
             async with bridge:
-                if args.transport == "stdio":
-                    await create_server(bridge, principal=args.principal).run_stdio_async()
-                else:
-                    import uvicorn
-
-                    from kirabridge.mcp_gateway.http import create_http_app
-
-                    server = uvicorn.Server(
-                        uvicorn.Config(
-                            create_http_app(bridge),
-                            host=config.host,
-                            port=config.port,
-                            ssl_certfile=config.tls_cert,
-                            ssl_keyfile=config.tls_key,
-                            access_log=False,
-                            log_level="critical",
-                            limit_concurrency=config.max_http_requests,
-                            timeout_keep_alive=5,
-                        )
-                    )
-                    await server.serve()
+                await create_server(bridge, principal=args.principal).run_stdio_async()
             return
         if args.command == "grant":
             request = parse_request(args.request)
