@@ -21,6 +21,36 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+
+def acceptance_environment(environ=None):
+    """Copy the child environment without credentials for another installation."""
+    # Keep this script standalone: native acceptance hosts copy it on its own.
+    legacy = {"CHATGPT_TOKEN", "LOCAL_TOKEN", "CODEX_TOKEN", "GROK_TOKEN"}
+    return {
+        key: value
+        for key, value in (os.environ if environ is None else environ).items()
+        if key not in legacy and not (key.startswith("KIRABRIDGE_") and key.endswith("_TOKEN"))
+    }
+
+
+def isolate_installer_environment(installer):
+    """Scope the imported installer's CLI children to this acceptance run."""
+    installer_run = installer.run
+
+    def isolated_run(argv, **kwargs):
+        if "env" not in kwargs:
+            # Preserve installer.run's existing Python-environment isolation.
+            kwargs["env"] = {
+                key: value
+                for key, value in os.environ.items()
+                if key not in {"PYTHONPATH", "PYTHONHOME", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV"}
+            }
+        kwargs["env"] = acceptance_environment(kwargs.get("env"))
+        return installer_run(argv, **kwargs)
+
+    installer.run = isolated_run
+
+
 # Fixed helper source: credentials are loaded only from the isolated config and
 # never enter argv, stdout, stderr or evidence. This client performs reads only.
 HOLD_COMPLETION = r"""
@@ -218,6 +248,7 @@ def stop_test_service(service):
 
 
 def run(argv, **kwargs):
+    kwargs["env"] = acceptance_environment(kwargs.get("env"))
     result = subprocess.run(argv, text=True, capture_output=True, timeout=240, **kwargs)
     if result.returncode:
         raise RuntimeError(
@@ -269,6 +300,7 @@ def accept(
     )
     installer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(installer)
+    isolate_installer_environment(installer)
     label = "com.kirabridge.test." + root.name.lower().replace("_", "-")
     installer.LABEL = label
     service = f"gui/{os.getuid()}/{label}"
@@ -384,7 +416,7 @@ def accept(
 
     scratch = root / "scratch"
     scratch.mkdir(mode=0o700)
-    test_env = dict(os.environ, TMPDIR=str(scratch))
+    test_env = acceptance_environment(dict(os.environ, TMPDIR=str(scratch)))
 
     def health(expected, prior_pid=None):
         deadline = time.monotonic() + 40
