@@ -1,10 +1,16 @@
 # Sieben Werkzeuge · Fortsetzung am 19.10.2026
 
-Fortgesetzter Auftrag `seven-tools-build-20261018-1833`. Keine neue Produktfusion,
-kein öffentlicher KiraBridge-Release und keine Discussion. Maßgeblicher Paketstatus
-bleibt ausschließlich [status.json](seven-tools-build-20261018-1833/status.json),
-mit daraus gerendertem [MASTERPLAN](seven-tools-build-20261018-1833/MASTERPLAN.md).
+Historischer Prüfbericht zum Auftrag `seven-tools-build-20261018-1833` vom
+19.10.2026. Die folgenden Quell-, Laufzeit- und Testbelege beschreiben diesen
+Zeitpunkt; sie sind keine aktuelle Aufgabenfreigabe oder Paketplanung.
 Kein technischer Prüfnachweis setzt `user_accepted=true`.
+
+Aktuelle Planung und Paketstatus werden ausschließlich in ThreadDesk geführt:
+Hauptplan `7fb455b083f7`, Arbeitsboard `188ce4729a62`. Die alten Plan-/Statuskopien
+wurden aus dem aktuellen Repository entfernt. Ihr vollständiges unverändertes
+Archiv `kirabridge-legacy-plan-mirrors-20261113.zip` liegt als Datei
+`bb32567e949c` am Arbeitsboard. Die Git-Historie und die technischen Belege unten
+bleiben erhalten.
 
 ## Tatsächlich laufender Bridge-Anschluss
 
