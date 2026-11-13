@@ -1,4 +1,4 @@
-> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `6b5b73b9de36` (Master mit Etappen E01–E09; Status im Board `188ce4729a62`; Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+> **Technische Betriebsbeschreibung des Koordinatoradapters. Planung und Aufgabenstände werden ausschließlich in den bestehenden ThreadDesk-Boards geführt; dieses Dokument enthält keinen Plan-Spiegel.**
 
 # Big Plan · Codex-Koordinatorloop
 
@@ -38,7 +38,30 @@ Der Loop fragt im Leerlauf alle5 Sekunden nur das lokale Freigabeprofil ab; es e
 
 ## Berichte und Kira
 
-Der Koordinator berichtet mindestens alle60 Sekunden seinen tatsächlich beobachteten Zustand und angenommene Aufgaben. Jede gestartete Work-ID erhält ein eigenes Berichtsboard für Codex, Grok oder Codex-Verifier. Die Workerberichte sind ausdrücklich Zustandsbeobachtungen des Koordinators; sie erfinden keine Eigenmeldung oder unabhängige Abnahme. Modelltexte und Rohtranskripte werden nicht automatisch in die zentrale Übersicht kopiert.
+Quelländerung 13.11.2026: Der Koordinator meldet nur fachliche Änderungen an
+Koordinator- oder Workerzustand. Unveränderte Arbeitsstände, Leerlauf und bloßer
+Zeitablauf erzeugen keine weiteren Reportaufrufe. Technische Beobachtungen im
+bestehenden lokalen `status.json` werden weiter aktualisiert. Pollzeitpunkte,
+Lease-/Kontingentdetails und andere volatile Metadaten sind kein fachlicher
+Fortschritt. Blockaden, Zustandswechsel und neue Ergebnisse bleiben sichtbar. Große Listen
+werden mit Anzahl, Zustandsreferenz und wenigen Beispielen zusammengefasst; auch
+eine Änderung hinter der Vorschaugrenze verändert die sichtbare Meldung.
+
+Meldeversuche erhalten eine stabile Kennung und werden vor dem Aufruf im bestehenden
+profilgebundenen Status reserviert. Ein Neustart wiederholt unveränderte Versuche
+nicht; ein unklarer Ausgang bleibt unbekannt und wird nicht mit neuer Kennung
+ersetzt. Bei einer neuen fachlichen Beobachtung bleibt der frühere unbekannte
+Versuch unter seiner Originalkennung in `reporting.unresolved` erhalten.
+Alte oder beschädigte Zustandsdateien benötigen ausdrücklich geklärten
+Abgleich. Die Workerberichte sind Beobachtungen des Koordinators, keine erfundenen
+Eigenmeldungen oder unabhängigen Abnahmen. Rohtranskripte bleiben außerhalb der
+Berichte. Die zentrale ThreadDesk-Verdichtung ist zusätzlich nötig, damit andere
+Aufrufer keine Instanzboards oder unveränderte Historie erzeugen.
+
+Quellpatch, installierter Reportadapter und laufender Supervisor sind getrennte
+Stände. Diese Änderung stellt keinen laufenden Dienst um. Vor Aktivierung müssen
+der genaue Quellpin, Profil-/Statuskompatibilität, Datenerhalt und die kompatible
+ThreadDesk-Berichtsruntime geprüft sein.
 
 Kira liest `get_thread` für die bestehende Agentenübersicht `3e706958488c`: Notes enthalten den lesbaren Stand und JSON. Wie beim Berichtssystem gilt180 Sekunden als Veraltungsgrenze. Gesonderte Quellen-/Corebelege liegen in den bestehenden AutoNext-/Team-Receipts und im dedizierten Profil. Ein alter abgeschlossener Workerbericht bleibt abgeschlossen, ist aber keine aktuelle Liveness-Meldung.
 
@@ -56,7 +79,7 @@ The dedicated local Codex coordinator reuses existing AutoNext claims, TeamWork,
 
 The existing production daemon, visible terminal bindings and default route remain untouched. Dedicated workers explicitly select the managed route through sealed team assignments. No additional task queue or model-invented authorization is introduced. UNKNOWN, negative reviews, failed/interrupted checks, changed sources or missing subscription evidence stop advancement without replay. Idle monitoring makes no model requests.
 
-Use `bigplan-loop status` and `bigplan-loop approve --entry-id EXACT_APPROVED_ENTRY`. Cards must match the fixed isolated profile. New approved batches are loaded after the previous batch completes. Each worker and the coordinator report through the existing central agent overview. Tests using deterministic native CLI fixtures are distinguished from actual provider acceptance. Installation details and evidence are recorded in shared Big Plan references.
+Use `bigplan-loop status` and `bigplan-loop approve --entry-id EXACT_APPROVED_ENTRY`. Cards must match the fixed isolated profile. New approved batches are loaded after the previous batch completes. Workers and the coordinator report substantive changes through the existing central agent overview. Current local observations remain fresh without minute-by-minute report calls. Report attempts are reserved under stable IDs in the existing profile-bound status before sending; restart never automatically replays unchanged or uncertain attempts. The source patch does not update running services. Tests using deterministic native CLI fixtures are distinguished from actual provider acceptance. Installation details and evidence are recorded in shared Big Plan references.
 
 ## Lokale Abnahme und Betrieb am 05.11.2026
 

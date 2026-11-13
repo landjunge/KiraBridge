@@ -8,6 +8,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import secrets
 import signal
 import socket
@@ -74,12 +75,22 @@ def load_profile(path):
     return LoopProfile.model_validate_json(path.read_text()).model_dump()
 
 
-def save(path, value):
+def save(path, value, *, durable=False):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2))
-    temporary.chmod(0o600)
+    with temporary.open("w") as stream:
+        temporary.chmod(0o600)
+        stream.write(json.dumps(value, ensure_ascii=False, indent=2))
+        if durable:
+            stream.flush()
+            os.fsync(stream.fileno())
     temporary.replace(path)
+    if durable:
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
 
 
 def fixed_profile(profile):
@@ -323,10 +334,14 @@ def configuration(profile):
     )
 
 
-def report(profile, done, text, status="working"):
-    report_id = "loop-" + secrets.token_hex(12)
+def report_instance(profile, work_id=None):
+    return profile["instance"] + ("-" + work_id if work_id is not None else "")
+
+
+def report(profile, done, text, status="working", report_id=None):
+    report_id = report_id or "loop-" + secrets.token_hex(12)
     message = {
-        "done": ", ".join(done)[-500:] or "Noch kein Aufgabenabschluss",
+        "done": compact_report_items(done, 500) or "Noch kein Aufgabenabschluss",
         "working": text[:600],
         "next": "Nächste passende bestehende Aufgabe im beauftragten Umfang",
     }
@@ -335,7 +350,7 @@ def report(profile, done, text, status="working"):
             profile["report_cli"],
             "report",
             "--instance",
-            profile["instance"],
+            report_instance(profile),
             "--agent",
             "Codex Loop",
             "--report-id",
@@ -353,8 +368,8 @@ def report(profile, done, text, status="working"):
     )
 
 
-def report_worker(profile, work):
-    report_id = "observe-" + secrets.token_hex(12)
+def report_worker(profile, work, report_id=None):
+    report_id = report_id or "observe-" + secrets.token_hex(12)
     state = work["state"]
     status = (
         "done"
@@ -379,7 +394,7 @@ def report_worker(profile, work):
             profile["report_cli"],
             "report",
             "--instance",
-            profile["instance"] + "-" + work["id"],
+            report_instance(profile, work["id"]),
             "--agent",
             actor,
             "--report-id",
@@ -397,6 +412,143 @@ def report_worker(profile, work):
         ],
         report_id=report_id,
     )
+
+
+def compact_report_items(items, limit):
+    """Bound previews while keeping every substantive long-list change visible."""
+    values = sorted(set(items))
+    text = ", ".join(values)
+    if len(text) <= limit:
+        return text
+    prefix = str(len(values)) + " Einträge / Ref " + digest(values)[:12] + ": "
+    return prefix + text[: limit - len(prefix) - 1] + "…"
+
+
+def worker_report_fingerprint(work):
+    """Only changes in the worker observation warrant a durable report."""
+    return digest({key: work[key] for key in ("id", "assignee", "state", "core_task_id")})
+
+
+def coordinator_report_observation(state, done, intake):
+    """Keep volatile inspect, lease and resource-probe data in status.json only."""
+    resource_stop = (intake or {}).get("resource_stop") or {}
+    mode = (
+        "blocked"
+        if (state["state"] == "stopped" and not intake) or resource_stop
+        else "idle"
+        if state["state"] in ("disabled", "complete", "idle")
+        else "working"
+    )
+    text = "Koordinator: " + state["state"] + " / " + str(state.get("reason"))
+    if "enabled" in state:
+        text += " / aktiviert " + str(state["enabled"])
+    if state.get("grant_id"):
+        text += " / Auftrag " + str(state["grant_id"])
+    if resource_stop:
+        text += " / Ressourcenstopp: " + str(resource_stop.get("reason"))
+        if resource_stop.get("error_type"):
+            text += " (" + str(resource_stop["error_type"]) + ")"
+    held = sorted({(row["task_id"], row["reason"]) for row in (intake or {}).get("held", [])})
+    selected = (intake or {}).get("selected")
+    selected_task = selected["card"].task_id if selected else None
+    if selected_task:
+        text += " / Auswahl " + selected_task
+    if held:
+        text += " / Gehalten: " + compact_report_items(
+            [task + ":" + reason for task, reason in held], 180
+        )
+    done = sorted(set(done))
+    if len(text) > 600:
+        text = text[:560] + " / Ref " + digest(text)[:12]
+    fingerprint = digest({"done": compact_report_items(done, 500), "text": text, "status": mode})
+    return fingerprint, done, text, mode
+
+
+def restore_reporting(path, scope):
+    """Reuse recorded outcomes, including UNKNOWN, instead of retrying at startup."""
+    if not path.exists():
+        return {"coordinator": None, "workers": {}, "unresolved": {}}
+    try:
+        status = json.loads(path.read_text())
+    except (ValueError, OSError) as error:
+        raise RuntimeError("Unreadable saved reporting state; reconcile before restart") from error
+    if not isinstance(status, dict):
+        raise RuntimeError("Invalid saved status object; reconcile before restart")
+    if status.get("reporting_scope") != scope:
+        raise RuntimeError("Saved reporting scope differs or is unknown; reconcile before restart")
+    previous = status.get("reporting")
+    if (
+        not isinstance(previous, dict)
+        or "coordinator" not in previous
+        or not isinstance(previous.get("workers"), dict)
+    ):
+        raise RuntimeError("Invalid saved reporting state; reconcile before restart")
+    if previous.get("coordinator") is not None and not isinstance(previous["coordinator"], dict):
+        raise RuntimeError("Invalid saved coordinator report; reconcile before restart")
+    unresolved = previous.get("unresolved", {})
+    if not isinstance(unresolved, dict):
+        raise RuntimeError("Invalid saved unresolved reports; reconcile before restart")
+    for work_id, row in previous["workers"].items():
+        if not isinstance(row, dict) or row.get("target") != work_id:
+            raise RuntimeError("Saved worker report target differs; reconcile before restart")
+    if previous.get("coordinator") and previous["coordinator"].get("target") is not None:
+        raise RuntimeError("Saved coordinator target differs; reconcile before restart")
+    rows = list(previous["workers"].values()) + list(unresolved.values())
+    if previous.get("coordinator") is not None:
+        rows.append(previous["coordinator"])
+    for row in rows:
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("instance"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", row["instance"])
+            or "target" not in row
+            or not (
+                row["target"] is None
+                or (
+                    isinstance(row["target"], str)
+                    and re.fullmatch(r"[A-Za-z0-9_-]{1,128}", row["target"])
+                )
+            )
+            or not isinstance(row.get("fingerprint"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", row["fingerprint"])
+            or not isinstance(row.get("report_id"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", row["report_id"])
+            or row.get("state") not in ("sent", "unknown", "failed")
+            or row.get("automatic_retry") is not False
+            or not (row.get("error") is None or isinstance(row["error"], str))
+        ):
+            raise RuntimeError("Incomplete saved report receipt; reconcile before restart")
+    return previous
+
+
+def reserve_report(path, reporting, scope, target, fingerprint, instance, *, observation):
+    """Persist UNKNOWN before a subprocess can send; restart never retries it."""
+    report_id = ("loop-" if target is None else "observe-") + secrets.token_hex(12)
+    reservation = {
+        "report_id": report_id,
+        "fingerprint": fingerprint,
+        "target": target,
+        "instance": instance,
+        "state": "unknown",
+        "error": "report_reserved_outcome_unknown",
+        "automatic_retry": False,
+    }
+    previous = reporting["coordinator"] if target is None else reporting["workers"].get(target)
+    if previous and previous["state"] == "unknown":
+        # A genuinely new observation may proceed, but its predecessor stays
+        # explicitly unresolved under its original identity, with no replay.
+        reporting.setdefault("unresolved", {})[previous["report_id"]] = dict(previous)
+    if target is None:
+        reporting["coordinator"] = reservation
+    else:
+        reporting["workers"][target] = reservation
+    status = json.loads(path.read_text()) if path.exists() else {}
+    # status.json is also the public observation boundary. Even the first
+    # pre-send reservation must expose its complete current runtime snapshot.
+    status.update(observation)
+    status.update(reporting=reporting, reporting_scope=scope, observed_at=time.time())
+    save(path, status, durable=True)
+    return report_id
 
 
 def seed(bridge):
@@ -619,10 +771,12 @@ async def serve(path):
     for signum in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(signum, stop.set)
     active_revision = None
-    last_report = 0
-    last_summary = None
-    worker_reports = {}
-    reporting = {"coordinator": None, "workers": {}}
+    reporting_scope = digest(fixed_profile(profile))
+    reporting = restore_reporting(cfg.state_path / "status.json", reporting_scope)
+    last_summary = (reporting["coordinator"] or {}).get("fingerprint")
+    worker_reports = {
+        work_id: row.get("fingerprint") for work_id, row in reporting["workers"].items()
+    }
     team, anchor = seed(bridge)
     if profile.get("continuation"):
         active_revision = restore(bridge, profile)
@@ -648,31 +802,53 @@ async def serve(path):
                 )
                 processed = process_completions(bridge, latest)
                 state = bridge.autonext.inspect()
+                current_status = {
+                    "observed_at": time.time(),
+                    "pid": os.getpid(),
+                    "execution_scope": "separate_managed_session",
+                    "autonext": state,
+                    "completions": processed,
+                    "reporting": reporting,
+                    "reporting_scope": reporting_scope,
+                    "continuation": {
+                        "authority_ref": intake["authority_ref"],
+                        "source_revision": intake["source_revision"],
+                        "held": intake["held"],
+                        "selected_task": intake["selected"]["card"].task_id
+                        if intake["selected"]
+                        else None,
+                        "state": "working" if state["state"] == "waiting" else "watching",
+                        "resource_stop": intake.get("resource_stop"),
+                    }
+                    if intake
+                    else None,
+                }
                 for work in bridge.store.db.execute(
                     "SELECT id,assignee,state,core_task_id FROM team_work WHERE assignee!='local'"
                 ).fetchall():
                     if stop.is_set():
                         break
-                    fingerprint = digest([work["state"], work["core_task_id"]])
-                    previous = worker_reports.get(work["id"])
-                    terminal = work["state"] in (
-                        "completed",
-                        "failed",
-                        "blocked",
-                        "unknown",
-                        "cancelled",
-                    )
-                    if (
-                        previous
-                        and previous[0] == fingerprint
-                        and (terminal or time.monotonic() - previous[1] < 60)
-                    ):
+                    fingerprint = worker_report_fingerprint(work)
+                    if worker_reports.get(work["id"]) == fingerprint:
                         continue
                     row = dict(work)
-                    reporting["workers"][row["id"]] = await asyncio.to_thread(
-                        report_worker, profile, row
+                    report_id = reserve_report(
+                        cfg.state_path / "status.json",
+                        reporting,
+                        reporting_scope,
+                        row["id"],
+                        fingerprint,
+                        report_instance(profile, row["id"]),
+                        observation=current_status,
                     )
-                    worker_reports[row["id"]] = (fingerprint, time.monotonic())
+                    outcome = await asyncio.to_thread(report_worker, profile, row, report_id)
+                    reporting["workers"][row["id"]] = {
+                        **reporting["workers"][row["id"]],
+                        **outcome,
+                        "report_id": report_id,
+                        "fingerprint": fingerprint,
+                    }
+                    worker_reports[row["id"]] = fingerprint
                     # A stop signal queued from another thread may not have run yet when the
                     # report thread returns; let it run before deciding to start another report.
                     await asyncio.sleep(0)
@@ -682,51 +858,35 @@ async def serve(path):
                         "SELECT task_id FROM autonext_items WHERE state='completed' ORDER BY rowid"
                     )
                 ]
-                summary = digest([state, done])
-                if not stop.is_set() and (
-                    time.monotonic() - last_report >= 60 or summary != last_summary
-                ):
-                    mode = (
-                        "blocked"
-                        if (state["state"] == "stopped" and not intake)
-                        or (intake and intake.get("resource_stop"))
-                        else "idle"
-                        if state["state"] in ("disabled", "complete", "idle")
-                        else "working"
+                summary, done, text, mode = coordinator_report_observation(state, done, intake)
+                if not stop.is_set() and summary != last_summary:
+                    report_id = reserve_report(
+                        cfg.state_path / "status.json",
+                        reporting,
+                        reporting_scope,
+                        None,
+                        summary,
+                        report_instance(profile),
+                        observation=current_status,
                     )
-                    reporting["coordinator"] = await asyncio.to_thread(
+                    outcome = await asyncio.to_thread(
                         report,
                         profile,
                         done,
-                        "Koordinator: " + state["state"] + " / " + str(state.get("reason")),
+                        text,
                         mode,
+                        report_id,
                     )
-                    last_report = time.monotonic()
+                    reporting["coordinator"] = {
+                        **reporting["coordinator"],
+                        **outcome,
+                        "report_id": report_id,
+                        "fingerprint": summary,
+                    }
                     last_summary = summary
                     await asyncio.sleep(0)  # let a pending stop signal run (see worker reports)
-                save(
-                    cfg.state_path / "status.json",
-                    {
-                        "observed_at": time.time(),
-                        "pid": os.getpid(),
-                        "execution_scope": "separate_managed_session",
-                        "autonext": state,
-                        "completions": processed,
-                        "reporting": reporting,
-                        "continuation": {
-                            "authority_ref": intake["authority_ref"],
-                            "source_revision": intake["source_revision"],
-                            "held": intake["held"],
-                            "selected_task": intake["selected"]["card"].task_id
-                            if intake["selected"]
-                            else None,
-                            "state": "working" if state["state"] == "waiting" else "watching",
-                            "resource_stop": intake.get("resource_stop"),
-                        }
-                        if intake
-                        else None,
-                    },
-                )
+                current_status["observed_at"] = time.time()
+                save(cfg.state_path / "status.json", current_status, durable=True)
                 if stop.is_set():
                     break
                 try:
