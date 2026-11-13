@@ -116,6 +116,26 @@ class AccessibilitySetInput(AccessibilityElementInput):
         return self
 
 
+class MouseMoveInput(Input):
+    x: int | float = Field(ge=-100000, le=100000, allow_inf_nan=False)
+    y: int | float = Field(ge=-100000, le=100000, allow_inf_nan=False)
+
+
+class MouseClickInput(MouseMoveInput):
+    button: Literal["left", "right"] = "left"
+
+
+class MouseScrollInput(Input):
+    dx: int = Field(default=0, ge=-1000, le=1000)
+    dy: int = Field(default=0, ge=-1000, le=1000)
+
+    @model_validator(mode="after")
+    def non_zero_delta(self):
+        if self.dx == 0 and self.dy == 0:
+            raise ValueError("Scroll requires a non-zero wheel delta")
+        return self
+
+
 CONTROL_INPUTS = {
     "system.info": SystemInfoInput,
     "system.permissions": SystemInfoInput,
@@ -130,4 +150,7 @@ CONTROL_INPUTS = {
     "accessibility.inspect": AccessibilityInspectInput,
     "accessibility.action": AccessibilityActionInput,
     "accessibility.set": AccessibilitySetInput,
+    "mouse.move": MouseMoveInput,
+    "mouse.click": MouseClickInput,
+    "mouse.scroll": MouseScrollInput,
 }

@@ -36,6 +36,7 @@ def build(destination=None):
         root / "integrations/desktop/SystemKeyboard.swift",
         root / "integrations/desktop/SystemShortcuts.swift",
         root / "integrations/desktop/SystemSpecialKeys.swift",
+        root / "integrations/desktop/SystemMouse.swift",
     ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +100,7 @@ def build(destination=None):
                 ).hexdigest(),
                 "KiraBridgeSystemProtocol": 1,
                 "KiraBridgeKeyboardProtocol": 1,
+                "KiraBridgeMouseProtocol": 1,
                 "CFBundlePackageType": "APPL",
                 "NSHighResolutionCapable": True,
                 "LSMinimumSystemVersion": "12.0",

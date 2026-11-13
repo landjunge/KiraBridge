@@ -15,6 +15,9 @@ DESKTOP_EFFECT_OPERATIONS = frozenset(
         "windows.focus",
         "accessibility.action",
         "accessibility.set",
+        "mouse.move",
+        "mouse.click",
+        "mouse.scroll",
     }
 )
 
