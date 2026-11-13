@@ -147,3 +147,79 @@ def test_http_cli_sigterm_runs_bridge_shutdown(tmp_path):
         if process.poll() is None:
             process.kill()
             process.communicate(timeout=5)
+
+
+def _close_listeners(listeners):
+    for listener in listeners:
+        listener.close()
+
+
+def test_bind_http_listener_literal_ipv4_stays_ipv4_only():
+    listeners = cli._bind_http_listener(SimpleNamespace(host="127.0.0.1", port=0))
+    try:
+        assert [listener.family for listener in listeners] == [socket.AF_INET]
+        assert listeners[0].getsockname()[0] == "127.0.0.1"
+    finally:
+        _close_listeners(listeners)
+
+
+def test_bind_http_listener_reserves_resolved_localhost_families():
+    expected = set()
+    for family, socktype, protocol, _canonname, sockaddr in socket.getaddrinfo(
+        "localhost", 0, type=socket.SOCK_STREAM
+    ):
+        if family not in {socket.AF_INET, socket.AF_INET6}:
+            continue
+        probe = None
+        try:
+            probe = socket.socket(family, socktype, protocol)
+            if family == socket.AF_INET6 and hasattr(socket, "IPV6_V6ONLY"):
+                probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            probe.bind(sockaddr)
+        except OSError:
+            continue
+        else:
+            expected.add(family)
+        finally:
+            if probe is not None:
+                probe.close()
+    assert expected
+    listeners = cli._bind_http_listener(SimpleNamespace(host="localhost", port=0))
+    try:
+        assert {listener.family for listener in listeners} == expected
+    finally:
+        _close_listeners(listeners)
+
+
+def test_localhost_bind_fails_when_ipv4_port_is_occupied():
+    occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    occupied.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    occupied.bind(("127.0.0.1", 0))
+    occupied.listen(1)
+    try:
+        with pytest.raises(BridgeError) as error:
+            cli._bind_http_listener(
+                SimpleNamespace(host="localhost", port=occupied.getsockname()[1])
+            )
+        assert error.value.code == "bind_failed"
+    finally:
+        occupied.close()
+
+
+def test_bind_http_listener_literal_ipv6_loopback():
+    probe = None
+    try:
+        probe = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        probe.bind(("::1", 0))
+    except OSError:
+        pytest.skip("IPv6 loopback is unavailable")
+    finally:
+        if probe is not None:
+            probe.close()
+    listeners = cli._bind_http_listener(SimpleNamespace(host="::1", port=0))
+    try:
+        assert [listener.family for listener in listeners] == [socket.AF_INET6]
+        assert listeners[0].getsockname()[0] == "::1"
+    finally:
+        _close_listeners(listeners)
