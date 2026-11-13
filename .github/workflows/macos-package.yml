@@ -40,6 +40,7 @@ jobs:
           uv run python scripts/accept_macos_release.py dist/candidate
           --root dist/accept-ci-rc15
           --previous-wheel dist/previous/kirabridge-0.8.0rc49-py3-none-any.whl
+          --previous-commit edc44290831b5b79e5d1f64238bcf09e4fe8b85a
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: KiraBridge-macos-${{ matrix.os }}

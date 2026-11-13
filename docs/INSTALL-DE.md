@@ -1,9 +1,9 @@
-# KiraBridge installieren und aktualisieren · 0.8.0rc36
+# KiraBridge installieren und aktualisieren · 0.8.0rc49
 
 [English](INSTALL-EN.md) · [README](../README.de.md)
 
-Die [veröffentlichte Intel-Vorabversion](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) stammt vom 4. November 2026.
-Ihr Code ist auf `d4aebdd89a206045731f2692a3f363fddaa15ee0` festgelegt.
+Die [veröffentlichte Intel-Vorabversion](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49)
+ist auf `edc44290831b5b79e5d1f64238bcf09e4fe8b85a` festgelegt.
 [Release- und Downloadprüfung](evidence/readme-current-20261107.json).
 Diese Anleitung installiert dieses veröffentlichte Paket. Die getrennt installierte
 lokale RC40-Laufzeit bei `d12838a` ist ein späterer Quellbuild ohne veröffentlichten RC40-Download.
@@ -25,14 +25,14 @@ Keine Tokens kopieren.
 
 ## Installation / Update
 
-1. Lade **KiraBridge-0.8.0rc36-Intel-Installer.zip** aus der [README](../README.de.md)
+1. Lade **KiraBridge-macos.tar.gz** aus der [README](../README.de.md)
    herunter und entpacke es vollständig. Das Release bietet `SHA256SUMS` zur Prüfung.
-2. Öffne `KiraBridge-Installer.app`, bestätige und folge der sichtbaren
+2. Führe das enthaltene `install.sh` aus, bestätige und folge der sichtbaren
    Terminalinstallation. Keine arbeitende Codex-/Grok-Sitzung als Installationsfenster verwenden.
 3. Der Installer aktualisiert Dienst und Desktop-App gemeinsam und erstellt eine
    Rückfallsicherung. Öffne nach erfolgreichem Abschluss `KiraBridge.app` in `~/Applications`.
 
-Das ZIP enthält das App-/Dienstpaket; Python und uv bleiben Voraussetzungen.
+Das Archiv enthält das App-/Dienstpaket; Python und uv bleiben Voraussetzungen.
 Python 3.11 und uv 0.11.6 müssen vorher im Terminal verfügbar sein. Der Installer verbindet kein ChatGPT-Konto automatisch.
 Nur bei fehlender Verbindung im lokalen Terminal
 `~/.local/bin/kirabridge chatgpt setup --language de` starten und der
@@ -41,7 +41,7 @@ Nur bei fehlender Verbindung im lokalen Terminal
 Für dieselbe App-/Dienstinstallation im Terminal ist der authentifizierte Bootstrap verfügbar:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc36 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --desktop --require-visible-terminal --language de)
+d=$(mktemp -d) && gh release download v0.8.0rc49 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --desktop --require-visible-terminal --language de)
 ```
 
 Er lädt den Installer als Datei, prüft ihn und anschließend das festgelegte
