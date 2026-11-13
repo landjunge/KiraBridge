@@ -55,12 +55,21 @@ async def limited_body(request: Request) -> bytes:
 
 
 class ApprovalConsole:
-    def __init__(self, application: OperatorApplication, key: str, *, origin: str | None = None):
+    def __init__(
+        self,
+        application: OperatorApplication,
+        key: str,
+        *,
+        origin: str | None = None,
+        live_only: bool = False,
+    ):
         if len(key) < 32:
             raise BridgeError("unsafe_credentials", "Console credential is too short")
         self.application, self.key = application, key
         self.instance = secrets.token_hex(16)
         self.used_tickets: dict[str, float] = {}
+        self.live_only = bool(live_only)
+        self.live_status = getattr(application, "live_status", None)
         self.set_origin(origin or ORIGIN)
         self.app = Starlette(
             exception_handlers={BridgeError: self.error},
@@ -97,6 +106,23 @@ class ApprovalConsole:
                 Route("/api/tasks/{task_id}/{decision}", self.decide, methods=["POST"]),
             ],
         )
+        if self.live_only:
+            # The isolated Live console exposes exactly the private login, health,
+            # live page/assets and the read-only live projection. No operator,
+            # approval, keyboard, service or connector handlers are mounted, so
+            # no request can reach an action, reservation or subprocess path.
+            self.app.router.routes = [
+                Route("/health", self.health),
+                Route("/login", self.login, methods=["POST"]),
+                Route("/", self.live_page),
+                Route("/live", self.live_page),
+                Route("/login.js", self.asset),
+                Route("/networkpunkt.css", self.asset),
+                Route("/live.js", self.asset),
+                Route("/live.css", self.asset),
+                Route("/api/control/live", self.live),
+            ]
+            return
         from kirabridge.team_console import TeamConsole
 
         self.team_console = TeamConsole(application.team, self.authenticate)
@@ -189,6 +215,21 @@ class ApprovalConsole:
             raise BridgeError("unauthorized", "Open the console from this Mac")
         if request.method == "POST" and request.headers.get("origin") != self.origin:
             raise BridgeError("csrf", "A local browser decision is required")
+
+    async def live_page(self, request: Request):
+        return HTMLResponse((ASSETS / "live.html").read_text())
+
+    async def live(self, request: Request):
+        self.authenticate(request)
+        if self.live_status is None:
+            raise BridgeError("not_found", "Live status is not available")
+        try:
+            return JSONResponse(await self.live_status())
+        except BridgeError as exc:
+            return JSONResponse(
+                {"ok": False, "error": {"code": exc.code, "message": str(exc)}},
+                status_code=503,
+            )
 
     async def health(self, request: Request):
         challenge = request.headers.get("x-kirabridge-challenge", "")

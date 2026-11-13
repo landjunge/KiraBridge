@@ -24,32 +24,33 @@ import uuid
 from pathlib import Path
 
 from kirabridge.approval_console import ApprovalConsole, signed_token
+from kirabridge.audit_manager import AuditWriter
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config, load_config, private_directory
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.console_runtime import console_key
 from kirabridge.live_status import project
 from kirabridge.local_runtime import default_config, write_private
-from kirabridge.operator_application import operator_application
 
 PRODUCTION_PORTS = frozenset({8765, 8766, 8767})
 PRODUCTION_CONSOLE_PORT = 8766
 _MIN_PORT = 1024
 
 
-class IsolatedDaemon:
-    """Serves only the live projection from the isolated in-process bridge.
+class IsolatedApplication:
+    """The only operator surface of an isolated instance: audit plus live read.
 
-    No network, no production daemon and no fallback: any other call is denied.
+    It deliberately has no control, action, reservation, service, connector or
+    keyboard surface; the live-only console mounts no handler that could reach
+    one. Production tokens and services are never consulted.
     """
 
     def __init__(self, bridge, principal: str = "local"):
+        self.audit = AuditWriter(bridge.store)
         self.bridge = bridge
         self.principal = principal
 
-    async def call(self, name: str, **_kwargs):
-        if name != "live_status":
-            raise BridgeError("forbidden", "The isolated Live instance only serves live_status")
+    async def live_status(self):
         return project(self.bridge, self.principal)
 
 
@@ -177,6 +178,21 @@ def receipt(origin: str, login_file: Path, config: Path) -> dict:
     }
 
 
+def live_console(
+    config_path: str | Path, *, origin: str | None = None
+) -> tuple[ApprovalConsole, Bridge, str, Path, Path]:
+    """Build the live-only console for one isolated instance.
+
+    The returned console mounts only login, health, the live page/assets and the
+    read-only live projection; there is no operator, approval, keyboard, service
+    or connector handler to reach.
+    """
+    config, directory, path, key = prepare(config_path)
+    bridge = Bridge(config)
+    console = ApprovalConsole(IsolatedApplication(bridge), key, origin=origin, live_only=True)
+    return console, bridge, key, directory, path
+
+
 async def serve_isolated(config_path: str | Path, *, port: int = 0) -> None:
     """Serve one isolated console and print exactly one receipt line.
 
@@ -190,12 +206,8 @@ async def serve_isolated(config_path: str | Path, *, port: int = 0) -> None:
         )
     import uvicorn
 
-    config, directory, path, key = prepare(config_path)
-    bridge = Bridge(config)
+    console, bridge, key, directory, path = live_console(config_path, origin="http://127.0.0.1:1")
     try:
-        application = operator_application(bridge)
-        application.control.daemon = IsolatedDaemon(bridge)
-        console = ApprovalConsole(application, key)
         server = uvicorn.Server(
             uvicorn.Config(
                 console,
