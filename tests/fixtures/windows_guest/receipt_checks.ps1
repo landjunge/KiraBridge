@@ -1,10 +1,14 @@
 param([Parameter(Mandatory=$true)][string]$RunnerPath,
       [Parameter(Mandatory=$true)][string]$TempRoot)
 $ErrorActionPreference='Stop'
+# Immediate host-side checkpoints distinguish engine startup, AST parsing and
+# individual receipt scenarios if the unchanged outer execution budget expires.
+[Console]::Error.WriteLine('receipt-check-phase:started')
 $errors=$null
 $tokens=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($RunnerPath,[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Guest runner syntax invalid'}
+[Console]::Error.WriteLine('receipt-check-phase:parsed')
 $names=@('New-PrivateReceipt','Log-Tail','Run-Once')
 foreach($name in $names){
     $node=$ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst]},$false) |
@@ -31,6 +35,7 @@ function Invoke-Bounded([string]$Program,[string[]]$Arguments,[string]$Name,[int
     return @{exit_code=0;pid=123;stdout=$stdout;stderr=$stderr}
 }
 function Scenario([string]$Name){
+    [Console]::Error.WriteLine('receipt-check-phase:scenario-'+$Name)
     $script:Work=Join-Path $TempRoot $Name
     $script:Attempts=Join-Path $Work 'attempts'
     New-Item -ItemType Directory -Force $Attempts | Out-Null
@@ -91,4 +96,5 @@ New-PrivateReceipt $path '{"first":true}'
 $caught=$false
 try {New-PrivateReceipt $path '{"second":true}'} catch {$caught=$true}
 Assert ($caught -and [IO.File]::ReadAllText($path) -ceq '{"first":true}') 'Receipt overwritten'
+[Console]::Error.WriteLine('receipt-check-phase:complete')
 '{"scenarios":7,"native_commands":0,"receipt_replay_guards":"passed","parser":"passed"}'

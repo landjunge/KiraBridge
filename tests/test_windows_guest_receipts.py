@@ -13,7 +13,7 @@ def test_guest_receipt_state_machine_rejects_stale_or_unknown_attempts(tmp_path)
     if powershell is None:
         pytest.skip("PowerShell is required for executable bootstrap control-flow checks")
     root = Path(__file__).parents[1]
-    result = subprocess.run(
+    result = run_receipt_check(
         [
             powershell,
             "-NoProfile",
@@ -24,10 +24,6 @@ def test_guest_receipt_state_machine_rejects_stale_or_unknown_attempts(tmp_path)
             "-TempRoot",
             str(tmp_path),
         ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(result.stdout.strip())
@@ -37,3 +33,46 @@ def test_guest_receipt_state_machine_rejects_stale_or_unknown_attempts(tmp_path)
         "receipt_replay_guards": "passed",
         "parser": "passed",
     }
+
+
+def run_receipt_check(command):
+    """Keep the original budget and expose the last observed fixture boundary."""
+    try:
+        return subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    except subprocess.TimeoutExpired as error:
+        stderr = error.stderr or b""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        phases = [
+            line.partition("receipt-check-phase:")[2].strip()
+            for line in stderr.splitlines()
+            if line.startswith("receipt-check-phase:")
+        ]
+        phase = phases[-1] if phases else "not_observed_before_fixture_start"
+        pytest.fail(
+            "PowerShell receipt check exceeded unchanged 30s budget; "
+            "last fixture phase=" + phase + "; receipt guards not accepted"
+        )
+
+
+@pytest.mark.parametrize(
+    "stderr,phase",
+    [
+        (None, "not_observed_before_fixture_start"),
+        (b"receipt-check-phase:started\nreceipt-check-phase:parsed\n", "parsed"),
+        ("receipt-check-phase:scenario-unknown\n", "scenario-unknown"),
+    ],
+)
+def test_receipt_timeout_preserves_budget_and_reports_last_observed_phase(
+    monkeypatch, stderr, phase
+):
+    calls = []
+
+    def timeout(command, **kwargs):
+        calls.append(kwargs)
+        raise subprocess.TimeoutExpired(command, 30, stderr=stderr)
+
+    monkeypatch.setattr(subprocess, "run", timeout)
+    with pytest.raises(pytest.fail.Exception, match="last fixture phase=" + phase):
+        run_receipt_check(["fixture-host"])
+    assert calls == [{"capture_output": True, "text": True, "timeout": 30, "check": False}]
