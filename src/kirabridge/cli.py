@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import errno
 import json
 import logging
 import os
@@ -55,21 +56,51 @@ class _BridgeSignalHandling:
 
 
 def _bind_http_listener(config):
-    family = socket.AF_INET6 if ":" in config.host else socket.AF_INET
-    listener = socket.socket(family=family, type=socket.SOCK_STREAM)
     try:
-        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listener.bind((config.host, config.port))
-        listener.set_inheritable(True)
+        infos = socket.getaddrinfo(
+            config.host,
+            config.port,
+            type=socket.SOCK_STREAM,
+        )
     except OSError as exc:
-        listener.close()
         raise BridgeError("bind_failed", "Unable to bind the configured HTTP listener") from exc
-    return listener
+    listeners = []
+    seen = set()
+    try:
+        for family, socktype, proto, _canonname, sockaddr in infos:
+            key = (family, sockaddr)
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                listener = socket.socket(family, socktype, proto)
+            except OSError:
+                continue
+            listeners.append(listener)
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if family == socket.AF_INET6 and hasattr(socket, "IPPROTO_IPV6"):
+                listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            try:
+                listener.bind(sockaddr)
+            except OSError as exc:
+                if exc.errno == errno.EADDRNOTAVAIL:
+                    listeners.pop()
+                    listener.close()
+                    continue
+                raise
+            listener.set_inheritable(True)
+        if not listeners:
+            raise OSError("could not bind the configured HTTP listener")
+    except OSError as exc:
+        for listener in listeners:
+            listener.close()
+        raise BridgeError("bind_failed", "Unable to bind the configured HTTP listener") from exc
+    return listeners
 
 
 async def _serve_http(config, principal):
     # Bind before Bridge starts its dispatcher, so a port conflict cannot claim queued work.
-    listener = _bind_http_listener(config)
+    listeners = _bind_http_listener(config)
     bridge = None
     entered = False
     try:
@@ -94,9 +125,10 @@ async def _serve_http(config, principal):
         )
         async with bridge:
             entered = True
-            await server.serve(sockets=[listener])
+            await server.serve(sockets=listeners)
     finally:
-        listener.close()
+        for listener in listeners:
+            listener.close()
         if bridge is not None and not entered:
             try:
                 await bridge.system_modules.close()
