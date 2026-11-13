@@ -5,9 +5,9 @@ Every button links straight to the installation file (``browser_download_url``),
 never to a release page, so one click starts the download. Drafts are ignored;
 prereleases count because the products currently ship previews only.
 
-Shared by KiraBridge, ThreadDesk and 4AllPass; the three copies are identical
-(see TOOL_VERSION). Desktop buttons come from the newest unprefixed ``v*``
-release. KiraBridge's Debian server track (``linux-*`` tags) is a second lane
+Based on the shared family updater. This KiraBridge version selects desktop
+buttons from the newest unprefixed ``v*`` release. KiraBridge's Debian server
+track (``linux-*`` tags) is a second lane
 and shows as optional ``Debian Remote``. ``windows-*`` tags stay unused.
 Only the block between the AUTO-DOWNLOADS markers in README.md / README.de.md
 and the generated ``assets/readme/download-<platform>.svg`` buttons are
@@ -28,13 +28,14 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
 from html import escape
 from pathlib import Path
 
-TOOL_VERSION = "2.2.0"
+TOOL_VERSION = "2.2.1"
 START, END = "<!-- AUTO-DOWNLOADS:START -->", "<!-- AUTO-DOWNLOADS:END -->"
 BUTTON_DIR = Path("assets/readme")
 API = "https://api.github.com"
@@ -131,7 +132,7 @@ def lane(tag):
         return "remote"
     if name.startswith("windows-"):
         return None
-    return "desktop"
+    return "desktop" if name.startswith("v") else None
 
 
 def published(releases):
@@ -291,7 +292,14 @@ def render(repo, chosen):
             f'<a href="{url}" title="{title}"><img src="{path.as_posix()}" '
             f'alt="{alt}" width="190" height="52"></a>'
         )
-    block = '<p align="center">\n  ' + "\n  &nbsp;\n  ".join(links) + "\n</p>"
+    block = (
+        '<p align="center">\n  ' + "\n  &nbsp;\n  ".join(links) + "\n</p>"
+        if links
+        else (
+            '<p align="center"><a href="https://github.com/'
+            f'{escape(repo, quote=True)}/releases">GitHub Releases</a></p>'
+        )
+    )
     return buttons, block
 
 
@@ -425,6 +433,66 @@ def self_test():
     picked = {label: tag for label, (tag, _) in choose(appimage).items()}
     if picked != {"macOS Intel": "v0.1.2-rc.2", "Linux": "v0.1.2-rc.2"}:
         failed.append(f"choose-appimage: {picked}")
+    foreign = {
+        "tag_name": "docs-2099-01-01",
+        "draft": False,
+        "published_at": "2099-01-01",
+        "assets": [{"name": "Other-macOS.dmg", "state": "uploaded"}],
+    }
+    if choose([foreign, *dual]) != choose(dual):
+        failed.append("foreign release tag replaced the supported download lanes")
+    # Exercise the actual write path after the last supported release is deleted.
+    # A successful empty API result must clear stale links, but a dry run must not.
+    original_api, original_releases = globals()["api"], globals()["all_releases"]
+    original_summary = globals()["summary"]
+    original_repo, original_cwd = os.environ.get("GITHUB_REPOSITORY"), Path.cwd()
+    try:
+        globals()["summary"] = lambda _lines: None
+        globals()["api"] = lambda _path: {"private": False}
+        globals()["all_releases"] = lambda _repo: []
+        os.environ["GITHUB_REPOSITORY"] = "landjunge/KiraBridge"
+        with tempfile.TemporaryDirectory() as scratch:
+            os.chdir(scratch)
+            stale = START + '\n<a href="https://example.invalid/deleted">old</a>\n' + END
+            for page in ("README.md", "README.de.md"):
+                Path(page).write_text(stale)
+            BUTTON_DIR.mkdir(parents=True)
+            stale_button = BUTTON_DIR / "download-debian-remote.svg"
+            stale_button.write_text("old")
+            unrelated = BUTTON_DIR / "download-custom.svg"
+            unrelated.write_text("preserve")
+
+            def api_failure(_path):
+                raise SystemExit("Simulated API failure")
+
+            globals()["api"] = api_failure
+            try:
+                main([])
+                failed.append("API failure did not stop the updater")
+            except SystemExit:
+                pass
+            if Path("README.md").read_text() != stale or not stale_button.exists():
+                failed.append("API failure modified files")
+            globals()["api"] = lambda _path: {"private": False}
+            main(["--dry-run"])
+            if Path("README.md").read_text() != stale or not stale_button.exists():
+                failed.append("empty-release dry run modified files")
+            main([])
+            if stale_button.exists():
+                failed.append("deleted release left its generated button behind")
+            for page in ("README.md", "README.de.md"):
+                if "example.invalid/deleted" in Path(page).read_text():
+                    failed.append(f"deleted release left a dead link in {page}")
+            if unrelated.read_text() != "preserve":
+                failed.append("unrelated download asset changed")
+    finally:
+        os.chdir(original_cwd)
+        globals()["api"], globals()["all_releases"] = original_api, original_releases
+        globals()["summary"] = original_summary
+        if original_repo is None:
+            os.environ.pop("GITHUB_REPOSITORY", None)
+        else:
+            os.environ["GITHUB_REPOSITORY"] = original_repo
     if failed:
         raise SystemExit("Self-test failed:\n  " + "\n  ".join(failed))
     print(
@@ -443,10 +511,6 @@ def main(argv):
         raise SystemExit("GITHUB_REPOSITORY (owner/name) is required")
     private = bool(api(f"/repos/{repo}").get("private"))
     chosen = choose(all_releases(repo))
-    if not chosen:
-        print("No platform-specific release assets; keeping existing buttons unchanged.")
-        summary(["### README downloads", "", "No platform release assets; nothing changed."])
-        return
     rows = [
         f"| {label} | {chosen[label][0]} | `{chosen[label][1]['name']}` |"
         for label in ORDER
@@ -459,12 +523,20 @@ def main(argv):
         summary(["### README downloads: not updated", "", *[f"- {p}" for p in problems]])
         raise SystemExit("Not updating README; failed checks:\n  " + "\n  ".join(problems))
     if dry_run:
-        print("Dry run: all links verified, no files written.")
+        print(
+            "Dry run: all links verified, no files written."
+            if chosen
+            else "Dry run: no supported installers; would clear stale buttons, no files written."
+        )
         return
     buttons, block = render(repo, chosen)
     write(buttons, block)
     summary(["### README downloads", "", *table])
-    print(f"Verified {len(chosen)} direct download buttons for {repo} (tool {TOOL_VERSION})")
+    print(
+        f"Verified {len(chosen)} direct download buttons for {repo} (tool {TOOL_VERSION})"
+        if chosen
+        else f"Cleared stale download buttons for {repo}; no supported published installers."
+    )
 
 
 if __name__ == "__main__":

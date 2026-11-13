@@ -80,8 +80,8 @@ tracks, so their version numbers can differ.
 | **Debian Remote** | Debian/Linux x86_64 server with remote-agent and MCP capabilities. This package does not provide a Linux desktop app. | [Linux / Debian server](docs/INSTALL-LINUX-SERVER.md) |
 
 [All releases, checksums and release notes](https://github.com/landjunge/KiraBridge/releases)
-are public; downloading does not require a GitHub account. The current packages
-are previews. Use the release notes for each package's requirements and limits.
+are public; downloading does not require a GitHub account. Releases may be
+previews. Check each release's notes for its status, requirements and limits.
 AI-provider sign-in and any provider charges are separate.
 
 The download buttons refresh automatically when a release is published, edited

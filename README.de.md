@@ -78,8 +78,8 @@ Releasewege; ihre Versionsnummern können deshalb unterschiedlich sein.
 | **Debian Remote** | Debian-/Linux-Server für x86_64 mit Remote-Agenten- und MCP-Funktionen. Dieses Paket enthält keine Linux-Desktop-App. | [Linux-/Debian-Server](docs/INSTALL-LINUX-SERVER.de.md) |
 
 [Alle Versionen, Prüfsummen und Release-Hinweise](https://github.com/landjunge/KiraBridge/releases)
-sind öffentlich; für den Download ist kein GitHub-Konto nötig. Die aktuellen
-Pakete sind Vorabversionen. Voraussetzungen und Grenzen stehen beim jeweiligen
+sind öffentlich; für den Download ist kein GitHub-Konto nötig. Releases können
+Vorabversionen sein. Status, Voraussetzungen und Grenzen stehen beim jeweiligen
 Release. KI-Anmeldung und mögliche Anbieterkosten bleiben getrennt.
 
 Die Download-Buttons werden bei Veröffentlichung, Bearbeitung oder Löschung
