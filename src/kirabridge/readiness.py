@@ -15,7 +15,12 @@ from kirabridge import __version__
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
-from kirabridge.permissions import state_exclusions
+from kirabridge.permissions import (
+    decision,
+    direct_terminal_required,
+    state_exclusions,
+    visible_execution,
+)
 from kirabridge.terminal_manager import check_executable
 
 
@@ -113,19 +118,47 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         bridge.security.principal(principal, "terminal.execute")
         _directory(PathScope(policy.terminal_roots or policy.roots), path)
 
-    def operation(name):
+    def visible_route(name):
+        return visible_execution(bridge.config, principal, name) or (
+            name == "admin.execute" and direct_terminal_required(bridge.config, principal)
+        )
+
+    def operation_prerequisites(name):
         from kirabridge.bridge_core.bridge import INPUTS
 
         if name not in INPUTS:
             raise BridgeError("unknown_operation", "Unknown operation")
-        bridge.security.principal(principal, name)
+        bridge.security.authorize(principal, name)
         if name == "workflow.stop":
             bridge.security.principal(principal, "task.cancel")
             bridge.security.principal(principal, "process.terminate")
         if name.startswith(("threaddesk.", "handoff.")) and name != "handoff.status":
             bridge.threaddesk.check_configuration()
+        if visible_route(name) and not bridge.sessions.terminal_app.available:
+            raise BridgeError("unsupported_platform", "Visible Terminal.app requires macOS")
+        if name in {"terminal.execute", "terminal.visible", "admin.execute"} and not (
+            policy.executables or policy.allow_any_executable
+        ):
+            raise BridgeError("executable_denied", "No program is allowed by this policy")
         if name in {"clipboard.read", "clipboard.write"}:
             bridge.clipboard.platform.clipboard_command(write=name == "clipboard.write")
+
+    def operation(name):
+        permission = decision(bridge.config, principal, name)
+        item = {
+            "operation": name,
+            **{key: permission[key] for key in ("authorized", "automatic", "approval_required")},
+            **_probe(lambda: operation_prerequisites(name)),
+        }
+        if not permission["authorized"]:
+            item["missing_capabilities"] = permission["missing_capabilities"]
+        if item["ok"] and permission["approval_required"]:
+            item.update(ok=False, code="approval_required")
+        elif item["ok"] and (name.startswith(("session.", "threaddesk.")) or visible_route(name)):
+            # Configuration/OS metadata cannot establish a live transport or
+            # an exact usable session. This synchronous query never probes it.
+            item.update(ok=None, code="transport_not_probed")
+        return item
 
     paths = [{"path": p, **_probe(lambda p=p: file(p))} for p in requirements.read_paths]
     images = [{"path": p, **_probe(lambda p=p: image(p))} for p in requirements.image_paths]
@@ -134,9 +167,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         {"path": p, **_probe(lambda p=p: working_directory(p))}
         for p in requirements.working_directories
     ]
-    operations = [
-        {"operation": p, **_probe(lambda p=p: operation(p))} for p in requirements.operations
-    ]
+    operations = [operation(name) for name in requirements.operations]
     for item in operations:
         if item["operation"] == "workflow.stop" and item["ok"]:
 
@@ -153,9 +184,18 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         {"path": p, **_probe(lambda p=p: directory(p))}
         for p in dict.fromkeys(policy.roots + policy.read_roots)
     ]
-    health = bridge.health(principal)
+    health = bridge.health(principal, include_diagnostics=False)
     requested = bool(paths or images or programs or operations or working_dirs)
     checks = paths + images + programs + operations + working_dirs
+    ready = None
+    if requested:
+        ready = (
+            False
+            if not health["dispatcher_active"] or any(x["ok"] is False for x in checks)
+            else None
+            if any(x["ok"] is None for x in checks)
+            else True
+        )
     result = {
         "principal": principal,
         "runtime": bridge.runtime,
@@ -173,22 +213,20 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         "working_directory_checks": working_dirs,
         "operation_checks": operations,
         "workflow_id": requirements.workflow_id,
-        "requested_prerequisites_ready": (
-            health["dispatcher_active"] and all(x["ok"] for x in checks)
-        )
-        if requested
-        else None,
+        "requested_prerequisites_ready": ready,
         "scope": "Only requested prerequisites at this instant; no process is started, no file "
         "content is returned. No complete workflow, tunnel, ChatGPT, or future success claim. "
-        "automatic approval does not extend roots or executable permissions.",
+        "Automatic approval does not extend roots or executable permissions. "
+        "False includes pending approval; null means a requested transport remains unprobed. "
+        "Terminal operation names use the default foreground route.",
         "remediation": "path_denied: use file.read inside configured roots/read_roots; "
         "missing roots/config drift: local operator must correct policy and reload safely. "
         "executable_denied: use file tools for file access; no interpreter workaround.",
     }
-    if requested and not result["requested_prerequisites_ready"]:
+    if requested and ready is False:
         from kirabridge.diagnostics import rejection_report
 
-        failures = [x for x in checks if not x["ok"]]
+        failures = [x for x in checks if x["ok"] is False]
         code = failures[0]["code"] if failures else "dispatcher_unavailable"
         result["diagnostic"] = rejection_report(
             bridge.runtime,
@@ -205,7 +243,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
             {
                 "workflow_id": requirements.workflow_id,
                 "checks": compact_checks(checks),
-                "outcome": "ready" if result["requested_prerequisites_ready"] else "not_ready",
+                "outcome": "unknown" if ready is None else "ready" if ready else "not_ready",
             },
         )
         result["audit_storage"] = observer.status()

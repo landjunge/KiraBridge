@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 from conftest import request
@@ -116,6 +117,7 @@ def test_config_origin_snapshot_does_not_change_after_file_edit(tmp_path):
 
 
 async def test_owned_stop_readiness_separates_abort_from_optional_durable_barrier(bridge):
+    bridge.config.principals["local"].approval_mode = "automatic"
     async with bridge:
         value = readiness(bridge, "local", ReadinessInput(operations=["workflow.stop"]))
         assert value["requested_prerequisites_ready"] is True
@@ -159,3 +161,161 @@ async def test_opencode_http_preflight_does_not_require_an_executable(bridge):
     agent_check = next(item for item in result["checks"] if item["kind"] == "agent")
     assert agent_check["ok"] is True
     assert result["ready"] is True
+
+
+def test_readiness_reports_pending_approval_without_changing_tasks_or_policy(bridge):
+    policy = bridge.config.principals["local"]
+    policy.capabilities.append("session.inspect")
+    policy.approval_mode = "automatic"
+    queued = request("file.read", {"path": str(Path(policy.roots[0]) / "queued")}, task_id="queued")
+    bridge.prepare("local", queued)
+    policy.approval_mode = "manual"
+    original = policy.model_dump()
+    before = bridge.store.db.total_changes
+    value = readiness(bridge, "local", ReadinessInput(operations=["file.read", "session.catalog"]))
+    for item in value["operation_checks"]:
+        assert item["authorized"] and not item["automatic"] and item["approval_required"]
+        assert item["ok"] is False and item["code"] == "approval_required"
+    assert value["requested_prerequisites_ready"] is False
+    assert bridge.store.get("queued")["state"] == "queued"
+    assert bridge.store.db.total_changes == before
+    assert policy.model_dump() == original
+
+
+def test_readiness_checks_secondary_capabilities_before_calling_an_operation(bridge):
+    policy = bridge.config.principals["local"]
+    policy.capabilities.append("session.inspect")
+    policy.approval_mode = "automatic"
+    policy.capabilities.remove("session.input")
+    value = readiness(bridge, "local", ReadinessInput(operations=["terminal.visible"]))
+    item = value["operation_checks"][0]
+    assert item["authorized"] is False and item["code"] == "forbidden"
+    assert item["missing_capabilities"] == ["session.input"]
+    assert value["requested_prerequisites_ready"] is False
+
+
+def test_readiness_reports_native_platform_blocker_from_passive_metadata(bridge, monkeypatch):
+    bridge.config.principals["local"].approval_mode = "automatic"
+    bridge.config.principals["local"].capabilities.append("session.inspect")
+    monkeypatch.setattr(
+        type(bridge.sessions.terminal_app), "available", property(lambda self: False)
+    )
+    bridge.sessions.catalog = AsyncMock(side_effect=AssertionError("No terminal probe allowed"))
+    value = readiness(bridge, "local", ReadinessInput(operations=["terminal.visible"]))
+    item = value["operation_checks"][0]
+    assert item["authorized"] and item["automatic"]
+    assert item["ok"] is False and item["code"] == "unsupported_platform"
+    bridge.sessions.catalog.assert_not_called()
+
+
+async def test_readiness_leaves_unprobed_transports_unknown_without_database_or_peer_io(
+    bridge, monkeypatch
+):
+    policy = bridge.config.principals["local"]
+    policy.capabilities.append("session.inspect")
+    policy.approval_mode = "automatic"
+    monkeypatch.setattr(
+        type(bridge.sessions.terminal_app), "available", property(lambda self: True)
+    )
+    bridge.sessions.catalog = AsyncMock(side_effect=AssertionError("No terminal probe allowed"))
+    bridge.threaddesk.connect = AsyncMock(side_effect=AssertionError("No peer connection allowed"))
+    bridge.threaddesk.check_configuration = lambda: None
+    async with bridge:
+        statements = []
+        bridge.store.db.set_trace_callback(statements.append)
+        try:
+            value = readiness(
+                bridge,
+                "local",
+                ReadinessInput(
+                    operations=[
+                        "terminal.visible",
+                        "session.catalog",
+                        "threaddesk.read",
+                        "threaddesk.manage",
+                    ]
+                ),
+            )
+        finally:
+            bridge.store.db.set_trace_callback(None)
+        assert statements == []
+        assert value["dispatcher_active"]
+        assert value["requested_prerequisites_ready"] is None
+        assert "diagnostic" not in value
+        for item in value["operation_checks"]:
+            assert item["ok"] is None and item["code"] == "transport_not_probed"
+            assert item["authorized"] and item["automatic"] and not item["approval_required"]
+        assert (
+            readiness(bridge, "local", ReadinessInput(operations=["file.read"]))[
+                "requested_prerequisites_ready"
+            ]
+            is True
+        )
+        bridge.sessions.catalog.assert_not_called()
+        bridge.threaddesk.connect.assert_not_called()
+        audited = readiness(
+            bridge,
+            "local",
+            ReadinessInput(
+                operations=["session.catalog"],
+                workflow_id="explicit-audit",
+            ),
+        )
+        assert audited["audit_recorded"] is True
+        record = bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='diagnostic.workflow.preflight' "
+            "ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        assert json.loads(record["metadata"])["outcome"] == "unknown"
+
+
+def test_readiness_separates_empty_executable_allowlist_from_operation_permission(bridge):
+    policy = bridge.config.principals["local"]
+    executable = policy.executables[0]
+    policy.executables = []
+    policy.allow_any_executable = False
+    policy.approval_mode = "automatic"
+    value = readiness(
+        bridge,
+        "local",
+        ReadinessInput(
+            executables=[executable],
+            operations=["terminal.execute"],
+        ),
+    )
+    assert value["operation_checks"][0]["authorized"] is True
+    assert value["operation_checks"][0]["code"] == "executable_denied"
+    assert value["executable_checks"][0]["code"] == "executable_denied"
+    assert value["requested_prerequisites_ready"] is False
+
+
+@pytest.mark.parametrize("operation", ["terminal.execute", "admin.execute"])
+@pytest.mark.parametrize("client_type", ["chatgpt", "agent"])
+@pytest.mark.parametrize("native_available", [False, True])
+async def test_readiness_aliases_follow_visible_route_without_blocking_internal_execution(
+    bridge, monkeypatch, operation, client_type, native_available
+):
+    policy = bridge.config.principals["local"]
+    policy.approval_mode = "automatic"
+    policy.client_type = client_type
+    policy.capabilities.append("session.inspect")
+    monkeypatch.setattr(
+        type(bridge.sessions.terminal_app), "available", property(lambda self: native_available)
+    )
+    bridge.sessions.catalog = AsyncMock(side_effect=AssertionError("No terminal probe allowed"))
+    bridge.terminal.execute = AsyncMock(side_effect=AssertionError("No execution allowed"))
+    async with bridge:
+        value = readiness(bridge, "local", ReadinessInput(operations=[operation]))
+        item = value["operation_checks"][0]
+        assert item["authorized"] and item["automatic"]
+        if client_type == "agent":
+            assert item["ok"] is True and item["code"] == "available"
+            assert value["requested_prerequisites_ready"] is True
+        elif native_available:
+            assert item["ok"] is None and item["code"] == "transport_not_probed"
+            assert value["requested_prerequisites_ready"] is None
+        else:
+            assert item["ok"] is False and item["code"] == "unsupported_platform"
+            assert value["requested_prerequisites_ready"] is False
+        bridge.sessions.catalog.assert_not_called()
+        bridge.terminal.execute.assert_not_called()

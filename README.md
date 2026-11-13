@@ -68,6 +68,8 @@ In the development source, the opt-in ThreadDesk tool proxy accepts bounded JSON
 
 Development source also separates routine MCP liveness from storage diagnostics, protects running ThreadDesk calls during catalogue recovery, and offers compact verified write responses. Unknown writes still require reconciliation against the original operation. These changes apply to the shared Mac/Linux code; they do not establish a new installed version. See [behaviour and verification limits](docs/THREADDESK-OPERATIONS-RELIABILITY.md).
 
+Readiness now distinguishes permission, platform support and unprobed transport. Pending approval and known blockers report false; an untested session or ThreadDesk connection reports unknown. This changes status reporting without granting access or starting commands.
+
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
 ## Downloads and installation profiles

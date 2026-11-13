@@ -17,6 +17,25 @@ Passive discovery still depends on the running event loop and bounded native
 filesystem checks. This is not an independent watchdog and cannot respond while
 arbitrary synchronous work blocks that loop.
 
+## Prerequisites are separate from executable transport
+
+`bridge_readiness` includes the complete permission decision for each requested
+operation: `authorized`, `automatic` and `approval_required`. Known capability,
+platform or executable-policy blockers report `ok=false`; pending operator
+approval reports `approval_required`, without changing queued-task policy.
+
+Unprobed session, ThreadDesk or visible-terminal transport reports `ok=null`
+and `transport_not_probed`. The aggregate is false if any known blocker exists,
+otherwise null if a requested transport is unprobed. Other successful checks
+retain true. Operation names for terminal execution describe their default
+foreground route, including aliases routed to a visible terminal for ChatGPT;
+internal execution routes remain independent of macOS Terminal.app.
+
+The read uses routine health without database aggregation. Explicit workflow
+audits remain opt-in. No command, terminal probe or connection attempt is
+started, and a permission change is never inferred from readiness. An empty
+executable allowlist remains an intentional restriction.
+
 ## Discovery during ongoing work
 
 Explicit catalogue requests remain fresh. Operation preflight may reuse a
