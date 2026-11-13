@@ -164,11 +164,23 @@ def test_bind_http_listener_literal_ipv4_stays_ipv4_only():
 
 
 def test_bind_http_listener_reserves_resolved_localhost_families():
-    expected = {
-        info[0]
-        for info in socket.getaddrinfo("localhost", 0, type=socket.SOCK_STREAM)
-        if info[0] in {socket.AF_INET, socket.AF_INET6}
-    }
+    expected = set()
+    for family, socktype, protocol, _canonname, sockaddr in socket.getaddrinfo(
+        "localhost", 0, type=socket.SOCK_STREAM
+    ):
+        if family not in {socket.AF_INET, socket.AF_INET6}:
+            continue
+        probe = socket.socket(family, socktype, protocol)
+        try:
+            if family == socket.AF_INET6 and hasattr(socket, "IPV6_V6ONLY"):
+                probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            probe.bind(sockaddr)
+        except OSError:
+            continue
+        else:
+            expected.add(family)
+        finally:
+            probe.close()
     assert expected
     listeners = cli._bind_http_listener(SimpleNamespace(host="localhost", port=0))
     try:
