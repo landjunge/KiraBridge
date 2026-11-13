@@ -177,8 +177,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return {
             "error": {
                 "code": "threaddesk_peer_failure",
-                "message": f"ThreadDesk peer failed: {type(exc).__name__}"
-                + (f": {exc}" if str(exc) else " (no detail)"),
+                "message": f"ThreadDesk peer failed: {type(exc).__name__}",
             },
             "diagnostic": {"automatic_retry": False, "tool_dispatch": "unknown"},
         }
@@ -211,10 +210,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     )
 
     @server.tool(annotations=read)
-    async def bridge_health(ctx: Context, observe_terminals: bool = False) -> dict[str, Any]:
-        """Lightweight live daemon health; cached terminal observations are not input proof.
+    async def bridge_health(
+        ctx: Context, observe_terminals: bool = False, include_diagnostics: bool = False
+    ) -> dict[str, Any]:
+        """Authenticated daemon liveness; routine polling does not read storage.
 
         Set observe_terminals=true for an explicit bounded fresh terminal catalogue.
+        Set include_diagnostics=true for synchronous storage and AutoNext details.
+        Unprobed admission is unknown; use bridge_readiness for prerequisites.
+        Cached terminal observations are not input proof.
         Routine polling must not consume the foreground terminal-read lane.
         Never claims ChatGPT integration.
         """
@@ -223,9 +227,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         name = identity(ctx)
         try:
             if observe_terminals:
+                bridge.security.principal(name, "bridge.health")
                 discovery = await live(bridge, name)
-                return {**bridge.health(name), "discovery": discovery}
-            return bridge.health(name)
+                return {
+                    **bridge.health(name, include_diagnostics=include_diagnostics),
+                    "discovery": discovery,
+                }
+            return bridge.health(name, include_diagnostics=include_diagnostics)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -598,13 +606,24 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
     )
     async def threaddesk_dynamic_call(
-        name: str, arguments: dict[str, Any], ctx: Context, operation_id: str | None = None
+        name: str,
+        arguments: dict[str, Any],
+        ctx: Context,
+        operation_id: str | None = None,
+        compact_response: bool = False,
     ) -> dict[str, Any]:
         """Call a fresh authorized ThreadDesk tool; mutations require a stable operation_id."""
         from kirabridge.threaddesk_dynamic import call as dynamic_call
 
         try:
-            return await dynamic_call(bridge, identity(ctx), name, arguments, operation_id)
+            return await dynamic_call(
+                bridge,
+                identity(ctx),
+                name,
+                arguments,
+                operation_id,
+                compact_response=compact_response,
+            )
         except Exception as exc:
             return dynamic_failure(exc)
 
@@ -1573,7 +1592,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     def bridge_epoch(ctx: Context) -> dict[str, Any]:
-        """Fresh passive schema epoch; explicit bridge_health retains full status."""
+        """Fresh passive schema epoch; bridge_health(include_diagnostics=true) adds details."""
         from kirabridge.discovery import epoch
 
         def action():

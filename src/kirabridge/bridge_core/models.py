@@ -195,6 +195,7 @@ class ThreadDeskDynamicInput(Input):
     name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
     arguments: dict[str, Any] = Field(default_factory=dict)
     contract_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    compact_response: bool = False
 
 
 class ThreadDeskReadInput(Input):

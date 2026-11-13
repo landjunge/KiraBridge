@@ -66,6 +66,8 @@ ThreadDesk adds projects and work history to this workflow, while the other fami
 
 In the development source, the opt-in ThreadDesk tool proxy accepts bounded JSON Schema 2020-12 references within the supplied schema, including embedded domain resources. References cannot load schemas from the network or disk; cyclic, ambiguous and unsupported schemas remain excluded. Existing tool permissions and operation receipts still apply. See the [proxy contract](docs/DYNAMIC-THREADDESK-PROXY.md).
 
+Development source also separates routine MCP liveness from storage diagnostics, protects running ThreadDesk calls during catalogue recovery, and offers compact verified write responses. Unknown writes still require reconciliation against the original operation. These changes apply to the shared Mac/Linux code; they do not establish a new installed version. See [behaviour and verification limits](docs/THREADDESK-OPERATIONS-RELIABILITY.md).
+
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
 ## Downloads and installation profiles
