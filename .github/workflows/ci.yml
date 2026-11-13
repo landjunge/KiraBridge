@@ -64,21 +64,21 @@ jobs:
       - name: Check out fixed reviewed ThreadDesk source for the actual MCP roundtrip
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: landjunge/threaddesk
+          repository: landjunge/ThreadDesk
           ref: 869a38970bace13c37d73654538b64efa1629da3
           path: .ci-threaddesk
           persist-credentials: false
       - name: Check out fixed M4 ThreadDesk source for remote R2 and R3
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: landjunge/threaddesk
+          repository: landjunge/ThreadDesk
           ref: a0dd4c39478b031e0e31d335c2a15435dfbc52eb
           path: .ci-threaddesk-m4
           persist-credentials: false
       - name: Check out fixed reviewed TollGate stop-only journal source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: landjunge/tollgate
+          repository: landjunge/TollGate
           ref: 53fc57cc2e082d022e65e5929cb2a1e186fba852
           path: .ci-tollgate
           persist-credentials: false

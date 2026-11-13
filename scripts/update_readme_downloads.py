@@ -47,6 +47,7 @@ BRAND = {
     "threaddesk": "#b99cff",
     "4allpass": "#6be4f2",
     "tollgate": "#e77745",
+    "agentauthority": "#3b78fc",
     "agent-authority-lab": "#3b78fc",
     "blockdesign": "#ebc33f",
 }
