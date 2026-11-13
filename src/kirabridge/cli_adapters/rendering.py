@@ -67,6 +67,26 @@ def _same_hint_warning_footer(before, after):
     return bool(hint and warning and hint[2] == warning[2] and len(hint[1]) == len(warning[1]))
 
 
+def _same_inline_hint_warning_footer(before, after):
+    """Codex 0.167 hides this captured inline hint without moving its badge."""
+    old = _without_viewport_padding(before).split("\n")
+    new = _without_viewport_padding(after).split("\n")
+    if len(old) != len(new):
+        return False
+    changed = 0
+    for previous, current in zip(old, new, strict=True):
+        if previous == current:
+            continue
+        match = re.fullmatch(
+            r"([ ]*GPT-\S+[^\n]*?)( · ← f…[ ]+)(⚠ [1-9][0-9]* warnings? · f2 to view)",
+            previous,
+        )
+        if match is None or current != match[1] + " " * len(match[2]) + match[3]:
+            return False
+        changed += 1
+    return changed == 1
+
+
 def _cwd_footer(suffix):
     rows = _without_viewport_padding(suffix).split("\n")
     found = []
@@ -290,7 +310,9 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None, column
             actual_suffix = content[len(expected) :]
             if actual_suffix and not actual_suffix.startswith("\n"):
                 continue
-            if _same_hint_warning_footer(suffix, actual_suffix):
+            if _same_hint_warning_footer(suffix, actual_suffix) or _same_inline_hint_warning_footer(
+                suffix, actual_suffix
+            ):
                 return True
             rendered_after = _codex_renderer_suffix(actual_suffix)
             for before_variant in before_variants:

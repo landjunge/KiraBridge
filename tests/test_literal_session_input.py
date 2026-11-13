@@ -463,3 +463,34 @@ async def test_literal_input_refuses_existing_input_before_paste(literal_visible
         )
     assert error.value.code == "visible_input_not_empty"
     assert not transport["literal_calls"]
+
+
+@pytest.mark.parametrize(
+    "change", [None, "column", "badge", "model", "cwd", "hint", "extra", "payload"]
+)
+def test_codex167_inline_shortcut_transition_is_exact(change):
+    from kirabridge.literal_session_input import insertion_observed
+
+    payload = "isolated literal input\n" * 60
+    prefix = "  GPT-6.1-Sol low · ~/owned/workspace"
+    badge = "⚠ 1 warning · f2 to view"
+    hint = " · ← f…  "
+    before = "› Ask Codex to do anything\n \n" + prefix + hint + badge + "\n"
+    after = (
+        f"› [Pasted Content {len(payload)} chars]\n \n" + prefix + " " * len(hint) + badge + "\n"
+    )
+    if change == "column":
+        after = after.replace(badge, " " + badge)
+    elif change == "badge":
+        after = after.replace("1 warning", "2 warnings")
+    elif change == "model":
+        after = after.replace("low", "high")
+    elif change == "cwd":
+        after = after.replace("workspace", "different")
+    elif change == "hint":
+        before = before.replace("← f…", "← x…")
+    elif change == "extra":
+        after += "extra footer row\n"
+    elif change == "payload":
+        after = after.replace(f"{len(payload)} chars", f"{len(payload) + 1} chars")
+    assert insertion_observed("codex", after, payload, before) is (change is None)
