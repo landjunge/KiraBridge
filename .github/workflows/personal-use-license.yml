@@ -21,7 +21,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Check the license rules
-        run: python3 -I scripts/check_personal_use_license.py --self-test
+        run: |
+          python3 -I scripts/check_personal_use_license.py --self-test
+          python3 -I scripts/test_personal_use_license.py
       - name: Check LICENSE, README and package metadata
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}

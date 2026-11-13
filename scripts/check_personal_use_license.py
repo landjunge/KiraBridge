@@ -12,13 +12,14 @@ Exit 0 when LICENSE, README, package metadata and packaging recipes agree.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
 import sys
 from pathlib import Path
 
-TOOL_VERSION = "1.0.2"
+TOOL_VERSION = "1.0.3"
 LICENSE_TITLE = "Netzwerkpunkt Personal Use License 1.0"
 
 PRODUCTS = {
@@ -161,8 +162,8 @@ def check_package_json(repo: Path) -> list[str]:
         rel = path.relative_to(repo).as_posix()
         data = json.loads(path.read_text(encoding="utf-8"))
         license_field = data.get("license")
-        if not isinstance(license_field, str) or not license_field.startswith(
-            ("SEE LICENSE IN ", "LicenseRef-Netzwerkpunkt")
+        if not isinstance(license_field, str) or not (
+            license_field == ALLOWED_LICENSE_REF or license_field.startswith("SEE LICENSE IN ")
         ):
             problems.append(f"{rel}: license muss SEE LICENSE IN LICENSE sein")
             continue
@@ -198,12 +199,70 @@ def check_tauri(repo: Path) -> list[str]:
     return problems
 
 
+# Concrete source-recipe guards, not proof of a built artifact. Unknown recipes fail closed.
+PACKAGER_PROOFS = {
+    "scripts/build_release.py": (
+        'linux_files["LICENSE"] = Path("LICENSE").read_bytes()',
+        'files["LICENSE"] = Path("LICENSE").read_bytes()',
+        '(output / "LICENSE").write_bytes(license_bytes)',
+        'license_bytes = Path("LICENSE").read_bytes()',
+    ),
+    "scripts/make-dmg.sh": ('cp "$ROOT/LICENSE" "$STAGE/LICENSE"',),
+    "scripts/check-release-license.py": (
+        'license_bytes = (ROOT / "LICENSE").read_bytes()',
+        'assert reader.extract("LICENSE") == license_bytes',
+        "p.read_bytes() == expected",
+    ),
+    ".github/workflows/desktop.yml": ('shutil.copy2("LICENSE", metadata / "LICENSE")',),
+}
+
+
+def native_product_license_copy(text: str) -> bool:
+    """Recognize the product copy as executable Python, excluding comments/strings."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or len(node.args) < 2:
+            continue
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "copy2":
+            continue
+        if not isinstance(node.func.value, ast.Name) or node.func.value.id != "shutil":
+            continue
+        source, target = node.args[:2]
+        if (
+            isinstance(source, ast.BinOp)
+            and isinstance(source.op, ast.Div)
+            and isinstance(source.left, ast.Name)
+            and source.left.id in {"REPO", "repo"}
+            and isinstance(source.right, ast.Constant)
+            and source.right.value == "LICENSE"
+            and isinstance(target, ast.BinOp)
+            and isinstance(target.op, ast.Div)
+            and isinstance(target.left, ast.Name)
+            and target.left.id == "resources"
+            and isinstance(target.right, ast.Constant)
+            and target.right.value == "LICENSE-AgentAuthority.txt"
+        ):
+            return True
+    return False
+
+
 def check_packagers(repo: Path) -> list[str]:
     problems = []
     for rel in PACKAGERS:
         path = repo / rel
-        if path.is_file() and "LICENSE" not in path.read_text(encoding="utf-8"):
-            problems.append(f"{rel}: Installationsrezept muss LICENSE mit ausliefern")
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if rel == "native/macos/scripts/build_app.py":
+            proven = native_product_license_copy(text)
+        else:
+            proofs = PACKAGER_PROOFS.get(rel, ())
+            proven = bool(proofs) and all(proof in text for proof in proofs)
+        if not proven:
+            problems.append(f"{rel}: konkreter Produkt-LICENSE-Paketnachweis fehlt")
     return problems
 
 
