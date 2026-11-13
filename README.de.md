@@ -64,31 +64,32 @@ ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge
 
 Der ausdrücklich aktivierte ThreadDesk-Werkzeugproxy unterstützt im Entwicklungsstand begrenzte JSON-Schema-2020-12-Verweise innerhalb des gelieferten Schemas, einschließlich eingebetteter Fachschemas. Er lädt keine Schemas aus dem Netzwerk oder von Datenträgern nach; zyklische, mehrdeutige und nicht unterstützte Schemas bleiben ausgeschlossen. Bestehende Werkzeugrechte und Operationsquittungen gelten weiter. Siehe [Proxy-Vertrag](docs/DYNAMIC-THREADDESK-PROXY.md).
 
-**Verifizierter Laufzeitstand (11. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc48** (`48c635137b4b`), direkt über den laufenden KiraBridge-Dienst und das veröffentlichte macOS-Pre-Release `v0.8.0rc48` geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
+**Verifizierter Laufzeitstand (11. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc48** (`48c635137b4b`), direkt über den laufenden KiraBridge-Dienst und das veröffentlichte macOS-Pre-Release `v0.8.0rc49` geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
 
-**Veröffentlichter macOS-Intel-Download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion.
+**Veröffentlichter macOS-Intel-Download:** [0.8.0rc49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49) · 4. November 2026 · Vorabversion.
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip)
+### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/KiraBridge-macos.tar.gz)
 
-[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/SHA256SUMS)
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/SHA256SUMS)
 · [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
 
-Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC36 ist für Intel-Macs verfügbar.
+Die aktuellen Downloads sind das veröffentlichte macOS-Intel-Archiv und das separate Debian-Server-Archiv.
+Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC49 ist für Intel-Macs verfügbar.
 
-Das frühere RC33-Release enthält eine [Windows 11-Entwicklungsvorschau](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
+Das frühere RC33-Release enthält eine [Windows 11-Entwicklungsvorschau](docs/RC33-DELIVERY-20261104.md)
 mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
 separates Entwicklungspaket; allgemeine Windows-Datei-, Prozess- und Terminaltools
-gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md).
+gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md)
+und [Windows-Einrichtungsbelege](docs/WINDOWS-SETUP-20261104.md).
 
-Der veröffentlichte [Windows-Einrichtungsassistent 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
-hat Belege für Download und getrennte Windows-Installation.
+Der [Windows-Einrichtungsassistent 0.8.0rc37.dev1](docs/WINDOWS-SETUP-20261104.md)
+hat historische Belege für eine getrennte Windows-Installation.
 Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden. Entpacke das Paket und öffne
 **Einrichtung-starten.cmd** für die vier Schritte. Kontoanmeldung und der echte
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-Der oben verlinkte, geprüfte veröffentlichte Intel-Download basiert auf RC36 (`d4aebdd`), **nicht** auf der lokal installierten RC45. Der verifizierte Laufzeitstand steht am Anfang; der unten verlinkte Prüfbericht vom 7. November ist älter als RC45.
+Der oben verlinkte, geprüfte veröffentlichte Intel-Download basiert auf RC49, **nicht** auf der lokal installierten RC45. Der verifizierte Laufzeitstand steht am Anfang; der unten verlinkte Prüfbericht vom 7. November ist älter als RC45.
 [Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 beschreibt den vorherigen RC40-Quellstand `a5d381a`.
@@ -118,10 +119,10 @@ Release um; der Rollback setzt beide Werte zurück. Andere Einstellungen bleiben
 
 ## Loslegen
 
-1. **Installieren oder aktualisieren.** Lade das Intel-Installer-ZIP herunter und
-   entpacke es vollständig. Öffne `KiraBridge-Installer.app` und folge der Bestätigung
-   und sichtbaren Terminalinstallation. Verwende ein separates Terminalfenster;
-   laufende Agentensitzungen erhalten.
+1. **Installieren oder aktualisieren.** Lade `KiraBridge-macos.tar.gz` herunter und
+   entpacke es vollständig. Führe im entpackten Ordner `KiraBridge`
+   `sh ./install.sh --desktop --require-visible-terminal` in einem separaten
+   Terminalfenster aus und folge der Bestätigung. Laufende Agentensitzungen erhalten.
 2. **App öffnen.** Der Installer aktualisiert Dienst und Desktop-App gemeinsam.
    Öffne `KiraBridge.app` in `~/Applications`. Vorhandene Einstellungen und Zugänge
    bleiben erhalten; der Installer erstellt eine Rückfallsicherung.
@@ -220,7 +221,7 @@ uv-Umgebung, CLI-Einstieg, Quellverzeichnisse und gezielte Prüfungen. Ausgangsp
 ist ein Repositorycheckout; veröffentlichter Installer und Entwicklungsumgebung sind getrennt.
 
 Lokaler CLI-Modulkandidat: [Terminal-/Codex-/Grok-Grenzen und Prüfgrenzen](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
-Dieses Entwicklungspaket ist vom veröffentlichten RC36-Download getrennt; die
+Dieses Entwicklungspaket ist vom veröffentlichten RC49-Download getrennt; die
 echte Browserchat-Abnahme steht noch aus.
 
 Lokaler Big-Plan-Koordinatoradapter: [freigegebener Aufgaben-Loop, Codex/Grok-Prüfung und Agentenberichte](docs/COORDINATOR-LOOP.md). Eigenes Opt-in-Profil; bestehende sichtbare Sitzungen und veröffentlichte Pakete behalten ihren bisherigen Stand.
@@ -237,15 +238,15 @@ Das optionale [native Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.m
 
 [CLI-Rückgabe und reine Postfachzustellung](docs/NATIVE-COMPLETION-RETURNS-20261106.md): Der integrierte Quellstand belässt Antworten/Ergebnisse im Postfach des anfragenden Clients. `--inbox-only` vermeidet Terminalzustellung; Completionquittungen benötigen keinen weiteren Agententurn.
 
-[Frühere Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+[Frühere Windows-Vorschau dev2](docs/WINDOWS-DEVELOPMENT-20261103.md):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
 [Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
 
-[Frühere Windows-Desktop-Vorschau dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): Alle sechs nativen
+[Frühere Windows-Desktop-Vorschau dev3](docs/WINDOWS-DESKTOP-20261104.md): Alle sechs nativen
 Gastprüfungen bestanden, einschließlich Ctrl-/Alt-/Shift-Kombinationen und
-abgesicherter Fenstersteuerung. Veröffentlichte Downloads und die getrennte
-Windows 11-Installation sind geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
-dev2 bleibt als Rückfallmöglichkeit erhalten.
+abgesicherter Fenstersteuerung. Die dokumentierte Windows 11-Installation ist
+geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
+der frühere dev2-Nachweis bleibt für Rückfallhinweise erhalten.
 
 ### Designquellstand · 7. November 2026
 

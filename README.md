@@ -66,32 +66,33 @@ In the development source, the opt-in ThreadDesk tool proxy accepts bounded JSON
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
-**Verified runtime status (November 11, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc48** (`48c635137b4b`), verified through the live KiraBridge daemon and the published macOS pre-release `v0.8.0rc48`. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
+**Verified runtime status (November 11, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc48** (`48c635137b4b`), verified through the live KiraBridge daemon and the published macOS pre-release `v0.8.0rc49`. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
 
-**Published macOS Intel download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · November 4, 2026 · Preview.
+**Published macOS Intel download:** [0.8.0rc49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49) · November 4, 2026 · Preview.
 
-### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip)
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/KiraBridge-macos.tar.gz)
 
-[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/SHA256SUMS)
+[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/SHA256SUMS)
 · [All releases](https://github.com/landjunge/KiraBridge/releases)
 
-Downloads require a GitHub account with access to this private repository.
-This is a preview; there is no stable release yet. RC36 is available for Intel Macs.
+The current downloads are the published macOS Intel archive and the separate Debian server archive.
+This is a preview; there is no stable release yet. RC49 is available for Intel Macs.
 
-The earlier RC33 release includes a [Windows 11 development preview](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
+The earlier RC33 release includes a [Windows 11 development preview](docs/RC33-DELIVERY-20261104.md)
 with native keyboard, shortcuts and guarded window control. It is a separate
 development kit; general Windows file, process and terminal tools remain outside
-its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md).
+its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md)
+and [Windows setup evidence](docs/WINDOWS-SETUP-20261104.md).
 
-The published [Windows setup wizard 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
-has verified download and separate Windows installation evidence.
+The [Windows setup wizard 0.8.0rc37.dev1](docs/WINDOWS-SETUP-20261104.md)
+has historical evidence for a separate Windows installation.
 All seven native phases for that limited development preview passed. Extract the package and open
 **Einrichtung-starten.cmd** for four guided steps. Account sign-in and a real
 ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-The linked Intel download is the verified published RC36 (`d4aebdd`), **not** the newer locally installed RC45. The verified installed runtime is listed in the opening status. The historical November 7 evidence below predates RC45.
+The linked Intel download is the verified published RC49, **not** the newer locally installed RC45. The verified installed runtime is listed in the opening status. The historical November 7 evidence below predates RC45.
 [Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 describes the previous RC40 source `a5d381a`.
@@ -121,9 +122,10 @@ Python; rollback restores both values. Other settings stay unchanged.
 
 ## Get started
 
-1. **Install or update.** Download and fully extract the Intel installer ZIP.
-   Open `KiraBridge-Installer.app` and follow its confirmation and visible Terminal
-   installation. Use a separate Terminal window; preserve running agent sessions.
+1. **Install or update.** Download and fully extract `KiraBridge-macos.tar.gz`.
+   Run `sh ./install.sh --desktop --require-visible-terminal` from the extracted
+   `KiraBridge` directory in a separate Terminal window and follow its confirmation.
+   Preserve running agent sessions.
 2. **Open the app.** The installer updates the service and desktop app together.
    Open `KiraBridge.app` in `~/Applications`. Existing settings and credentials
    remain; the installer creates a rollback backup.
@@ -223,7 +225,7 @@ environment, CLI quickstart, source directories and scoped checks. Start from a
 repository checkout; the published installer and development environment are separate.
 
 Local CLI-module candidate: [Terminal/Codex/Grok adapter boundaries and test limits](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
-This development package is separate from the published RC36 download and still
+This development package is separate from the published RC49 download and still
 requires real browserchat acceptance.
 
 Local Big Plan coordinator adapter: [approved-task loop, Codex/Grok review and agent reports](docs/COORDINATOR-LOOP.md). Uses a separate opt-in profile; existing visible sessions and published packages retain their current behavior.
@@ -240,14 +242,14 @@ The optional [native worker routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md
 
 [CLI return-message behavior and inbox-only delivery](docs/NATIVE-COMPLETION-RETURNS-20261106.md): the integrated source keeps answers/results in the requesting client's inbox. `--inbox-only` avoids terminal dispatch; completion acknowledgements do not require another agent turn.
 
-[Earlier Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+[Earlier Windows preview dev2](docs/WINDOWS-DEVELOPMENT-20261103.md):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 [Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.
 
-[Earlier Windows desktop preview dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): all six native
+[Earlier Windows desktop preview dev3](docs/WINDOWS-DESKTOP-20261104.md): all six native
 guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window control.
-Published downloads and the separate Windows 11 installation were verified.
-[Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); dev2 remains available for rollback.
+The documented Windows 11 installation was verified.
+[Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); the earlier dev2 record remains for rollback notes.
 
 ### Design source · November 7, 2026
 

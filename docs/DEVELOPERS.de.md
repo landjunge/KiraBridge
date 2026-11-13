@@ -12,9 +12,9 @@ Geprüfte Mainbasis: `2bbf6d9dc628cdf95e5591df7968f761f938883c`; die abschließe
 diesen Gitpin ohne Änderung der paketierten Laufzeit fortschreiben.
 
 Die lokale Intel-Laufzeit bleibt `0.8.0rc40` bei
-`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. Jüngster veröffentlichter Intel-Installer
-bleibt [RC36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36),
-Quelle `d4aebdd89a206045731f2692a3f363fddaa15ee0`. Dieser Installer und das getrennte
+`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. Der jüngste veröffentlichte Intel-Stand
+ist [RC49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49),
+Quelle `edc44290831b5b79e5d1f64238bcf09e4fe8b85a`. Dieser Installer und das getrennte
 Serverarchiv wurden tatsächlich geladen und auf Hashgleichheit geprüft.
 [Prüfung, Quellen und verbleibende Grenzen](evidence/readme-current-20261107.json).
 
