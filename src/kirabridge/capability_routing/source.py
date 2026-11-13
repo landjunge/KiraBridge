@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from .router import Matrix, RoutingError
+from .router import Matrix, RoutingError, ScopedAuthority
 
 BEGIN = "<!-- bigplan-cli-matrix:v1 -->"
 END = "<!-- /bigplan-cli-matrix -->"
@@ -47,7 +47,33 @@ class ThreadDeskSource:
         if notes.index(BEGIN) >= notes.index(END):
             raise RoutingError("ThreadDesk matrix markers are reversed")
         raw = notes.split(BEGIN, 1)[1].split(END, 1)[0].strip()
-        matrix = Matrix.model_validate(json.loads(raw, object_pairs_hook=unique_object))
+        try:
+            matrix = Matrix.model_validate(json.loads(raw, object_pairs_hook=unique_object))
+        except (ValueError, RecursionError):
+            raise RoutingError("Invalid global CLI matrix") from None
+        if matrix.scopes:
+            raise RoutingError("Scoped refreshes require their separate versioned blocks")
+        for cli in ("qwen",):
+            begin = f"<!-- bigplan-cli-scope:v1:{cli} -->"
+            end = f"<!-- /bigplan-cli-scope:{cli} -->"
+            if not notes.count(begin) and not notes.count(end):
+                continue
+            if (
+                notes.count(begin) != 1
+                or notes.count(end) != 1
+                or notes.index(begin) >= notes.index(end)
+            ):
+                raise RoutingError("Scoped authority markers are missing or ambiguous")
+            raw_scope = notes.split(begin, 1)[1].split(end, 1)[0].strip()
+            try:
+                scope = ScopedAuthority.model_validate(
+                    json.loads(raw_scope, object_pairs_hook=unique_object)
+                )
+            except (ValueError, RecursionError):
+                raise RoutingError("Invalid scoped CLI authority") from None
+            if scope.cli != cli:
+                raise RoutingError("Scoped authority marker and CLI disagree")
+            matrix.scopes.append(scope)
         return matrix, {"thread_id": self.thread_id, "revision": thread["revision"]}
 
 

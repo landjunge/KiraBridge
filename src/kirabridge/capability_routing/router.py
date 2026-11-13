@@ -7,7 +7,14 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 EFFORTS = {
     "none": 0,
@@ -76,11 +83,42 @@ class Capability(Record):
     limitations: str
 
 
+class ScopedAuthority(Record):
+    """An explicit adapter-specific refresh, never a refresh of the global matrix."""
+
+    schema_version: Literal["bigplan.cli-scope.v1"]
+    cli: Literal["qwen"]
+    adapter: Literal["qwen_acp"]
+    authority_ref: str = Field(min_length=1, max_length=1000)
+    checked_at: str
+    expires_at: str
+    read_only: bool
+    capability: Capability
+
+    @model_validator(mode="after")
+    def exact_adapter(self):
+        if self.capability.id != self.cli:
+            raise ValueError("Scoped authority must bind one exact CLI and native adapter")
+        if not self.capability.models or not self.capability.installed_version:
+            raise ValueError("Scoped authority requires actual version/model evidence")
+        if len({model.id for model in self.capability.models}) != len(self.capability.models):
+            raise ValueError("Scoped authority models must be unambiguous")
+        return self
+
+
 class Matrix(Record):
     schema_version: Literal["bigplan.cli-matrix.v1"]
     checked_at: str
     expires_at: str
     clis: list[Capability]
+    scopes: list[ScopedAuthority] = Field(default_factory=list, max_length=1)
+
+    @model_serializer(mode="wrap")
+    def legacy_fingerprint(self, handler):
+        value = handler(self)
+        if not self.scopes:
+            value.pop("scopes", None)
+        return value
 
     @field_validator("clis")
     @classmethod
@@ -152,6 +190,14 @@ class Task(Record):
     read_only: bool = True
     timeout_seconds: int = Field(default=300, ge=1, le=3600)
     delegation_depth: int = Field(default=0, ge=0, le=1)
+    execution_adapter: Literal["qwen_acp"] | None = None
+
+    @model_serializer(mode="wrap")
+    def legacy_fingerprint(self, handler):
+        value = handler(self)
+        if self.execution_adapter is None:
+            value.pop("execution_adapter", None)
+        return value
 
 
 def timestamp(value: str) -> datetime:
@@ -175,10 +221,39 @@ def fingerprint(value) -> str:
     ).hexdigest()
 
 
-def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
+def select(
+    matrix: Matrix,
+    runtime: Runtime,
+    task: Task,
+    *,
+    now=None,
+    _allow_scoped_qwen: bool = False,
+) -> dict:
     """Select only known, granted combinations; preserve explicit requirements."""
     now = now or datetime.now(timezone.utc)
-    fresh(matrix.checked_at, matrix.expires_at, now, timedelta(days=7))
+    # A scoped block never rewrites/extends the global checked_at/expires_at.
+    # It is usable only for the explicit choice and exact managed adapter.
+    scoped = [scope for scope in matrix.scopes if scope.cli == task.explicit_cli]
+    if len(scoped) > 1:
+        raise RoutingError("Ambiguous scoped CLI authority")
+    if scoped:
+        if not _allow_scoped_qwen:
+            raise RoutingError("Scoped Qwen authority requires dedicated scoped Qwen validation")
+        scope = scoped[0]
+        if (
+            task.execution_adapter != scope.adapter
+            or not task.explicit_model
+            or not task.explicit_effort
+            or (scope.read_only and not task.read_only)
+        ):
+            raise RoutingError("Task is outside the explicit scoped adapter authority")
+        fresh(scope.checked_at, scope.expires_at, now, timedelta(days=1))
+        if timestamp(scope.expires_at) - timestamp(scope.checked_at) > timedelta(days=1):
+            raise RoutingError("Scoped authority cannot extend beyond 24 hours")
+        capabilities = [scope.capability]
+    else:
+        fresh(matrix.checked_at, matrix.expires_at, now, timedelta(days=7))
+        capabilities = matrix.clis
     if task.delegation_depth:
         raise RoutingError("A delegated child cannot delegate again")
     for effort in (task.min_effort, task.explicit_effort):
@@ -192,7 +267,7 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
     if not task.read_only and not runtime.allow_write:
         raise RoutingError("Runtime does not grant writing")
     candidates, rejected = [], []
-    for cli in matrix.clis:
+    for cli in capabilities:
         if cli.id not in task.allowed_clis or (task.explicit_cli and cli.id != task.explicit_cli):
             continue
         grants = [a for a in runtime.access if a.cli == cli.id]
@@ -263,4 +338,12 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
             "suitability then cost rank; Codex budget preferred"
         ),
         "excluded": rejected,
+        **(
+            {
+                "scoped_authority_ref": scoped[0].authority_ref,
+                "execution_adapter": scoped[0].adapter,
+            }
+            if scoped
+            else {}
+        ),
     }
