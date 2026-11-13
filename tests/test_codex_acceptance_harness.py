@@ -704,3 +704,12 @@ def test_execute_missing_harness_commit_stops_before_any_run(harness, monkeypatc
         runpy.run_path(harness.__file__, run_name="__main__")
     assert not root.exists()
     run.assert_not_called()
+
+
+@pytest.mark.parametrize("version", ["codex-cli 0.166.0", "codex-cli 0.168.0", "unknown"])
+def test_native_candidate_requires_the_current_exact_codex_version(harness, monkeypatch, version):
+    monkeypatch.setattr(harness.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
+    assert harness.parser().parse_args([]).codex_version == "codex-cli 0.167.0"
+    with pytest.raises(RuntimeError, match="pins the 0.167 renderer"):
+        harness.validate_candidate(SimpleNamespace(codex_version=version))

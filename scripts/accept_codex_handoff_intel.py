@@ -612,7 +612,7 @@ def require_commit_pins(head, installed, package_commit, harness_commit):
 def validate_candidate(args):
     require((platform.system(), platform.machine()) == ("Darwin", "x86_64"), "Intel macOS only")
     require(not sys.flags.optimize, "Independent proof assertions must remain enabled")
-    require(args.codex_version == "codex-cli 0.166.0", "This harness pins the 0.166 renderer")
+    require(args.codex_version == "codex-cli 0.167.0", "This harness pins the 0.167 renderer")
     require(Path(sys.executable).absolute() == args.expected_python.absolute(), "Wrong interpreter")
     require(
         Path(kirabridge.__file__).resolve().parent == args.package_root.resolve(), "Wrong package"
@@ -1609,7 +1609,7 @@ def parser():
     value.add_argument("--harness-commit")
     value.add_argument("--codex", type=Path, default=Path.home() / ".local/bin/codex")
     value.add_argument("--codex-sha256")
-    value.add_argument("--codex-version", default="codex-cli 0.166.0")
+    value.add_argument("--codex-version", default="codex-cli 0.167.0")
     value.add_argument("--response-timeout", type=int, default=120, choices=range(30, 181))
     return value
 
