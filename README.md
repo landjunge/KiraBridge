@@ -228,6 +228,8 @@ requires real browserchat acceptance.
 
 Local Big Plan coordinator adapter: [approved-task loop, Codex/Grok review and agent reports](docs/COORDINATOR-LOOP.md). Uses a separate opt-in profile; existing visible sessions and published packages retain their current behavior.
 
+Source update: the coordinator reports substantive status changes instead of resending unchanged states every minute. Local observations stay current; report attempts retain their identity across restarts, including uncertain outcomes. Running services require a separately verified update.
+
 The [standing-mandate supervisor](docs/COORDINATOR-CONTINUATION-20261106.md) continues coordinator-assigned ThreadDesk tasks without another user approval. It reconciles existing claims and results, skips completed work and keeps task-local problems separate from independent work.
 
 [The November 6 integration checkpoint](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) records accepted packages, combined remote/crash tests and the gates open at that time. Use the [November 7 verification](docs/evidence/readme-current-20261107.json) for the reviewed source and installed pin; dated checkpoints retain their historical results.

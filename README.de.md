@@ -225,6 +225,8 @@ echte Browserchat-Abnahme steht noch aus.
 
 Lokaler Big-Plan-Koordinatoradapter: [freigegebener Aufgaben-Loop, Codex/Grok-Prüfung und Agentenberichte](docs/COORDINATOR-LOOP.md). Eigenes Opt-in-Profil; bestehende sichtbare Sitzungen und veröffentlichte Pakete behalten ihren bisherigen Stand.
 
+Quelländerung: Der Koordinator meldet fachliche Zustandswechsel und sendet unveränderte Stände nicht mehr minütlich erneut. Lokale Beobachtungen bleiben aktuell; Meldeversuche behalten ihre Kennung über Neustarts, auch bei unklarem Ausgang. Laufende Dienste benötigen ein separat geprüftes Update.
+
 Der [Supervisor mit bestehendem Nutzerauftrag](docs/COORDINATOR-CONTINUATION-20261106.md) führt zugeordnete ThreadDesk-Aufgaben ohne weitere Nutzerfreigabe fort. Er gleicht vorhandene Claims und Ergebnisse ab, überspringt erledigte Arbeit und hält unabhängige Aufgaben bei einem Einzelfehler weiter bearbeitbar.
 
 Der [Integrationscheckpoint vom 6. November](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) bündelt angenommene Pakete, gemeinsame Remote-/Absturztests und die damals offenen Gates. Für geprüfte Quelle und installierten Pin gilt der [Abgleich vom 7. November](docs/evidence/readme-current-20261107.json); datierte Checkpoints behalten ihre historischen Ergebnisse.
