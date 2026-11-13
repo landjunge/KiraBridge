@@ -129,11 +129,32 @@ def test_start_isolated_reads_one_line_and_owns_the_child(isolated_harness, tmp_
 
 
 def test_start_isolated_keeps_draining_stderr_past_the_old_limit(isolated_harness, tmp_path):
-    output = _run(isolated_harness, tmp_path, "stderr_flood", _receipt(tmp_path))
-    assert output.splitlines() == [
-        "started http://127.0.0.1:54321",
-        "stopped",
-    ]
+    # A real single Python child writes 2 MiB to fd 2 before and after its
+    # receipt. The old 64 KiB drain would block it before the receipt.
+    output = _run(isolated_harness, tmp_path, "stderr_flood", _receipt(tmp_path)).splitlines()
+    assert output[0] == "started http://127.0.0.1:54321"
+    assert output[1] == "alive true"
+    assert output[2] == "stopped false"
+
+
+def test_owned_handle_is_kept_until_absence_and_adoption_is_fenced(isolated_harness, tmp_path):
+    # adopted, first stop false, still running, handle kept, late adopt refused,
+    # second stop false, stopper called twice — never nil before absence.
+    assert _run(isolated_harness, tmp_path, "owned_fence") == "true false true true false false 2"
+
+
+def test_stop_before_adopt_fences_late_children(isolated_harness, tmp_path):
+    assert _run(isolated_harness, tmp_path, "owned_sealed") == "true false false"
+
+
+def test_a_late_child_is_stopped_not_tracked(isolated_harness, tmp_path):
+    assert _run(isolated_harness, tmp_path, "late_child", _receipt(tmp_path)) == "fenced false true"
+
+
+def test_old_bounded_drain_would_block_the_same_child(isolated_harness, tmp_path):
+    # Negative control for the regression: with the old 64 KiB drain the same
+    # child never delivers its receipt.
+    assert _run(isolated_harness, tmp_path, "old_drain", _receipt(tmp_path)) == "blocked"
 
 
 def test_start_isolated_times_out_and_stops_the_child(isolated_harness, tmp_path):

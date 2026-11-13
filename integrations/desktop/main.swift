@@ -146,7 +146,7 @@ enum DesktopBootstrap {
     static func startIsolated(executable: URL, arguments: [String], environment: [String: String],
                               privateDirectory: URL, timeout: TimeInterval = 30,
                               maxStdoutBytes: Int = 65536,
-                              owned: ((Process) -> Void)? = nil) throws -> DesktopIsolatedServer {
+                              owned: ((Process) -> Bool)? = nil) throws -> DesktopIsolatedServer {
         guard timeout.isFinite, timeout > 0, timeout <= 60,
               maxStdoutBytes > 0, maxStdoutBytes <= 1024 * 1024 else {
             throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
@@ -163,8 +163,15 @@ enum DesktopBootstrap {
             throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
         }
         // The caller keeps the owned handle immediately, so even an uncertain
-        // cleanup leaves it stoppable and never starts a second child.
-        owned?(task)
+        // cleanup leaves it stoppable and never starts a second child. If the
+        // owner refuses the child (sealed holder), stop it here so it can never
+        // become an untracked process.
+        if let owned, !owned(task) {
+            guard DesktopBootstrap.stop(task) else {
+                throw DesktopBootstrapFailure(kind: .cleanupUnknown, cleanupConfirmed: false)
+            }
+            throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
+        }
         DispatchQueue.global().async {
             // Keep draining for the whole child lifetime so a full pipe can
             // never block the server; the bytes are discarded, not stored.
@@ -253,21 +260,59 @@ struct DesktopIsolatedServer {
 /// soon as the child starts, so an uncertain cleanup never loses the handle and
 /// the app never starts a second child.
 final class DesktopOwnedChild {
-    private let lock = NSLock()
-    private var process: Process?
+    typealias Stopper = (Process) -> Bool
 
-    func adopt(_ process: Process) {
+    private let lock = NSLock()
+    private let stopper: Stopper
+    private var process: Process?
+    private var sealed = false
+
+    init(stopper: @escaping Stopper = DesktopBootstrap.stop) {
+        self.stopper = stopper
+    }
+
+    /// Adopt the owned process. Returns false when the holder is sealed or
+    /// already holds a process; the caller must then stop the child itself.
+    @discardableResult
+    func adopt(_ process: Process) -> Bool {
         lock.lock()
+        defer { lock.unlock() }
+        guard !sealed, self.process == nil else { return false }
         self.process = process
+        return true
+    }
+
+    /// Stop the one owned child. The handle is kept — and adoption stays
+    /// sealed — until the child is confirmed absent, so a failed stop reports
+    /// unknown and can be retried instead of looking absent.
+    @discardableResult
+    func stop() -> Bool {
+        lock.lock()
+        sealed = true
+        let owned = process
+        lock.unlock()
+        guard let owned else { return true }
+        let confirmed = stopper(owned)
+        if confirmed {
+            lock.lock()
+            process = nil
+            lock.unlock()
+        }
+        return confirmed
+    }
+
+    /// Close the adoption fence without touching the child (used when a start
+    /// failed uncertainly so a later start cannot adopt an untracked child).
+    func seal() {
+        lock.lock()
+        sealed = true
         lock.unlock()
     }
 
-    func stop() {
+    var hasHandle: Bool {
         lock.lock()
-        let owned = process
-        process = nil
-        lock.unlock()
-        if let owned { _ = DesktopBootstrap.stop(owned) }
+        defer { lock.unlock() }
+        return process != nil
     }
 
     var isRunning: Bool {
@@ -676,6 +721,9 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
                 DispatchQueue.main.async {
                     self.bootstrapInProgress = !failure.cleanupConfirmed
                     self.bootstrapCleanupUnknown = !failure.cleanupConfirmed
+                    // A failed start closes the adoption fence: a late child can
+                    // never be adopted untracked while the outcome is unknown.
+                    self.isolatedChild.seal()
                     self.openRequests.failAll()
                     self.showError(
                         failure.localizedDescription, retryAllowed: failure.cleanupConfirmed)
