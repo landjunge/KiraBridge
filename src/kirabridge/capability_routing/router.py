@@ -221,7 +221,14 @@ def fingerprint(value) -> str:
     ).hexdigest()
 
 
-def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
+def select(
+    matrix: Matrix,
+    runtime: Runtime,
+    task: Task,
+    *,
+    now=None,
+    _allow_scoped_qwen: bool = False,
+) -> dict:
     """Select only known, granted combinations; preserve explicit requirements."""
     now = now or datetime.now(timezone.utc)
     # A scoped block never rewrites/extends the global checked_at/expires_at.
@@ -230,6 +237,8 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
     if len(scoped) > 1:
         raise RoutingError("Ambiguous scoped CLI authority")
     if scoped:
+        if not _allow_scoped_qwen:
+            raise RoutingError("Scoped Qwen authority requires dedicated scoped Qwen validation")
         scope = scoped[0]
         if (
             task.execution_adapter != scope.adapter

@@ -41,9 +41,12 @@ def subscription_environment():
     return env
 
 
-def before_delegation(source, runtime, task, *, probe=True):
+def _before_delegation(source, runtime, task, *, probe, allow_scoped_qwen):
     matrix, binding = source.load()
-    decision = {**select(matrix, runtime, task), "thread_desk": binding}
+    decision = {
+        **select(matrix, runtime, task, _allow_scoped_qwen=allow_scoped_qwen),
+        "thread_desk": binding,
+    }
     cwd = Path(task.cwd).resolve(strict=True)
     if not cwd.is_dir() or not any(
         cwd.is_relative_to(Path(root).resolve(strict=True)) for root in runtime.allowed_roots
@@ -119,6 +122,11 @@ def before_delegation(source, runtime, task, *, probe=True):
     return decision
 
 
+def before_delegation(source, runtime, task, *, probe=True):
+    """Generic coordinator path; scoped Qwen evidence is deliberately unavailable."""
+    return _before_delegation(source, runtime, task, probe=probe, allow_scoped_qwen=False)
+
+
 def command_for(decision, task):
     """Static adapters only. ThreadDesk cannot provide executable code or flags."""
     exe, model, effort = (decision[k] for k in ("executable", "model", "effort"))
@@ -191,6 +199,20 @@ class DelegationGuard:
             )
         return decision
 
+    def _validate_scoped_qwen_configured(self, task, *, model, effort):
+        decision = _before_delegation(
+            self.source,
+            self.runtime,
+            task,
+            probe=True,
+            allow_scoped_qwen=True,
+        )
+        if ("qwen", model, effort) != tuple(decision[k] for k in ("cli", "model", "effort")):
+            raise RoutingError(
+                "Configured worker differs from matrix decision; bind a matching per-run profile"
+            )
+        return decision
+
     def validate_qwen_task(self, task, *, args, config, expected=None):
         """Select for actual Qwen arguments; call again at the native effect boundary.
 
@@ -223,15 +245,15 @@ class DelegationGuard:
         from .router import fingerprint
 
         input_hash, config_hash = fingerprint(args), fingerprint(config)
-        decision = self.validate_configured(
-            task, cli="qwen", model=config.model, effort=config.qwen_reasoning_effort
+        decision = self._validate_scoped_qwen_configured(
+            task, model=config.model, effort=config.qwen_reasoning_effort
         )
         if Path(config.executable or "").resolve(strict=True) != Path(
             decision["executable"]
         ).resolve(strict=True):
             raise RoutingError("Configured Qwen executable differs from the access evidence")
         matrix, binding = self.source.load()
-        current = select(matrix, self.runtime, task)
+        current = select(matrix, self.runtime, task, _allow_scoped_qwen=True)
         if (
             binding != decision["thread_desk"]
             or any(

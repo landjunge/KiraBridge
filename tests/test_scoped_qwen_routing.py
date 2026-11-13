@@ -148,6 +148,27 @@ def test_explicit_qwen_scope_uses_real_hook_without_refreshing_global_matrix(sco
         select(matrix, runtime, task.model_copy(update={"explicit_cli": "codex"}))
 
 
+def test_generic_native_prepare_cannot_consume_scoped_qwen(scoped):
+    """Only the argument-validating scoped hook may opt into Qwen evidence."""
+    source, runtime, task, config, args, *_ = scoped
+    from kirabridge.bridge_core.models import BridgeError
+    from kirabridge.capability_routing.native import NativeRoutedAdapter
+
+    guard = DelegationGuard(source, runtime)
+    with pytest.raises(RoutingError, match="dedicated scoped Qwen validation"):
+        guard.prepare(task)
+    generic = NativeRoutedAdapter(object(), "qwen", guard, profiles=None)
+    with pytest.raises(BridgeError) as error:
+        generic.prepare(task)
+    assert error.value.code == "routing_preflight_blocked"
+
+    # The permitted path has already bound actual args/config and passes the
+    # MEDIUM, read-only, operation, grant, auth and executable checks.
+    decision = guard.validate_qwen_task(task, args=args, config=config)
+    assert decision["cli"] == "qwen"
+    assert decision["effort"] == "medium"
+
+
 @pytest.mark.parametrize(
     "change",
     [
