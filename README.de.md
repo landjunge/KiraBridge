@@ -66,40 +66,44 @@ ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge
 
 Der ausdrücklich aktivierte ThreadDesk-Werkzeugproxy unterstützt im Entwicklungsstand begrenzte JSON-Schema-2020-12-Verweise innerhalb des gelieferten Schemas, einschließlich eingebetteter Fachschemas. Er lädt keine Schemas aus dem Netzwerk oder von Datenträgern nach; zyklische, mehrdeutige und nicht unterstützte Schemas bleiben ausgeschlossen. Bestehende Werkzeugrechte und Operationsquittungen gelten weiter. Siehe [Proxy-Vertrag](docs/DYNAMIC-THREADDESK-PROXY.md).
 
-**Verifizierter Laufzeitstand (11. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc48** (`48c635137b4b`), direkt über den laufenden KiraBridge-Dienst und das veröffentlichte macOS-Pre-Release `v0.8.0rc49` geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
+## Downloads und Installationsprofile
 
-**Veröffentlichter macOS-Intel-Download:** [0.8.0rc49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49) · 4. November 2026 · Vorabversion.
+Die Buttons oben verlinken direkt auf veröffentlichte Installationsdateien und
+zeigen deren Versionen. macOS-Desktop und Debian-Remote-Server haben getrennte
+Releasewege; ihre Versionsnummern können deshalb unterschiedlich sein.
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/KiraBridge-macos.tar.gz)
+| Download | Einsatzzweck | Installationsanleitung |
+| --- | --- | --- |
+| **macOS Intel** | Desktop-App und lokaler KiraBridge-Dienst auf einem Intel-Mac. | [Installieren, prüfen und Hilfe finden](docs/INSTALL-DE.md) |
+| **Debian Remote** | Debian-/Linux-Server für x86_64 mit Remote-Agenten- und MCP-Funktionen. Dieses Paket enthält keine Linux-Desktop-App. | [Linux-/Debian-Server](docs/INSTALL-LINUX-SERVER.de.md) |
 
-[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/SHA256SUMS)
-· [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
+[Alle Versionen, Prüfsummen und Release-Hinweise](https://github.com/landjunge/KiraBridge/releases)
+sind öffentlich; für den Download ist kein GitHub-Konto nötig. Releases können
+Vorabversionen sein. Status, Voraussetzungen und Grenzen stehen beim jeweiligen
+Release. KI-Anmeldung und mögliche Anbieterkosten bleiben getrennt.
 
-Die aktuellen Downloads sind das veröffentlichte macOS-Intel-Archiv und das separate Debian-Server-Archiv.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC49 ist für Intel-Macs verfügbar.
+Die Download-Buttons werden bei Veröffentlichung, Bearbeitung oder Löschung
+eines Releases, bei Änderungen am Aktualisierungsskript und zusätzlich alle
+sechs Stunden für nachträglich hochgeladene Dateien aktualisiert. Angeboten
+werden nur vollständige, geprüfte Downloads. Desktop-Buttons verwenden das
+neueste veröffentlichte Desktop-Release; fehlende Plattformen werden nicht aus
+älteren Desktop-Releases ergänzt. Debian Remote wird unabhängig aus dem neuesten
+veröffentlichten `linux-*`-Serverrelease gewählt. Buttons für Apple Silicon und
+Windows-Desktop erscheinen, sobald dieses Desktop-Release entsprechende Pakete enthält.
 
-Das frühere RC33-Release enthält eine [Windows 11-Entwicklungsvorschau](docs/RC33-DELIVERY-20261104.md)
-mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
-separates Entwicklungspaket; allgemeine Windows-Datei-, Prozess- und Terminaltools
-gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md)
-und [Windows-Einrichtungsbelege](docs/WINDOWS-SETUP-20261104.md).
+Der Quellcode kann neuere Änderungen als die veröffentlichten Pakete enthalten.
+Die tatsächlich auf deinem Rechner laufende Version siehst du in der App oder
+mit `kirabridge status`. Quellcommit, erfolgreicher Build und installierte
+Version sind unterschiedliche Nachweise.
 
-Der [Windows-Einrichtungsassistent 0.8.0rc37.dev1](docs/WINDOWS-SETUP-20261104.md)
-hat historische Belege für eine getrennte Windows-Installation.
-Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden. Entpacke das Paket und öffne
-**Einrichtung-starten.cmd** für die vier Schritte. Kontoanmeldung und der echte
-ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
-[Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
+**Frühere Windows-Entwicklungsvorschauen:** Der [RC33-Paketbericht](docs/RC33-DELIVERY-20261104.md)
+und der [Windows-Einrichtungsbericht](docs/WINDOWS-SETUP-20261104.md) beschreiben
+deren begrenzte Tastatur-, Shortcut- und abgesicherte Fenstersteuerung. Sie belegen
+keinen aktuellen Windows-Funktionsgleichstand und keinen aktuellen allgemeinen
+Windows-Installer. [Windows-Einrichtungsanleitung](docs/WINDOWS-SETUP.md).
 
-Der oben verlinkte, geprüfte veröffentlichte Intel-Download basiert auf RC49, **nicht** auf der lokal installierten RC45. Der verifizierte Laufzeitstand steht am Anfang; der unten verlinkte Prüfbericht vom 7. November ist älter als RC45.
-[Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
-Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
-beschreibt den vorherigen RC40-Quellstand `a5d381a`.
-
-Windows-Funktionsgleichstand und eigenständiger Installer bleiben Entwicklungsarbeit. Die veröffentlichte Windows-Vorschau
-enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
-Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
-und kein veröffentlichter RC40-Download angeboten.
+[Historische Release- und Installationsbelege](docs/evidence/readme-current-20261107.json)
+bleiben als datierte Nachweise erhalten, nicht als aktueller Installationsstand.
 
 ## Wobei KiraBridge dir hilft
 
@@ -140,8 +144,9 @@ Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet 
 Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
-ist nicht von Apple notarisiert. Der [RC36-Nachweis](docs/TERMINAL-MINIMIZED-RC36-20261104.md)
-beschreibt das veröffentlichte Paket; siehe [Installation, Prüfung und Hilfe](docs/INSTALL-DE.md).
+ist nicht von Apple notarisiert. Beachte die Hinweise beim ausgewählten Download
+und [Installation, Prüfung und Hilfe](docs/INSTALL-DE.md). Der
+[RC36-Nachweis](docs/TERMINAL-MINIMIZED-RC36-20261104.md) bleibt ein historischer Bericht.
 
 
 ## Linux-/Debian-Server
