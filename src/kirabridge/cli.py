@@ -385,11 +385,24 @@ async def execute(args) -> None:
         from kirabridge.console_runtime import open_console, serve_console
         from kirabridge.local_runtime import default_config
 
-        config_path = Path(args.config).absolute() if args.config else default_config()
+        # An explicit config argument or KIRABRIDGE_CONFIG selects the instance;
+        # the production default stays unchanged when neither is set.
+        selected = args.config or os.environ.get("KIRABRIDGE_CONFIG") or default_config()
+        config_path = Path(selected).absolute()
         if args.command == "approvals":
             emit(open_console(config_path))
         else:
             await serve_console(config, config_path)
+        return
+    if args.command == "isolated-live":
+        from kirabridge.isolated_live import serve_isolated
+
+        if not args.config:
+            raise BridgeError(
+                "isolated_config_required",
+                "The isolated Live instance requires its own --config path",
+            )
+        await serve_isolated(Path(args.config).absolute(), port=args.port)
         return
     if args.command == "chatgpt":
         from kirabridge.chatgpt_setup import wizard
@@ -882,6 +895,13 @@ def main() -> None:
     message_actions.add_parser("status")
     sub.add_parser("approvals", help="Open the private local approval page in your browser")
     sub.add_parser("approval-server", help="Run the loopback-only local approval interface")
+    isolated = sub.add_parser(
+        "isolated-live",
+        help="Run an explicitly isolated Live console on its own private loopback port",
+    )
+    isolated.add_argument(
+        "--port", type=int, default=0, help="Loopback port; 0 binds a private ephemeral port"
+    )
     chatgpt = sub.add_parser("chatgpt", help="Local account linking for a private ChatGPT tunnel")
     chatgpt.add_argument("action", choices=["setup", "status"])
     chatgpt.add_argument("--language", choices=["de", "en"], default="de")
@@ -1041,7 +1061,9 @@ def main() -> None:
             output["diagnostic"] = exc.diagnostic
         emit(
             output,
-            stream=sys.stderr if args.command in {"serve", "connect"} else sys.stdout,
+            stream=(
+                sys.stderr if args.command in {"serve", "connect", "isolated-live"} else sys.stdout
+            ),
         )
         raise SystemExit(1) from None
 

@@ -1,0 +1,35 @@
+/* KiraBridge Live: compact, colour-coded observer. Reuses the existing tokens. */
+.live { margin: 0; min-height: 100vh; background: var(--np-canvas, #121316); }
+.live-shell { max-width: 720px; margin: 0 auto; padding: 20px 16px 32px; display: grid; gap: 12px; }
+.live-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.live-head h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+.live-observed { font-size: 11px; color: var(--np-muted, #afb6c1); }
+.live-hint { margin: 0; min-height: 16px; font-size: 12px; color: var(--np-warning, #e4be70); }
+.live-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.live-row {
+  display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--np-divider, #353940);
+  border-radius: 6px; background: var(--np-surface, #1a1c20);
+}
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--np-muted, #afb6c1); }
+.live-row[data-family="codex"] .live-dot { background: #e4be70; }
+.live-row[data-family="grok"] .live-dot { background: #6be4f2; }
+.live-row[data-family="opencode"] .live-dot { background: #7bdaa7; }
+.live-row[data-family="qwen"] .live-dot { background: #b99cff; }
+.live-row[data-family="kirabridge"] .live-dot { background: #fc63ad; }
+.live-row[data-family="unknown"] .live-dot { background: var(--np-muted, #afb6c1); }
+.live-main { display: grid; gap: 2px; min-width: 0; }
+.live-title { font-size: 13px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.live-step { font-size: 12px; color: var(--np-muted, #afb6c1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-state { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--np-muted, #afb6c1); white-space: nowrap; }
+.live-row[data-state="working"] .live-state { color: #7bdaa7; }
+.live-row[data-state="waiting"] .live-state { color: #e4be70; }
+.live-row[data-state="queued"] .live-state { color: #6be4f2; }
+.live-row[data-state="blocked"] .live-state { color: #f49b9b; }
+.live-row[data-state="unknown"] .live-state { color: #e4be70; }
+.live-row[data-state="completed"] .live-state { color: #7bdaa7; }
+.live-stale { font-size: 10px; color: #e4be70; margin-left: 6px; }
+.live-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--np-muted, #afb6c1); }
+.live-scope { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: var(--np-muted, #afb6c1); }
+.live-gap { margin: 0; font-size: 11px; line-height: 1.5; color: var(--np-muted, #afb6c1); }
+.live-empty { font-size: 13px; color: var(--np-muted, #afb6c1); padding: 12px 0; }

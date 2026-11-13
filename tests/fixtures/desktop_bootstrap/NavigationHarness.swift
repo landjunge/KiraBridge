@@ -34,7 +34,9 @@ struct NavigationHarness {
             print((try? DesktopLoginReceipt(data: Data(args[1].utf8))) != nil ? "accepted" : "invalid")
             return
         }
-        var policy = DesktopNavigationPolicy()
+        var policy = args.count > 3
+            ? DesktopNavigationPolicy(consolePort: Int(args[3]) ?? 8766)
+            : DesktopNavigationPolicy()
         if !args[2].contains("untrusted") {
             let path = args[2].contains("custom")
                 ? "/private/custom-config/approval-login.html" : "/private/owned/approval-login.html"
@@ -46,7 +48,9 @@ struct NavigationHarness {
             return
         }
         let url = args[1] == "nil" ? nil : URL(string: args[1])
+        let isolated = args.count > 4 && args[4] == "isolated"
         print(args[2] == "popup" ? String(policy.allowsPopup(url))
-              : policy.decision(for: url, activated: args[2] == "activated").rawValue)
+              : policy.decision(
+                    for: url, activated: args[2] == "activated", isolated: isolated).rawValue)
     }
 }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KiraBridge Live</title>
+<link rel="stylesheet" href="/networkpunkt.css">
+<link rel="stylesheet" href="/live.css">
+<script src="/live.js" defer></script>
+</head>
+<body class="np-ui live">
+<main class="live-shell">
+  <header class="live-head">
+    <h1>KiraBridge Live</h1>
+    <span class="live-observed" id="live-observed" aria-live="polite">…</span>
+  </header>
+  <p class="live-hint" id="live-hint" role="status"></p>
+  <p class="live-note" id="live-note">Der Zustand ist ein Prozess- oder Aufgabenstand. Ein laufender Prozess oder ein beendeter Turn ist keine bestätigte Facharbeit; „Turn beendet" heißt nur, dass der Transport geendet hat. Fachliche Abnahme: nicht bewertet.</p>
+  <ul class="live-list" id="live-list" aria-live="polite"></ul>
+  <p class="live-scope" id="live-scope">Nur lesende Live-Anzeige aus der vorhandenen Beobachtung. Kein Archiv, keine Rohlogs, keine erfundenen Prozentwerte.</p>
+  <p class="live-gap" id="live-gap">Nicht beobachtet werden externe Agenten, die weder eine Live-Quelle noch eine Bridge-Aufgabe schreiben; die Liste zeigt nur, was die Bridge tatsächlich beobachtet hat.</p>
+</main>
+</body>
+</html>

@@ -9,7 +9,7 @@ import re
 import secrets
 import time
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -55,12 +55,22 @@ async def limited_body(request: Request) -> bytes:
 
 
 class ApprovalConsole:
-    def __init__(self, application: OperatorApplication, key: str):
+    def __init__(
+        self,
+        application: OperatorApplication,
+        key: str,
+        *,
+        origin: str | None = None,
+        live_only: bool = False,
+    ):
         if len(key) < 32:
             raise BridgeError("unsafe_credentials", "Console credential is too short")
         self.application, self.key = application, key
         self.instance = secrets.token_hex(16)
         self.used_tickets: dict[str, float] = {}
+        self.live_only = bool(live_only)
+        self.live_status = getattr(application, "live_status", None)
+        self.set_origin(origin or ORIGIN)
         self.app = Starlette(
             exception_handlers={BridgeError: self.error},
             routes=[
@@ -89,11 +99,30 @@ class ApprovalConsole:
                 Route("/product-header.css", self.asset),
                 Route("/kirabridge-wordmark.svg", self.asset),
                 Route("/protocol.js", self.asset),
+                Route("/live.js", self.asset),
+                Route("/live.css", self.asset),
                 Route("/api/tasks", self.tasks),
                 Route("/api/tasks/{task_id}", self.task),
                 Route("/api/tasks/{task_id}/{decision}", self.decide, methods=["POST"]),
             ],
         )
+        if self.live_only:
+            # The isolated Live console exposes exactly the private login, health,
+            # live page/assets and the read-only live projection. No operator,
+            # approval, keyboard, service or connector handlers are mounted, so
+            # no request can reach an action, reservation or subprocess path.
+            self.app.router.routes = [
+                Route("/health", self.health),
+                Route("/login", self.login, methods=["POST"]),
+                Route("/", self.live_page),
+                Route("/live", self.live_page),
+                Route("/login.js", self.asset),
+                Route("/networkpunkt.css", self.asset),
+                Route("/live.js", self.asset),
+                Route("/live.css", self.asset),
+                Route("/api/control/live", self.live),
+            ]
+            return
         from kirabridge.team_console import TeamConsole
 
         self.team_console = TeamConsole(application.team, self.authenticate)
@@ -121,7 +150,7 @@ class ApprovalConsole:
         headers = {k.lower(): v for k, v in scope.get("headers", [])}
         client = scope.get("client")
         if (
-            headers.get(b"host") != f"127.0.0.1:{PORT}".encode()
+            headers.get(b"host") != self.expected_host
             or not client
             or client[0] not in {"127.0.0.1", "::1"}
         ):
@@ -154,13 +183,53 @@ class ApprovalConsole:
             code = 400 if exc.code == "invalid_request" else 413
         return JSONResponse({"error": exc.code}, status_code=code)
 
+    def set_origin(self, origin: str) -> None:
+        """Bind host and browser origin to exactly one explicit loopback origin.
+
+        The production console passes ``http://127.0.0.1:8766``. An isolated
+        instance passes its own chosen loopback port; anything other than an
+        explicit ``http://127.0.0.1:<port>`` origin is rejected, so no remote
+        origin or alias can be accepted by accident.
+        """
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname != "127.0.0.1"
+            or parsed.port is None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise BridgeError(
+                "unsafe_origin", "Console origin must be one explicit loopback origin"
+            )
+        self.origin = f"http://127.0.0.1:{parsed.port}"
+        self.expected_host = f"127.0.0.1:{parsed.port}".encode()
+
     def authenticate(self, request: Request) -> None:
         header = request.headers.get("authorization", "")
         token = header[7:] if header.startswith("Bearer ") else ""
         if not valid_token(self.key, "session", token, SESSION_AGE):
             raise BridgeError("unauthorized", "Open the console from this Mac")
-        if request.method == "POST" and request.headers.get("origin") != ORIGIN:
+        if request.method == "POST" and request.headers.get("origin") != self.origin:
             raise BridgeError("csrf", "A local browser decision is required")
+
+    async def live_page(self, request: Request):
+        return HTMLResponse((ASSETS / "live.html").read_text())
+
+    async def live(self, request: Request):
+        self.authenticate(request)
+        if self.live_status is None:
+            raise BridgeError("not_found", "Live status is not available")
+        try:
+            return JSONResponse(await self.live_status())
+        except BridgeError as exc:
+            return JSONResponse(
+                {"ok": False, "error": {"code": exc.code, "message": str(exc)}},
+                status_code=503,
+            )
 
     async def health(self, request: Request):
         challenge = request.headers.get("x-kirabridge-challenge", "")
@@ -175,7 +244,7 @@ class ApprovalConsole:
         )
 
     async def login(self, request: Request):
-        if request.headers.get("origin") not in {None, "null", ORIGIN}:
+        if request.headers.get("origin") not in {None, "null", self.origin}:
             raise BridgeError("csrf", "Use the local launcher")
         if request.headers.get("content-type", "").split(";")[0] != (
             "application/x-www-form-urlencoded"
