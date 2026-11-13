@@ -300,8 +300,7 @@ async def connect_stdio(config, principal, *, task_policy=None):
                 # A missing/offline optional ThreadDesk cannot break core Bridge tools.
                 return dynamic_unavailable(
                     "threaddesk_catalog_failed",
-                    f"ThreadDesk catalog read failed: {type(exc).__name__}"
-                    + (f": {exc}" if str(exc) else " (no detail)"),
+                    f"ThreadDesk catalog read failed: {type(exc).__name__}",
                 )
 
         @server.list_tools()

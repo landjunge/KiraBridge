@@ -66,6 +66,8 @@ ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge
 
 Der ausdrücklich aktivierte ThreadDesk-Werkzeugproxy unterstützt im Entwicklungsstand begrenzte JSON-Schema-2020-12-Verweise innerhalb des gelieferten Schemas, einschließlich eingebetteter Fachschemas. Er lädt keine Schemas aus dem Netzwerk oder von Datenträgern nach; zyklische, mehrdeutige und nicht unterstützte Schemas bleiben ausgeschlossen. Bestehende Werkzeugrechte und Operationsquittungen gelten weiter. Siehe [Proxy-Vertrag](docs/DYNAMIC-THREADDESK-PROXY.md).
 
+Der Entwicklungsstand trennt außerdem die normale MCP-Erreichbarkeitsprüfung von Speicherdiagnosen, schützt laufende ThreadDesk-Aufrufe bei Katalogproblemen und bietet kompakte bestätigte Schreibantworten. Ungewisse Schreibvorgänge benötigen weiterhin den Abgleich ihrer ursprünglichen Operation. Die Änderungen betreffen den gemeinsamen Mac-/Linux-Code; sie belegen keine neue Installation. Siehe [Verhalten und Prüfgrenzen](docs/THREADDESK-OPERATIONS-RELIABILITY.md).
+
 ## Downloads und Installationsprofile
 
 Die Buttons oben verlinken direkt auf veröffentlichte Installationsdateien und

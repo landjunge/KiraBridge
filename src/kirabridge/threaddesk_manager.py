@@ -40,6 +40,9 @@ READ_KEYS = {
 RECONNECT_MAX_SECONDS = 60.0
 # The pool enforces its own deadline first; this only backstops a stuck pool call.
 CATALOG_BACKSTOP_SECONDS = 0.5
+# Operation preflight can reuse a validated observation briefly. Explicit discovery
+# remains fresh, and the pool binds reuse to connection, epoch and list_changed.
+OPERATION_CATALOG_MAX_AGE_SECONDS = 1.0
 ERROR_CODES = {
     "validation_error",
     "invalid_state",
@@ -179,16 +182,17 @@ class ThreadDeskManager:
         self.failures, self.retry_at = 0, 0.0
 
     async def read_catalog(self):
-        """Fresh peer catalog; a hung or closed peer is replaced and reported clearly."""
+        """Fresh peer catalog; recovery preserves already dispatched tool calls."""
+        generation = self.pool._generation("threaddesk")
         try:
             async with asyncio.timeout(self.settings.timeout + CATALOG_BACKSTOP_SECONDS):
                 return await self.pool.list_tools("threaddesk")
         except TimeoutError:
-            await self.pool.disconnect("threaddesk")  # Idempotent; kills the unresponsive peer.
+            reset = await self.pool.retire_catalog_connection("threaddesk", generation=generation)
             raise self.peer_failure(
                 "threaddesk_catalog_timeout",
-                "Peer catalog exceeded configured timeout; the unresponsive peer was replaced",
-                reset=True,
+                "Peer catalog exceeded configured timeout; recovery preserves in-flight tools",
+                reset=reset,
                 cause="peer_unresponsive",
             ) from None
         except (McpError, *TRANSPORT_CLOSED) as exc:
@@ -200,7 +204,8 @@ class ThreadDeskManager:
                     peer_reset=False,
                     cause=f"mcp_error_{exc.error.code}",
                 ) from None
-            await self.pool.disconnect("threaddesk")
+            if generation == self.pool._generation("threaddesk"):
+                await self.pool.disconnect("threaddesk")
             raise self.peer_failure(
                 "threaddesk_peer_disconnected",
                 "ThreadDesk peer connection was closed; the connection will be rebuilt",
@@ -208,6 +213,15 @@ class ThreadDeskManager:
                 cause="peer_connection_closed",
             ) from None
         except BridgeError as exc:
+            if exc.code == "peer_recovering":
+                raise self.diagnose(
+                    BridgeError(
+                        "threaddesk_peer_recovering",
+                        "ThreadDesk catalog recovery awaits in-flight tools",
+                    ),
+                    peer_reset=False,
+                    cause="peer_recovering",
+                ) from None
             if exc.code == "peer_disconnected":
                 raise self.peer_failure(
                     "threaddesk_peer_disconnected",
@@ -217,8 +231,12 @@ class ThreadDeskManager:
                 ) from None
             raise
 
-    async def refresh_catalog(self):
-        catalog = await self.read_catalog()
+    async def read_operation_catalog(self):
+        catalog = self.pool.cached_catalog("threaddesk", max_age=OPERATION_CATALOG_MAX_AGE_SECONDS)
+        return catalog if catalog is not None else await self.read_catalog()
+
+    async def refresh_catalog(self, *, operation=False):
+        catalog = await self.read_operation_catalog() if operation else await self.read_catalog()
         self.tool_schemas = {item.name: item.inputSchema for item in catalog}
         self.available_tools = set(self.tool_schemas)
 
@@ -357,9 +375,9 @@ class ThreadDeskManager:
             if self.observer_factory:
                 self.pool.observer = self.observer_factory(task["principal"])
             await self.connect()
-            # A connected peer can change its catalog without reconnecting.
-            # Refresh before rejecting cached names or sending any declared operation.
-            await self.refresh_catalog()
+            # Reuse only the pool's brief generation-bound observation. Validation
+            # and authorization still run on every operation below.
+            await self.refresh_catalog(operation=True)
             self.note_success()
             if tool not in self.available_tools:
                 raise BridgeError("threaddesk_version", "Peer lacks the declared operation")

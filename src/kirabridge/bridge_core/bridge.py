@@ -409,7 +409,12 @@ class Bridge:
                 task_id=request.task_id,
             )
 
-    def health(self, principal: str) -> dict:
+    def health(self, principal: str, *, include_diagnostics: bool = True) -> dict:
+        """Report authenticated liveness, optionally with synchronous storage diagnostics.
+
+        Direct callers retain the detailed report. Routine MCP polling opts out of
+        storage reads; an alive dispatcher alone does not prove task admission.
+        """
         policy = self.security.principal(principal, "bridge.health")
         from kirabridge.discovery import snapshot
         from kirabridge.permissions import automatic_for, permission_summary
@@ -456,23 +461,41 @@ class Bridge:
             "voice_messaging": self.config.voice_messaging.model_dump(),
             "visible_handoffs": self.config.visible_handoffs.model_dump(),
             **self.messages.voice_channel.profile(principal),
-            "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+            "health_scope": "liveness and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
             "operations": {
                 "protocol": 1,
-                "maintenance": self.store.maintenance_state(),
-                "accepting_new_work": self.store.maintenance_state() is None,
+                "status": "not_probed",
+                "maintenance": None,
+                "accepting_new_work": None,
             },
             "desktop_last_observation": self.sessions.desktop.last,
-            "output_history": self.outputs.status(),
-            "diagnostics_storage": self.diagnostics.status(),
+            "output_history": {"status": "not_probed"},
+            "diagnostics_storage": {"recording": "not_probed"},
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
-            "autonext": self.autonext.inspect(),
+            "autonext": {"state": "not_probed"},
+            "health_detail": {
+                "included": include_diagnostics,
+                "request": "bridge_health(include_diagnostics=true)",
+                "readiness": "not_checked",
+            },
             "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
+        if include_diagnostics:
+            maintenance = self.store.maintenance_state()
+            result.update(
+                operations={
+                    "protocol": 1,
+                    "maintenance": maintenance,
+                    "accepting_new_work": maintenance is None,
+                },
+                output_history=self.outputs.status(),
+                diagnostics_storage=self.diagnostics.status(),
+                autonext=self.autonext.inspect(),
+            )
         if sys.platform.startswith("linux"):
             from kirabridge.platform_adapters import LinuxAdapter
 
