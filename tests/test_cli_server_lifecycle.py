@@ -170,8 +170,9 @@ def test_bind_http_listener_reserves_resolved_localhost_families():
     ):
         if family not in {socket.AF_INET, socket.AF_INET6}:
             continue
-        probe = socket.socket(family, socktype, protocol)
+        probe = None
         try:
+            probe = socket.socket(family, socktype, protocol)
             if family == socket.AF_INET6 and hasattr(socket, "IPV6_V6ONLY"):
                 probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
             probe.bind(sockaddr)
@@ -180,7 +181,8 @@ def test_bind_http_listener_reserves_resolved_localhost_families():
         else:
             expected.add(family)
         finally:
-            probe.close()
+            if probe is not None:
+                probe.close()
     assert expected
     listeners = cli._bind_http_listener(SimpleNamespace(host="localhost", port=0))
     try:
@@ -205,14 +207,16 @@ def test_localhost_bind_fails_when_ipv4_port_is_occupied():
 
 
 def test_bind_http_listener_literal_ipv6_loopback():
-    probe = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    probe = None
     try:
+        probe = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         probe.bind(("::1", 0))
     except OSError:
         pytest.skip("IPv6 loopback is unavailable")
     finally:
-        probe.close()
+        if probe is not None:
+            probe.close()
     listeners = cli._bind_http_listener(SimpleNamespace(host="::1", port=0))
     try:
         assert [listener.family for listener in listeners] == [socket.AF_INET6]
