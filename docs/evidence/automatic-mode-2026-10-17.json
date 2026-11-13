@@ -4,7 +4,7 @@
   "version": "0.4.0",
   "authorization": "Explicit user instruction to change the code so repeated approvals are no longer required; Grok explicitly included.",
   "configuration": {
-    "path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "principals": [
       "local",
       "codex",

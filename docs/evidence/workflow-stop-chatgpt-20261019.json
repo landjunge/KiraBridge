@@ -209,12 +209,12 @@
     "version": "0.5.2",
     "pid": 43967,
     "started_at": "2026-10-18T19:29:38.814780+00:00",
-    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "config_sha256": "04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c",
     "effective_config_sha256": "d4f9380268c72f90712e775c39de854cf74a097661c34b019a91b304e6d5f08f",
     "source_tree_sha256": "1d994ab1e3257d0701d2786e4220fca1f3891c914ae115ee11c4d45ea449ae31",
     "source_file_count": 37,
-    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
     "source_scope": "package Python files observed at startup; no remote attestation"
   },
   "runtime_initial_stop": {
@@ -222,12 +222,12 @@
     "version": "0.5.2",
     "pid": 67108,
     "started_at": "2026-10-18T22:42:40.650911+00:00",
-    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
     "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
     "source_tree_sha256": "734e7a3a8c8d2cf5a83b6eaf06776ef1796c513f57435de236444247889ca826",
     "source_file_count": 39,
-    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
     "source_scope": "package Python files observed at startup; no remote attestation"
   },
   "runtime_after_restart": {
@@ -235,12 +235,12 @@
     "version": "0.5.2",
     "pid": 68228,
     "started_at": "2026-10-18T22:49:15.071202+00:00",
-    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
     "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
     "source_tree_sha256": "441216fe84a30f1228e3778d62656af96f42b2c37d4e440d8c131477f970387f",
     "source_file_count": 39,
-    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
     "source_scope": "package Python files observed at startup; no remote attestation"
   },
   "preservation": {

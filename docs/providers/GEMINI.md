@@ -41,7 +41,7 @@ Ein gewöhnlicher MCP-Auftrag über `task_request`:
     "arguments": {
       "agent": "gemini",
       "prompt": "Antworte mit genau: KiraBridge Gemini bereit",
-      "cwd": "/Users/landjunge/KiraBridge",
+      "cwd": "/Users/EXAMPLE_USER/KiraBridge",
       "timeout": 45,
       "local_tools": false
     }

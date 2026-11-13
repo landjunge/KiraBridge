@@ -104,13 +104,13 @@
           "status": "matches_loaded"
         },
         "runtime": {
-          "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+          "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
           "config_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
           "effective_config_sha256": "a4784a2aba06d1e098e5a4fbb1ffca890dd007508953d630c2d63a22d47e13e8",
           "instance_id": "7a003e5444d54d3a8e9575fef651e9ff",
           "pid": 19707,
           "source_file_count": 33,
-          "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+          "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
           "source_scope": "package Python files observed at startup; no remote attestation",
           "source_tree_sha256": "82c93aa795e0c37dcd4fc470aac9cbeed72beccee7c1f16e3786ae2d94aa272a",
           "started_at": "2026-10-18T17:15:51.782920+00:00",
@@ -782,13 +782,13 @@
           "status": "matches_loaded"
         },
         "runtime": {
-          "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+          "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
           "config_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
           "effective_config_sha256": "a4784a2aba06d1e098e5a4fbb1ffca890dd007508953d630c2d63a22d47e13e8",
           "instance_id": "3cd8af3837174d70a19b1b87281695a1",
           "pid": 20472,
           "source_file_count": 33,
-          "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+          "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
           "source_scope": "package Python files observed at startup; no remote attestation",
           "source_tree_sha256": "deadc7ba4ae21292dd01ae2430bdfe6aa45acdd4bce76dda5a41e45864dc7381",
           "started_at": "2026-10-18T17:22:08.237521+00:00",

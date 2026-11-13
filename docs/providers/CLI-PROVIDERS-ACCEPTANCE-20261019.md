@@ -50,7 +50,7 @@ Unbekannte Aufgaben wurden nicht blind wiederholt.
 
 ## Aktivierung und Bestandsschutz
 
-Die vorhandene Laufzeit liegt unter `/Users/landjunge/KiraBridge`, ihre tatsächlich
+Die vorhandene Laufzeit liegt unter `/Users/EXAMPLE_USER/KiraBridge`, ihre tatsächlich
 geladene private Konfiguration unter `~/.config/kirabridge/config.toml`.
 Der Quellcode wurde in einem separaten Git-Arbeitsstand entwickelt und additiv
 in die bestehende Installation übernommen. Bestehende Codex-/Grok-Klassen

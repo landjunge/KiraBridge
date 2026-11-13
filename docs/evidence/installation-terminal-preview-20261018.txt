@@ -11,7 +11,7 @@ Vibe Coding: discuss with ChatGPT, delegate through KiraBridge to Codex or Grok.
 [1/4] Detect prerequisites
 Detected CLIs: codex, grok
 [2/4] Detect or create private setup
-Project folder (only this folder will be allowed) [/Users/landjunge/workspace/KiraBridge]: New identities require per-task approval. Files/terminal in the selected folder;
+Project folder (only this folder will be allowed) [/Users/EXAMPLE_USER/workspace/KiraBridge]: New identities require per-task approval. Files/terminal in the selected folder;
 local agent execution. No global filesystem access, no sudo.
 Create this scoped setup? [y/N]: [3/4] Local service
 Install/update the user service (no sudo)? [y/N]: {

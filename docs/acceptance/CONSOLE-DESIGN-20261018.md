@@ -66,8 +66,8 @@ anfängliche Harness-Fehler (Selektor und Fokusprüfung ohne Tastaturmodalität)
 wurden im Prüfskript korrigiert. Historische fehlgeschlagene Läufe sind erhalten.
 
 ```sh
-PYTHONPATH=src /Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q tests/test_approval_console.py tests/test_console_design.py
-KB_CONSOLE_TEST_PYTHON=/Users/landjunge/KiraBridge/.venv/bin/python /Users/landjunge/threaddesk/.venv/bin/python tests/console_browser_probe.py
+PYTHONPATH=src /Users/EXAMPLE_USER/KiraBridge/.venv/bin/python -m pytest -q tests/test_approval_console.py tests/test_console_design.py
+KB_CONSOLE_TEST_PYTHON=/Users/EXAMPLE_USER/KiraBridge/.venv/bin/python /Users/EXAMPLE_USER/threaddesk/.venv/bin/python tests/console_browser_probe.py
 ```
 
 Der Browseraufruf verlangt eine vorhandene kompatible Playwright-/Chrome-Umgebung;

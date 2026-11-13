@@ -80,11 +80,11 @@ Programmsuche. Ein grüner Health-Status bleibt kein Arbeitsfähigkeitsnachweis.
 Administratorbeispiel, nur mit lokal anwesendem Betreiber auslösen:
 
 ```json
-{"operation":"admin.execute","arguments":{"argv":["/usr/bin/id","-u"],"cwd":"/Users/landjunge","timeout":60,"max_output":1024}}
+{"operation":"admin.execute","arguments":{"argv":["/usr/bin/id","-u"],"cwd":"/Users/EXAMPLE_USER","timeout":60,"max_output":1024}}
 ```
 
 Den macOS-Dialog lokal bestätigen; Passwort ausschließlich im Systemdialog.
-`sudo -n` meldet derzeit korrekt `a password is required`. Nach einem Timeout oder
+Unbeaufsichtigte Administratorausführung ist ohne gesonderte Autorisierung nicht verfügbar. Nach einem Timeout oder
 Abbruch ist das Ergebnis ausdrücklich unknown: zuerst ursprünglichen Task und
 Prozesszustand lesen, keine automatische Wiederholung eines Schreibauftrags.
 Die echte JXA-Probe `permissions-20261018-admin-jxa` wurde nicht rechtzeitig lokal

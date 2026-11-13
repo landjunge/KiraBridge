@@ -20,7 +20,7 @@ Funktion eines fremden Diensts werden daraus nicht abgeleitet. Lokaler Weg:
 ```sh
 kirabridge --principal chatgpt readiness \
   --workflow-id project-review-20261018 \
-  --read-path /Users/landjunge/KiraBridge/README.md \
+  --read-path /Users/EXAMPLE_USER/KiraBridge/README.md \
   --operation file.read --operation terminal.execute \
   --executable /usr/bin/osascript
 ```
