@@ -255,6 +255,157 @@ class VisibleHandoffs:
                 self.transition(identifier, "completed", {**evidence, "reply_id": reply["id"]})
         return self.status(principal, identifier)
 
+    async def reconcile_observed(self, principal, identifier):
+        """Reconcile a manually completed Codex turn from its original pre-paste cursor.
+
+        This path only reads the bound Codex rollout and visible process binding. It
+        never retries the paste or sends Return.
+        """
+        status = self.reconcile(principal, identifier)
+        if (
+            status["state"] not in {"unknown", "confirmed"}
+            or not any(
+                event["state"] == "unknown"
+                and event["evidence"].get("reason") == "visible_paste_unconfirmed"
+                for event in status["events"]
+            )
+            or status["target"] != "codex"
+        ):
+            return status
+
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+        try:
+            binding = VisibleTerminalBinding.model_validate(status["binding"])
+        except (TypeError, ValueError):
+            return status
+        if self.config.visible_handoffs.bindings.get("codex") != binding:
+            return status
+
+        message = self.messages.get(principal, status["message_id"])
+        if (
+            message["sender"] != principal
+            or message["recipient"] != "codex"
+            or not isinstance(message["body"], str)
+            or not message["request_reply"]
+        ):
+            return status
+
+        inserting = next(
+            (
+                event["evidence"]
+                for event in status["events"]
+                if event["state"] == "inserting"
+                and isinstance(event["evidence"].get("local_reply_observer"), dict)
+            ),
+            None,
+        )
+        observer_record = inserting.get("local_reply_observer") if inserting else None
+        cursor = observer_record.get("cursor") if observer_record else None
+        if (
+            inserting is None
+            or inserting.get("wait_for_reply") is not True
+            or not isinstance(observer_record, dict)
+            or observer_record.get("state") != "ready"
+            or not isinstance(cursor, dict)
+        ):
+            return status
+
+        try:
+            async with self.sessions.agent_selection(principal, "codex", binding):
+                await self.check_target(principal, "codex", binding)
+                observed = await self.codex_reply.observe(
+                    cursor,
+                    binding,
+                    body=message["body"],
+                    process_identity=self.sessions.terminal_app.process_identity,
+                )
+                await self.check_target(principal, "codex", binding)
+        except BridgeError:
+            return self.status(principal, identifier)
+
+        if (
+            not isinstance(observed, dict)
+            or observed.get("state") != "completed"
+            or observed.get("reply_source") != "bound_local_codex_rollout"
+            or observed.get("agent_confirmed") is not False
+            or not isinstance(observed.get("evidence"), dict)
+        ):
+            return self.status(principal, identifier)
+
+        # Recheck authenticated completion after the local observation. If a
+        # mailbox ACK arrived meanwhile, its existing reconciliation wins.
+        status = self.reconcile(principal, identifier)
+        if status["state"] not in {"unknown", "confirmed"}:
+            return status
+
+        evidence = {
+            **observed["evidence"],
+            "handoff_id": identifier,
+            "message_id": status["message_id"],
+            "route": "existing_visible_terminal",
+            "reply_route": "bound_local_codex_rollout_reconciliation",
+            "reply_visible_rendering": "client_not_attested",
+            "completion_scope": "local_agent_turn",
+            "agent_confirmed": False,
+            "request_reply_satisfied": True,
+            "reconciled_without_input": True,
+            "automatic_retry": False,
+        }
+        result = {
+            "success": True,
+            "text": observed["text"],
+            "scope": "local_agent_turn",
+            "reply_source": "bound_local_codex_rollout",
+            "agent_confirmed": False,
+            "request_reply_satisfied": True,
+            "work_completion_verified": False,
+            "project_completion_verified": False,
+            "evidence": evidence,
+        }
+        mailbox_acknowledged = False
+        with self.store.transaction():
+            current = self.store.db.execute(
+                "SELECT state,evidence FROM visible_handoffs WHERE id=?", (identifier,)
+            ).fetchone()
+            if current and current["state"] in {"unknown", "confirmed"}:
+                import json
+
+                current_evidence = json.loads(current["evidence"])
+                if (
+                    current["state"] == "confirmed"
+                    or current_evidence.get("reason") == "visible_paste_unconfirmed"
+                ):
+                    message_row = self.store.db.execute(
+                        "SELECT acknowledged,conversation_id FROM messages WHERE id=?",
+                        (status["message_id"],),
+                    ).fetchone()
+                    mailbox_reply = (
+                        self.store.db.execute(
+                            "SELECT 1 FROM messages WHERE reply_to=? AND sender=? "
+                            "AND recipient=? AND conversation_id=? "
+                            "AND kind IN ('answer','result') LIMIT 1",
+                            (
+                                status["message_id"],
+                                "codex",
+                                principal,
+                                message_row["conversation_id"],
+                            ),
+                        ).fetchone()
+                        if message_row
+                        else None
+                    )
+                    mailbox_acknowledged = bool(message_row and message_row["acknowledged"])
+                    if not mailbox_acknowledged or not mailbox_reply:
+                        self.transition(
+                            identifier,
+                            "completed",
+                            {**evidence, "local_reply_result": result},
+                        )
+        if mailbox_acknowledged:
+            return self.reconcile(principal, identifier)
+        return self.status(principal, identifier)
+
     def transition(self, identifier, state, evidence):
         with self.store.transaction():
             current = self.store.db.execute(

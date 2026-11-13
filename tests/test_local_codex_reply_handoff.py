@@ -1,11 +1,18 @@
 """Only a positive bound local observer can finish without a mailbox ACK/reply."""
 
 import asyncio
+import hashlib
+from contextlib import asynccontextmanager
 
 import pytest
-from test_visible_handoff import callback, visible  # noqa: F401
+from test_visible_handoff import callback, retain_legacy_handoff, visible  # noqa: F401
 
 from kirabridge.bridge_core.models import AgentInput, BridgeError, UncertainExecution
+from kirabridge.message_manager import MessageSend
+
+RECOVERY_BODY = "Manually submitted exact body"
+RECOVERY_ANSWER = "Observed final answer"
+RECOVERY_TURN = "manual-turn"
 
 
 @pytest.fixture
@@ -188,3 +195,207 @@ async def test_explicit_draft_continuation_rechecks_local_cursor_and_cannot_use_
         await execute(bridge, timeout=0.02)
     assert "continuation_recheck" in trace and "observe_after_return" not in trace
     assert transport["calls"] == ["insert", "return"]
+
+
+def unknown_paste_with_ready_cursor(bridge, *, identifier="unknown-codex-paste"):
+    from kirabridge.bridge_core.models import canonical
+
+    original = retain_legacy_handoff(
+        bridge,
+        AgentInput(agent="codex", prompt=RECOVERY_BODY, cwd="/tmp"),
+        state="unknown",
+        reason="visible_paste_unconfirmed",
+        identifier=identifier,
+    )
+    cursor = {"persisted_pre_paste_cursor": True}
+    bridge.store.db.execute(
+        "INSERT INTO visible_handoff_events(id,at,state,evidence) VALUES(?,2,?,?)",
+        (
+            identifier,
+            "inserting",
+            canonical(
+                {
+                    "wait_for_reply": True,
+                    "local_reply_observer": {"state": "ready", "cursor": cursor},
+                }
+            ),
+        ),
+    )
+    return original, cursor
+
+
+def stub_observation_binding(bridge, monkeypatch):
+    calls = []
+
+    @asynccontextmanager
+    async def selected(principal, target, binding):
+        assert principal == "chatgpt" and target == "codex"
+        assert binding == bridge.config.visible_handoffs.bindings["codex"]
+        calls.append("selected")
+        yield
+
+    async def check_target(principal, target, binding):
+        assert principal == "chatgpt" and target == "codex"
+        assert binding == bridge.config.visible_handoffs.bindings["codex"]
+        calls.append("check_target")
+        return {"text": "read-only terminal observation"}
+
+    monkeypatch.setattr(bridge.sessions, "agent_selection", selected)
+    monkeypatch.setattr(bridge.visible_handoffs, "check_target", check_target)
+    return calls
+
+
+@pytest.mark.parametrize("ack_timing", ["none", "before", "during"])
+async def test_unknown_manual_codex_turn_reconciles_from_inserting_cursor_without_input(
+    visible,  # noqa: F811
+    monkeypatch,
+    ack_timing,
+):
+    bridge, transport = visible
+    original, cursor = unknown_paste_with_ready_cursor(bridge)
+
+    def acknowledge():
+        message = next(
+            item
+            for item in bridge.messages.receive("codex")["messages"]
+            if item["id"] == original["id"]
+        )
+        bridge.messages.ack("codex", message["id"], message["receipt"])
+
+    if ack_timing == "before":
+        acknowledge()
+    calls = stub_observation_binding(bridge, monkeypatch)
+
+    async def observe(actual, binding, *, body, process_identity):
+        assert actual == cursor and binding == bridge.config.visible_handoffs.bindings["codex"]
+        assert body == RECOVERY_BODY and callable(process_identity)
+        calls.append("observe")
+        if ack_timing == "during":
+            acknowledge()
+        return {
+            "state": "completed",
+            "text": RECOVERY_ANSWER,
+            "reply_source": "bound_local_codex_rollout",
+            "agent_confirmed": False,
+            "evidence": {
+                "reply_source": "bound_local_codex_rollout",
+                "identity_scope": "OS_process_and_local_protocol_not_authenticated_mailbox",
+                "binding": binding.model_dump(),
+                "protocol_binding": {
+                    "thread_id": "01a192b9-64f2-7d22-8429-cabd5faf13b6",
+                    "rollout_path": "/tmp/codex-rollout.jsonl",
+                    "cwd": "/tmp",
+                    "origin": "process_writer_discovery",
+                },
+                "baseline_offset": 100,
+                "baseline_sha256": "a" * 64,
+                "appended_sha256": "b" * 64,
+                "expected_payload_sha256": hashlib.sha256(RECOVERY_BODY.encode()).hexdigest(),
+                "turn_id": RECOVERY_TURN,
+                "user_item_id": "new-user",
+                "final_item_id": "new-final",
+                "task_complete_observed": True,
+                "process_writer_verified": True,
+                "agent_confirmed": False,
+            },
+        }
+
+    monkeypatch.setattr(bridge.visible_handoffs.codex_reply, "observe", observe)
+    before = bridge.visible_handoffs.status("chatgpt", "unknown-codex-paste")
+    status = await bridge.visible_handoffs.reconcile_observed("chatgpt", "unknown-codex-paste")
+
+    assert status["state"] == "completed"
+    result = status["evidence"]["local_reply_result"]
+    assert result["text"] == RECOVERY_ANSWER and result["scope"] == "local_agent_turn"
+    assert result["agent_confirmed"] is False and result["request_reply_satisfied"] is True
+    assert result["work_completion_verified"] is result["project_completion_verified"] is False
+    assert "return_sent" not in result and "return_sent" not in result["evidence"]
+    assert status["evidence"]["reconciled_without_input"] is True
+    accepted = bridge.message_receiver._local_reply_evidence(
+        status["message_id"], "unknown-codex-paste", result, recovered=True
+    )
+    assert accepted["reconciled_without_input"] is True
+    assert accepted["agent_confirmed"] is False
+    assert len(status["events"]) == len(before["events"]) + (1 if ack_timing == "none" else 2)
+    assert calls == ["selected", "check_target", "observe", "check_target"]
+    assert transport["calls"] == []
+
+
+async def test_authenticated_mailbox_completion_wins_before_local_observation(visible, monkeypatch):  # noqa: F811
+    bridge, transport = visible
+    original, _ = unknown_paste_with_ready_cursor(bridge)
+
+    async def observe(*args, **kwargs):
+        delivered = bridge.messages.receive("codex")["messages"]
+        message = next(item for item in delivered if item["id"] == original["id"])
+        bridge.messages.ack("codex", message["id"], message["receipt"])
+        bridge.messages.send(
+            "codex",
+            MessageSend(
+                recipient="chatgpt",
+                conversation_id=message["conversation_id"],
+                idempotency_key="authenticated-reply",
+                reply_to=message["id"],
+                body="Authenticated answer",
+                kind="result",
+                request_reply=False,
+                dispatch=False,
+            ),
+        )
+        return {
+            "state": "completed",
+            "text": "Observed local answer",
+            "reply_source": "bound_local_codex_rollout",
+            "agent_confirmed": False,
+            "evidence": {},
+        }
+
+    monkeypatch.setattr(bridge.visible_handoffs.codex_reply, "observe", observe)
+
+    status = await bridge.visible_handoffs.reconcile_observed("chatgpt", "unknown-codex-paste")
+    assert status["state"] == "completed"
+    assert status["evidence"]["reply_id"]
+    assert "local_reply_result" not in status["evidence"]
+    assert transport["calls"] == []
+
+
+async def test_unknown_manual_codex_turn_pending_keeps_handoff_and_events_unchanged(
+    visible,  # noqa: F811
+    monkeypatch,
+):
+    bridge, transport = visible
+    unknown_paste_with_ready_cursor(bridge)
+    calls = stub_observation_binding(bridge, monkeypatch)
+
+    async def pending(*args, **kwargs):
+        calls.append("observe")
+        return {"state": "pending", "reason": "matching_completed_turn_not_observed"}
+
+    monkeypatch.setattr(bridge.visible_handoffs.codex_reply, "observe", pending)
+    before = bridge.visible_handoffs.status("chatgpt", "unknown-codex-paste")
+    after = await bridge.visible_handoffs.reconcile_observed("chatgpt", "unknown-codex-paste")
+
+    assert after["state"] == "unknown"
+    assert after["events"] == before["events"]
+    assert after["evidence"] == before["evidence"]
+    assert calls == ["selected", "check_target", "observe", "check_target"]
+    assert transport["calls"] == []
+
+
+async def test_unknown_manual_codex_turn_binding_mismatch_is_not_observed(visible, monkeypatch):  # noqa: F811
+    bridge, transport = visible
+    unknown_paste_with_ready_cursor(bridge)
+    bridge.config.visible_handoffs.bindings["codex"] = bridge.config.visible_handoffs.bindings[
+        "codex"
+    ].model_copy(update={"agent_pid": 999})
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("binding mismatch must not inspect or reconcile the Codex rollout")
+
+    monkeypatch.setattr(bridge.visible_handoffs.codex_reply, "observe", forbidden)
+    before = bridge.visible_handoffs.status("chatgpt", "unknown-codex-paste")
+    after = await bridge.visible_handoffs.reconcile_observed("chatgpt", "unknown-codex-paste")
+
+    assert after["state"] == "unknown"
+    assert after["events"] == before["events"] and after["evidence"] == before["evidence"]
+    assert transport["calls"] == []

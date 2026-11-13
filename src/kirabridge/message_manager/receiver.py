@@ -485,7 +485,6 @@ class MessageReceiver:
                 or job["run_id"] != handoff_id
                 or handoff["principal"] != message["sender"]
                 or handoff["target"] != message["recipient"]
-                or message["acknowledged"] is None
             ):
                 return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
             reply = self.bridge.store.db.execute(
@@ -498,14 +497,68 @@ class MessageReceiver:
                     message["conversation_id"],
                 ),
             ).fetchone()
-            if reply is None:
-                return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
             try:
                 previous = json.loads(job["evidence"])
             except (ValueError, TypeError, RecursionError):
                 return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
             if not isinstance(previous, dict):
                 return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
+
+            # Preserve the authenticated mailbox route whenever its ACK and
+            # exact reply are present. Otherwise accept only a persisted local
+            # Codex result that passes the same strict validator used at finish.
+            if message["acknowledged"] is None or reply is None:
+                try:
+                    handoff_evidence = json.loads(handoff["evidence"])
+                    local_result = (
+                        handoff_evidence.get("local_reply_result")
+                        if isinstance(handoff_evidence, dict)
+                        else None
+                    )
+                    if local_result is None or not message["request_reply"]:
+                        return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
+                    local = self._local_reply_evidence(
+                        message["id"], handoff_id, local_result, recovered=True
+                    )
+                except (ValueError, TypeError, AttributeError, RecursionError):
+                    return {**unchanged, "state": "unknown", "reason": "local_reply_conflict"}
+                except BridgeError as exc:
+                    if exc.code != "local_reply_conflict":
+                        raise
+                    return {**unchanged, "state": "unknown", "reason": "local_reply_conflict"}
+
+                notice = self.bridge.store.db.execute(
+                    "SELECT id FROM completion_notices WHERE source='message' AND source_id=? "
+                    "ORDER BY seq DESC LIMIT 1",
+                    (message["id"],),
+                ).fetchone()
+                evidence = {
+                    **local,
+                    "reason": "completed_local_handoff_reconciled",
+                    "handoff_id": handoff_id,
+                    "run_id": job["run_id"],
+                    "completion_scope": "local_agent_turn",
+                    "reply_source": "bound_local_codex_rollout",
+                    "agent_confirmed": False,
+                    "request_reply_satisfied": True,
+                    "project_completion_verified": False,
+                    "reconciled_without_input": True,
+                    "automatic_retry": False,
+                    "previous_state": "unknown",
+                    "previous_error": job["error"],
+                    "previous_finished": job["finished"],
+                    "previous_evidence": previous,
+                    "supersedes_notice_id": notice["id"] if notice else None,
+                }
+                self._record_finish(job, "completed", evidence)
+                return {
+                    "reconciled": True,
+                    "message_id": message["id"],
+                    "state": "completed",
+                    "reply_source": "bound_local_codex_rollout",
+                    "reconciled_without_input": True,
+                }
+
             notice = self.bridge.store.db.execute(
                 "SELECT id FROM completion_notices WHERE source='message' AND source_id=? "
                 "ORDER BY seq DESC LIMIT 1",

@@ -493,12 +493,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    def visible_handoff_status(handoff_id: str, ctx: Context) -> dict[str, Any]:
-        """Read/reconcile visible input, Return and authenticated acknowledgement; never resend."""
+    async def visible_handoff_status(handoff_id: str, ctx: Context) -> dict[str, Any]:
+        """Reconcile delivery and bound local answers without sending terminal input."""
 
-        def action():
+        async def action():
             principal = identity(ctx)
-            result = bridge.visible_handoffs.reconcile(principal, handoff_id)
+            result = await bridge.visible_handoffs.reconcile_observed(principal, handoff_id)
             if result["state"] == "completed":
                 try:
                     result["receiver_reconciliation"] = (
@@ -514,7 +514,19 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     }
             return result
 
-        return safe(action)
+        try:
+            return await action()
+        except BridgeError as exc:
+            result = {"error": {"code": exc.code, "message": str(exc)}}
+            if hasattr(exc, "diagnostic"):
+                result["diagnostic"] = exc.diagnostic
+            return result
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
+        except Exception:
+            return {
+                "error": {"code": "internal_error", "message": "Request could not be completed"}
+            }
 
     @server.tool(annotations=read)
     async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:
