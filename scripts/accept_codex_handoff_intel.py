@@ -46,7 +46,7 @@ from kirabridge.bridge_core.config import (
     PrincipalConfig,
     VisibleTerminalBinding,
 )
-from kirabridge.bridge_core.models import TaskRequest
+from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.literal_session_input import codex_full_row_widths
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
@@ -407,6 +407,16 @@ def require_created_birth(identity, created, receipt):
         "Created PID birth/parent does not match the original open task receipt",
     )
     return generation
+
+
+async def read_startup_window(current):
+    """An unstable AX read grants no readiness; the caller keeps its deadline."""
+    try:
+        return await current()
+    except BridgeError as error:
+        if error.code != "macos_tree_changed":
+            raise
+        return None
 
 
 async def wait_created_shell(
@@ -1267,7 +1277,11 @@ async def accept(args):
                     async with asyncio.timeout(75):
                         previous = None
                         while True:  # noqa: ASYNC110 -- actual own Codex startup
-                            row = await current()
+                            row = await read_startup_window(current)
+                            if row is None:
+                                previous = None
+                                await asyncio.sleep(0.15)
+                                continue
                             agents = [p for p in row["processes"] if p["name"] == "codex"]
                             raw = await transport.read(owned["pane_id"])
                             if len(agents) == 1:
