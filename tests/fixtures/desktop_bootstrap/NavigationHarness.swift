@@ -48,7 +48,9 @@ struct NavigationHarness {
             return
         }
         let url = args[1] == "nil" ? nil : URL(string: args[1])
+        let isolated = args.count > 4 && args[4] == "isolated"
         print(args[2] == "popup" ? String(policy.allowsPopup(url))
-              : policy.decision(for: url, activated: args[2] == "activated").rawValue)
+              : policy.decision(
+                    for: url, activated: args[2] == "activated", isolated: isolated).rawValue)
     }
 }

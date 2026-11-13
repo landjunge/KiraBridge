@@ -16,6 +16,34 @@ struct IsolatedHarness {
             }
             return
         }
+        if mode == "env" {
+            let root = URL(fileURLWithPath: args[3])
+            let source = [
+                "PATH": "/usr/bin:/bin", "HOME": "/private/home", "LANG": "de_DE.UTF-8",
+                "KIRABRIDGE_LOCAL_TOKEN": "prod-token-marker",
+                "KIRABRIDGE_CONFIG": "/private/production/config.toml",
+                "SECRET_MARKER": "leak-marker",
+            ]
+            let environment = DesktopBootstrap.isolatedEnvironment(root: root, from: source)
+            let keys = environment.keys.sorted().joined(separator: ",")
+            print("\(keys)|\(environment["PYTHONPATH"] ?? "")")
+            return
+        }
+        if mode == "owned" {
+            var adopted = false
+            do {
+                _ = try DesktopBootstrap.startIsolated(
+                    executable: URL(fileURLWithPath: "/bin/sh"),
+                    arguments: ["-c", "printf '%s\\n' \"$1\"; sleep 5", "fixture", args[3]],
+                    environment: ProcessInfo.processInfo.environment,
+                    privateDirectory: directory, timeout: 5,
+                    owned: { _ in adopted = true })
+                print("unexpected \(adopted)")
+            } catch {
+                print("failed \(adopted)")
+            }
+            return
+        }
         if mode == "timeout" {
             do {
                 _ = try DesktopBootstrap.startIsolated(
@@ -37,6 +65,40 @@ struct IsolatedHarness {
                     environment: ProcessInfo.processInfo.environment,
                     privateDirectory: directory, timeout: 5)
                 print("unexpected")
+            } catch {
+                print("failed")
+            }
+            return
+        }
+        if mode == "eof_live" {
+            let start = Date()
+            do {
+                _ = try DesktopBootstrap.startIsolated(
+                    executable: URL(fileURLWithPath: "/bin/sh"),
+                    arguments: ["-c", "exec 1>&-; sleep 5"],
+                    environment: ProcessInfo.processInfo.environment,
+                    privateDirectory: directory, timeout: 5)
+                print("unexpected")
+            } catch {
+                print("failed \(String(format: "%.1f", Date().timeIntervalSince(start)))")
+            }
+            return
+        }
+        if mode == "stderr_flood" {
+            do {
+                let started = try DesktopBootstrap.startIsolated(
+                    executable: URL(fileURLWithPath: "/bin/sh"),
+                    arguments: [
+                        "-c",
+                        "dd if=/dev/zero of=/dev/stderr bs=1024 count=70 2>/dev/null; "
+                            + "printf '%s\\n' \"$1\"; sleep 5",
+                        "fixture", args[3],
+                    ],
+                    environment: ProcessInfo.processInfo.environment,
+                    privateDirectory: directory, timeout: 5)
+                print("started \(started.receipt.origin.absoluteString)")
+                DesktopBootstrap.stop(started.process)
+                print("stopped")
             } catch {
                 print("failed")
             }

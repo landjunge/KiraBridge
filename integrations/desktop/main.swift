@@ -121,15 +121,20 @@ enum DesktopBootstrap {
         return data
     }
 
-    /// Stop exactly this owned child; never a process group.
-    static func stop(_ task: Process) {
+    /// Stop exactly this owned child; never a process group. Returns true only
+    /// when the owned child is confirmed absent, so a caller can distinguish a
+    /// confirmed cleanup from an unknown one.
+    static func stop(_ task: Process) -> Bool {
         if task.isRunning { task.terminate() }
         let now = { Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000 }
-        let deadline = now() + 0.5
+        var deadline = now() + 0.5
         while task.isRunning && now() < deadline { usleep(20_000) }
         if task.isRunning && task.processIdentifier > 1 {
             _ = Darwin.kill(task.processIdentifier, SIGKILL)
+            deadline = now() + 0.5
+            while task.isRunning && now() < deadline { usleep(20_000) }
         }
+        return !task.isRunning
     }
 
     /// Start an explicitly isolated Live console as this app's owned child.
@@ -140,7 +145,8 @@ enum DesktopBootstrap {
     /// stopped and no production fallback is attempted.
     static func startIsolated(executable: URL, arguments: [String], environment: [String: String],
                               privateDirectory: URL, timeout: TimeInterval = 30,
-                              maxStdoutBytes: Int = 65536) throws -> DesktopIsolatedServer {
+                              maxStdoutBytes: Int = 65536,
+                              owned: ((Process) -> Void)? = nil) throws -> DesktopIsolatedServer {
         guard timeout.isFinite, timeout > 0, timeout <= 60,
               maxStdoutBytes > 0, maxStdoutBytes <= 1024 * 1024 else {
             throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
@@ -156,45 +162,58 @@ enum DesktopBootstrap {
         do { try task.run() } catch {
             throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
         }
+        // The caller keeps the owned handle immediately, so even an uncertain
+        // cleanup leaves it stoppable and never starts a second child.
+        owned?(task)
         DispatchQueue.global().async {
-            var total = 0
-            while total < 65536 {
+            // Keep draining for the whole child lifetime so a full pipe can
+            // never block the server; the bytes are discarded, not stored.
+            while true {
                 guard let chunk = try? errors.fileHandleForReading.read(upToCount: 8192),
                       !chunk.isEmpty else { return }
-                total += chunk.count
             }
         }
         let now = { Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000 }
         let deadline = now() + timeout
         let descriptor = output.fileHandleForReading.fileDescriptor
         var data = Data(), buffer = [UInt8](repeating: 0, count: 4096)
-        while true {
-            if now() >= deadline {
-                stop(task)
-                throw DesktopBootstrapFailure(kind: .timeout, cleanupConfirmed: true)
+        // A cleanup is only "confirmed" when the owned child is verifiably gone;
+        // otherwise the failure is reported as unknown and no retry is implied.
+        func failure(_ kind: DesktopBootstrapFailure.Kind) -> DesktopBootstrapFailure {
+            guard DesktopBootstrap.stop(task) else {
+                return DesktopBootstrapFailure(kind: .cleanupUnknown, cleanupConfirmed: false)
             }
+            return DesktopBootstrapFailure(kind: kind, cleanupConfirmed: true)
+        }
+        while true {
+            if now() >= deadline { throw failure(.timeout) }
             var ready = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
             let status = withUnsafeMutablePointer(to: &ready) { pointer in
                 Darwin.poll(pointer, 1, 50)
             }
             if status < 0 {
                 if errno == EINTR { continue }
-                stop(task)
-                throw DesktopBootstrapFailure(kind: .readFailed, cleanupConfirmed: true)
+                throw failure(.readFailed)
             }
             if status == 0 { continue }
             let count = buffer.withUnsafeMutableBytes { pointer in
                 Darwin.read(descriptor, pointer.baseAddress, pointer.count)
             }
             if count <= 0 {
-                task.waitUntilExit()
+                // EOF without a receipt. A child that is still running is
+                // stopped with a bounded wait; never wait for it to exit by
+                // itself, and never signal anything but this owned child.
+                if task.isRunning {
+                    guard DesktopBootstrap.stop(task) else {
+                        throw DesktopBootstrapFailure(
+                            kind: .cleanupUnknown, cleanupConfirmed: false)
+                    }
+                }
+                if !task.isRunning { task.waitUntilExit() }
                 throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
             }
             data.append(contentsOf: buffer.prefix(count))
-            if data.count > maxStdoutBytes {
-                stop(task)
-                throw DesktopBootstrapFailure(kind: .outputLimit, cleanupConfirmed: true)
-            }
+            if data.count > maxStdoutBytes { throw failure(.outputLimit) }
             if let newline = data.firstIndex(of: 0x0A) {
                 data = data.prefix(upTo: newline)
                 break
@@ -202,16 +221,60 @@ enum DesktopBootstrap {
         }
         guard let receipt = try? DesktopIsolatedReceipt(
             data: Data(data), directory: privateDirectory) else {
-            stop(task)
-            throw DesktopBootstrapFailure(kind: .readFailed, cleanupConfirmed: true)
+            throw failure(.readFailed)
         }
         return DesktopIsolatedServer(receipt: receipt, process: task)
+    }
+
+    /// Narrow positive allowlist for the isolated child: no inherited bridge or
+    /// provider tokens, no production config pointer, only the fixed source path.
+    static let isolatedEnvironmentKeys = [
+        "PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "USER", "LOGNAME",
+        "SHELL",
+    ]
+
+    static func isolatedEnvironment(root: URL, from source: [String: String]) -> [String: String] {
+        var environment: [String: String] = [:]
+        for key in isolatedEnvironmentKeys {
+            if let value = source[key] { environment[key] = value }
+        }
+        environment["PYTHONPATH"] = root.standardizedFileURL.path + "/src"
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        return environment
     }
 }
 
 struct DesktopIsolatedServer {
     let receipt: DesktopIsolatedReceipt
     let process: Process
+}
+
+/// Thread-safe handle to the one isolated child this app owns. It is adopted as
+/// soon as the child starts, so an uncertain cleanup never loses the handle and
+/// the app never starts a second child.
+final class DesktopOwnedChild {
+    private let lock = NSLock()
+    private var process: Process?
+
+    func adopt(_ process: Process) {
+        lock.lock()
+        self.process = process
+        lock.unlock()
+    }
+
+    func stop() {
+        lock.lock()
+        let owned = process
+        process = nil
+        lock.unlock()
+        if let owned { _ = DesktopBootstrap.stop(owned) }
+    }
+
+    var isRunning: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return process?.isRunning ?? false
+    }
 }
 
 enum DesktopNavigationDecision: String { case allow, external, deny }
@@ -239,12 +302,12 @@ struct DesktopLoginReceipt {
 struct DesktopIsolatedReceipt {
     let origin: URL
     let loginFile: URL
-    static let productionPort = 8766
+    static let productionPorts: Set<Int> = [8765, 8766, 8767]
     static func isValidOrigin(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "http", url.host == "127.0.0.1",
               url.user == nil, url.password == nil,
               let port = url.port, port >= 1024, port <= 65535,
-              port != productionPort,
+              !productionPorts.contains(port),
               url.path.isEmpty || url.path == "/",
               url.query == nil, url.fragment == nil else { return false }
         return true
@@ -258,18 +321,13 @@ struct DesktopIsolatedReceipt {
               DesktopLoginReceipt.isValidPath(path) else {
             throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
         }
-        let login = URL(fileURLWithPath: path)
-        var owned = directory.path
-        if owned.hasSuffix("/") { owned.removeLast() }
-        var ownedStandardized = directory.standardizedFileURL.path
-        if ownedStandardized.hasSuffix("/") { ownedStandardized.removeLast() }
-        let expected = Set([
-            owned + "/approval-login.html",
-            URL(fileURLWithPath: owned + "/approval-login.html").standardizedFileURL.path,
-            ownedStandardized + "/approval-login.html",
-        ])
-        guard expected.contains(login.standardizedFileURL.path)
-            || expected.contains(login.path) else {
+        // Compare canonical forms on both sides. The owned base is canonicalised
+        // before it is created, and resolving symlinks here rejects a login path
+        // that escapes through a symlink; there is no general path allowlist.
+        let owned = directory.resolvingSymlinksInPath().standardizedFileURL
+        let login = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+        guard login.lastPathComponent == "approval-login.html",
+              login.deletingLastPathComponent().standardizedFileURL.path == owned.path else {
             throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
         }
         origin = URL(string: "http://127.0.0.1:\(parsed.port!)")!
@@ -291,7 +349,9 @@ struct DesktopNavigationPolicy {
             && url.port == consolePort
             && url.user == nil && url.password == nil
     }
-    func decision(for url: URL?, activated: Bool) -> DesktopNavigationDecision {
+    func decision(
+        for url: URL?, activated: Bool, isolated: Bool = false
+    ) -> DesktopNavigationDecision {
         guard let url, url.user == nil, url.password == nil else { return .deny }
         if url.isFileURL {
             let local = url.host == nil || url.host == "" || url.host == "localhost"
@@ -304,9 +364,9 @@ struct DesktopNavigationPolicy {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
-        ].contains(url.absoluteString) { return .external }
+        ].contains(url.absoluteString) { return isolated ? .deny : .external }
         if activated, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-           let host = url.host, !host.isEmpty { return .external }
+           let host = url.host, !host.isEmpty { return isolated ? .deny : .external }
         return .deny
     }
     func allowsPopup(_ url: URL?) -> Bool {
@@ -369,7 +429,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     var bootstrapCleanupUnknown = false
     var liveMode = false
     var isolatedMode = false
-    var isolatedServer: Process?
+    let isolatedChild = DesktopOwnedChild()
     var familySwitchInProgress = false
     var familySwitchUnknown = false
     var mainNavigationGeneration: UInt64 = 0
@@ -512,11 +572,14 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
             // An explicitly isolated instance keeps no WebKit session or storage
             // beyond this process; the production window keeps its data store.
             configuration.websiteDataStore = isolatedMode ? .nonPersistent() : .default()
-            // Only the main console window bridges the catalog-ID family switch.
-            configuration.userContentController.add(self, name: "familySwitch")
-            configuration.userContentController.addUserScript(
-                WKUserScript(source: Self.familyBridgeScript, injectionTime: .atDocumentStart,
-                             forMainFrameOnly: true))
+            // Only the production console window bridges the catalog-ID family
+            // switch; an isolated instance never registers that handler.
+            if !isolatedMode {
+                configuration.userContentController.add(self, name: "familySwitch")
+                configuration.userContentController.addUserScript(
+                    WKUserScript(source: Self.familyBridgeScript, injectionTime: .atDocumentStart,
+                                 forMainFrameOnly: true))
+            }
         }
         configuration.applicationNameForUserAgent = "KiraBridgeDesktop"
         let view = WKWebView(frame: .zero, configuration: configuration)
@@ -580,23 +643,26 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
                 retryAllowed: false)
             return
         }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+        // Canonical owned base before the directory exists, so the private
+        // config and the receipt's login path agree on /var vs /private/var.
+        let base = FileManager.default.temporaryDirectory
+            .resolvingSymlinksInPath().standardizedFileURL
+        let directory = base.appendingPathComponent(
             "kirabridge-live-isolated-" + UUID().uuidString)
         let config = directory.appendingPathComponent("config.toml")
-        var environment = ProcessInfo.processInfo.environment
-        environment["PYTHONPATH"] = root.path + "/src"
-        environment.removeValue(forKey: "KIRABRIDGE_CONSOLE_EMBED")
+        let environment = DesktopBootstrap.isolatedEnvironment(
+            root: root, from: ProcessInfo.processInfo.environment)
         DispatchQueue.global().async {
             do {
                 let server = try DesktopBootstrap.startIsolated(
                     executable: python,
                     arguments: ["-m", "kirabridge.cli", "--config", config.path,
                                 "isolated-live", "--port", "0"],
-                    environment: environment, privateDirectory: directory)
+                    environment: environment, privateDirectory: directory,
+                    owned: { self.isolatedChild.adopt($0) })
                 DispatchQueue.main.async {
                     self.bootstrapInProgress = false
                     self.bootstrapCleanupUnknown = false
-                    self.isolatedServer = server.process
                     self.navigationPolicy = DesktopNavigationPolicy(
                         consolePort: server.receipt.origin.port ?? 0)
                     self.navigationPolicy.authorizeLogin(
@@ -608,10 +674,11 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
                 let failure = (error as? DesktopBootstrapFailure)
                     ?? DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
                 DispatchQueue.main.async {
-                    self.bootstrapInProgress = false
-                    self.bootstrapCleanupUnknown = false
+                    self.bootstrapInProgress = !failure.cleanupConfirmed
+                    self.bootstrapCleanupUnknown = !failure.cleanupConfirmed
                     self.openRequests.failAll()
-                    self.showError(failure.localizedDescription, retryAllowed: false)
+                    self.showError(
+                        failure.localizedDescription, retryAllowed: failure.cleanupConfirmed)
                 }
             }
         }
@@ -696,10 +763,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
 
     func applicationWillTerminate(_ notification: Notification) {
         openRequests.failAll()
-        if let server = isolatedServer {
-            DesktopBootstrap.stop(server)
-            isolatedServer = nil
-        }
+        isolatedChild.stop()
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
@@ -727,7 +791,8 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
             return
         }
         switch navigationPolicy.decision(for: navigationAction.request.url,
-                                         activated: navigationAction.navigationType == .linkActivated) {
+                                         activated: navigationAction.navigationType == .linkActivated,
+                                         isolated: isolatedMode) {
         case .external:
             if let url = navigationAction.request.url { NSWorkspace.shared.open(url) }
             decisionHandler(.cancel)

@@ -134,9 +134,23 @@ def test_console_origin_is_bound_to_exactly_one_loopback_port(tmp_path):
         bridge.store.close()
 
 
-def test_production_console_port_is_refused(tmp_path):
-    with pytest.raises(BridgeError, match="production console port"):
-        asyncio.run(serve_isolated(tmp_path / "instance/config.toml", port=PRODUCTION_CONSOLE_PORT))
+@pytest.mark.parametrize("port", [8765, 8766, 8767])
+def test_production_ports_are_refused(tmp_path, port):
+    with pytest.raises(BridgeError, match="production ports|production console port"):
+        asyncio.run(serve_isolated(tmp_path / "instance/config.toml", port=port))
+
+
+def test_canonical_alias_directory_yields_a_canonical_receipt(tmp_path):
+    real = tmp_path / "real-instance"
+    real.mkdir(mode=0o700)
+    real.chmod(0o700)
+    alias = tmp_path / "alias-instance"
+    alias.symlink_to(real, target_is_directory=True)
+    config, directory, path, _key = prepare(alias / "config.toml")
+    assert directory == real.resolve()
+    assert path == (real / "config.toml").resolve()
+    login = (directory / "approval-login.html").resolve()
+    assert login.parent == directory.resolve()
 
 
 def test_login_page_targets_the_isolated_origin_only():

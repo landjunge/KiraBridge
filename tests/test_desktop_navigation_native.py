@@ -145,6 +145,39 @@ def test_isolated_origin_binds_exactly_one_loopback_port(
 
 
 @pytest.mark.parametrize(
+    "url,mode,expected",
+    [
+        ("https://example.invalid/", "activated", "deny"),
+        ("http://example.invalid/", "activated", "deny"),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "activated",
+            "deny",
+        ),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+            "activated",
+            "deny",
+        ),
+        ("http://127.0.0.1:54321/", "automatic", "allow"),
+        ("http://127.0.0.1:54321/live", "automatic", "allow"),
+        ("https://127.0.0.1:54321/", "activated", "deny"),
+    ],
+)
+def test_isolated_mode_never_intends_to_open_anything_external(
+    navigation_harness, url, mode, expected
+):
+    result = subprocess.run(
+        [str(navigation_harness), url, mode, "54321", "isolated"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected
+
+
+@pytest.mark.parametrize(
     "value,expected",
     [
         ({"login_file": "/private/custom/approval-login.html"}, "accepted"),

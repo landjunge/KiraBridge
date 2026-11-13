@@ -32,6 +32,7 @@ from kirabridge.live_status import project
 from kirabridge.local_runtime import default_config, write_private
 from kirabridge.operator_application import operator_application
 
+PRODUCTION_PORTS = frozenset({8765, 8766, 8767})
 PRODUCTION_CONSOLE_PORT = 8766
 _MIN_PORT = 1024
 
@@ -182,10 +183,10 @@ async def serve_isolated(config_path: str | Path, *, port: int = 0) -> None:
     Port 0 binds an ephemeral loopback port; an explicit port is accepted only
     when it is a private port other than the production console port.
     """
-    if port and (port < _MIN_PORT or port > 65535 or port == PRODUCTION_CONSOLE_PORT):
+    if port and (port < _MIN_PORT or port > 65535 or port in PRODUCTION_PORTS):
         raise BridgeError(
             "isolated_port_required",
-            "Choose a private loopback port other than the production console port",
+            "Choose a private loopback port outside the production ports 8765-8767",
         )
     import uvicorn
 
@@ -213,16 +214,16 @@ async def serve_isolated(config_path: str | Path, *, port: int = 0) -> None:
                 raise BridgeError("isolated_start", "The isolated console did not start")
             await asyncio.sleep(0.02)
         actual = server.servers[0].sockets[0].getsockname()[1]
-        if actual == PRODUCTION_CONSOLE_PORT:
+        if actual in PRODUCTION_PORTS:
             server.should_exit = True
             await serving
             raise BridgeError(
                 "isolated_port_conflict",
-                "The isolated console must not use the production console port",
+                "The isolated console must not bind a production port",
             )
         origin = f"http://127.0.0.1:{actual}"
         console.set_origin(origin)
-        login = write_login(directory, login_page(key, origin, console.instance))
+        login = write_login(directory, login_page(key, origin, console.instance)).resolve()
         print(json.dumps(receipt(origin, login, path), sort_keys=True), flush=True)
         await serving
     finally:
