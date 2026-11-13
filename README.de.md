@@ -68,6 +68,8 @@ Der ausdrücklich aktivierte ThreadDesk-Werkzeugproxy unterstützt im Entwicklun
 
 Der Entwicklungsstand trennt außerdem die normale MCP-Erreichbarkeitsprüfung von Speicherdiagnosen, schützt laufende ThreadDesk-Aufrufe bei Katalogproblemen und bietet kompakte bestätigte Schreibantworten. Ungewisse Schreibvorgänge benötigen weiterhin den Abgleich ihrer ursprünglichen Operation. Die Änderungen betreffen den gemeinsamen Mac-/Linux-Code; sie belegen keine neue Installation. Siehe [Verhalten und Prüfgrenzen](docs/THREADDESK-OPERATIONS-RELIABILITY.md).
 
+Die Bereitschaftsprüfung unterscheidet jetzt Berechtigung, Plattformunterstützung und ungeprüften Transport. Ausstehende Freigaben und bekannte Blockaden ergeben „nicht bereit“; eine ungeprüfte Session- oder ThreadDesk-Verbindung bleibt unbekannt. Die Statuskorrektur erteilt keine Zugriffsrechte und startet keine Befehle.
+
 ## Downloads und Installationsprofile
 
 Die Buttons oben verlinken direkt auf veröffentlichte Installationsdateien und
