@@ -1,7 +1,8 @@
 # Geladener eigener Stopp · Betreiberstand 19.10.2026
 
 Historischer Installations- und Prüfbericht. Aktuelle Planung und Paketstatus
-stehen in ThreadDesk (Hauptplan `7fb455b083f7`, Arbeitsboard `188ce4729a62`).
+stehen in ThreadDesk: maßgeblicher Master `6b5b73b9de36`, aktiver Arbeitsplan
+`7fb455b083f7` und Status im Arbeitsboard `188ce4729a62`.
 
 Installierte Version0.5.2 mit geprüftem Quellbackport `f3f1302`;
 zugehöriger Main-Quellpin `612a5c8f34a01d4280ce665dbf9d380a9e45a2c3`.

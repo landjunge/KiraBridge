@@ -6,7 +6,8 @@ Zeitpunkt; sie sind keine aktuelle Aufgabenfreigabe oder Paketplanung.
 Kein technischer Prüfnachweis setzt `user_accepted=true`.
 
 Aktuelle Planung und Paketstatus werden ausschließlich in ThreadDesk geführt:
-Hauptplan `7fb455b083f7`, Arbeitsboard `188ce4729a62`. Die alten Plan-/Statuskopien
+maßgeblicher Master `6b5b73b9de36`, aktiver Arbeitsplan `7fb455b083f7` und
+Status im Arbeitsboard `188ce4729a62`. Die alten Plan-/Statuskopien
 wurden aus dem aktuellen Repository entfernt. Ihr vollständiges unverändertes
 Archiv `kirabridge-legacy-plan-mirrors-20261113.zip` liegt als Datei
 `bb32567e949c` am Arbeitsboard. Die Git-Historie und die technischen Belege unten
