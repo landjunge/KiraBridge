@@ -19,6 +19,27 @@ import tomllib
 import zipfile
 from pathlib import Path
 
+ISOLATED_SETUP = r"""
+import re
+import sys
+from pathlib import Path
+from kirabridge.local_runtime import setup
+
+path = Path(sys.argv[1])
+setup(sys.argv[2], path, install_wrapper=False)
+content = path.read_text().replace("port = 8765", "port = " + sys.argv[3])
+content, matches = re.subn(
+    r"(?m)^\[principals\.local\]\ncapabilities = [^\n]+",
+    '[principals.local]\napproval_mode = "automatic"\n'
+    'capabilities = ["bridge.health", "file.read"]',
+    content,
+    count=1,
+)
+if matches != 1:
+    raise RuntimeError("Synthetic local policy could not be configured")
+path.write_text(content)
+"""
+
 
 def run(argv, **kwargs):
     result = subprocess.run(argv, capture_output=True, text=True, timeout=240, **kwargs)
@@ -34,7 +55,11 @@ def run(argv, **kwargs):
                     "audit_recorded",
                 )
             }
-            detail["codes"] = [x.get("code") for x in payload.get("read_path_checks", [])]
+            detail["codes"] = [
+                check.get("code")
+                for group in ("read_path_checks", "operation_checks")
+                for check in payload.get(group, [])
+            ]
         except ValueError:
             detail = {"output": "not structured"}
         raise RuntimeError(
@@ -206,12 +231,9 @@ def smoke(artifacts: Path):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
-        script = (
-            "import sys;from pathlib import Path;from kirabridge.local_runtime import setup;"
-            "p=Path(sys.argv[1]);setup(sys.argv[2],p,install_wrapper=False);"
-            "p.write_text(p.read_text().replace('port = 8765','port = '+sys.argv[3]))"
-        )
-        run([python, "-c", script, str(config), str(workspace), str(port)])
+        # Only this temporary local fixture grants the requested probe operation.
+        # Real setup defaults and all other operation approvals remain unchanged.
+        run([python, "-c", ISOLATED_SETUP, str(config), str(workspace), str(port)])
         probe = workspace / "release-probe.txt"
         probe.write_text("Synthetic isolated release prerequisite\n")
         config_before = hashlib.sha256(config.read_bytes()).hexdigest()
