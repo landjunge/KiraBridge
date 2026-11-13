@@ -889,9 +889,12 @@ const entries=menus[0].menus()[0].menuItems().filter(m=>
  ['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(m)));
 if(entries.length!==1||!entries[0].enabled())throw Error('Detach menu is unavailable');
 checkCreatedTab();
-if(!selected()||owner.windows().filter(w=>named(w).includes(__NONCE__)).length!==1||
- !['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(entries[0]))||
- !entries[0].enabled())throw Error('Detach target changed');
+if(!selected())throw Error('Detach target focus changed');
+if(owner.windows().filter(w=>named(w).includes(__NONCE__)).length!==1)
+ throw Error('Detach target title changed');
+if(!['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(entries[0])))
+ throw Error('Detach target menu label changed');
+if(!entries[0].enabled())throw Error('Detach target menu disabled');
 entries[0].click();JSON.stringify({detached:true});
 """
         )
