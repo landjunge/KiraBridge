@@ -219,10 +219,20 @@ async def exercise_loop(
         current["index"] += 1
         return None, observation().get("intake")
 
+    def published_status():
+        status = json.loads((cfg.state_path / "status.json").read_text())
+        # Readers use existence as the readiness boundary, including while the
+        # first reporter is still running. A reservation must never publish a
+        # partial status document or a previous iteration's runtime snapshot.
+        assert status["autonext"] == observation()["state"]
+        assert status["completions"] == {"pending": 0}
+        assert status["pid"] == runtime.os.getpid()
+        assert status["execution_scope"] == "separate_managed_session"
+        assert "continuation" in status
+        return status
+
     def worker_report(profile, work, report_id):
-        pending = json.loads((cfg.state_path / "status.json").read_text())["reporting"]["workers"][
-            work["id"]
-        ]
+        pending = published_status()["reporting"]["workers"][work["id"]]
         assert pending["report_id"] == report_id
         assert pending["state"] == "unknown"
         reports.append((work["id"], work["state"], report_id))
@@ -236,9 +246,7 @@ async def exercise_loop(
         }
 
     def coordinator_report(profile, done, text, mode, report_id):
-        pending = json.loads((cfg.state_path / "status.json").read_text())["reporting"][
-            "coordinator"
-        ]
+        pending = published_status()["reporting"]["coordinator"]
         assert pending["report_id"] == report_id
         assert pending["state"] == "unknown"
         reports.append(("coordinator", mode, report_id))

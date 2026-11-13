@@ -521,7 +521,7 @@ def restore_reporting(path, scope):
     return previous
 
 
-def reserve_report(path, reporting, scope, target, fingerprint, instance):
+def reserve_report(path, reporting, scope, target, fingerprint, instance, *, observation):
     """Persist UNKNOWN before a subprocess can send; restart never retries it."""
     report_id = ("loop-" if target is None else "observe-") + secrets.token_hex(12)
     reservation = {
@@ -543,6 +543,9 @@ def reserve_report(path, reporting, scope, target, fingerprint, instance):
     else:
         reporting["workers"][target] = reservation
     status = json.loads(path.read_text()) if path.exists() else {}
+    # status.json is also the public observation boundary. Even the first
+    # pre-send reservation must expose its complete current runtime snapshot.
+    status.update(observation)
     status.update(reporting=reporting, reporting_scope=scope, observed_at=time.time())
     save(path, status, durable=True)
     return report_id
@@ -799,6 +802,27 @@ async def serve(path):
                 )
                 processed = process_completions(bridge, latest)
                 state = bridge.autonext.inspect()
+                current_status = {
+                    "observed_at": time.time(),
+                    "pid": os.getpid(),
+                    "execution_scope": "separate_managed_session",
+                    "autonext": state,
+                    "completions": processed,
+                    "reporting": reporting,
+                    "reporting_scope": reporting_scope,
+                    "continuation": {
+                        "authority_ref": intake["authority_ref"],
+                        "source_revision": intake["source_revision"],
+                        "held": intake["held"],
+                        "selected_task": intake["selected"]["card"].task_id
+                        if intake["selected"]
+                        else None,
+                        "state": "working" if state["state"] == "waiting" else "watching",
+                        "resource_stop": intake.get("resource_stop"),
+                    }
+                    if intake
+                    else None,
+                }
                 for work in bridge.store.db.execute(
                     "SELECT id,assignee,state,core_task_id FROM team_work WHERE assignee!='local'"
                 ).fetchall():
@@ -815,6 +839,7 @@ async def serve(path):
                         row["id"],
                         fingerprint,
                         report_instance(profile, row["id"]),
+                        observation=current_status,
                     )
                     outcome = await asyncio.to_thread(report_worker, profile, row, report_id)
                     reporting["workers"][row["id"]] = {
@@ -842,6 +867,7 @@ async def serve(path):
                         None,
                         summary,
                         report_instance(profile),
+                        observation=current_status,
                     )
                     outcome = await asyncio.to_thread(
                         report,
@@ -859,30 +885,8 @@ async def serve(path):
                     }
                     last_summary = summary
                     await asyncio.sleep(0)  # let a pending stop signal run (see worker reports)
-                save(
-                    cfg.state_path / "status.json",
-                    {
-                        "observed_at": time.time(),
-                        "pid": os.getpid(),
-                        "execution_scope": "separate_managed_session",
-                        "autonext": state,
-                        "completions": processed,
-                        "reporting": reporting,
-                        "reporting_scope": reporting_scope,
-                        "continuation": {
-                            "authority_ref": intake["authority_ref"],
-                            "source_revision": intake["source_revision"],
-                            "held": intake["held"],
-                            "selected_task": intake["selected"]["card"].task_id
-                            if intake["selected"]
-                            else None,
-                            "state": "working" if state["state"] == "waiting" else "watching",
-                            "resource_stop": intake.get("resource_stop"),
-                        }
-                        if intake
-                        else None,
-                    },
-                )
+                current_status["observed_at"] = time.time()
+                save(cfg.state_path / "status.json", current_status)
                 if stop.is_set():
                     break
                 try:
