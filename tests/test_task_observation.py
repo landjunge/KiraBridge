@@ -398,7 +398,11 @@ async def test_grok_submit_native_and_conversation_wait_share_one_response_budge
     try:
         async with MCPClientPool() as clients:
             await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
-            async with asyncio.timeout(0.25):
+            # Generous hang guard: the shared response budget under test is the
+            # 60ms MAX_WAIT_SECONDS above, not this outer deadline. A tight 0.25s
+            # guard raced the MCP round-trip plus the 40ms native wait under host
+            # load and timed out spuriously.
+            async with asyncio.timeout(2.0):
                 result = (
                     await clients.call("local", "task_request", {"request": value.model_dump()})
                 ).structuredContent
