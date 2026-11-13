@@ -68,41 +68,43 @@ In the development source, the opt-in ThreadDesk tool proxy accepts bounded JSON
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
-**Verified runtime status (November 11, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc48** (`48c635137b4b`), verified through the live KiraBridge daemon and the published macOS pre-release `v0.8.0rc49`. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
+## Downloads and installation profiles
 
-**Published macOS Intel download:** [0.8.0rc49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49) · November 4, 2026 · Preview.
+The buttons above link directly to published installation files and show their
+versions. The macOS desktop and Debian Remote server have independent release
+tracks, so their version numbers can differ.
 
-### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/KiraBridge-macos.tar.gz)
+| Download | Intended use | Installation guide |
+| --- | --- | --- |
+| **macOS Intel** | Desktop app and local KiraBridge service on an Intel Mac. | [Install, verify and get help](docs/INSTALL-EN.md) |
+| **Debian Remote** | Debian/Linux x86_64 server with remote-agent and MCP capabilities. This package does not provide a Linux desktop app. | [Linux / Debian server](docs/INSTALL-LINUX-SERVER.md) |
 
-[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/SHA256SUMS)
-· [All releases](https://github.com/landjunge/KiraBridge/releases)
+[All releases, checksums and release notes](https://github.com/landjunge/KiraBridge/releases)
+are public; downloading does not require a GitHub account. The current packages
+are previews. Use the release notes for each package's requirements and limits.
+AI-provider sign-in and any provider charges are separate.
 
-The current downloads are the published macOS Intel archive and the separate Debian server archive.
-This is a preview; there is no stable release yet. RC49 is available for Intel Macs.
+The download buttons refresh automatically when a release is published, edited
+or deleted, when the updater changes, and every six hours for later asset uploads.
+Only complete, verified downloads are offered. Desktop buttons use the newest
+published desktop release; missing platforms are not filled from older desktop
+releases. Debian Remote is selected independently from the newest published
+`linux-*` server release. Apple Silicon and Windows desktop buttons appear when
+that desktop release actually includes their packages.
 
-The earlier RC33 release includes a [Windows 11 development preview](docs/RC33-DELIVERY-20261104.md)
-with native keyboard, shortcuts and guarded window control. It is a separate
-development kit; general Windows file, process and terminal tools remain outside
-its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md)
-and [Windows setup evidence](docs/WINDOWS-SETUP-20261104.md).
+The source repository can contain newer changes than the published packages.
+Check the app or `kirabridge status` for the version actually running on your
+computer. A source commit, a successful build and an installed version are
+separate pieces of evidence.
 
-The [Windows setup wizard 0.8.0rc37.dev1](docs/WINDOWS-SETUP-20261104.md)
-has historical evidence for a separate Windows installation.
-All seven native phases for that limited development preview passed. Extract the package and open
-**Einrichtung-starten.cmd** for four guided steps. Account sign-in and a real
-ChatGPT connection test with your account remain yours to complete.
-[Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
-[Setup guide, German](docs/WINDOWS-SETUP.md).
+**Earlier Windows development previews:** the [RC33 package report](docs/RC33-DELIVERY-20261104.md)
+and [Windows setup report](docs/WINDOWS-SETUP-20261104.md) describe their limited
+keyboard, shortcut and guarded-window support. They do not establish current
+Windows feature parity or a current general-purpose Windows installer.
+[Windows setup guide](docs/WINDOWS-SETUP.md).
 
-The linked Intel download is the verified published RC49, **not** the newer locally installed RC45. The verified installed runtime is listed in the opening status. The historical November 7 evidence below predates RC45.
-[Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
-The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
-describes the previous RC40 source `a5d381a`.
-
-Windows feature parity and a standalone installer remain development work. The published Windows preview does not include general
-file, process or terminal tools, or Windows service installation. No new package
-for those ongoing projects or published RC40 download is offered here.
-
+[Historical release and installation evidence](docs/evidence/readme-current-20261107.json)
+remains available as dated evidence, not as the current installed version.
 
 ## What KiraBridge helps you do
 
@@ -143,8 +145,9 @@ For terminal-agent tasks, install and sign in to Grok Build or Codex, then
 configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
-See [RC36 fixes, checks and limits](docs/TERMINAL-MINIMIZED-RC36-20261104.md) for the current
-package; see [installation, verification and help](docs/INSTALL-EN.md).
+See the notes accompanying the selected download and [installation, verification
+and help](docs/INSTALL-EN.md). The [RC36 report](docs/TERMINAL-MINIMIZED-RC36-20261104.md)
+remains a historical record.
 
 
 ## Linux / Debian server
