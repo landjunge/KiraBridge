@@ -120,7 +120,8 @@ Release um; der Rollback setzt beide Werte zurück. Andere Einstellungen bleiben
 ## Loslegen
 
 1. **Installieren oder aktualisieren.** Lade `KiraBridge-macos.tar.gz` herunter und
-   entpacke es vollständig. Führe das enthaltene `install.sh` in einem separaten
+   entpacke es vollständig. Führe das enthaltene
+   `install.sh --desktop --require-visible-terminal` in einem separaten
    Terminalfenster aus und folge der Bestätigung. Laufende Agentensitzungen erhalten.
 2. **App öffnen.** Der Installer aktualisiert Dienst und Desktop-App gemeinsam.
    Öffne `KiraBridge.app` in `~/Applications`. Vorhandene Einstellungen und Zugänge
