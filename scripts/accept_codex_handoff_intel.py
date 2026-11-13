@@ -46,7 +46,7 @@ from kirabridge.bridge_core.config import (
     PrincipalConfig,
     VisibleTerminalBinding,
 )
-from kirabridge.bridge_core.models import TaskRequest
+from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.literal_session_input import codex_full_row_widths
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
@@ -252,6 +252,8 @@ def codex_arguments(binary, workspace, server_names=()):
     # These flags are required in the pinned local --help. Overrides apply only
     # to this invocation; the harness never writes the user's Codex config/auth.
     overrides = [
+        # A pinned acceptance candidate must never launch the CLI installer.
+        "check_for_update_on_startup=false",
         *("features." + name + "=false" for name in CODEX_DISABLED_FEATURES),
         *("mcp_servers." + name + ".enabled=false" for name in server_names),
         'history.persistence="none"',
@@ -405,6 +407,16 @@ def require_created_birth(identity, created, receipt):
         "Created PID birth/parent does not match the original open task receipt",
     )
     return generation
+
+
+async def read_startup_window(current):
+    """An unstable AX read grants no readiness; the caller keeps its deadline."""
+    try:
+        return await current()
+    except BridgeError as error:
+        if error.code != "macos_tree_changed":
+            raise
+        return None
 
 
 async def wait_created_shell(
@@ -612,7 +624,7 @@ def require_commit_pins(head, installed, package_commit, harness_commit):
 def validate_candidate(args):
     require((platform.system(), platform.machine()) == ("Darwin", "x86_64"), "Intel macOS only")
     require(not sys.flags.optimize, "Independent proof assertions must remain enabled")
-    require(args.codex_version == "codex-cli 0.166.0", "This harness pins the 0.166 renderer")
+    require(args.codex_version == "codex-cli 0.167.0", "This harness pins the 0.167 renderer")
     require(Path(sys.executable).absolute() == args.expected_python.absolute(), "Wrong interpreter")
     require(
         Path(kirabridge.__file__).resolve().parent == args.package_root.resolve(), "Wrong package"
@@ -1265,7 +1277,11 @@ async def accept(args):
                     async with asyncio.timeout(75):
                         previous = None
                         while True:  # noqa: ASYNC110 -- actual own Codex startup
-                            row = await current()
+                            row = await read_startup_window(current)
+                            if row is None:
+                                previous = None
+                                await asyncio.sleep(0.15)
+                                continue
                             agents = [p for p in row["processes"] if p["name"] == "codex"]
                             raw = await transport.read(owned["pane_id"])
                             if len(agents) == 1:
@@ -1609,7 +1625,7 @@ def parser():
     value.add_argument("--harness-commit")
     value.add_argument("--codex", type=Path, default=Path.home() / ".local/bin/codex")
     value.add_argument("--codex-sha256")
-    value.add_argument("--codex-version", default="codex-cli 0.166.0")
+    value.add_argument("--codex-version", default="codex-cli 0.167.0")
     value.add_argument("--response-timeout", type=int, default=120, choices=range(30, 181))
     return value
 
