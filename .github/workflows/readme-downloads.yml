@@ -23,9 +23,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   refresh:
-    # Hosted runners are unavailable for this private repository; use the
-    # existing self-hosted Linux runners that also run the KiraBridge CI.
-    runs-on: kirabridge
+    # Public repository: GitHub-hosted runner, so a stuck self-hosted queue
+    # cannot freeze README download buttons.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
