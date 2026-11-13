@@ -70,6 +70,8 @@ Der Entwicklungsstand trennt außerdem die normale MCP-Erreichbarkeitsprüfung v
 
 Die Bereitschaftsprüfung unterscheidet jetzt Berechtigung, Plattformunterstützung und ungeprüften Transport. Ausstehende Freigaben und bekannte Blockaden ergeben „nicht bereit“; eine ungeprüfte Session- oder ThreadDesk-Verbindung bleibt unbekannt. Die Statuskorrektur erteilt keine Zugriffsrechte und startet keine Befehle.
 
+Die Release-Smoke-Testkonfiguration beschränkt ihre temporäre lokale Identität auf Erreichbarkeits- und `file.read`-Prüfungen mit automatischer Freigabe. Reguläre Installationen benötigen weiterhin standardmäßig eine Freigabe.
+
 ## Downloads und Installationsprofile
 
 Die Buttons oben verlinken direkt auf veröffentlichte Installationsdateien und
