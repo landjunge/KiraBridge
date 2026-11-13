@@ -245,18 +245,33 @@ def stub_observation_binding(bridge, monkeypatch):
     return calls
 
 
+@pytest.mark.parametrize("ack_timing", ["none", "before", "during"])
 async def test_unknown_manual_codex_turn_reconciles_from_inserting_cursor_without_input(
     visible,  # noqa: F811
     monkeypatch,
+    ack_timing,
 ):
     bridge, transport = visible
-    _, cursor = unknown_paste_with_ready_cursor(bridge)
+    original, cursor = unknown_paste_with_ready_cursor(bridge)
+
+    def acknowledge():
+        message = next(
+            item
+            for item in bridge.messages.receive("codex")["messages"]
+            if item["id"] == original["id"]
+        )
+        bridge.messages.ack("codex", message["id"], message["receipt"])
+
+    if ack_timing == "before":
+        acknowledge()
     calls = stub_observation_binding(bridge, monkeypatch)
 
     async def observe(actual, binding, *, body, process_identity):
         assert actual == cursor and binding == bridge.config.visible_handoffs.bindings["codex"]
         assert body == RECOVERY_BODY and callable(process_identity)
         calls.append("observe")
+        if ack_timing == "during":
+            acknowledge()
         return {
             "state": "completed",
             "text": RECOVERY_ANSWER,
@@ -301,7 +316,7 @@ async def test_unknown_manual_codex_turn_reconciles_from_inserting_cursor_withou
     )
     assert accepted["reconciled_without_input"] is True
     assert accepted["agent_confirmed"] is False
-    assert len(status["events"]) == len(before["events"]) + 1
+    assert len(status["events"]) == len(before["events"]) + (1 if ack_timing == "none" else 2)
     assert calls == ["selected", "check_target", "observe", "check_target"]
     assert transport["calls"] == []
 

@@ -263,8 +263,12 @@ class VisibleHandoffs:
         """
         status = self.reconcile(principal, identifier)
         if (
-            status["state"] != "unknown"
-            or status["evidence"].get("reason") != "visible_paste_unconfirmed"
+            status["state"] not in {"unknown", "confirmed"}
+            or not any(
+                event["state"] == "unknown"
+                and event["evidence"].get("reason") == "visible_paste_unconfirmed"
+                for event in status["events"]
+            )
             or status["target"] != "codex"
         ):
             return status
@@ -332,7 +336,7 @@ class VisibleHandoffs:
         # Recheck authenticated completion after the local observation. If a
         # mailbox ACK arrived meanwhile, its existing reconciliation wins.
         status = self.reconcile(principal, identifier)
-        if status["state"] != "unknown":
+        if status["state"] not in {"unknown", "confirmed"}:
             return status
 
         evidence = {
@@ -364,11 +368,14 @@ class VisibleHandoffs:
             current = self.store.db.execute(
                 "SELECT state,evidence FROM visible_handoffs WHERE id=?", (identifier,)
             ).fetchone()
-            if current and current["state"] == "unknown":
+            if current and current["state"] in {"unknown", "confirmed"}:
                 import json
 
                 current_evidence = json.loads(current["evidence"])
-                if current_evidence.get("reason") == "visible_paste_unconfirmed":
+                if (
+                    current["state"] == "confirmed"
+                    or current_evidence.get("reason") == "visible_paste_unconfirmed"
+                ):
                     message_row = self.store.db.execute(
                         "SELECT acknowledged,conversation_id FROM messages WHERE id=?",
                         (status["message_id"],),
