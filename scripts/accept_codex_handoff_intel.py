@@ -252,6 +252,8 @@ def codex_arguments(binary, workspace, server_names=()):
     # These flags are required in the pinned local --help. Overrides apply only
     # to this invocation; the harness never writes the user's Codex config/auth.
     overrides = [
+        # A pinned acceptance candidate must never launch the CLI installer.
+        "check_for_update_on_startup=false",
         *("features." + name + "=false" for name in CODEX_DISABLED_FEATURES),
         *("mcp_servers." + name + ".enabled=false" for name in server_names),
         'history.persistence="none"',

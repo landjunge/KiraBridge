@@ -91,6 +91,7 @@ def test_argv_does_not_change_home_auth_or_add_resume_prompt(harness, tmp_path):
     assert argv[argv.index("-s") + 1] == "read-only"
     assert argv[argv.index("-a") + 1] == "never"
     values = overrides[1::2]
+    assert "check_for_update_on_startup=false" in values
     assert "mcp_servers.kirabridge.enabled=false" in values
     assert "mcp_servers={}" not in values
     assert all(
