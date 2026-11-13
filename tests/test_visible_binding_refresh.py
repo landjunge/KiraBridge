@@ -24,6 +24,31 @@ LIVE_STATUS = "Die Antwort ist fertig.\n⠋ Running [stop]\n╭\n│ ❯ │\n�
 BUSY = "╭\nThinking… [stop]\n│ ❯ │\n╰"
 NONEMPTY = "╭\n│ ❯ schon getippt │\n╰"
 
+# The Grok paste-proof (single_row_capacity / insertion_observed) requires the
+# full boxed footer. These local full-box screens/transport are used only by the
+# dispatch tests below; the shared simplified-box fixture stays untouched.
+GROK_BOX_TOP = "╭──────╮"
+GROK_BOX_BOTTOM = "╰────── Grok 1.0 ─╯"
+GROK_EMPTY_FULL = GROK_BOX_TOP + "\n│ ❯      │\n" + GROK_BOX_BOTTOM
+GROK_IDLE_FULL = (
+    "Alte Zeile Thinking… [stop]\nDie Antwort ist fertig.\n" + GROK_EMPTY_FULL
+)
+
+
+def fullbox_grok_transport(bridge, transport):
+    transport["text"] = GROK_IDLE_FULL
+
+    async def insert(principal, args, *, before_transport=None):
+        assert not args.submit
+        if before_transport is not None:
+            await before_transport()
+        transport["calls"].append("insert")
+        transport["inserted_body"] = args.text
+        transport["text"] = GROK_BOX_TOP + "\n│ ❯ " + args.text + " │\n" + GROK_BOX_BOTTOM
+        return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
+
+    bridge.sessions.insert = insert
+
 
 def new_session():
     return {
@@ -170,7 +195,7 @@ async def test_still_live_configured_window_is_kept(visible, monkeypatch):
 
 async def test_dead_reservation_does_not_busy_lock_the_replacement_or_replay(visible, monkeypatch):
     bridge, transport = visible
-    transport["text"] = IDLE
+    fullbox_grok_transport(bridge, transport)
     previous = bridge.config.visible_handoffs.bindings["grok"].model_copy()
     before = remember(bridge, previous)
     install_catalog(monkeypatch, bridge, [new_session()])
@@ -183,7 +208,7 @@ async def test_dead_reservation_does_not_busy_lock_the_replacement_or_replay(vis
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
-        transport["text"] = "╭\n│ ❯ │\n╰"
+        transport["text"] = GROK_EMPTY_FULL
         message = bridge.messages.receive("grok")["messages"][-1]
         bridge.messages.ack("grok", message["id"], message["receipt"])
         bridge.messages.send(
@@ -355,12 +380,12 @@ async def test_historical_activity_delivers_once_and_current_activity_or_text_wa
 
 async def test_two_consecutive_replies_each_return_once_then_reopen_keeps_results(visible, config):
     bridge, transport = visible
-    transport["text"] = IDLE
+    fullbox_grok_transport(bridge, transport)
     bodies = []
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
-        transport["text"] = "╭\n│ ❯ │\n╰"
+        transport["text"] = GROK_EMPTY_FULL
         message = bridge.messages.receive("grok")["messages"][-1]
         bridge.messages.ack("grok", message["id"], message["receipt"])
         sent = bridge.messages.send(
@@ -402,14 +427,14 @@ async def test_sent_dead_reservation_leaves_the_index_without_a_second_delivery(
     visible, monkeypatch
 ):
     bridge, transport = visible
-    transport["text"] = IDLE
+    fullbox_grok_transport(bridge, transport)
     previous = bridge.config.visible_handoffs.bindings["grok"].model_copy()
     remember(bridge, previous, state="sent")
     install_catalog(monkeypatch, bridge, [new_session()])
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
-        transport["text"] = "╭\n│ ❯ │\n╰"
+        transport["text"] = GROK_EMPTY_FULL
         message = bridge.messages.receive("grok")["messages"][-1]
         bridge.messages.ack("grok", message["id"], message["receipt"])
         bridge.messages.send(

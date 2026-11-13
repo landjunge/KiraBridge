@@ -10,6 +10,25 @@ from kirabridge.bridge_core.config import ReceiverConfig
 from kirabridge.bridge_core.models import AgentInput, BridgeError, canonical
 from kirabridge.message_manager import MessageSend
 
+# Full boxed footer required by the Grok paste-proof geometry; local to the
+# dispatch test below so the shared simplified-box fixture stays untouched.
+GROK_BOX_TOP = "╭──────╮"
+GROK_BOX_BOTTOM = "╰────── Grok 1.0 ─╯"
+GROK_EMPTY_FULL = GROK_BOX_TOP + "\n│ ❯      │\n" + GROK_BOX_BOTTOM
+
+
+def fullbox_grok_insert(bridge, transport):
+    async def insert(principal, args, *, before_transport=None):
+        assert not args.submit
+        if before_transport is not None:
+            await before_transport()
+        transport["calls"].append("insert")
+        transport["inserted_body"] = args.text
+        transport["text"] = GROK_BOX_TOP + "\n│ ❯ " + args.text + " │\n" + GROK_BOX_BOTTOM
+        return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
+
+    bridge.sessions.insert = insert
+
 
 def enqueue(bridge, sender="chatgpt", target="grok", key="wait"):
     bridge.config.messaging.receivers[target] = ReceiverConfig(
@@ -378,7 +397,8 @@ async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_
         cwd=config.principals["grok"].roots[0], timeout=3
     )
     config.visible_handoffs.bindings["grok"].busy_pattern = "Thinking…"
-    transport["text"] = "╭\nThinking…\n│ ❯ │\n╰"
+    fullbox_grok_insert(bridge, transport)
+    transport["text"] = GROK_BOX_TOP + "\nThinking…\n│ ❯      │\n" + GROK_BOX_BOTTOM
     await bridge.message_receiver.start()
     async with MCPClientPool() as clients:
         await clients.connect(Peer("caller", url=endpoint, token="chatgpt-" + "x" * 48))
@@ -403,7 +423,7 @@ async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_
         assert sent["processing"]["state"] == "failed"
         assert sent["processing"]["claimed"] is None
         assert transport["calls"] == []
-        transport["text"] = "╭\n│ ❯ │\n╰"
+        transport["text"] = GROK_EMPTY_FULL
         bridge.messages.wake.set()
         repeated = (
             await clients.call(

@@ -31,7 +31,7 @@ def visible(bridge, config, monkeypatch):
         for target in ["codex", "grok"]
     }
     config.agents = {target: AgentConfig(kind="grok_acp") for target in ["codex", "grok"]}
-    transport = {"text": "╭\n│ ❯ │\n╰", "calls": [], "ack": True, "reply": True, "fail": False}
+    transport = {"text": "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯", "calls": [], "ack": True, "reply": True, "fail": False}
 
     async def selected(principal, pane, pid):
         if (pane, pid) == ("terminal:100:ttys001", 123):
@@ -59,11 +59,15 @@ def visible(bridge, config, monkeypatch):
             await before_transport()
         transport["calls"].append("insert")
         transport["inserted_body"] = args.text
-        transport["text"] = (
-            "› " + args.text
-            if transport.get("target") == "codex"
-            else "╭\n│ ❯ " + args.text + "\n╰"
-        )
+        if transport.get("target") == "codex":
+            transport["text"] = "› " + args.text
+        else:
+            rows = args.text.split("\n")
+            composer = "\n".join(
+                ("│ ❯ " if i == 0 else "│ ") + line + " │"
+                for i, line in enumerate(rows)
+            )
+            transport["text"] = "╭──────╮\n" + composer + "\n╰────── Grok 1.0 ─╯"
         return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
 
     async def submit(principal, pane, pid, *, expected_screen=None):
@@ -75,7 +79,7 @@ def visible(bridge, config, monkeypatch):
             "SELECT message_id FROM visible_handoffs WHERE target=? AND state='submitting'",
             (target,),
         ).fetchone()
-        transport["text"] = "› " if transport.get("target") == "codex" else "╭\n│ ❯ │\n╰"
+        transport["text"] = "› " if transport.get("target") == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
         if transport["fail"]:
             raise UncertainExecution("uncertain_return", "Unknown return delivery")
         messages = bridge.messages.receive(target)["messages"]
@@ -150,7 +154,7 @@ async def test_final_session_preflight_refusal_is_not_an_uncertain_paste(
 async def test_body_edit_between_paste_and_return_never_submits(visible, target):
     bridge, transport = visible
     transport["target"] = target
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
 
     async def edited(evidence):
         assert evidence["state"] == "inserted"
@@ -255,9 +259,19 @@ async def test_body_only_handoff_never_adds_text_or_requires_agent_protocol(
 
     bridge, transport = visible
     transport.update(target=target, ack=False, reply=False)
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     task = {"id": "literal-body", "principal": sender}
     args = AgentInput(agent=target, prompt=body, cwd="/tmp", timeout=0.01, wait_for_reply=False)
+    from kirabridge.cli_adapters.grok_echo import verifiable_payload
+
+    if target == "grok" and not verifiable_payload(body):
+        # The Grok paste-proof cannot verify edge-space payloads from the
+        # composer cells, so it refuses them instead of pasting unproven text.
+        with pytest.raises(BridgeError) as error:
+            await bridge.visible_handoffs.execute(task, args, callback, callback)
+        assert error.value.code == "visible_input_geometry_ambiguous"
+        assert transport["calls"] == []
+        return
     result = await bridge.visible_handoffs.execute(task, args, callback, callback)
     assert transport["inserted_body"].encode("utf-8") == body.encode("utf-8")
     assert result["scope"] == "visible_input_delivery" and result["return_sent"]
@@ -714,7 +728,7 @@ async def test_maintenance_blocks_new_visible_work_for_all_senders(visible, send
     bridge, transport = visible
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp")
     hold_activation(bridge, state)
     args = AgentInput(agent=target, prompt="New work during maintenance", cwd="/tmp", timeout=1)
@@ -751,7 +765,7 @@ async def test_already_claimed_visible_turn_and_return_complete_while_draining(v
     bridge, transport = visible
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp")
     original = bridge.messages.send(
         sender,
@@ -797,7 +811,7 @@ async def test_four_senders_use_same_visible_route_and_distinct_confirmation(vis
     bridge, transport = visible
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     args = AgentInput(agent=target, prompt="Read-only review", cwd="/tmp", timeout=1)
     task = {"id": "visible-test", "principal": sender}
     result = await bridge.agents.execute(
@@ -833,7 +847,7 @@ async def test_missing_changed_or_unready_target_never_spawns_or_sends(visible, 
     bridge, transport = visible
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     binding = bridge.config.visible_handoffs.bindings[target]
     if failure == "binding":
         del bridge.config.visible_handoffs.bindings[target]
@@ -878,7 +892,7 @@ async def test_in_flight_window_rejects_second_handoff(visible):
         )
     )
     await asyncio.sleep(0.01)
-    transport["text"] = "╭\nThinking… [stop]\n│ ❯ │\n╰"
+    transport["text"] = "╭──────╮\nThinking… [stop]\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     with pytest.raises(BridgeError) as error:
         await bridge.visible_handoffs.execute(
             {"id": "second", "principal": "chatgpt"},
@@ -956,7 +970,7 @@ def test_real_codex_multiline_collapsed_paste_representation(target, delta, obse
 
     prompt = "First line\nSecond line with spaces and (punctuation)."
     view = f"› [Pasted Content {len(prompt) + delta} chars]\n"
-    before = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    before = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     assert (
         bool(VisibleHandoffs.insertion_observed(target, view, prompt, "test", before=before))
         == observed
@@ -1069,7 +1083,7 @@ def test_old_marker_and_line_count_do_not_prove_a_literal_body():
     identifier, prompt = "grok-collapse", "First\nSecond\nThird"
     preview = "╭\nKB-END-" + digest(identifier)[:12] + "\n╰─ paste again or double-cli…"
     field = "\n╭\n│ ❯ [Pasted: 3 lines]\n╰"
-    before = "╭\n│ ❯ │\n╰"
+    before = "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     assert not VisibleHandoffs.insertion_observed(
         "grok", preview + field, prompt, identifier, before=before
     )
@@ -1157,7 +1171,7 @@ def test_old_inbox_only_work_retry_does_not_retroactively_dispatch(visible):
 @pytest.mark.parametrize("sender", ["codex", "grok", "chatgpt", "grok_app"])
 async def test_empty_field_with_active_agent_never_receives_a_new_handoff(visible, sender):
     bridge, transport = visible
-    transport["text"] = "╭\nThinking… [stop]\n│ ❯ │\n╰"
+    transport["text"] = "╭──────╮\nThinking… [stop]\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     with pytest.raises(BridgeError) as exc:
         await bridge.visible_handoffs.execute(
             {"id": "busy-original", "principal": sender},
@@ -1175,7 +1189,7 @@ async def test_reply_to_closed_original_requester_never_opens_another_window(
     bridge, transport = visible
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
-    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    transport["text"] = "› " if target == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     original_selected = bridge.sessions.selected
     requester = bridge.config.visible_handoffs.bindings[sender]
 
