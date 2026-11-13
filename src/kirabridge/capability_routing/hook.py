@@ -222,6 +222,7 @@ class DelegationGuard:
             raise RoutingError("Actual Qwen task exceeds the scoped read-only MEDIUM profile")
         from .router import fingerprint
 
+        input_hash, config_hash = fingerprint(args), fingerprint(config)
         decision = self.validate_configured(
             task, cli="qwen", model=config.model, effort=config.qwen_reasoning_effort
         )
@@ -229,10 +230,22 @@ class DelegationGuard:
             decision["executable"]
         ).resolve(strict=True):
             raise RoutingError("Configured Qwen executable differs from the access evidence")
+        matrix, binding = self.source.load()
+        current = select(matrix, self.runtime, task)
+        if (
+            binding != decision["thread_desk"]
+            or any(
+                current[key] != decision[key]
+                for key in ("matrix_sha256", "runtime_sha256", "task_sha256", "model", "effort")
+            )
+            or fingerprint(args) != input_hash
+            or fingerprint(config) != config_hash
+        ):
+            raise RoutingError("Scoped Qwen source or input changed during preflight")
         decision.update(
             {
-                "agent_input_sha256": fingerprint(args),
-                "configured_agent_sha256": fingerprint(config),
+                "agent_input_sha256": input_hash,
+                "configured_agent_sha256": config_hash,
             }
         )
         if expected is not None and any(

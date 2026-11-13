@@ -41,6 +41,37 @@ read operations / `read_queries` grants. A historical broader AgentConfig does
 not widen that task's explicit grants. Source revision/hash, runtime, task,
 actual arguments and agent configuration are rechecked against `decision`.
 
+## Actual dispatcher/effect binding
+
+The existing owner can compose the reviewed adapter at **owned Core startup**:
+
+```python
+from kirabridge.capability_routing.qwen import ScopedQwenAdapter
+
+native = bridge.agents.adapters["qwen_acp"]
+guarded = ScopedQwenAdapter(bridge, native, guard)
+bridge.agents.adapters["qwen_acp"] = Observed(guarded)
+```
+
+`Observed.execute` must forward its actual `task`, `args`, `config` and keyword
+arguments to the inner adapter. The wrapper derives its Task from the actual
+dispatcher-packed prompt after `seal_request`, not a preconstructed work-body
+lookalike. It checks the real Core record, Team owner/seal, worker scope, current
+Core lease owner/receipt/attempt/expiry and CWD identity. It supplies the Qwen
+adapter's existing `before_spawn` callback, which rechecks the same binding,
+fresh authority, actual arguments/configuration and lease after metadata IO,
+immediately before native `spawn_process`.
+
+Keine zweite Queue, kein neuer Dispatcher/Store und keine Sessionübernahme.
+Der Wrapper erstellt oder löscht keine Verzeichnisse, Credentials oder Historien;
+Ergebnis, UNKNOWN und Cleanup bleiben beim ursprünglichen Qwen-Adapter. Seine
+Konstruktion ist kein Hotreload-Protokoll für einen bereits laufenden privaten
+Core. Ein Prozess ohne vorhandenen Setter erhält die Anbindung nicht durch einen
+Dateiedit oder externen Vorabcheck. Aktivierung benötigt einen gesondert geprüften
+Start-/Idlepfad des bestehenden eigenen Ausführers; fremde oder zu erhaltende
+Prozesse werden dafür nicht ersetzt. Kein `TemporaryDirectory`-Kontext um bereits
+vorhandene Runtime-/Store-/CWD-Pfade.
+
 Der Hookbeleg ist **keine** Core-Ausführungsberechtigung, Claim-Übernahme,
 fachliche Abnahme oder Erlaubnis zum Replay eines UNKNOWN. Der bestehende
 Aufrufer muss seine native Effektgrenze anbinden; ein einmaliger Vorabcheck
