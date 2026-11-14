@@ -72,7 +72,7 @@ Die Bereitschaftsprüfung unterscheidet jetzt Berechtigung, Plattformunterstütz
 
 Im Entwicklungsstand blockieren gültige macOS-Systembenutzer mit negativer UID, etwa `nobody`, nicht mehr den gesamten Terminalkatalog. Ihre Prozesse gelten weiterhin als fremd; fehlerhafte Prozessdaten und belegte Eingabeziele werden weiterhin abgewiesen.
 
-Sichtbare Shell-Eingaben sind im Entwicklungsstand an ihren ursprünglichen autorisierten Auftrag gebunden und benötigen ein eindeutiges Terminalfenster mit einem Tab. Text wird ohne Return eingegeben; vollständiger Terminaltext und Cursorposition müssen vor einem einmaligen Return übereinstimmen. Unbestätigte Eingaben bleiben ohne automatische Wiederholung erhalten. Vor dem Produktiveinsatz bleibt eine echte Terminal-Abnahme einschließlich Zeilenumbruch und Scrollen erforderlich.
+Sichtbare Shell-Eingaben sind im Entwicklungsstand an ihren ursprünglichen autorisierten Auftrag gebunden und benötigen ein eindeutiges Terminalfenster mit einem Tab. Text wird ohne Return eingegeben; vollständiger Terminaltext und Cursorposition müssen vor einem einmaligen Return übereinstimmen. Fokuswechsel und Schließaktionen durch KiraBridge warten laufende Eingaben ab; geschlossen werden nur eindeutig zugeordnete Fenster mit einem Tab. Unbestätigte Eingaben bleiben ohne automatische Wiederholung erhalten. Vor dem Produktiveinsatz bleibt eine echte Terminal-Abnahme einschließlich Zeilenumbruch und Scrollen erforderlich.
 
 Die Release-Smoke-Testkonfiguration beschränkt ihre temporäre lokale Identität auf Erreichbarkeits- und `file.read`-Prüfungen mit automatischer Freigabe. Reguläre Installationen benötigen weiterhin standardmäßig eine Freigabe.
 
@@ -171,6 +171,8 @@ des Hosts. Linger, Administratorrechte, Firewall und öffentliches HTTPS werden 
 Der Server läuft ohne macOS-GUI, Terminal.app oder native Tastatursteuerung.
 Zwischenablage ist optional (`wl-clipboard`/`xclip`). ChatGPT-/Kontoverknüpfung und
 Fernzugriff benötigen eigene Konfiguration.
+
+Der Entwicklungsquellstand unterscheidet jetzt die Terminalwege je Betriebssystem: `terminal.visible` auf macOS, eine eigene Server-Terminalsitzung über `session.open` auf Linux und `windows.console.handoff` auf Windows. Die alternativen Wege bleiben als ungeprüft gekennzeichnet und benötigen separate Freigaben sowie passende Pfad- und Programmrechte. Die Hinweise ändern weder Zugriffsrechte noch die installierte Laufzeit.
 
 Das 0.8.0rc41-Archiv ist nativ auf Debian 13.6 x86_64 abgenommen und
 [im getrennten Serverrelease veröffentlicht](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). Der echte Download

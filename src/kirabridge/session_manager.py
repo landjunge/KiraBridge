@@ -763,40 +763,49 @@ class SessionManager:
         )
 
     async def focus(self, principal, pane_id, expected_pid):
-        self.authorization.principal(principal, "session.input")
-        selected = await self.selected(principal, pane_id, expected_pid)
-        if not pane_id.startswith("terminal:"):
-            raise BridgeError("visible_terminal_required", "Focus requires a Terminal.app tab")
-        before = await self.terminal_app.front_tab()
-        await self.terminal_app.focus(pane_id)
-        after = await self.terminal_app.front_tab()
-        return {
-            "pane_id": pane_id,
-            "expected_pid": expected_pid,
-            "visual_window_id": selected.get("visual_window_id"),
-            "tab_index": selected.get("tab_index"),
-            "before": before,
-            "after": after,
-            "focused": after.get("tty") == selected.get("tty")
-            and after.get("window_id") == selected.get("window_id"),
-        }
+        async with self.lock:
+            self.authorization.principal(principal, "session.input")
+            selected = await self.selected(principal, pane_id, expected_pid)
+            if not pane_id.startswith("terminal:"):
+                raise BridgeError("visible_terminal_required", "Focus requires a Terminal.app tab")
+            before = await self.terminal_app.front_tab()
+            await self.terminal_app.focus(pane_id)
+            after = await self.terminal_app.front_tab()
+            return {
+                "pane_id": pane_id,
+                "expected_pid": expected_pid,
+                "visual_window_id": selected.get("visual_window_id"),
+                "tab_index": selected.get("tab_index"),
+                "before": before,
+                "after": after,
+                "focused": after.get("tty") == selected.get("tty")
+                and after.get("window_id") == selected.get("window_id"),
+            }
 
     async def close_tab(self, principal, pane_id, expected_pid):
-        self.authorization.principal(principal, "session.input")
-        selected = await self.selected(principal, pane_id, expected_pid)
-        if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
-            raise BridgeError(
-                "terminal_window_required", "Refusing to close the only visible terminal"
-            )
-        if not pane_id.startswith("terminal:"):
-            raise BridgeError("visible_terminal_required", "Close requires a Terminal.app tab")
-        result = await self.terminal_app.close_tab(pane_id)
-        return {
-            "pane_id": pane_id,
-            "expected_pid": expected_pid,
-            "closed": bool(result.get("closed")),
-            "remaining": result.get("remaining"),
-        }
+        async with self.lock:
+            self.authorization.principal(principal, "session.input")
+            selected = await self.selected(principal, pane_id, expected_pid)
+            from kirabridge.terminal_input import terminal_target_supported
+
+            if not terminal_target_supported(selected):
+                raise BridgeError(
+                    "terminal_window_unsupported",
+                    "Close requires an unambiguous physical single-tab terminal",
+                )
+            if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
+                raise BridgeError(
+                    "terminal_window_required", "Refusing to close the only visible terminal"
+                )
+            if not pane_id.startswith("terminal:"):
+                raise BridgeError("visible_terminal_required", "Close requires a Terminal.app tab")
+            result = await self.terminal_app.close_tab(pane_id)
+            return {
+                "pane_id": pane_id,
+                "expected_pid": expected_pid,
+                "closed": bool(result.get("closed")),
+                "remaining": result.get("remaining"),
+            }
 
     def assigned_agent(self, selected):
         """Recognized CLI input always needs the persistent original binding."""

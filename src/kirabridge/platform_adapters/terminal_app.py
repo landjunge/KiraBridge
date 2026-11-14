@@ -764,14 +764,48 @@ class TerminalAppTransport:
         """Confirm target absence; a pending close dialog is not a closed tab."""
         result = await self.native(
             self.native_target(pane_id)
+            + "const expectedTTY = "
+            + json.dumps("/dev/" + pane_id.split(":")[2])
+            + ";"
             + """
             const id = targetWindow.id();
             if (targetWindow.tabs().length !== 1)
                 throw Error("Refusing to close a multi-tab Terminal window");
+            function boundsOf(w) {
+                const b = w.bounds(), keys = ['x', 'y', 'width', 'height'];
+                if (!b || !keys.every(k => typeof b[k] === 'number' && Number.isFinite(b[k])) ||
+                    b.width <= 0 || b.height <= 0)
+                    throw Error('Close surface bounds are unavailable');
+                return keys.map(k => b[k]);
+            }
+            const bounds = boundsOf(targetWindow);
+            function sameBounds(a, b) { return a.every((v, i) => v === b[i]); }
+            function checkCloseSurface() {
+                const windows = app.windows(), ids = windows.map(w => w.id());
+                if (ids.some(v => !Number.isInteger(v) || v <= 0) ||
+                    new Set(ids).size !== ids.length)
+                    throw Error('Close window identity is ambiguous');
+                const matches = windows.filter(w => w.id() === id);
+                if (matches.length !== 1 || !sameBounds(boundsOf(matches[0]), bounds))
+                    throw Error('Close target bounds changed');
+                // Native macOS tab groups can expose one scripting window/tab
+                // per shared surface. Coincident standalone windows are also
+                // conservatively refused; bounds do not claim atomic AX identity.
+                const surfaces = windows.filter(w => sameBounds(boundsOf(w), bounds));
+                if (surfaces.length !== 1 || surfaces[0].id() !== id)
+                    throw Error('Refusing to close a shared or ambiguous Terminal surface');
+                const tabs = matches[0].tabs();
+                if (tabs.length !== 1 || tabs[0].tty() !== expectedTTY ||
+                    windows.flatMap(w => w.tabs()).filter(t => t.tty() === expectedTTY)
+                        .length !== 1)
+                    throw Error('Close target TTY binding changed');
+            }
+            checkCloseSurface();
             const others = app.windows().filter(w => w.id() !== id).map(w => w.id());
             if (!others.length) throw Error("Refusing to close the only Terminal tab");
             // A running process makes Terminal ask before closing; never leave that dialog.
             if (tab.busy()) throw Error("Selected terminal is busy; no close dialog");
+            checkCloseSurface();
             targetWindow.close();
             delay(0.3);
             const left = app.windows().map(w => w.id());

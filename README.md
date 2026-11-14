@@ -72,7 +72,7 @@ Readiness now distinguishes permission, platform support and unprobed transport.
 
 In development source, valid macOS system users with negative UIDs, such as `nobody`, no longer block the entire Terminal catalog. Their processes remain foreign; malformed process data and busy input targets are still rejected.
 
-Visible shell input in development source is bound to its original authorized task and requires an unambiguous Terminal window with one tab. Text is entered without Return; the complete terminal text and cursor position must match before one Return can be sent. Unconfirmed input is preserved without automatic repetition. Real terminal acceptance, including wrapping and scrolling, remains required before productive use.
+Visible shell input in development source is bound to its original authorized task and requires an unambiguous Terminal window with one tab. Text is entered without Return; the complete terminal text and cursor position must match before one Return can be sent. KiraBridge's focus and close actions wait for active input; closing requires a clearly identified single-tab window. Unconfirmed input is preserved without automatic repetition. Real terminal acceptance, including wrapping and scrolling, remains required before productive use.
 
 The release smoke fixture limits its temporary local identity to health and `file.read` checks with automatic approval. Normal installation defaults continue to require approval.
 
@@ -172,6 +172,8 @@ It does not configure linger, administrator rights, a firewall or public HTTPS.
 This is a headless server, with no macOS GUI, Terminal.app or native keyboard.
 Clipboard support is optional (`wl-clipboard`/`xclip`). ChatGPT/account linking and
 remote access need separate configuration.
+
+Development source now identifies terminal routes by host: `terminal.visible` on macOS, a separate Bridge-owned terminal through `session.open` on Linux, and `windows.console.handoff` on Windows. The alternative routes remain marked as unprobed and require separate approval and suitable path and executable permissions. This guidance does not change access rights or the installed runtime.
 
 The 0.8.0rc41 archive is natively accepted on Debian 13.6 x86_64 and
 [published in its separate server release](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). The downloaded
