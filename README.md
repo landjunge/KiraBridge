@@ -171,6 +171,8 @@ This is a headless server, with no macOS GUI, Terminal.app or native keyboard.
 Clipboard support is optional (`wl-clipboard`/`xclip`). ChatGPT/account linking and
 remote access need separate configuration.
 
+Development source now identifies terminal routes by host: `terminal.visible` on macOS, a separate Bridge-owned terminal through `session.open` on Linux, and `windows.console.handoff` on Windows. The alternative routes remain marked as unprobed and require separate approval and suitable path and executable permissions. This guidance does not change access rights or the installed runtime.
+
 The 0.8.0rc41 archive is natively accepted on Debian 13.6 x86_64 and
 [published in its separate server release](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). The downloaded
 archive matches GitHub's digest and the release checksums. Ubuntu 24.04 is a
