@@ -1,14 +1,23 @@
 """Offline Big Plan preview fixtures; never create Core or provider work."""
 
+import importlib.util
 import json
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
-import scripts.bigplan_loop as loop
 from kirabridge.autonext.continuation import ContinuationPolicy, grant_id
 from kirabridge.autonext.manager import text_sha
+
+# CI runs a script-based pytest launcher without the repository root on sys.path.
+spec = importlib.util.spec_from_file_location(
+    "continuation_preview_loop", Path(__file__).resolve().parents[1] / "scripts/bigplan_loop.py"
+)
+loop = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = loop
+spec.loader.exec_module(loop)
 
 NOW = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
 
