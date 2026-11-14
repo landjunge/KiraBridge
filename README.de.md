@@ -261,6 +261,8 @@ Der integrierte Koordinatorquellstand unterstützt außerdem native Core-Aktivie
 
 Mit ausdrücklich gesetztem `autonext.completion_mode="verified_ack"` verarbeitet derselbe Daemon seine gebundenen Annahmemeldungen autonom. Ein Folgeclaim benötigt die passende Annahmequittung, die bestätigte Board-Outbox und den gespeicherten eigentümergebundenen Completion-ACK; die Claim-Transaktion prüft diese Bindung erneut. Der Standard `external` erhält das bisherige Verhalten. Es entsteht keine zweite Bridge, kein weiterer Dienst und keine zusätzliche Queue; siehe [Konfiguration und Neustartvertrag](docs/COORDINATOR-NATIVE-20261106.md#opt-in-autonome-verarbeitung-vor-folgestart). Quelltests und echte Serverabnahme bleiben getrennt.
 
+Der konfigurierte Koordinator und der frisch bestätigte unveränderliche Owner seines konfigurierten Teams dürfen denselben begrenzten `coordinator_status` mit aufgezeichneten Zeiten lesen. Die Team-Ownerschaft gewährt nur diese Statusansicht; Steuerung, Completion-ACKs und private Core-Daten behalten ihre bisherigen Rechte.
+
 Sein Status zeigt gespeicherte Warte-, Ausführungs- und Abnahmezeiten aus dem gebundenen Core und Receipt. Fehlende oder ungültige Zeitwerte bleiben unbekannt; das Lesen startet keine Arbeit.
 
 Das optionale [native Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) verwendet die geprüfte CLI-Matrix für versiegelte Managed-Aufträge; sichtbare Sitzungen und das eigene strukturierte Grok-Reviewprotokoll bleiben erhalten. Angeforderte Modell-/Effortwerte und beobachtete Metadaten bleiben getrennt; lokale Fixturetests sind keine Provider- oder Deploymentabnahme.

@@ -26,8 +26,13 @@ er befragt dafür kein Modell und lädt keinen Skill.
 
 ## Lesbarer Stand und dauerhafte Rückmeldungen
 
-Der neue lesende MCP-Aufruf `coordinator_status` benötigt `team.read` und den
-konfigurierten Eigentümer. Er liefert höchstens die 16 Aufgaben des aktuellen
+Der lesende MCP-Aufruf `coordinator_status` benötigt `team.read` und erlaubt den
+konfigurierten Koordinatorakteur sowie den frisch über `Team.get` bestätigten
+unveränderlichen Owner ausschließlich des konfigurierten Teams. Diese zusätzliche
+Leseansicht bleibt auch nach einem Koordinatorrollenwechsel beim echten Owner;
+sie erweitert keine Steuer-, ACK- oder privaten Core-/Prompt-/Ergebnisrechte.
+Ein fremdes, fehlendes oder nicht mehr aktiv zugängliches Team ist keine
+Ersatzbindung. Der Aufruf liefert höchstens die 16 Aufgaben des aktuellen
 gepinnten Grants mit Claim-/Work-/Corekennungen, Zuständen, Checkphase und
 vorhandener Annahmequittung. Prompts, Modellresultate, Prüfausgaben und alte
 fremde Grants werden nicht ausgegeben. Mitgliedschaft und Berechtigungen werden

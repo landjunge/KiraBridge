@@ -6,17 +6,15 @@ reads model output. Durable terminal notices use the existing completion inbox.
 
 from collections import Counter
 
-from kirabridge.autonext.timings import task_timings
+from kirabridge.autonext.timings import authorize_coordinator_reader, task_timings
 from kirabridge.bridge_core.models import BridgeError
 
 
 def coordinator_status(bridge, principal):
-    bridge.security.principal(principal, "team.read")
     cfg, manager = bridge.config.autonext, bridge.autonext
-    if principal != cfg.principal:
-        raise BridgeError("coordinator_owner_required", "Configured coordinator owner required")
     native = bool(getattr(manager, "supports_coordinator_checks", False))
     with bridge.store.transaction():
+        authorize_coordinator_reader(bridge, principal)
         state = manager.inspect()
         items = []
         if cfg.coordinator_mode and native:

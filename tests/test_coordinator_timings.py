@@ -93,10 +93,10 @@ async def test_timings_enforce_owner_capability_current_grant_and_membership(
     s, b = scenario, scenario["bridge"]
     card = configure(s, tmp_path, monkeypatch)
     await b.autonext.tick()
-    for principal in ("local", "grok"):
-        with pytest.raises(BridgeError) as error:
-            task_timings(b, principal, card["task_id"])
-        assert error.value.code == "coordinator_owner_required"
+    assert task_timings(b, "local", card["task_id"]) == task_timings(b, "codex", card["task_id"])
+    with pytest.raises(BridgeError) as error:
+        task_timings(b, "grok", card["task_id"])
+    assert error.value.code == "coordinator_owner_required"
     with pytest.raises(BridgeError) as error:
         task_timings(b, "codex", "foreign-task")
     assert error.value.code == "not_found"
