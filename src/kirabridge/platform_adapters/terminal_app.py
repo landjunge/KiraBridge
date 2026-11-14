@@ -918,19 +918,39 @@ entries[0].click();JSON.stringify({detached:true});
         if result.get("detached") is not True:
             raise UncertainExecution("session_open_unknown", "Detach result unknown; never replay")
 
-    async def open(self, command, *, on_created=None, principal="session_open"):
+    async def prepare_open(self, *, principal):
+        from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+        proof = TerminalWindowProof(self, self.system_transport, principal)
+        await proof.prepare_readonly()
+        return proof
+
+    @timed_async("terminal_window_create")
+    async def open(self, command, *, on_created=None, principal="session_open", prepared=None):
         from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
 
         if command:
             raise BridgeError(
                 "terminal_authority_required", "Create an empty shell before bound input"
             )
-        proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)
-        await proof.prepare()
+        proof = prepared or TerminalWindowProof(
+            self, getattr(self, "system_transport", None), principal
+        )
+        require(
+            proof.terminal is self
+            and proof.native is self.system_transport
+            and proof.principal == principal,
+            "Prepared window owner changed",
+        )
+        if prepared is None:
+            await proof.prepare_readonly()
         receipt = None
         try:
+            await proof.activate_prepared()
+            proof.mark_phase("creation")
             source = self.native_open_source(command, "KiraBridge_" + secrets.token_hex(16), proof)
             receipt = await self.native(source, mutation=True)
+            proof.mark_phase("created")
             if on_created is not None:
                 await on_created(dict(receipt))
             require(
@@ -944,6 +964,7 @@ entries[0].click();JSON.stringify({detached:true});
             pane = f"terminal:{receipt['window_id']}:{Path(receipt['tty']).name}"
             target = self.native_target(pane)
             focus = self.native_focus(pane)[len(target) :]
+            proof.mark_phase("focus_created")
             await self.native(
                 self.created_tab_guard(receipt)
                 + focus
@@ -951,8 +972,14 @@ entries[0].click();JSON.stringify({detached:true});
                 mutation=True,
             )
             binding = await proof.isolate(receipt)
-            return {**receipt, "physical_window": binding, "separate_window": True}
-        except Exception as cause:
+            proof.mark_phase("bound")
+            return {
+                **receipt,
+                "physical_window": binding,
+                "separate_window": True,
+                "window_phases": proof.phase_observation(),
+            }
+        except BaseException as cause:
             error = UncertainExecution(
                 "session_open_unknown",
                 "Window creation/isolation is unconfirmed; never reopen or resend",
@@ -962,6 +989,7 @@ entries[0].click();JSON.stringify({detached:true});
                 "automatic_retry": False,
                 "cause_code": getattr(cause, "code", type(cause).__name__),
                 "cause_message": str(cause)[:512],
+                "window_phases": proof.phase_observation(),
             }
             if getattr(cause, "window_observation", None) is not None:
                 error.provider_error["window_observation"] = cause.window_observation

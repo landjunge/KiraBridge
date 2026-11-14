@@ -499,3 +499,180 @@ async def test_postmove_only_count_mismatch_reads_again_without_repeating_move(p
         assert postmove_reads == 2
     assert events == ["create", "receipt", "focus", "move"]
     assert leaf.native.await_count == 3
+
+
+async def test_readonly_prepare_is_one_shot_and_activation_is_separate(product):
+    from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+    scene, leaf, _, _, _ = product
+    original_groups = scene.groups
+    scene.groups = lambda: (
+        [] if sum(op == "windows.list" for op, _ in scene.calls) < 3 else original_groups()
+    )
+    leaf.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    proof = await leaf.prepare_open(principal="chatgpt")
+    leaf.native.assert_not_awaited()
+    before, worker = deepcopy(proof.before), proof.worker
+    with pytest.raises(BridgeError, match="one-shot"):
+        await proof.prepare_readonly()
+    assert proof.before == before and proof.worker == worker
+    await proof.activate_prepared()
+    leaf.native.assert_awaited_once()
+    with pytest.raises(BridgeError, match="unavailable"):
+        await proof.activate_prepared()
+    # An alien transport/principal cannot consume even a freshly prepared proof.
+    other = TerminalWindowProof(leaf, leaf.system_transport, "other")
+    with pytest.raises(BridgeError, match="owner changed"):
+        await leaf.open("", prepared=other, principal="chatgpt")
+    assert leaf.native.await_count == 1
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "success",
+        "raw_cancel",
+        "bound_cancel",
+        "settle_cancel",
+        "settle_timeout",
+        "text_wait_cancel",
+        "text_cancel",
+        "bound_readback_mismatch",
+    ],
+)
+async def test_open_phases_preserve_real_owner_receipts_and_unknown(
+    bridge, config, monkeypatch, native_session_platform, phase
+):
+    from conftest import request, submit
+
+    from kirabridge.bridge_core.models import State
+
+    manager = bridge.sessions
+    cwd = config.principals["local"].roots[0]
+    raw = {"tty": "/dev/ttys004", "opened": True, "window_id": 123}
+    bound = {**raw, "physical_window": {"proof": "native"}, "separate_window": True}
+    row = {"pane_id": "terminal:123:ttys004", "expected_pid": 345, "tty": raw["tty"], "busy": False}
+    events, authorities = [], []
+    preparation = object()
+    original_bind = manager.native_input.bind_stored
+
+    def bind(*a, **kw):
+        authority = original_bind(*a, **kw)
+        authorities.append(authority)
+        return authority
+
+    monkeypatch.setattr(manager.native_input, "bind_stored", bind)
+
+    async def prepare(*, principal):
+        assert principal == "local" and not manager.lock.locked()
+        events.append("prepare")
+        return preparation
+
+    async def opened(command, *, on_created, principal, prepared):
+        assert not command and principal == "local" and prepared is preparation
+        assert manager.lock.locked()
+        events.append("create")
+        await on_created(deepcopy(raw))
+        if phase == "raw_cancel":
+            raise asyncio.CancelledError()
+        return deepcopy(bound)
+
+    async def catalog():
+        assert not manager.lock.locked()
+        assert bridge.store.get("phase-open")["evidence"]["evidence_type"] == "session_window_bound"
+        events.append("settle")
+        if phase == "settle_cancel":
+            raise asyncio.CancelledError()
+        if phase == "settle_timeout":
+            raise TimeoutError()
+        return [row]
+
+    async def read(_):
+        assert not manager.lock.locked()
+        return "KiraBridge visible % "
+
+    async def sent(selected, text, identity, *, expected_cwd, input_context, before_transport):
+        assert manager.lock.locked() and selected == row and expected_cwd == cwd
+        assert input_context.owner == authorities[0].owner
+        assert input_context.turn is not authorities[0].turn
+        with pytest.raises(BridgeError):
+            manager.native_input.desktop_input.require_turn(authorities[0].turn)
+        input_context.check("terminal.input.inspect")
+        await before_transport()
+        events.append("text")
+        if phase == "text_cancel":
+            raise asyncio.CancelledError()
+        return {"sent": True}
+
+    leaf = SimpleNamespace(
+        prepare_open=AsyncMock(side_effect=prepare),
+        open=AsyncMock(side_effect=opened),
+        catalog=AsyncMock(side_effect=catalog),
+        read=AsyncMock(side_effect=read),
+        verify_opened=AsyncMock(),
+        process_identity=AsyncMock(return_value="full-identity"),
+        process_working_directory=AsyncMock(return_value=cwd),
+        send_confirmed=AsyncMock(side_effect=sent),
+    )
+    manager.terminal_app = leaf
+    original_record = bridge.record_window_binding
+
+    async def record(task, progress, receipt):
+        assert manager.lock.locked()
+        if phase == "bound_readback_mismatch":
+
+            async def uncommitted(_):
+                pass
+
+            # A callback that returns without the real commit must not authorize text.
+            await original_record(task, uncommitted, receipt)
+        else:
+            await original_record(task, progress, receipt)
+        events.append("bound")
+        if phase == "bound_cancel":
+            raise asyncio.CancelledError()
+
+    monkeypatch.setattr(bridge, "record_window_binding", record)
+    if phase == "text_wait_cancel":
+        original_settle = manager._settle_opened
+
+        async def settle(*a, **kw):
+            await original_settle(*a, **kw)
+            # Simulate an external cancellation precisely after read-only settle,
+            # before entering the new caller-owned text turn.
+            raise asyncio.CancelledError()
+
+        monkeypatch.setattr(manager, "_settle_opened", settle)
+    bridge.tasks.preflight = None
+    bridge.tasks.executor = bridge._execute_operation  # No real desktop/OS coordinator.
+    submit(bridge, request("session.open", {"cwd": cwd}, task_id="phase-open"))
+    task = bridge.store.claim_exact(bridge.tasks.owner, config.lease_seconds, "phase-open")
+    await bridge.tasks._execute(task)
+    observed = bridge.store.get("phase-open")
+    stored_events = [
+        json.loads(r[0])
+        for r in bridge.store.db.execute(
+            "SELECT evidence FROM events WHERE task_id=? ORDER BY seq", ("phase-open",)
+        )
+    ]
+    receipts = [e for e in stored_events if e.get("evidence_type") == "session_window_created"]
+    full = [e for e in stored_events if e.get("evidence_type") == "session_window_bound"]
+    assert len(receipts) == 1 and receipts[0]["creation_receipt"] == raw
+    assert len(full) == (0 if phase in {"raw_cancel", "bound_readback_mismatch"} else 1)
+    leaf.open.assert_awaited_once()
+    assert not manager.lock.locked()
+    if phase == "success":
+        assert observed["state"] == State.COMPLETED
+        assert events == ["prepare", "create", "bound", "settle", "text"]
+        leaf.send_confirmed.assert_awaited_once()
+    else:
+        assert observed["state"] == State.UNKNOWN
+        assert observed["evidence"]["automatic_retry"] is False
+        provider = observed["evidence"]["provider_error"]
+        assert provider["creation_receipt"] == (raw if phase == "raw_cancel" else bound)
+        assert provider["automatic_retry"] is False
+        assert leaf.send_confirmed.await_count == (1 if phase == "text_cancel" else 0)
+    # Only the real original immutable request is ever used, across both turns.
+    assert {a.owner["task_id"] for a in authorities} == {task["id"]}
+    assert {a.owner["request_sha256"] for a in authorities} == {task["request_sha256"]}
+    assert {a.owner["operation"] for a in authorities} == {"session.open"}

@@ -34,7 +34,7 @@ class VisibleTerminalInput(TerminalInput):
 
 
 class VisibleTerminal:
-    def __init__(self, config, security, sessions, environment):
+    def __init__(self, config, security, sessions, environment, *, record_window_binding):
         self.config, self.security, self.sessions, self.environment = (
             config,
             security,
@@ -42,6 +42,7 @@ class VisibleTerminal:
             environment,
         )
         self.native_input = None
+        self.record_window_binding = record_window_binding
 
     @staticmethod
     def idle_shell_candidate(row):
@@ -177,6 +178,9 @@ class VisibleTerminal:
             open_options = {"task_id": task["id"]}
             if progress is not None:
                 open_options["on_created"] = window_created
+                open_options["on_bound"] = lambda receipt: bridge.record_window_binding(
+                    task, progress, receipt
+                )
             opened = await bridge.sessions.open(
                 principal, SessionOpen(cwd=cwd, controlled_shell=True), **open_options
             )

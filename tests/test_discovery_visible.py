@@ -21,6 +21,8 @@ def owned_shell_setup(bridge, config, monkeypatch):
     """Window-grant tests use the real task/turn and fake only their native peer."""
     native, inputs = bridge.sessions.terminal_app, []
     cwd = config.principals["local"].roots[0]
+    preparation = object()
+    monkeypatch.setattr(native, "prepare_open", AsyncMock(return_value=preparation))
     monkeypatch.setattr(native, "read", AsyncMock(return_value="KiraBridge visible % "))
     monkeypatch.setattr(
         native,
@@ -115,11 +117,17 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
     calls = []
     inputs = owned_shell_setup(bridge, config, monkeypatch)
 
-    async def opened(command, *, on_created=None, principal):
+    async def opened(command, *, on_created=None, principal, prepared):
         assert principal == "local"
         assert command == ""
         calls.append(command)
-        receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
+        assert prepared is bridge.sessions.terminal_app.prepare_open.return_value
+        receipt = {
+            "tty": "/dev/ttys022",
+            "window_id": 222,
+            "separate_window": True,
+            "physical_window": {"proof": "synthetic native peer"},
+        }
         if on_created is not None:
             await on_created(receipt)
         return receipt
@@ -157,11 +165,17 @@ async def test_manual_window_task_waits_for_exact_operator_approval(
     calls = []
     inputs = owned_shell_setup(bridge, config, monkeypatch)
 
-    async def opened(command, *, on_created=None, principal):
+    async def opened(command, *, on_created=None, principal, prepared):
         assert principal == "local"
         assert command == ""
         calls.append(command)
-        receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
+        assert prepared is bridge.sessions.terminal_app.prepare_open.return_value
+        receipt = {
+            "tty": "/dev/ttys022",
+            "window_id": 222,
+            "separate_window": True,
+            "physical_window": {"proof": "synthetic native peer"},
+        }
         if on_created is not None:
             await on_created(receipt)
         return receipt

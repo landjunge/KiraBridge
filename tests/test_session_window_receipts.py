@@ -10,8 +10,9 @@ from kirabridge.bridge_core.models import UncertainExecution
 
 
 @pytest.mark.parametrize("operation", ["session.open", "terminal.visible"])
+@pytest.mark.parametrize("full_binding", [False, True])
 async def test_window_creation_receipt_is_durable_before_unknown_without_replay(
-    bridge, config, monkeypatch, operation
+    bridge, config, monkeypatch, operation, full_binding
 ):
     # Exercise the real dispatcher and durable event store, without any OS/UI.
     monkeypatch.setattr(bridge, "platform_operation", lambda *args: None)
@@ -24,11 +25,29 @@ async def test_window_creation_receipt_is_durable_before_unknown_without_replay(
         "script_window_id": 1001,
         "creation_nonce": "owned-window-fixture",
     }
+    bound = {
+        **receipt,
+        "physical_window": {"proof": "synthetic native peer"},
+        "separate_window": True,
+    }
     calls = []
 
-    async def opened_then_unknown(principal, args, *, task_id, on_created):
+    async def opened_then_unknown(principal, args, *, task_id, on_created, on_bound):
         calls.append(task_id)
+        assert callable(on_bound)
         await on_created(receipt)
+        if full_binding:
+            await on_bound(bound)
+            # Exercise the actual injected Core callback, not merely its shape.
+            observed = bridge.store.get(task_id, principal, resolve_output=False)
+            assert observed["state"] == (
+                "accepted" if operation == "terminal.visible" else "running"
+            )
+            assert observed["evidence"] == {
+                "evidence_type": "session_window_bound",
+                "creation_receipt": bound,
+                "automatic_retry": False,
+            }
         raise UncertainExecution("visible_window_unknown", "Created; physical proof unavailable")
 
     monkeypatch.setattr(bridge.sessions, "open", opened_then_unknown)
@@ -55,6 +74,22 @@ async def test_window_creation_receipt_is_durable_before_unknown_without_replay(
                 "automatic_retry": False,
             }
         ]
+        bindings = [
+            event["evidence"]
+            for event in events
+            if event["evidence"].get("evidence_type") == "session_window_bound"
+        ]
+        assert bindings == (
+            [
+                {
+                    "evidence_type": "session_window_bound",
+                    "creation_receipt": bound,
+                    "automatic_retry": False,
+                }
+            ]
+            if full_binding
+            else []
+        )
         assert bridge.submit("local", value, "already-consumed")["state"] == "unknown"
         assert calls == [value.task_id]
     finally:
@@ -68,7 +103,7 @@ async def test_pending_session_handle_is_unknown_not_completed(bridge, config, m
     pending = {"tty": "/dev/ttys099", "session_handle_pending": True, "agent_processed": False}
     calls = []
 
-    async def pending_open(principal, args, *, task_id, on_created):
+    async def pending_open(principal, args, *, task_id, on_created, on_bound):
         calls.append(task_id)
         return pending
 

@@ -6,7 +6,7 @@ import time
 from copy import deepcopy
 from dataclasses import replace
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
@@ -97,7 +97,10 @@ async def test_new_window_cannot_adopt_ambiguous_tty_view(
     native.send_confirmed.assert_not_awaited()
     native.process_identity.assert_not_awaited()
     manager.read.assert_not_awaited()
-    authorization.window_outcome.assert_called_once_with("chatgpt", "new-window", "opened")
+    assert authorization.window_outcome.call_args_list == [
+        call("chatgpt", "new-window", "opened"),
+        call("chatgpt", "new-window", "unknown"),
+    ]
 
 
 async def test_unique_new_window_keeps_exact_handle_and_command(tmp_path, native_session_platform):
