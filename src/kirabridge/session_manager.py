@@ -65,17 +65,32 @@ class SessionSelect(SessionReference):
 
 
 class SessionInput(SessionReference):
-    """Literal text, or key='enter' bound to an observed cursor and current agent PID."""
+    """Literal text, a bound key, or intent='interim' to the exact working Codex PID.
+
+    Interim messages preserve the current turn and require expected_agent_pid.
+    """
 
     text: str = Field(default="", max_length=16384)
     submit: bool = True
     require_idle: bool = False
+    intent: Literal["literal", "interim"] = "literal"
     key: Literal["enter", "escape"] | None = None
     expected_cursor: str = Field(default="", pattern=r"^$|^[0-9a-f]{64}$")
     expected_agent_pid: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def explicit_input_mode(self):
+        if self.intent == "interim":
+            if (
+                self.key is not None
+                or not self.submit
+                or not self.text
+                or self.expected_agent_pid is None
+            ):
+                raise ValueError("Interim input requires text, submit=true and an exact agent PID")
+            if self.expected_cursor or self.require_idle:
+                raise ValueError("Interim input does not require an idle turn or a Return cursor")
+            return self
         if self.key is not None:
             if self.text or not self.submit or not self.expected_cursor:
                 raise ValueError(

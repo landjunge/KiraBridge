@@ -40,6 +40,8 @@ class DirectDelivery:
         "approval_required",
         "payload_limit",
         "invalid_arguments",
+        "interim_messages_disabled",
+        "interim_transport_unavailable",
     }
 
     def __init__(self, receiver):
@@ -303,6 +305,27 @@ class DirectDelivery:
             recipient = message["recipient"]
             if not self.accepting:
                 raise BridgeError("receiver_unavailable", "Direct receiver is not running")
+            interim = bridge.messages.interim_target(message_id)
+            if interim is not None:
+                selected = await bridge.sessions.selected(
+                    principal, interim.pane_id, interim.expected_pid
+                )
+                target, binding = bridge.sessions.explicit_agent_binding(selected)
+                if target != recipient or binding.agent_pid != interim.expected_agent_pid:
+                    raise BridgeError("visible_target_changed", "Explicit message target changed")
+                async with MCPClientPool(call_timeout=15) as pool:
+                    await pool.connect(peer(bridge.config, recipient))
+                    claimed = self.receiver._claim(message_id, direct=True, interim=True)
+                    if claimed is not None:
+                        self._claimed[message_id] = claimed[1]
+                        await self.receiver._process(
+                            pool,
+                            *claimed,
+                            delivery_event=event,
+                            delivery_binding=binding,
+                            interim=interim,
+                        )
+                return
             recipient_key = ("recipient", recipient)
             if (
                 recipient_key in self.targets

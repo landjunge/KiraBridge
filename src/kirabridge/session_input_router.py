@@ -4,6 +4,8 @@ from kirabridge.slash_commands import command_name
 
 
 def input_kind(args):
+    if args.intent == "interim":
+        return "interim_message"
     if args.key is not None:
         return "observed_return"
     return "slash_command" if command_name(args.text) is not None else "literal_text"
@@ -11,7 +13,11 @@ def input_kind(args):
 
 async def execute(bridge, task, args, target, binding, running, progress):
     kind = input_kind(args)
-    if kind == "observed_return":
+    if kind == "interim_message":
+        from kirabridge.interim_message import execute as interim_execute
+
+        result = await interim_execute(bridge, task, args, target, binding, running, progress)
+    elif kind == "observed_return":
         from kirabridge.session_return import execute as return_execute
 
         result = await return_execute(bridge, task, args, running, progress)

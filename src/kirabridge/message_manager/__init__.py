@@ -8,9 +8,17 @@ import time
 import uuid
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, canonical, digest
+
+
+class InterimSession(Input):
+    """An explicit current session; never a default or replacement window."""
+
+    pane_id: str = Field(pattern=r"^terminal:[0-9]+:ttys[0-9]+$")
+    expected_pid: int = Field(gt=0)
+    expected_agent_pid: int = Field(gt=0)
 
 
 class MessageSend(Input):
@@ -24,6 +32,22 @@ class MessageSend(Input):
     task_id: str | None = Field(default=None, min_length=1, max_length=128)
     request_reply: bool | None = None
     dispatch: bool | None = None
+    interim_session: InterimSession | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Exact working Codex destination for an interim question/note; no new job",
+    )
+
+    @model_validator(mode="after")
+    def interim_contract(self):
+        if self.interim_session is not None and (
+            self.recipient != "codex"
+            or self.kind not in {"question", "note"}
+            or self.dispatch is False
+            or self.request_reply is True
+        ):
+            raise ValueError("Interim delivery addresses Codex text; no new turn/reply waiter")
+        return self
 
 
 class MessageManager:
@@ -177,6 +201,15 @@ class MessageManager:
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
 
+    def interim_target(self, message_id):
+        row = self.store.db.execute(
+            "SELECT evidence FROM message_events WHERE message_id=? AND kind='message.queued' "
+            "ORDER BY seq LIMIT 1",
+            (message_id,),
+        ).fetchone()
+        value = json.loads(row[0]).get("interim_session") if row else None
+        return InterimSession.model_validate(value) if value else None
+
     def send(self, principal, message: MessageSend, *, completion_target=None):
         self._identity(principal, "message.send")
         message = self.voice_channel.route(principal, message)
@@ -237,7 +270,7 @@ class MessageManager:
                 dispatch = False
         if len(message.body.encode()) > limits.max_body_bytes:
             raise BridgeError("payload_limit", "Message exceeds configured byte limit")
-        wants_reply = message.request_reply
+        wants_reply = False if message.interim_session else message.request_reply
         if wants_reply is None:
             wants_reply = message.kind in {"question", "work"}
         if wants_reply and message.kind not in {"question", "work"}:
@@ -428,6 +461,11 @@ class MessageManager:
                     "position": position,
                     "content_sha256": digest(message.body),
                     "automatic_dispatch": dispatch,
+                    **(
+                        {"interim_session": message.interim_session.model_dump()}
+                        if message.interim_session
+                        else {}
+                    ),
                 },
             )
         self.wake.set()

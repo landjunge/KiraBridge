@@ -488,8 +488,16 @@ class VisibleHandoffs:
             }
         protocol = None
         protocol = await adapter_for(target).protocol_state(binding, self.codex_state)
+        observation = assess(target, output["text"], binding, protocol)
+        if not self.config.visible_handoffs.allow_interim_messages:
+            observation["interim_ready"] = False
+            observation["allowed_actions"] = [
+                action
+                for action in observation.get("allowed_actions", [])
+                if action != "interim_message"
+            ]
         return {
-            **assess(target, output["text"], binding, protocol),
+            **observation,
             "binding": {
                 "pane_id": binding.pane_id,
                 "expected_pid": binding.expected_pid,

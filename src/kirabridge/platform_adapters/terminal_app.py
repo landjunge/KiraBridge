@@ -492,9 +492,34 @@ class TerminalAppTransport:
         return f"Array.from(tab.history().slice(-{2 * limit})).slice(-{limit}).join('')"
 
     @staticmethod
-    def native_screen_guard(expected_screen):
+    def native_screen_guard(expected_screen, *, composer_only=False):
         if expected_screen is None:
             return ""
+        if composer_only:
+            # The turn output may grow; freeze the exact final composer and footer.
+            from kirabridge.cli_adapters._legacy_readiness import input_view
+
+            expected = input_view("codex", expected_screen)
+            if not expected:
+                raise BridgeError("visible_target_unknown", "No current Codex composer")
+            return (
+                "\n{ const frame="
+                + TerminalAppTransport.native_input_tail(65536)
+                + r";const prompts=Array.from(frame.matchAll(/^[ \t]*[›»][^\n]*/gm));"
+                + "if(!prompts.length || frame.slice(prompts[prompts.length-1].index)!=="
+                + json.dumps(expected)
+                + ") throw Error('Selected terminal input changed');"
+                + r"const start=prompts[prompts.length-1].index;"
+                + r"const pre=frame.slice(0,start).trimEnd().split(/\n[ \t]*\n/).pop();"
+                + r"if(/^[ \t]*(?:Approval required|Would you like to run the following command\?|"
+                + r"Would you like to make the following edits\?|"
+                + r"Do you want to allow this action\?)"
+                + r"[ \t]*$/m.test(pre.trim()))"
+                + " throw Error('Codex permission dialog is not a message composer');"
+                + r"if(!/^[ \t]*»/.test(frame.slice(start)) && "
+                + r"!/^[ \t]*[•◦]\s+[^\n]*\([^\n]*esc to interrupt/m.test(pre))"
+                + " throw Error('Codex turn no longer observed working'); }"
+            )
         # Freeze the current input and adjacent footer using the same source as
         # read(), rather than comparing that observation against a stale viewport.
         return (
@@ -649,11 +674,11 @@ class TerminalAppTransport:
             + "if(tab.busy())throw Error('Selected terminal is busy');"
         )
 
-    async def input_columns(self, pane_id, *, identity_guard, expected_screen):
+    async def input_columns(self, pane_id, *, identity_guard, expected_screen, composer_only=False):
         value = await self.native(
             self.native_target(pane_id)
             + self.native_identity_guard(identity_guard)
-            + self.native_screen_guard(expected_screen)
+            + self.native_screen_guard(expected_screen, composer_only=composer_only)
             + "\nJSON.stringify({columns:tab.numberOfColumns()});"
         )
         columns = value.get("columns")
@@ -668,6 +693,7 @@ class TerminalAppTransport:
         expected_screen=None,
         shell_snapshot=None,
         agent_target=None,
+        composer_only=False,
     ):
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
@@ -705,7 +731,7 @@ class TerminalAppTransport:
                         else ""
                     )
                     + "\ncheckFocus(); checkClipboard();"
-                    + self.native_screen_guard(expected_screen)
+                    + self.native_screen_guard(expected_screen, composer_only=composer_only)
                     + """
         const beforePaste="""
                     + self.native_input_tail(65536)
@@ -1159,7 +1185,13 @@ entries[0].click();JSON.stringify({detached:true});
         )
 
     async def press_return(
-        self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+        self,
+        pane_id,
+        *,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        composer_only=False,
     ):
         return await self.press_key(
             pane_id,
@@ -1167,10 +1199,18 @@ entries[0].click();JSON.stringify({detached:true});
             identity_guard=identity_guard,
             expected_screen=expected_screen,
             shell_snapshot=shell_snapshot,
+            composer_only=composer_only,
         )
 
     async def press_key(
-        self, pane_id, key, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+        self,
+        pane_id,
+        key,
+        *,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        composer_only=False,
     ):
         if key not in {"enter", "escape"}:
             raise BridgeError("invalid_arguments", "Unsupported bound terminal key")
@@ -1180,7 +1220,7 @@ entries[0].click();JSON.stringify({detached:true});
             + self.native_identity_guard(identity_guard)
             + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
             + "\ncheckFocus();"
-            + self.native_screen_guard(expected_screen)
+            + self.native_screen_guard(expected_screen, composer_only=composer_only)
             + "\nse.keyCode("
             + str(code)
             + "); JSON.stringify({key_sent:true});",

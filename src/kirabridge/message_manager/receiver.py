@@ -685,7 +685,7 @@ class MessageReceiver:
             payload,
         )
 
-    def _claim(self, message_id, *, direct=False):
+    def _claim(self, message_id, *, direct=False, interim=False):
         config = self.bridge.config.messaging
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
@@ -745,7 +745,7 @@ class MessageReceiver:
                 "WHERE m.conversation_id=? AND j.claimed>?",
                 (row["conversation_id"], since),
             ).fetchone()[0]
-            if count >= config.max_runs_per_conversation:
+            if not interim and count >= config.max_runs_per_conversation:
                 blocked("conversation_run_limit")
                 return None
             count = self.bridge.store.db.execute(
@@ -753,7 +753,7 @@ class MessageReceiver:
                 "WHERE m.recipient=? AND j.claimed>?",
                 (row["recipient"], since),
             ).fetchone()[0]
-            if count >= config.max_runs_per_hour:
+            if not interim and count >= config.max_runs_per_hour:
                 blocked("hourly_run_limit")
                 return None
             run_id = "channel-" + uuid.uuid4().hex
@@ -1069,7 +1069,9 @@ class MessageReceiver:
             except TimeoutError:
                 pass
 
-    async def _process(self, pool, message, run_id, *, delivery_event=None, delivery_binding=None):
+    async def _process(
+        self, pool, message, run_id, *, delivery_event=None, delivery_binding=None, interim=None
+    ):
         message_id, recipient = message["id"], message["recipient"]
         limits = self.bridge.config.messaging
         receiver = limits.receivers[recipient]
@@ -1139,19 +1141,37 @@ class MessageReceiver:
             if pinned is None or pinned[0] != receiver.cwd:
                 raise BridgeError("receiver_scope_changed", "Claimed receiver worktree changed")
             policy = self.bridge.security.principal(recipient, "message.read")
-            result = await self.bridge.agents.execute(
-                {
-                    "id": run_id,
-                    "principal": message["sender"] if visible else recipient,
-                    "visible_message_id": message_id if visible else None,
-                },
-                args,
-                policy,
-                running,
-                progress,
-                separate_managed=separate_managed,
-                **({"visible_binding": delivery_binding} if delivery_binding is not None else {}),
-            )
+            if interim is not None:
+                from kirabridge.interim_message import execute as steer
+                from kirabridge.session_manager import SessionInput
+
+                result = await steer(
+                    self.bridge,
+                    {"id": run_id, "principal": message["sender"]},
+                    SessionInput(**interim.model_dump(), text=prompt, intent="interim"),
+                    recipient,
+                    delivery_binding,
+                    running,
+                    progress,
+                )
+            else:
+                result = await self.bridge.agents.execute(
+                    {
+                        "id": run_id,
+                        "principal": message["sender"] if visible else recipient,
+                        "visible_message_id": message_id if visible else None,
+                    },
+                    args,
+                    policy,
+                    running,
+                    progress,
+                    separate_managed=separate_managed,
+                    **(
+                        {"visible_binding": delivery_binding}
+                        if delivery_binding is not None
+                        else {}
+                    ),
+                )
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
                 raise BridgeError("agent_failed", "Receiving agent did not complete successfully")
