@@ -261,6 +261,8 @@ Trusted `continuation.task_routing` entries bind a Codex `WorkerRouting` policy 
 
 The integrated coordinator source also supports native Core activation, owner-scoped MCP `coordinator_status` and durable accepted/stopped notices through the existing completion inbox. It follows pinned tasks after successful review and checks without loading a skill. See [native coordinator contract and validation](docs/COORDINATOR-NATIVE-20261106.md); desktop and live deployment acceptance remain separate.
 
+An explicitly configured `autonext.completion_mode="verified_ack"` lets that same daemon process its bound accepted-result notices autonomously. A follow-up claim requires the matching acceptance receipt, verified board outbox and persisted owner-scoped completion ACK, rechecked in the claim transaction. The default `external` mode retains existing behavior. This adds no second Bridge, service or queue; see [configuration and restart contract](docs/COORDINATOR-NATIVE-20261106.md#opt-in-autonome-verarbeitung-vor-folgestart). Source tests and live server acceptance remain separate.
+
 Its status projects recorded queue, execution and acceptance times from the bound Core and receipt. Missing or invalid timestamps remain unknown; reading the projection starts no work.
 
 The optional [native worker routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) reuses the verified CLI matrix for sealed managed tasks, preserving visible sessions and the separate structured Grok review protocol. Requested model/effort and observed metadata remain distinct; local fixture tests do not establish provider or deployment acceptance.

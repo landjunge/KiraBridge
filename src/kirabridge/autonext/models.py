@@ -3,7 +3,14 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from kirabridge.bridge_core.models import BridgeError, Input
 
@@ -55,6 +62,7 @@ class AutoNextConfig(BaseModel):
     principal: Literal["local", "chatgpt", "codex"] = "local"
     coordinator_mode: bool = False
     completion_target: str | None = None
+    completion_mode: Literal["external", "verified_ack"] = "external"
     team_id: str = Field(default="", max_length=128)
     team_revision: int = Field(default=0, ge=0)
     board_id: str = Field(default="", max_length=128)
@@ -70,6 +78,13 @@ class AutoNextConfig(BaseModel):
     budget_valid_until: float = Field(default=0, ge=0)
     budget_source_ref: str = Field(default="", max_length=256)
     billing_evidence_ref: str = Field(default="", max_length=256)
+
+    @model_serializer(mode="wrap")
+    def preserve_external_grants(self, handler):
+        value = handler(self)
+        if self.completion_mode == "external":
+            value.pop("completion_mode", None)
+        return value
 
     @field_validator("completion_target")
     @classmethod
@@ -94,6 +109,10 @@ class AutoNextConfig(BaseModel):
                 raise ValueError("Legacy scope pins must have unique message, run and session IDs")
         if self.coordinator_mode and self.principal != "codex":
             raise ValueError("Coordinator mode requires the explicit Codex coordinator identity")
+        if self.completion_mode == "verified_ack" and (
+            not self.coordinator_mode or self.completion_target is None
+        ):
+            raise ValueError("Verified ACK mode requires coordinator mode and a completion target")
         if self.enabled:
             if (
                 not all((self.team_id, self.board_id, self.after_work_id))

@@ -72,6 +72,70 @@ keine neue Ausführung. Bereits vor dem Consumer gespeicherte Meldungen bleiben
 bis zur passenden Quittierung nachlesbar. Das setzt einen aktiven Consumer
 voraus und weckt keine inaktive ChatGPT-Unterhaltung automatisch.
 
+## Opt-in: autonome Verarbeitung vor Folgestart
+
+Der Quellvertrag vom 14. November 2026 ergänzt den vorhandenen Manager um eine
+ausdrücklich wählbare Verarbeitung im selben Daemon. Das bestehende,
+vollständige und zunächst deaktivierte AutoNext-Profil erhält diese Einstellung:
+
+```toml
+[autonext]
+enabled = false
+principal = "codex"
+coordinator_mode = true
+completion_target = "kb-server-autonext-readonly-20261114-v1"
+completion_mode = "verified_ack"
+```
+
+Der Ausschnitt ersetzt keinen Grant. Team und aktuelle Revision, Quellenboard,
+vollständige Kartenpins, abgeschlossener Startanker mit Ergebnishash, feste
+Executor-/Verifierprofile, Arbeitsbereich, Lease und aktuelle Budgetbeobachtung
+bleiben erforderlich. Erst das vollständig gebundene Profil darf aktiviert
+werden. Der Modus benötigt `coordinator_mode=true` und eine stabile eigene
+Zielkennung. Ohne ausdrückliche Auswahl gilt `completion_mode="external"`:
+bisheriger Ablauf, bisherige externe Consumer und bestehende Grantfingerprints
+bleiben erhalten. Es gibt keine pauschale neue Sperre für andere Aufträge.
+
+Nach fachlicher Annahme prüft der vorhandene Manager den ursprünglichen
+versiegelten Coreauftrag, Principal, Requesthash, Versuch, Corequittung,
+nativen Erfolg und Ergebnis, Quellenpin und Annahmequittung. Nur eine exakt
+passende `completed`-Outbox mit bestätigtem Board-Readback und die dazugehörige
+Completion für denselben Eigentümer, Zielkanal, Grant und Task werden verarbeitet.
+Der Consumer nutzt die vorhandenen Receipt-/ACK-Operationen; fremde,
+unbestätigte, gehaltene oder gestoppte Meldungen werden nicht automatisch
+quittiert. ACK und typisierte Verarbeitungsquittung werden gemeinsam in der
+bisherigen Datenbank gespeichert. Die additive Tabelle
+`autonext_processed_completions` verändert keine historischen Zeilen und ist
+keine zweite Aufgabenliste.
+
+Vor einem Folgeclaim prüft dieselbe Schreibtransaktion die Originalbindung und
+den gespeicherten ACK erneut. Eine parallele oder verspätete Hintergrundprüfung
+kann diese Grenze nicht umgehen. Die Claim-Outbox enthält den gebundenen
+Vorgänger-ACK als Nachweis. Ein bereits passender ACK wird nach Neustart nur
+erneut validiert, nicht durch einen neuen Modellturn ersetzt. Fehlende oder
+abweichende Originalbelege lassen ausschließlich diese Folgearbeit ausstehen.
+Bei einer verspäteten Completion beobachtet der Manager das bestehende lokale
+Postfach; weder Modellpolling noch ein zusätzlicher HTTP-Endpunkt, Dienst oder
+eine weitere Queue sind erforderlich. Nach der letzten Karte wird auch deren
+Annahmemeldung verarbeitet, bevor der Grant als abgeschlossen gilt.
+
+Der Startanker vor der ersten Karte behält den bisherigen Vertrag: abgeschlossene
+Originalarbeit und expliziter Ergebnishash. Die neue ACK-Grenze betrifft die
+innerhalb dieses Grants angenommenen Karten. Ein anderer Grant, Nutzerstopp,
+historische UNKNOWNs und alte Leases werden dadurch nicht übernommen oder
+freigegeben. Bestehende Daten vor dem regulären Update sichern; keine alten
+Quittungen löschen, um einen fehlenden Nachweis zu umgehen.
+
+English: select `completion_mode="verified_ack"` explicitly on a complete pinned
+coordinator grant to process accepted-result notices inside the existing daemon.
+The claim transaction requires a matching persisted processing receipt and
+owner/target/grant/task-bound completion ACK. Acceptance, original Core request
+and result hashes, and verified board outbox are rechecked; foreign or unverified
+notices cannot unlock a successor. The additive processing ledger and idempotent
+ACK survive restart without replay. The default `external` mode preserves legacy
+behavior and grant fingerprints. This source contract does not claim live server,
+desktop or other-platform acceptance.
+
 ## Prüfung und nächste Integration
 
 Die gezielten Prüfungen verwenden ausschließlich temporäre Daten und echte

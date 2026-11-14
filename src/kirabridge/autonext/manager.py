@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from kirabridge.autonext.completion_processing import AcceptedCompletionConsumer
 from kirabridge.autonext.models import SHA, ReadyCard
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 from kirabridge.completion_manager import record_notice, valid_target
@@ -84,6 +85,7 @@ class AutoNextManager:
             for statement in SCHEMA.split(";"):
                 if statement.strip():
                     self.store.db.execute(statement)
+        self.completion_consumer = AcceptedCompletionConsumer(self)
 
     @property
     def settings(self):
@@ -96,7 +98,7 @@ class AutoNextManager:
 
     def inspect(self):
         run = self._run()
-        return {
+        result = {
             "enabled": self.settings.enabled,
             "state": "stopped"
             if self.faulted
@@ -114,6 +116,12 @@ class AutoNextManager:
             "source": "explicit operator-pinned board entries only",
             "scope": "continuation status; not project acceptance or provider quota proof",
         }
+        if self.settings.completion_mode == "verified_ack":
+            result["completion_processing"] = {
+                "mode": "verified_ack",
+                "pending": dict(self.completion_consumer.pending),
+            }
+        return result
 
     def notify(self):
         if self.loop is not None and not self.loop.is_closed():
@@ -162,7 +170,14 @@ class AutoNextManager:
             ).fetchone()[0]
             deadline = min(active, self.settings.budget_valid_until) if active else None
             try:
-                if deadline is None or self.inspect()["state"] in {"stopped", "complete"}:
+                if (
+                    self.completion_consumer.pending
+                    and self.settings.completion_mode == "verified_ack"
+                ):
+                    # Observe only the bound durable completion after a late commit or
+                    # owner ACK. No model/task replay or periodic board discovery.
+                    await asyncio.wait_for(self.wake.wait(), 5)
+                elif deadline is None or self.inspect()["state"] in {"stopped", "complete"}:
                     await self.wake.wait()
                 else:
                     await asyncio.wait_for(self.wake.wait(), max(0.01, deadline - time.time()))
@@ -259,6 +274,12 @@ class AutoNextManager:
             )
 
     def _queue_note(self, task_id, phase, details):
+        if phase == "completed" and self.settings.completion_mode == "verified_ack":
+            item = self.store.db.execute(
+                "SELECT * FROM autonext_items WHERE task_id=?", (task_id,)
+            ).fetchone()
+            identity = self.completion_consumer.identity(item)
+            details = {**details, "completion_binding_sha256": digest(identity.model_dump())}
         key = "autonext-" + digest([self.settings.grant_id, task_id, phase])[:48]
         if phase == "claimed" and getattr(self, "continuation_guard", None):
             key = "autonext-claim-" + digest([self.settings.board_id, task_id])[:40]
@@ -287,7 +308,7 @@ class AutoNextManager:
         # is the event identity, so replay/restart neither backfills nor executes.
         event_seq = inserted.lastrowid
         evidence = {"autonext_outbox_key": key, "content_sha256": text_sha(content)}
-        for name in ("receipt_sha256", "result_sha256"):
+        for name in ("receipt_sha256", "result_sha256", "completion_binding_sha256"):
             value = details.get(name)
             if isinstance(value, str) and re.fullmatch(SHA, value):
                 evidence[name] = value
@@ -424,6 +445,8 @@ class AutoNextManager:
             try:
                 self._setup()
                 self._flush()
+                if self.settings.completion_mode == "verified_ack":
+                    self.completion_consumer.process()
                 if self._run()["state"] in {"stopped", "complete"}:
                     return self.inspect()
                 item = self.store.db.execute(
@@ -435,6 +458,12 @@ class AutoNextManager:
                         self._flush()
                         return self.inspect()
                     self._flush()
+                    if self.settings.completion_mode == "verified_ack":
+                        self.completion_consumer.process()
+                if self.settings.completion_mode == "verified_ack":
+                    ready, _ = self.completion_consumer.barrier()
+                    if not ready:
+                        return self.inspect()
                 count = self.store.db.execute(
                     "SELECT count(*) FROM autonext_items WHERE grant_id=?",
                     (self.settings.grant_id,),
@@ -514,6 +543,11 @@ class AutoNextManager:
                 return
             if run["config_ref"] != self._configuration_ref():
                 raise BridgeError("autonext_grant_changed", "Grant changed during preflight")
+            predecessor = None
+            if self.settings.completion_mode == "verified_ack":
+                ready, predecessor = self.completion_consumer.barrier()
+                if not ready:
+                    return  # Rechecked under the write lock after asynchronous preflight.
             count = self.store.db.execute(
                 "SELECT count(*) FROM autonext_items WHERE grant_id=?",
                 (self.settings.grant_id,),
@@ -625,7 +659,11 @@ class AutoNextManager:
             self._queue_note(
                 card.task_id,
                 "claimed",
-                {"work_id": work["id"], "source_sha256": approved.content_sha256},
+                {
+                    "work_id": work["id"],
+                    "source_sha256": approved.content_sha256,
+                    **({"predecessor_ack": predecessor} if predecessor else {}),
+                },
             )
 
     def _check_existing_routes(self, cwd):
