@@ -274,6 +274,7 @@ class TeamDispatcher:
             core = await self._task(pool, claimed["core_task_id"])
             if core is None:
                 if existing:
+                    self._defer[claimed["id"]] = time.monotonic() + 5
                     self.teams.fail(
                         claimed["id"],
                         "unknown",
@@ -289,8 +290,19 @@ class TeamDispatcher:
                         claimed["id"],
                         "unknown",
                         code,
-                        {"core_task_id": claimed["core_task_id"], "automatic_retry": False},
+                        {
+                            "core_task_id": claimed["core_task_id"],
+                            "automatic_retry": False,
+                            "submission_observation_pending": True,
+                        },
                     )
+                    return
+            if claimed["state"] == "unknown":
+                try:
+                    claimed = self.teams.reconcile_submission(claimed["id"], core)
+                except BridgeError:
+                    # Only observe the original. Running/foreign/unproven results stay UNKNOWN.
+                    self._defer[claimed["id"]] = time.monotonic() + 5
                     return
             await self._observe(pool, claimed, core, worker.timeout)
 

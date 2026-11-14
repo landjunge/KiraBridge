@@ -272,6 +272,39 @@ class CoordinatedAutoNext(AutoNextManager):
 
     def _work_ready(self, work_id):
         review = self._review_row(work_id)
+        if review is not None:
+            item = self._parent(review)
+            work = self.bridge.teams._work(work_id)
+            if (
+                self.settings.enabled
+                and self._run()
+                and self._run()["state"] == "waiting"
+                and self._run()["config_ref"] == self._configuration_ref()
+                and item["grant_id"] == self.settings.grant_id
+            ):
+                try:
+                    if work["state"] == "processing_result":
+                        history = self.store.db.execute(
+                            "SELECT previous_evidence FROM team_work_reprocess_history "
+                            "WHERE work_id=?",
+                            (work_id,),
+                        ).fetchone()
+                        if (
+                            history
+                            and json.loads(history[0]).get("submission_observation_pending") is True
+                        ):
+                            self._original_acceptance_proof(item, review, recovering=work_id)
+                            return True
+                    if (
+                        work["state"] != "unknown"
+                        or work["evidence"].get("submission_observation_pending") is not True
+                    ):
+                        return super()._work_ready(item["work_id"])
+                    core = self.store.get(work["core_task_id"])
+                    self.bridge.teams._submission_result(work, core)
+                    return core["finished"] <= item["lease_until"]
+                except BridgeError:
+                    return False
         return (
             super()._work_ready(self._parent(review)["work_id"])
             if review is not None
@@ -397,6 +430,11 @@ class CoordinatedAutoNext(AutoNextManager):
 
     def _review_complete(self, item, work_id, expected):
         work = self.bridge.teams.work_get(self.settings.principal, self.settings.team_id, work_id)
+        if (
+            work["state"] == "unknown"
+            and work["evidence"].get("submission_observation_pending") is True
+        ):
+            return False  # Observation pending, not permission for another turn.
         if work["state"] in TERMINAL:
             raise BridgeError("autonext_review_unknown", "Review failed or has unknown outcome")
         if work["state"] != "completed":
@@ -485,10 +523,13 @@ class CoordinatedAutoNext(AutoNextManager):
                     return {"passed": False, "checks": results}
         return {"passed": True, "checks": results}
 
-    async def _guarded_checks(self, card):
+    async def _guarded_checks(self, card, *, result_only=False):
         if guard := getattr(self, "continuation_guard", None):
 
             def before_check():
+                if result_only:
+                    guard(card)
+                    return  # Explicit acceptance reads, never execution-lease renewal.
                 item = self.store.db.execute(
                     "SELECT work_id FROM autonext_items WHERE task_id=?", (card.task_id,)
                 ).fetchone()
@@ -507,8 +548,48 @@ class CoordinatedAutoNext(AutoNextManager):
         if guard := getattr(self, "continuation_guard", None):
             guard(card)
         self._identity(card)
-        if time.time() >= item["lease_until"]:
+        result_only = getattr(self, "_result_only_task", None) == item["task_id"]
+        row = self.store.db.execute(
+            "SELECT * FROM autonext_coordinator WHERE task_id=?", (item["task_id"],)
+        ).fetchone()
+        if result_only:
+            run = self._run()
+            lease = self.store.db.execute(
+                "SELECT * FROM autonext_leases WHERE task_id=?", (item["task_id"],)
+            ).fetchone()
+            if (
+                not run
+                or run["state"] != "stopped"
+                or run["reason"] != "autonext_review_unknown"
+                or not lease
+                or lease["owner"] != self._result_only_lease_owner
+                or lease["cwd"] != item["cwd"]
+                or lease["expires"] != item["lease_until"]
+            ):
+                raise BridgeError("autonext_completion_unknown", "Original stop/lease changed")
+            self._original_acceptance_proof(item, row)
+        if row and row["verify_work_id"]:
+            pending = self.bridge.teams._work(row["verify_work_id"])
+            if (
+                pending["state"] == "unknown"
+                and pending["evidence"].get("submission_observation_pending") is True
+            ):
+                return False
+            history = self.store.db.execute(
+                "SELECT previous_evidence FROM team_work_reprocess_history WHERE work_id=?",
+                (row["verify_work_id"],),
+            ).fetchone()
+            if history and json.loads(history[0]).get("submission_observation_pending") is True:
+                self._original_acceptance_proof(item, row)
+                result_only = True
+        if not result_only and time.time() >= item["lease_until"]:
             raise BridgeError("autonext_review_timeout", "Review/check lease expired")
+        if result_only and (
+            not row
+            or not row["verify_work_id"]
+            or (card.acceptance.review_with_grok and not row["grok_work_id"])
+        ):
+            raise BridgeError("autonext_completion_unknown", "Result-only cannot start a review")
         source_sha = text_sha(work["result"])
         with self.store.transaction():
             self.store.db.execute(
@@ -558,7 +639,7 @@ class CoordinatedAutoNext(AutoNextManager):
                 raise BridgeError("autonext_check_failed", "Pinned acceptance checks failed")
             self._confirm_artifacts(item, card)
             return True
-        if (
+        if not result_only and (
             item["lease_until"] - time.time()
             < sum(c.timeout_seconds for c in card.acceptance.checks) + 2
         ):
@@ -568,7 +649,168 @@ class CoordinatedAutoNext(AutoNextManager):
                 "UPDATE autonext_coordinator SET checks_state='running' WHERE task_id=?",
                 (item["task_id"],),
             )
-        task = asyncio.create_task(self._guarded_checks(card))
+        task = asyncio.create_task(self._guarded_checks(card, result_only=result_only))
         self._check_tasks[item["task_id"]] = task
         task.add_done_callback(lambda done: self.notify())
         return False
+
+    def _original_acceptance_proof(self, item, row, *, recovering=None):
+        """All native effects ended under the original lease; acceptance may finish later."""
+        from kirabridge.team_manager.dispatcher import parse_team_turn
+
+        works = [item["work_id"], row["verify_work_id"]]
+        if row["grok_work_id"]:
+            works.append(row["grok_work_id"])
+        if not row["verify_work_id"]:
+            raise BridgeError("autonext_completion_unknown", "Original verifier is missing")
+        for identifier in works:
+            work = self.bridge.teams.work_get(
+                self.settings.principal, self.settings.team_id, identifier
+            )
+            self.bridge.teams._check_sealed(work)
+            core = self.store.get(work["core_task_id"], work["assignee"])
+            native = core.get("result")
+            if (
+                core["state"] != "completed"
+                or not isinstance(native, dict)
+                or native.get("success") is not True
+                or core.get("finished") is None
+            ):
+                raise BridgeError(
+                    "autonext_completion_unknown", "Original native result is missing"
+                )
+            text = (core.get("result") or {}).get(
+                "final_message", (core.get("result") or {}).get("text")
+            )
+            if not isinstance(text, str) or not text.strip():
+                raise BridgeError("autonext_completion_unknown", "Original native text is missing")
+            turn = parse_team_turn(
+                text, framing=self.bridge.config.team.workers[work["assignee"]].response_framing
+            )
+            if (
+                core["state"] != "completed"
+                or core["attempt"] != 1
+                or not core.get("receipt")
+                or core.get("error") is not None
+                or not (core.get("result") or {}).get("success")
+                or core.get("finished") is None
+                or core["finished"] > item["lease_until"]
+                or turn.actions
+                or not turn.result.strip()
+                or (
+                    identifier != recovering
+                    and (
+                        work["state"] != "completed"
+                        or work["result"] != turn.result
+                        or work["evidence"].get("actions") != []
+                        or work["evidence"].get("model_turn_completed") is not True
+                    )
+                )
+            ):
+                raise BridgeError(
+                    "autonext_completion_unknown", "Original bounded result is unproven"
+                )
+        main = self.bridge.teams._work(item["work_id"])
+        if text_sha(main["result"]) != row["source_sha"]:
+            raise BridgeError("autonext_source_changed", "Original main result changed")
+
+    async def accept_original_result(self, principal, request, *, expected_lease_owner):
+        """Explicit owner acceptance on the ORIGINAL stopped grant, without reopening execution."""
+        if principal != self.settings.principal or principal != "codex":
+            raise BridgeError("autonext_operator_required", "Original coordinator required")
+        self.bridge.teams._team(principal, request.team_id, "team.write", manage=True)
+        review = self._review_row(request.work_id)
+        if review is None or review["verify_work_id"] != request.work_id:
+            raise BridgeError("autonext_completion_unknown", "Original verifier binding required")
+        item = self._parent(review)
+        run = self._run()
+        if item["grant_id"] != self.settings.grant_id or not run:
+            raise BridgeError("autonext_grant_changed", "Original grant required")
+        if item["state"] == "completed":
+            self.bridge.teams.work_reprocess(principal, request)  # Exact original idempotency key.
+            self._flush()
+            return self.receipt(principal, item["task_id"])
+        if run["state"] != "stopped" or run["reason"] != "autonext_review_unknown":
+            raise BridgeError("autonext_completion_unknown", "Unrelated/user stop remains held")
+        if item["state"] != "waiting" or review["checks_state"] not in {"not_started", "completed"}:
+            raise BridgeError("autonext_check_unknown", "Original acceptance state is unproven")
+        approved = next((p for p in self.settings.cards if p.task_id == item["task_id"]), None)
+        if approved is None:
+            raise BridgeError("autonext_source_changed", "Original source pin required")
+        card = self._card(approved)
+        if (
+            canonical(card.model_dump()) != item["card"]
+            or approved.content_sha256 != item["source_ref"]
+            or card.acceptance.kind != "coordinator_checks"
+        ):
+            raise BridgeError("autonext_source_changed", "Original card changed")
+        _, identity = self._identity(card)
+        lease = self.store.db.execute(
+            "SELECT * FROM autonext_leases WHERE task_id=?", (item["task_id"],)
+        ).fetchone()
+        if (
+            identity != item["cwd_ref"]
+            or not lease
+            or lease["cwd"] != item["cwd"]
+            or lease["owner"] != expected_lease_owner
+            or lease["expires"] != item["lease_until"]
+        ):
+            raise BridgeError("autonext_identity_changed", "Original lease identity changed")
+        if guard := getattr(self, "continuation_guard", None):
+            guard(card)
+        self._original_acceptance_proof(item, review, recovering=request.work_id)
+        self._confirm_artifacts(item, card)
+        core = self.store.get(request.core_task_id)
+        work = self.bridge.teams.work_reprocess(principal, request)
+        if work["state"] == "processing_result":
+            observed = self.bridge.teams.bind_task(work["id"], core)
+            from kirabridge.team_manager.dispatcher import parse_team_turn
+
+            text = core["result"].get("final_message", core["result"].get("text"))
+            turn = parse_team_turn(
+                text, framing=self.bridge.config.team.workers[work["assignee"]].response_framing
+            )
+            self.bridge.teams.finish(
+                work["id"],
+                turn.result,
+                {
+                    "actions": [],
+                    "model_turn_completed": True,
+                    "core_task_id": core["id"],
+                    "native_evidence": observed["evidence"].get("native_evidence", {}),
+                    "result_only_reconciliation": True,
+                },
+            )
+        self._result_only_task = item["task_id"]
+        self._result_only_lease_owner = expected_lease_owner
+        try:
+            if not self._reconcile(item):
+                task = self._check_tasks.get(item["task_id"])
+                if task is None:
+                    raise BridgeError(
+                        "autonext_check_unknown", "No original acceptance continuation"
+                    )
+                await task
+                if not self._reconcile(item):
+                    raise BridgeError("autonext_check_unknown", "Original acceptance is incomplete")
+            with self.store.transaction():
+                self._queue_note(
+                    item["task_id"],
+                    "original_result_reconciled",
+                    {
+                        "previous_state": run["state"],
+                        "previous_reason": run["reason"],
+                        "core_task_id": core["id"],
+                        "core_receipt": core["receipt"],
+                        "execution_restarted": False,
+                    },
+                )
+                self.store.db.execute(
+                    "UPDATE autonext_runs SET state='complete' WHERE grant_id=?",
+                    (self.settings.grant_id,),
+                )
+            self._flush()
+            return self.receipt(principal, item["task_id"])
+        finally:
+            self._result_only_task = None
+            self._result_only_lease_owner = None

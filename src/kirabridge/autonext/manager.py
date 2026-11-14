@@ -791,6 +791,11 @@ class AutoNextManager:
         work = self.bridge.teams.work_get(
             self.settings.principal, self.settings.team_id, item["work_id"]
         )
+        if (
+            work["state"] == "unknown"
+            and work["evidence"].get("submission_observation_pending") is True
+        ):
+            return False  # Keep only the original observation pending, never dispatch again.
         if work["state"] in TERMINAL:
             self._stop("autonext_work_" + work["state"], item)
             return False

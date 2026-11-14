@@ -275,7 +275,9 @@ class TeamManager:
             "WHERE team_id=? AND principal=? AND operation=? AND idem=?",
             (team_id, principal, operation, request.idempotency_key),
         ).fetchone()
-        if row and row["request_hash"] != digest(request.model_dump()):
+        if row and row["request_hash"] != digest(
+            request.model_dump(exclude_none=isinstance(request, TeamWorkReprocess))
+        ):
             raise BridgeError("idempotency_conflict", "Key belongs to a different team operation")
         return row["object_id"] if row else None
 
@@ -287,7 +289,7 @@ class TeamManager:
                 principal,
                 operation,
                 request.idempotency_key,
-                digest(request.model_dump()),
+                digest(request.model_dump(exclude_none=isinstance(request, TeamWorkReprocess))),
                 object_id,
             ),
         )
@@ -1195,12 +1197,13 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "work_reprocess", request)
             if prior:
                 return work
-            if work["state"] != "completed":
+            submission_unknown = self._submission_unknown(work)
+            if work["state"] != "completed" and not submission_unknown:
                 raise BridgeError("state_conflict", "Only completed team work can be reprocessed")
             if work["core_task_id"] is None or request.core_task_id != work["core_task_id"]:
                 raise BridgeError("team_task_conflict", "The original linked core task is required")
             actions = work["evidence"].get("actions")
-            if not isinstance(actions, list) or actions:
+            if not submission_unknown and (not isinstance(actions, list) or actions):
                 raise BridgeError(
                     "team_reprocess_denied",
                     "Reprocessing requires explicit evidence of zero prior actions",
@@ -1216,6 +1219,14 @@ class TeamManager:
             self._automatic(work["assignee"])
             worker = self.config.team.workers[work["assignee"]]
             core = self.store.get(request.core_task_id)
+            if submission_unknown:
+                self._submission_result(work, core)
+                if (
+                    request.expected_request_sha256 != core["request_sha256"]
+                    or request.expected_core_receipt != core["receipt"]
+                    or request.expected_core_attempt != core["attempt"]
+                ):
+                    raise BridgeError("team_task_conflict", "Original submission proof is required")
             if (
                 core["principal"] != work["assignee"]
                 or core["operation"] != "agent.execute"
@@ -1247,6 +1258,12 @@ class TeamManager:
                 raise BridgeError(
                     "team_result_conflict", "The expected native result SHA256 does not match"
                 )
+            if submission_unknown:
+                from kirabridge.team_manager.dispatcher import parse_team_turn
+
+                turn = parse_team_turn(text, framing=worker.response_framing)
+                if turn.actions:
+                    raise BridgeError("team_reprocess_denied", "Recovery requires zero actions")
             snapshot_id = "tr-" + uuid.uuid4().hex
             self.store.db.execute(
                 "INSERT INTO team_work_reprocess_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -1391,11 +1408,96 @@ class TeamManager:
         self._page(0, limit)
         rows = self.store.db.execute(
             "SELECT id FROM team_work WHERE core_task_id IS NOT NULL "
-            "AND state NOT IN ('completed','failed','unknown','cancelled','blocked') "
+            "AND (state NOT IN ('completed','failed','unknown','cancelled','blocked') "
+            "OR (state='unknown' AND json_extract(evidence,'$.submission_observation_pending')=1)) "
             "ORDER BY seq LIMIT ?",
             (limit,),
         ).fetchall()
         return [self._work(row["id"]) for row in rows]
+
+    @staticmethod
+    def _submission_unknown(work):
+        evidence = work["evidence"]
+        return (
+            work["state"] == "unknown"
+            and work["error"]
+            in {"peer_unknown", "peer_connection", "peer_timeout", "team_submission_unknown"}
+            and evidence.get("core_task_id") == work["core_task_id"]
+            and evidence.get("automatic_retry") is False
+            and set(evidence)
+            <= {"core_task_id", "automatic_retry", "submission_observation_pending"}
+        )
+
+    def _submission_result(self, work, observed):
+        """Prove one original completed attempt; never infer success from a transport error."""
+        if not self._submission_unknown(work):
+            raise BridgeError("team_reprocess_denied", "Not an unprocessed submission ambiguity")
+        self._check_sealed(work)
+        core = self.store.get(work["core_task_id"])
+        worker = self.config.team.workers.get(work["assignee"])
+        if (
+            not worker
+            or core["id"] != "team-" + work["id"]
+            or core["principal"] != work["assignee"]
+            or core["operation"] != "agent.execute"
+            or core["args"].get("agent") != worker.agent
+            or core["attempt"] != 1
+            or not isinstance(core["receipt"], str)
+            or not core["receipt"]
+            or core["state"] != "completed"
+            or core["error"] is not None
+            or not isinstance(core["result"], dict)
+            or core["result"].get("success") is not True
+            or core["finished"] is None
+            or any(
+                observed.get(k) != core[k]
+                for k in (
+                    "id",
+                    "principal",
+                    "operation",
+                    "args",
+                    "request_sha256",
+                    "attempt",
+                    "receipt",
+                    "state",
+                    "result",
+                    "error",
+                    "finished",
+                )
+            )
+        ):
+            raise BridgeError("team_task_conflict", "Original completed submission is unproven")
+        return core
+
+    def reconcile_submission(self, work_id, observed):
+        """Automatic observation is opt-in for NEW ambiguous submissions only."""
+        with self.store.transaction():
+            work = self._work(work_id)
+            if work["state"] != "unknown":
+                return work
+            if work["evidence"].get("submission_observation_pending") is not True:
+                raise BridgeError(
+                    "team_reprocess_denied", "Historical UNKNOWN requires owner review"
+                )
+            core = self._submission_result(work, observed)
+            text = core["result"].get("text", core["result"].get("final_message"))
+            if not isinstance(text, str) or not text:
+                raise BridgeError("team_reprocess_denied", "Original result has no text")
+            # Reuse the existing owner operation, immutable history and idempotency boundary.
+            team = self._team(work["assignee"], work["team_id"])
+            return self.work_reprocess(
+                team["coordinator"],
+                TeamWorkReprocess(
+                    team_id=work["team_id"],
+                    work_id=work_id,
+                    core_task_id=core["id"],
+                    expected_result_sha256=hashlib.sha256(text.encode()).hexdigest(),
+                    expected_request_sha256=core["request_sha256"],
+                    expected_core_receipt=core["receipt"],
+                    expected_core_attempt=core["attempt"],
+                    idempotency_key="late-original-" + work_id,
+                ),
+            )
 
     def authorize_execution(self, core_task):
         row = self.store.db.execute(

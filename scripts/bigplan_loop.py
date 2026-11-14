@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
 import os
@@ -1070,18 +1071,179 @@ def adopt(path, entries):
     print(json.dumps({"assigned": len(entries), "authority_ref": policy.authority_ref}))
 
 
+def reconcile_result(
+    path,
+    request,
+    *,
+    expected_profile_sha256,
+    accept_original=False,
+    expected_grant_sha256=None,
+    expected_lease_owner=None,
+):
+    """Reprocess one exact original result while the existing singleton is stopped.
+
+    No Bridge context, HTTP server, dispatcher, provider or continuation is started.
+    Current status/reporting, grant files and the original Core task remain untouched.
+    Optional result-only acceptance closes the original grant through its owner.
+    """
+    import fcntl
+    from types import SimpleNamespace
+
+    from kirabridge.output_history import OutputHistory
+    from kirabridge.security_manager import SecurityManager
+    from kirabridge.task_manager.store import Store
+    from kirabridge.team_manager import TeamManager
+    from kirabridge.team_manager.models import TeamWorkReprocess
+
+    profile_bytes = path.read_bytes()
+    if hashlib.sha256(profile_bytes).hexdigest() != expected_profile_sha256:
+        raise RuntimeError("Reviewed profile changed")
+    profile = load_profile(path)
+    state = Path(profile["state_dir"])
+    identity = {
+        "instance": profile["instance"],
+        "cwd": str(Path(profile["cwd"]).resolve()),
+        "workspace": str(Path(profile["workspace"]).resolve()),
+    }
+    # Never initialize a missing state or lock as an alternate controller.
+    with (state / "coordinator.lock").open("r+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if json.loads((state / "coordinator-profile.json").read_text()) != identity:
+            raise RuntimeError("Dedicated state profile identity changed")
+        if not (state / "bridge.sqlite3").is_file():
+            raise RuntimeError("Original Core state is missing")
+        restore_reporting(state / "status.json", digest(fixed_profile(profile)))
+        if path.read_bytes() != profile_bytes:
+            raise RuntimeError("Reviewed profile changed")
+        cfg = configuration(profile)
+        store = Store(state / "bridge.sqlite3")
+        try:
+            store.result_codec = OutputHistory(cfg.output_history, store)
+            owner = TeamManager(
+                SimpleNamespace(
+                    config=cfg,
+                    store=store,
+                    security=SecurityManager(cfg, store),
+                )
+            )
+            request = TeamWorkReprocess.model_validate(request)
+            owned = store.db.execute(
+                "SELECT 1 FROM autonext_items WHERE work_id=? UNION "
+                "SELECT 1 FROM autonext_coordinator WHERE grok_work_id=? OR verify_work_id=?",
+                (request.work_id, request.work_id, request.work_id),
+            ).fetchone()
+            if not owned or (not accept_original and request.team_id != "bigplan-codex-loop"):
+                raise RuntimeError("Work is outside this coordinator's original ownership")
+            if accept_original:
+                from kirabridge.autonext.coordinator import CoordinatedAutoNext
+                from kirabridge.autonext.models import AutoNextConfig, ReadyCard
+                from kirabridge.completion_manager import CompletionManager
+
+                review = store.db.execute(
+                    "SELECT i.* FROM autonext_items i JOIN autonext_coordinator r "
+                    "ON r.task_id=i.task_id WHERE r.verify_work_id=?",
+                    (request.work_id,),
+                ).fetchone()
+                if review is None or not expected_grant_sha256 or not expected_lease_owner:
+                    raise RuntimeError("Explicit original grant and lease proof required")
+                grant_path = state / ("grant-" + review["grant_id"] + ".json")
+                if hashlib.sha256(grant_path.read_bytes()).hexdigest() != expected_grant_sha256:
+                    raise RuntimeError("Original grant changed")
+                cfg.autonext = AutoNextConfig.model_validate_json(grant_path.read_text())
+                if (
+                    cfg.autonext.grant_id != review["grant_id"]
+                    or cfg.autonext.team_id != request.team_id
+                    or not cfg.autonext.completion_target
+                    or cfg.autonext.completion_target != profile.get("completion_target")
+                ):
+                    raise RuntimeError("Original grant identity changed")
+                adapter = owner.bridge
+                adapter.teams = owner
+                adapter.completions = CompletionManager(store, adapter.security)
+                adapter.autonext = CoordinatedAutoNext(adapter)
+                card = ReadyCard.model_validate_json(review["card"])
+                policy = ContinuationPolicy.model_validate(profile["continuation"])
+                current_pins = [p for p in policy.sources if p.task_id == card.task_id]
+                original_pins = [p for p in cfg.autonext.cards if p.task_id == card.task_id]
+                if (
+                    len(current_pins) != 1
+                    or current_pins != original_pins
+                    or card.cwd not in policy.allowed_cwds
+                    or card.product not in policy.products
+                    or not checks_allowed(policy, card)
+                    or not bind_scope(
+                        adapter, card, restoring_grant=cfg.autonext.grant_id, profile=profile
+                    )
+                ):
+                    raise RuntimeError("Original result is outside the current scope")
+
+                def current_source(current):
+                    if path.read_bytes() != profile_bytes:
+                        raise RuntimeError("Reviewed result-only profile changed")
+                    validate_source(adapter, load_profile(path), current)
+
+                adapter.autonext.continuation_guard = current_source
+                receipt = asyncio.run(
+                    adapter.autonext.accept_original_result(
+                        "codex",
+                        request,
+                        expected_lease_owner=expected_lease_owner,
+                    )
+                )
+                completions = process_completions(adapter, profile)
+                return {
+                    "work_id": request.work_id,
+                    "core_task_id": request.core_task_id,
+                    "state": "accepted",
+                    "receipt": receipt,
+                    "completions": completions,
+                    "provider_started": False,
+                }
+            work = owner.work_reprocess("codex", request)
+            return {
+                "work_id": work["id"],
+                "state": work["state"],
+                "core_task_id": work["core_task_id"],
+                "provider_started": False,
+            }
+        finally:
+            store.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument(
-        "action", choices=["serve", "status", "quota", "approve", "adopt", "preview"]
+        "action", choices=["serve", "status", "quota", "approve", "adopt", "preview", "reconcile"]
     )
     parser.add_argument("--entry-id", action="append", default=[])
     parser.add_argument(
         "--fixture", type=Path, help="private offline preview fixture (required for preview)"
     )
+    parser.add_argument(
+        "--request", type=Path, help="exact TeamWorkReprocess request for reconcile"
+    )
+    parser.add_argument("--expected-profile-sha256")
+    parser.add_argument("--accept-original", action="store_true")
+    parser.add_argument("--expected-grant-sha256")
+    parser.add_argument("--expected-lease-owner")
     args = parser.parse_args()
-    if args.action == "preview":
+    if args.action == "reconcile":
+        if args.request is None or args.expected_profile_sha256 is None:
+            parser.error("reconcile requires --request and --expected-profile-sha256")
+        print(
+            json.dumps(
+                reconcile_result(
+                    args.profile,
+                    json.loads(args.request.read_text()),
+                    expected_profile_sha256=args.expected_profile_sha256,
+                    accept_original=args.accept_original,
+                    expected_grant_sha256=args.expected_grant_sha256,
+                    expected_lease_owner=args.expected_lease_owner,
+                )
+            )
+        )
+    elif args.action == "preview":
         if args.fixture is None:
             parser.error("preview requires --fixture and never reads live Board/Core state")
         print(json.dumps(preview_profile(args.profile, args.fixture), sort_keys=True))
