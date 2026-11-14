@@ -70,6 +70,8 @@ Der Entwicklungsstand trennt außerdem die normale MCP-Erreichbarkeitsprüfung v
 
 Die Bereitschaftsprüfung unterscheidet jetzt Berechtigung, Plattformunterstützung und ungeprüften Transport. Ausstehende Freigaben und bekannte Blockaden ergeben „nicht bereit“; eine ungeprüfte Session- oder ThreadDesk-Verbindung bleibt unbekannt. Die Statuskorrektur erteilt keine Zugriffsrechte und startet keine Befehle.
 
+Im Entwicklungsstand blockieren gültige macOS-Systembenutzer mit negativer UID, etwa `nobody`, nicht mehr den gesamten Terminalkatalog. Ihre Prozesse gelten weiterhin als fremd; fehlerhafte Prozessdaten und belegte Eingabeziele werden weiterhin abgewiesen.
+
 Die Release-Smoke-Testkonfiguration beschränkt ihre temporäre lokale Identität auf Erreichbarkeits- und `file.read`-Prüfungen mit automatischer Freigabe. Reguläre Installationen benötigen weiterhin standardmäßig eine Freigabe.
 
 ## Downloads und Installationsprofile

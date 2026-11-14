@@ -45,7 +45,13 @@ def _parse_process_catalog(output, returncode):
         if not line.strip():
             continue
         parts = line.split(None, 4)
-        if len(parts) != 5 or any(not re.fullmatch(r"[0-9]+", part) for part in parts[:3]):
+        # macOS ps prints signed system UIDs (for example nobody as -2).
+        # PID/PPID remain nonnegative; ownership comparisons keep the signed UID.
+        if (
+            len(parts) != 5
+            or not re.fullmatch(r"-?[0-9]+", parts[0])
+            or any(not re.fullmatch(r"[0-9]+", part) for part in parts[1:3])
+        ):
             raise invalid("malformed_row")
         pid = int(parts[1])
         if pid in pids:
