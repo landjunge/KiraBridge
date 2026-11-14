@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from test_native_send_identity import wire_submit
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
@@ -45,7 +46,9 @@ def manager_with_transports(bridge, config, rows, *, incomplete=False):
         press_return=AsyncMock(),
         last_catalog_truncated=False,
     )
-    return SessionManager(bridge.sessions.ports, terminal_app=native, tmux=tmux)
+    manager = SessionManager(bridge.sessions.ports, terminal_app=native, tmux=tmux)
+    wire_submit(bridge, manager)
+    return manager
 
 
 async def test_exact_native_selection_never_observes_unrelated_timed_out_tmux(bridge, config):
@@ -171,6 +174,8 @@ async def test_native_ps_timeout_is_typed_and_reaps_once_without_input(monkeypat
 
     monkeypatch.setattr(module, "sys", SimpleNamespace(platform="darwin", exc_info=sys.exc_info))
     process = SimpleNamespace(communicate=AsyncMock(side_effect=TimeoutError()), returncode=None)
+    if phase == "catalog":
+        process.stdout = SimpleNamespace(read=AsyncMock(side_effect=TimeoutError()))
     spawn = AsyncMock(return_value=process)
     reap = AsyncMock()
     monkeypatch.setattr(module.asyncio, "create_subprocess_exec", spawn)
@@ -190,7 +195,7 @@ async def test_native_ps_timeout_is_typed_and_reaps_once_without_input(monkeypat
             await transport.shell_process_snapshot("/dev/ttys004")
 
     assert error.value.code == "session_observation_timeout"
-    assert error.value.provider_error == {
+    provider_error = {
         "phase": {
             "catalog": "native_process_catalog",
             "identity": "native_process_identity",
@@ -198,6 +203,22 @@ async def test_native_ps_timeout_is_typed_and_reaps_once_without_input(monkeypat
         }[phase],
         "reason": "timeout",
     }
+    if phase == "catalog":
+        provider_error.update(
+            stage="stdout_read", stdout_bytes=0, stdout_eof=False, exit_status=None
+        )
+        actual_provider_error = error.value.provider_error
+        assert actual_provider_error.keys() == provider_error.keys() | {"elapsed_ms", "cleanup_ms"}
+        for field in ("elapsed_ms", "cleanup_ms"):
+            assert type(actual_provider_error[field]) is int and actual_provider_error[field] >= 0
+        actual_without_timings = {
+            key: value
+            for key, value in actual_provider_error.items()
+            if key not in {"elapsed_ms", "cleanup_ms"}
+        }
+        assert actual_without_timings == provider_error
+    else:
+        assert error.value.provider_error == provider_error
     spawn.assert_awaited_once()
     reap.assert_awaited_once_with(process, process_group=False)
     transport.insert.assert_not_awaited()
@@ -213,6 +234,8 @@ async def test_native_ps_cancellation_propagates_without_retry(monkeypatch, phas
     process = SimpleNamespace(
         communicate=AsyncMock(side_effect=asyncio.CancelledError()), returncode=None
     )
+    if phase == "catalog":
+        process.stdout = SimpleNamespace(read=AsyncMock(side_effect=asyncio.CancelledError()))
     spawn, reap = AsyncMock(return_value=process), AsyncMock()
     monkeypatch.setattr(module.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(module, "reap_process", reap)

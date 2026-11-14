@@ -37,6 +37,7 @@ from kirabridge.bridge_core.models import (
     ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
+    UncertainExecution,
     WorkflowStopInput,
     WriteInput,
 )
@@ -247,7 +248,11 @@ class Bridge:
             )
         )
         self.visible_terminal = VisibleTerminal(
-            config, self.security, self.sessions, self.terminal.environment
+            config,
+            self.security,
+            self.sessions,
+            self.terminal.environment,
+            record_window_binding=self.record_window_binding,
         )
         self.terminal_queries = TerminalQueries(
             self.security, self.sessions, self.store, config.read_concurrency
@@ -285,6 +290,11 @@ class Bridge:
             desktop_input=self.desktop_input,
             authorize=self.security.authorize,
         )
+        from kirabridge.terminal_input import TerminalNativeInput
+
+        self.terminal_input = TerminalNativeInput(self.keyboard, self.security)
+        self.sessions.native_input = self.terminal_input
+        self.visible_terminal.native_input = self.terminal_input
         self.keyboard_control = KeyboardControl(self.keyboard)
         self.keyboard_sequence = KeyboardSequence(self.keyboard_control)
         self.keyboard_actions = KeyboardActionManager(
@@ -549,6 +559,26 @@ class Bridge:
             "tasks": [dict(row) for row in rows],
             "next_cursor": rows[-1]["cursor"] if rows else after,
         }
+
+    async def record_window_binding(self, task, progress, receipt):
+        """Persist the complete binding separately from the one-shot raw receipt."""
+        if receipt.get("separate_window") is not True or not receipt.get("physical_window"):
+            raise UncertainExecution("session_open_unknown", "Full window binding is missing")
+        evidence = {
+            "evidence_type": "session_window_bound",
+            "creation_receipt": receipt,
+            "automatic_retry": False,
+        }
+        await progress(evidence)
+        observed = self.store.get(task["id"], task["principal"], resolve_output=False)
+        if (
+            observed["state"] not in {"accepted", "running"}
+            or observed["request_sha256"] != task["request_sha256"]
+            or observed["evidence"] != evidence
+        ):
+            raise UncertainExecution(
+                "session_open_unknown", "Full window binding readback did not match"
+            )
 
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
         operation = self.platform_operation(task["operation"], task["args"], task["principal"])
@@ -921,7 +951,11 @@ class Bridge:
                 )
 
             return await self.sessions.open(
-                principal, args, task_id=task["id"], on_created=session_window_created
+                principal,
+                args,
+                task_id=task["id"],
+                on_created=session_window_created,
+                on_bound=lambda receipt: self.record_window_binding(task, progress, receipt),
             )
         if operation == "agent.execute":
             self.teams.authorize_execution(task)

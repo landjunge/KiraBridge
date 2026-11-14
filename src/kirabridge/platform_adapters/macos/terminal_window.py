@@ -10,8 +10,10 @@ import asyncio
 import hashlib
 import json
 import math
+import time
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.timing import timed_async
 
 
 def require(value, message, *, observation=None):
@@ -50,6 +52,23 @@ class TerminalWindowProof:
         require(native is not None, "The installed native window observer is unavailable")
         self.terminal, self.native, self.principal = terminal, native, principal
         self.app = self.worker = None
+        self.phase, self.phase_started = "initial", time.monotonic()
+        self.phase_timings = []
+        self.preparation_started = self.prepared = self.consumed = False
+
+    def mark_phase(self, phase):
+        now = time.monotonic()
+        self.phase_timings.append(
+            {"phase": self.phase, "elapsed_ms": round((now - self.phase_started) * 1000, 3)}
+        )
+        self.phase, self.phase_started = phase, now
+
+    def phase_observation(self):
+        return {
+            "phase": self.phase,
+            "elapsed_ms": round((time.monotonic() - self.phase_started) * 1000, 3),
+            "completed": list(self.phase_timings),
+        }
 
     async def read(self, operation, arguments):
         for attempt in range(3):
@@ -238,7 +257,11 @@ class TerminalWindowProof:
             raise inventory_pending(len(groups), len(minimized))
         return {"cg": windows, "ax": groups, "minimized": minimized}
 
-    async def prepare(self):
+    @timed_async("terminal_window_prepare_readonly")
+    async def prepare_readonly(self):
+        require(not self.preparation_started and not self.consumed, "Window proof is one-shot")
+        self.preparation_started = True
+        self.mark_phase("prepare_readonly")
         self.logical_before = logical_windows(await self.terminal.window_inventory())
         await self.application()
         require(
@@ -251,12 +274,26 @@ class TerminalWindowProof:
             if self.app
             else None
         )
+        self.prepared = True
+        self.mark_phase("prepared")
+
+    async def prepare(self):
+        # Compatibility for direct callers: the coordinator separates the pure
+        # reads, while all activation effects remain in its real creation turn.
+        await self.prepare_readonly()
+        await self.activate_prepared()
+
+    @timed_async("terminal_window_activate_prepared")
+    async def activate_prepared(self):
+        require(self.prepared and not self.consumed, "Prepared window proof is unavailable")
+        self.consumed = True
         if (
             self.logical_before
             and not self.before["cg"]
             and not self.before["ax"]
             and not self.before["minimized"]
         ):
+            self.mark_phase("activate_existing")
             source = self.terminal.native_existing_app_activation_source(
                 self.app["pid"], self.app_identity
             )
@@ -430,7 +467,9 @@ class TerminalWindowProof:
             return "hidden_singleton_partition"
         return "same_ax_window" if host["token"] == own["token"] else "retained_tab_identities"
 
+    @timed_async("terminal_window_isolate")
     async def isolate(self, receipt):
+        self.mark_phase("isolate")
         if self.app is None:
             await self.application(receipt["app_pid"])
         require(
@@ -452,7 +491,9 @@ class TerminalWindowProof:
         if moved:
             original = [r["token"] for r in radios if r["token"] != own_radio]
             host_identity_basis = self.bind_shared_host(before, own_cg, own, original)
+            self.mark_phase("detach")
             await self.terminal.move_created_tab(receipt)
+            self.mark_phase("post_detach")
             for attempt in range(10):
                 try:
                     after = await self.snapshot()

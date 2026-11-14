@@ -1,5 +1,4 @@
 import asyncio
-import json
 import shlex
 import shutil
 import subprocess
@@ -40,9 +39,11 @@ async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, 
         )
 
     async def process(*args, **kwargs):
-        return SimpleNamespace(
-            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
-        )
+        output, _ = await communicate()
+        reader = asyncio.StreamReader()
+        reader.feed_data(output)
+        reader.feed_eof()
+        return SimpleNamespace(stdout=reader, returncode=0, wait=AsyncMock(return_value=0))
 
     monkeypatch.setattr(manager.terminal_app, "native", native)
     monkeypatch.setattr(
@@ -170,10 +171,12 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
     )
     with pytest.raises(BridgeError, match="single-line"):
         await manager.send("local", args.model_copy(update={"submit": False}))
-    sent = await manager.send("local", args)
-    assert sent["input_handed_to_transport"] and not sent["agent_processed"]
-    assert calls[-1][1] is True
-    assert 'hello \\"quoted\\"\\nline' in calls[-1][0]
+    before = list(calls)
+    with pytest.raises(BridgeError, match="control characters"):
+        await manager.send("local", args)
+    with pytest.raises(BridgeError, match="adapter unavailable"):
+        await manager.send("local", args.model_copy(update={"text": "one line"}))
+    assert calls == before  # No unbound doScript fallback for any principal.
 
 
 @pytest.mark.asyncio
@@ -186,6 +189,19 @@ async def test_native_open_checks_authority_and_quotes_command(
 ):
     scene, leaf, events, receipt, created = product
     manager = SessionManager(bridge.sessions.ports, terminal_app=leaf)
+    from kirabridge.desktop_input import DesktopInput
+    from kirabridge.keyboard_manager import KeyboardManager
+    from kirabridge.terminal_input import TerminalNativeInput
+
+    config.principals["local"].capabilities += ["session.inspect"]
+    manager.native_input = TerminalNativeInput(
+        KeyboardManager(
+            transport=bridge.keyboard.transport,
+            desktop_input=DesktopInput(manager.lock),
+            authorize=bridge.security.authorize,
+        ),
+        bridge.security,
+    )
     observer = leaf.system_transport.request
 
     async def observe(operation, arguments, *, principal):
@@ -213,8 +229,12 @@ async def test_native_open_checks_authority_and_quotes_command(
     monkeypatch.setattr(manager, "read", AsyncMock(return_value={"text": "KiraBridge visible % "}))
     args = SessionOpen(cwd=cwd, argv=[sys.executable, "-c", "print('hello')"])
 
-    async def sent(row, text, identity, *, expected_cwd, before_transport):
-        assert row == selected and text == shlex.join(args.argv)
+    async def sent(row, text, identity, *, expected_cwd, before_transport, input_context):
+        assert row == selected and text == "cd -- " + shlex.quote(cwd) + " && " + shlex.join(
+            args.argv
+        )
+        assert input_context.owner["operation"] == "session.open"
+        assert input_context.owner["task_id"] == "explicit-new-window"
         assert identity == await scene.identity(selected["expected_pid"], detailed=True)
         assert expected_cwd == cwd
         await before_transport()  # Exercise the real TerminalWindowProof.verify on the fake scene.
@@ -224,8 +244,10 @@ async def test_native_open_checks_authority_and_quotes_command(
     leaf.send_confirmed = AsyncMock(side_effect=sent)
     token = bridge.security.grant_window("local", "explicit-new-window", args)
     args = args.model_copy(update={"window_authorization": token})
-    with bridge.store.transaction():
-        bridge.security.consume_window("local", "explicit-new-window", args)
+    from conftest import request, submit
+
+    submit(bridge, request("session.open", args.model_dump(), task_id="explicit-new-window"))
+    bridge.store.claim(bridge.tasks.owner, config.lease_seconds)
     result = await manager.open("local", args, task_id="explicit-new-window", on_created=created)
     assert result["opened"] and result["expected_pid"] == selected["expected_pid"]
     assert result["pane_id"] == selected["pane_id"] and result["tty"] == selected["tty"]
@@ -235,7 +257,7 @@ async def test_native_open_checks_authority_and_quotes_command(
         for call in leaf.native.await_args_list
         if "const tab=app.doScript(" in call.args[0]
     ]
-    assert len(creations) == 1 and json.dumps("cd -- " + shlex.quote(cwd)) in creations[0]
+    assert len(creations) == 1 and 'const tab=app.doScript("");' in creations[0]
     assert events == ["create", "receipt", "focus", "move", "argv"]
     assert leaf.native.await_count == 3  # One creation, plus required focus/move calls.
     leaf.send_confirmed.assert_awaited_once()
@@ -249,6 +271,70 @@ async def test_native_open_checks_authority_and_quotes_command(
         await manager.open("local", args, task_id="explicit-new-window")
     assert exc.value.code == "window_already_dispatched" and leaf.native.await_count == 3
     leaf.send_confirmed.assert_awaited_once()
+
+
+async def test_noargv_open_uses_private_own_window_inspection_without_global_session_read(
+    bridge,
+    config,
+    monkeypatch,
+    native_session_platform,
+    product,  # noqa: F811 -- synthetic physical-window fixture
+):
+    from conftest import request, submit
+
+    from kirabridge.desktop_input import DesktopInput
+    from kirabridge.keyboard_manager import KeyboardManager
+    from kirabridge.terminal_input import TerminalNativeInput
+
+    scene, leaf, _, receipt, created = product
+    config.principals["local"].capabilities = ["session.open", "terminal.execute", "task.read"]
+    manager = SessionManager(bridge.sessions.ports, terminal_app=leaf)
+    manager.native_input = TerminalNativeInput(
+        KeyboardManager(
+            transport=bridge.keyboard.transport,
+            desktop_input=DesktopInput(manager.lock),
+            authorize=bridge.security.authorize,
+        ),
+        bridge.security,
+    )
+    observer = leaf.system_transport.request
+
+    async def observe(operation, arguments, *, principal):
+        assert principal == "local"
+        return await observer(operation, arguments, principal="chatgpt")
+
+    leaf.system_transport.request = observe
+    cwd = config.principals["local"].roots[0]
+    scene.workspace = cwd
+    selected = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "tty": receipt["tty"],
+        "busy": False,
+    }
+    leaf.catalog = AsyncMock(return_value=[selected])
+    leaf.read = AsyncMock(return_value="KiraBridge visible % ")
+    manager.read = AsyncMock(side_effect=AssertionError("No public all-session read grant"))
+
+    async def sent(row, text, identity, *, expected_cwd, before_transport, input_context):
+        assert row == selected and text == "cd -- " + shlex.quote(cwd)
+        assert input_context.opening and not input_context.inspect_sessions
+        input_context.check("terminal.input.inspect")
+        await before_transport()
+        return {"sent": True}
+
+    leaf.send_confirmed = AsyncMock(side_effect=sent)
+    args = SessionOpen(cwd=cwd)
+    token = bridge.security.grant_window("local", "own-empty-window", args)
+    args = args.model_copy(update={"window_authorization": token})
+    submit(bridge, request("session.open", args.model_dump(), task_id="own-empty-window"))
+    bridge.store.claim_exact(bridge.tasks.owner, config.lease_seconds, "own-empty-window")
+    result = await manager.open("local", args, task_id="own-empty-window", on_created=created)
+    assert result["opened"] and result["pane_id"] == selected["pane_id"]
+    manager.read.assert_not_awaited()
+    leaf.read.assert_awaited_once_with(selected["pane_id"])
+    leaf.send_confirmed.assert_awaited_once()
+    assert "session.inspect" not in config.principals["local"].capabilities
 
 
 @pytest.mark.parametrize(

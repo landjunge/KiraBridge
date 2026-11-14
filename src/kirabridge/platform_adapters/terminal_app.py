@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from kirabridge.platform_adapters import reap_process
 from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 from kirabridge.timing import timed, timed_async
+
+MAX_PROCESS_CATALOG_BYTES = 1048576
 
 
 def _process_observation_timeout(phase):
@@ -26,14 +29,16 @@ def _process_observation_timeout(phase):
     return error
 
 
-def _parse_process_catalog(output, returncode):
-    def invalid(reason):
-        error = BridgeError(
-            "session_observation_invalid", "Complete native process catalog unavailable"
-        )
-        error.provider_error = {"phase": "native_process_catalog", "reason": reason}
-        return error
+def _process_catalog_invalid(reason):
+    error = BridgeError(
+        "session_observation_invalid", "Complete native process catalog unavailable"
+    )
+    error.provider_error = {"phase": "native_process_catalog", "reason": reason}
+    return error
 
+
+def _parse_process_catalog(output, returncode):
+    invalid = _process_catalog_invalid
     if returncode != 0:
         raise invalid("process_failed")
     try:
@@ -269,6 +274,7 @@ class TerminalAppTransport:
 
     async def _ps_catalog(self):
         with timed("ps_catalog"):
+            started = time.monotonic()
             child = await asyncio.create_subprocess_exec(
                 "/bin/ps",
                 "-axo",
@@ -276,14 +282,49 @@ class TerminalAppTransport:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
+            output = bytearray()
+            eof = False
+            phase = "stdout_read"
+            timeout_error = None
             try:
                 async with asyncio.timeout(3):
-                    output, _ = await child.communicate()
+                    # Drain while enforcing the same finite observation budget.
+                    # communicate() accumulates indefinitely until EOF; an already
+                    # oversized, still-open pipe must never become a partial census.
+                    while True:
+                        chunk = await child.stdout.read(
+                            min(65536, MAX_PROCESS_CATALOG_BYTES + 1 - len(output))
+                        )
+                        if not chunk:
+                            eof = True
+                            break
+                        output.extend(chunk)
+                        if len(output) > MAX_PROCESS_CATALOG_BYTES:
+                            raise _process_catalog_invalid("output_limit")
+                    phase = "exit_wait"
+                    await child.wait()
             except TimeoutError:
-                raise _process_observation_timeout("native_process_catalog") from None
+                timeout_error = _process_observation_timeout("native_process_catalog")
+                timeout_error.provider_error.update(
+                    {
+                        "stage": phase,
+                        "stdout_bytes": len(output),
+                        "stdout_eof": eof,
+                        "exit_status": child.returncode,
+                        "elapsed_ms": int((time.monotonic() - started) * 1000),
+                    }
+                )
+                raise timeout_error from None
             finally:
-                await reap_process(child, process_group=False)
-        return output, child.returncode
+                cleanup_started = time.monotonic()
+                try:
+                    await reap_process(child, process_group=False)
+                finally:
+                    if timeout_error is not None:
+                        timeout_error.provider_error["cleanup_ms"] = int(
+                            (time.monotonic() - cleanup_started) * 1000
+                        )
+        return bytes(output), child.returncode
 
     @timed_async("terminal_catalog")
     async def catalog(self):
@@ -764,14 +805,48 @@ class TerminalAppTransport:
         """Confirm target absence; a pending close dialog is not a closed tab."""
         result = await self.native(
             self.native_target(pane_id)
+            + "const expectedTTY = "
+            + json.dumps("/dev/" + pane_id.split(":")[2])
+            + ";"
             + """
             const id = targetWindow.id();
             if (targetWindow.tabs().length !== 1)
                 throw Error("Refusing to close a multi-tab Terminal window");
+            function boundsOf(w) {
+                const b = w.bounds(), keys = ['x', 'y', 'width', 'height'];
+                if (!b || !keys.every(k => typeof b[k] === 'number' && Number.isFinite(b[k])) ||
+                    b.width <= 0 || b.height <= 0)
+                    throw Error('Close surface bounds are unavailable');
+                return keys.map(k => b[k]);
+            }
+            const bounds = boundsOf(targetWindow);
+            function sameBounds(a, b) { return a.every((v, i) => v === b[i]); }
+            function checkCloseSurface() {
+                const windows = app.windows(), ids = windows.map(w => w.id());
+                if (ids.some(v => !Number.isInteger(v) || v <= 0) ||
+                    new Set(ids).size !== ids.length)
+                    throw Error('Close window identity is ambiguous');
+                const matches = windows.filter(w => w.id() === id);
+                if (matches.length !== 1 || !sameBounds(boundsOf(matches[0]), bounds))
+                    throw Error('Close target bounds changed');
+                // Native macOS tab groups can expose one scripting window/tab
+                // per shared surface. Coincident standalone windows are also
+                // conservatively refused; bounds do not claim atomic AX identity.
+                const surfaces = windows.filter(w => sameBounds(boundsOf(w), bounds));
+                if (surfaces.length !== 1 || surfaces[0].id() !== id)
+                    throw Error('Refusing to close a shared or ambiguous Terminal surface');
+                const tabs = matches[0].tabs();
+                if (tabs.length !== 1 || tabs[0].tty() !== expectedTTY ||
+                    windows.flatMap(w => w.tabs()).filter(t => t.tty() === expectedTTY)
+                        .length !== 1)
+                    throw Error('Close target TTY binding changed');
+            }
+            checkCloseSurface();
             const others = app.windows().filter(w => w.id() !== id).map(w => w.id());
             if (!others.length) throw Error("Refusing to close the only Terminal tab");
             // A running process makes Terminal ask before closing; never leave that dialog.
             if (tab.busy()) throw Error("Selected terminal is busy; no close dialog");
+            checkCloseSurface();
             targetWindow.close();
             delay(0.3);
             const left = app.windows().map(w => w.id());
@@ -821,6 +896,10 @@ class TerminalAppTransport:
         )
 
     def native_open_source(self, command, nonce, proof):
+        if command:
+            raise BridgeError(
+                "terminal_authority_required", "Create an empty shell before bound input"
+            )
         prior = json.dumps(proof.logical_before)
         guard = (
             self.native_identity_guard({proof.app["pid"]: proof.app_identity}) if proof.app else ""
@@ -914,15 +993,39 @@ entries[0].click();JSON.stringify({detached:true});
         if result.get("detached") is not True:
             raise UncertainExecution("session_open_unknown", "Detach result unknown; never replay")
 
-    async def open(self, command, *, on_created=None, principal="session_open"):
+    async def prepare_open(self, *, principal):
+        from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+        proof = TerminalWindowProof(self, self.system_transport, principal)
+        await proof.prepare_readonly()
+        return proof
+
+    @timed_async("terminal_window_create")
+    async def open(self, command, *, on_created=None, principal="session_open", prepared=None):
         from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
 
-        proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)
-        await proof.prepare()
+        if command:
+            raise BridgeError(
+                "terminal_authority_required", "Create an empty shell before bound input"
+            )
+        proof = prepared or TerminalWindowProof(
+            self, getattr(self, "system_transport", None), principal
+        )
+        require(
+            proof.terminal is self
+            and proof.native is self.system_transport
+            and proof.principal == principal,
+            "Prepared window owner changed",
+        )
+        if prepared is None:
+            await proof.prepare_readonly()
         receipt = None
         try:
+            await proof.activate_prepared()
+            proof.mark_phase("creation")
             source = self.native_open_source(command, "KiraBridge_" + secrets.token_hex(16), proof)
             receipt = await self.native(source, mutation=True)
+            proof.mark_phase("created")
             if on_created is not None:
                 await on_created(dict(receipt))
             require(
@@ -936,6 +1039,7 @@ entries[0].click();JSON.stringify({detached:true});
             pane = f"terminal:{receipt['window_id']}:{Path(receipt['tty']).name}"
             target = self.native_target(pane)
             focus = self.native_focus(pane)[len(target) :]
+            proof.mark_phase("focus_created")
             await self.native(
                 self.created_tab_guard(receipt)
                 + focus
@@ -943,8 +1047,14 @@ entries[0].click();JSON.stringify({detached:true});
                 mutation=True,
             )
             binding = await proof.isolate(receipt)
-            return {**receipt, "physical_window": binding, "separate_window": True}
-        except Exception as cause:
+            proof.mark_phase("bound")
+            return {
+                **receipt,
+                "physical_window": binding,
+                "separate_window": True,
+                "window_phases": proof.phase_observation(),
+            }
+        except BaseException as cause:
             error = UncertainExecution(
                 "session_open_unknown",
                 "Window creation/isolation is unconfirmed; never reopen or resend",
@@ -954,6 +1064,7 @@ entries[0].click();JSON.stringify({detached:true});
                 "automatic_retry": False,
                 "cause_code": getattr(cause, "code", type(cause).__name__),
                 "cause_message": str(cause)[:512],
+                "window_phases": proof.phase_observation(),
             }
             if getattr(cause, "window_observation", None) is not None:
                 error.provider_error["window_observation"] = cause.window_observation
@@ -1064,9 +1175,27 @@ entries[0].click();JSON.stringify({detached:true});
                 await reap_process(child, process_group=False)
 
     async def send_confirmed(
-        self, row, text, identity, *, before_transport=None, expected_cwd=None
+        self, row, text, identity, *, before_transport=None, expected_cwd=None, input_context=None
     ):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
+        from kirabridge.terminal_input import (
+            TerminalInputAuthority,
+            terminal_literal,
+            terminal_target_supported,
+        )
+
+        if not isinstance(input_context, TerminalInputAuthority):
+            raise BridgeError(
+                "terminal_authority_required", "Original task and desktop turn required"
+            )
+        terminal_literal(text)
+        input_context.check("terminal.input.inspect")
+        if not terminal_target_supported(row):
+            raise BridgeError(
+                "terminal_window_unsupported", "A confirmed physical single-tab shell is required"
+            )
+        if expected_cwd is None or len(identity.split(None, 8)) != 9:
+            raise BridgeError("visible_target_changed", "Detailed shell identity and CWD required")
         if identity.split()[1] != Path(row["tty"]).name:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
@@ -1118,6 +1247,8 @@ entries[0].click();JSON.stringify({detached:true});
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
         )
+        input_context.check("terminal.input.inspect")
+        input_context.turn.mark_attempted()
         screen = await self.native(
             target
             + identity_guard
@@ -1137,26 +1268,7 @@ entries[0].click();JSON.stringify({detached:true});
         # or activation in the dispatch.
         if not empty_shell_prompt(screen):
             raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
-        return await self.native(
-            target
-            + identity_guard
-            + own_boundary
-            + identity_check
-            + TerminalAppTransport.native_focus_check(row["pane_id"])
-            + "\ncheckFocus();"
-            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
-            # Use the accepted screen, not a second prompt parser that can drift.
-            + self.native_screen_guard(screen)
-            + ("\ncheckTargetIdentity();" if expected_cwd is not None else "")
-            + own_boundary
-            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
-            + self.native_screen_guard(screen)
-            + "\ncheckFocus();"
-            + "\napp.doScript("
-            + json.dumps(text)
-            + ", {in:tab}); JSON.stringify({sent:true});",
-            mutation=True,
-        )
+        return await input_context.submit(self, row, text, identity, expected_cwd)
 
     async def press_return(
         self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
@@ -1188,18 +1300,7 @@ entries[0].click();JSON.stringify({detached:true});
         )
 
     async def send(self, pane_id, text, *, submit, require_idle, identity_guard=None):
-        if not submit:
-            raise BridgeError("session_submit_required", "Terminal.app input submits a line")
-        if not identity_guard:
-            raise BridgeError(
-                "visible_selection_required", "Native submit requires a bound process identity"
-            )
-        await self.native(
-            self.native_target(pane_id)
-            + ('\nif(tab.busy()) throw Error("Selected terminal is busy");' if require_idle else "")
-            + self.native_identity_guard(identity_guard)
-            + "\napp.doScript("
-            + json.dumps(text)
-            + ", {in:tab}); JSON.stringify({sent:true});",
-            mutation=True,
+        raise BridgeError(
+            "terminal_authority_required",
+            "Terminal submission requires the original task and a live desktop turn",
         )

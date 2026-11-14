@@ -127,7 +127,10 @@ async def test_catalog_logs_ps_and_total_phases(on, lines, monkeypatch):
         return_value=[{"window_id": 123, "tty": "/dev/ttys004", "busy": False}]
     )
     output = f"{os.getuid()} 345 1 ttys004 /bin/zsh\n".encode()
-    child = SimpleNamespace(communicate=AsyncMock(return_value=(output, b"")), returncode=0)
+    reader = asyncio.StreamReader()
+    reader.feed_data(output)
+    reader.feed_eof()
+    child = SimpleNamespace(stdout=reader, returncode=0, wait=AsyncMock(return_value=0))
     monkeypatch.setattr(
         "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec",
         AsyncMock(return_value=child),

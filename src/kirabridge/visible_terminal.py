@@ -16,6 +16,7 @@ from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 from kirabridge.private_files import private_json, write_private
 from kirabridge.session_manager import SessionOpen, SessionReference
+from kirabridge.terminal_input import terminal_target_supported
 from kirabridge.terminal_manager import check_executable
 from kirabridge.timing import timed
 
@@ -33,27 +34,34 @@ class VisibleTerminalInput(TerminalInput):
 
 
 class VisibleTerminal:
-    def __init__(self, config, security, sessions, environment):
+    def __init__(self, config, security, sessions, environment, *, record_window_binding):
         self.config, self.security, self.sessions, self.environment = (
             config,
             security,
             sessions,
             environment,
         )
+        self.native_input = None
+        self.record_window_binding = record_window_binding
 
-    async def suitable(self, principal, row):
+    @staticmethod
+    def idle_shell_candidate(row):
         if (
             row.get("transport") != "terminal_app"
             or row.get("busy", True)
             or not row.get("processes")
+            or row.get("process_owner_verified") is not True
         ):
             return False
         # Idle shell only: an interactive agent/editor is never an interchangeable shell.
         processes = row["processes"]
-        if any(p["name"].lstrip("-") not in {"login", "zsh", "bash", "sh"} for p in processes):
+        return all(p["name"].lstrip("-") in {"login", "zsh", "bash", "sh"} for p in processes)
+
+    async def suitable(self, principal, row):
+        if not self.idle_shell_candidate(row):
             return False
         self.security.principal(principal, "session.inspect")
-        if row.get("identity_ambiguous"):
+        if row.get("identity_ambiguous") or row.get("selection_ambiguous"):
             raise BridgeError(
                 "visible_target_ambiguous", "Several live tabs report this tty; no input"
             )
@@ -68,7 +76,7 @@ class VisibleTerminal:
             )
             error.provider_error = {"process_state": "idle_shell", "input_state": "unknown"}
             raise error
-        return True
+        return terminal_target_supported(row)
 
     async def execute(self, task, args, running, *, progress=None, privileged=False):
         bridge, principal = self, task["principal"]
@@ -96,6 +104,11 @@ class VisibleTerminal:
         async with bridge.sessions.lock:
             if args.pane_id:
                 row = await bridge.sessions.selected(principal, args.pane_id, args.expected_pid)
+                if not terminal_target_supported(row):
+                    raise BridgeError(
+                        "terminal_window_unsupported",
+                        "Selected physical shell must have one confirmed tab",
+                    )
                 if not await self.suitable(principal, row):
                     raise BridgeError(
                         "session_busy", "Selected window is not a confirmed empty shell"
@@ -105,12 +118,19 @@ class VisibleTerminal:
                 error = catalog.get("transport_errors", {}).get("terminal_app")
                 if error:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
-                candidates, unconfirmed_input = [], None
+                candidates, unconfirmed_input, unsupported, ambiguous = [], None, False, False
                 for candidate in catalog["sessions"]:
+                    if not self.idle_shell_candidate(candidate):
+                        continue
                     try:
                         if await self.suitable(principal, candidate):
                             candidates.append(candidate)
+                        elif not terminal_target_supported(candidate):
+                            unsupported = True
                     except BridgeError as error:
+                        if error.code == "visible_target_ambiguous":
+                            ambiguous = True
+                            continue
                         if error.code != "visible_input_unknown":
                             raise
                         unconfirmed_input = error
@@ -123,6 +143,16 @@ class VisibleTerminal:
                         # An ambiguous existing shell is not evidence that more
                         # windows are needed. Preserve it and report input state.
                         raise unconfirmed_input
+                    if ambiguous:
+                        raise BridgeError(
+                            "visible_target_ambiguous",
+                            "Existing terminal view is ambiguous; no input",
+                        )
+                    if unsupported and not args.create_if_needed:
+                        raise BridgeError(
+                            "terminal_window_unsupported",
+                            "Existing free shells lack a confirmed single tab",
+                        )
                     if not args.create_if_needed:
                         raise BridgeError(
                             "visible_shell_missing", "No unique suitable visible shell"
@@ -148,6 +178,9 @@ class VisibleTerminal:
             open_options = {"task_id": task["id"]}
             if progress is not None:
                 open_options["on_created"] = window_created
+                open_options["on_bound"] = lambda receipt: bridge.record_window_binding(
+                    task, progress, receipt
+                )
             opened = await bridge.sessions.open(
                 principal, SessionOpen(cwd=cwd, controlled_shell=True), **open_options
             )
@@ -220,7 +253,11 @@ class VisibleTerminal:
             + "\n"
         )
         write_private(script_path, script)
-        async with bridge.sessions.lock:
+        if self.native_input is None:
+            raise BridgeError(
+                "terminal_authority_required", "Native terminal adapter is unavailable"
+            )
+        async with self.native_input.desktop_input.transaction() as turn:
             current = await bridge.sessions.selected(
                 principal, reference.pane_id, reference.expected_pid
             )
@@ -228,12 +265,38 @@ class VisibleTerminal:
                 raise BridgeError(
                     "visible_target_changed", "Visible shell changed before dispatch; no input"
                 )
-            identity = await bridge.sessions.terminal_app.process_identity(reference.expected_pid)
+            identity = await bridge.sessions.terminal_app.process_identity(
+                reference.expected_pid, detailed=True
+            )
+            shell_cwd = await bridge.sessions.terminal_app.process_working_directory(
+                reference.expected_pid, expected_identity=identity
+            )
             await running(
                 {"execution_route": "visible_terminal", **reference.model_dump(), "tty": row["tty"]}
             )
+
+            def revalidate_origin():
+                current_policy = self.security.principal(principal, "terminal.execute")
+                PathScope(current_policy.terminal_roots or current_policy.roots).split(cwd)
+                if (
+                    check_executable(
+                        args.argv[0],
+                        current_policy.executables,
+                        current_policy.allow_any_executable,
+                        self.environment["PATH"],
+                    )
+                    != executable
+                ):
+                    raise BridgeError("visible_target_changed", "Original executable changed")
+                if privileged:
+                    self.security.principal(principal, "admin.execute")
+
             await bridge.sessions.terminal_app.send_confirmed(
-                current, "/bin/zsh -f " + shlex.quote(str(script_path)), identity
+                current,
+                "/bin/zsh -f " + shlex.quote(str(script_path)),
+                identity,
+                expected_cwd=shell_cwd,
+                input_context=self.native_input.bind(task, turn, origin_guard=revalidate_origin),
             )
         deadline = time.monotonic() + args.timeout
         while time.monotonic() < deadline:

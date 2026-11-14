@@ -22,15 +22,35 @@ class TerminalCloseConfirmation(unittest.IsolatedAsyncioTestCase):
             setup = """
                 const mode = MODE;
                 let ids = mode === 'only' ? [101] : [101, 202];
-                const app = {windows: () => ids.map(id => ({id: () => id}))};
+                let boundReads = 0;
+                function peerBounds(id) {
+                    if (mode === 'missing_bounds') return null;
+                    if (mode === 'invalid_bounds') return {x: 0, y: 0, width: NaN, height: 600};
+                    return {x: id === 101 || mode === 'shared_surface'
+                                      ? (mode === 'negative_origin' ? -900 : 0) : 900,
+                            y: mode === 'negative_origin' ? -600 : 0,
+                            width: mode === 'bounds_changed' && ++boundReads > 3
+                                           ? 801 : 800, height: 600};
+                }
+                function tty(id) {
+                    return mode === 'duplicate_tty' || id === 101 ? '/dev/ttys001' : '/dev/ttys002';
+                }
+                const app = {windows: () => ids.map(id => ({
+                    id: () => id, bounds: () => peerBounds(id),
+                    tabs: () => [{tty: () => tty(id)}]
+                }))};
                 const targetWindow = {
                     id: () => 101,
-                    tabs: () => mode === 'multi_tab' ? [{}, {}] : [{}],
+                    bounds: () => peerBounds(101),
+                    tabs: () => mode === 'multi_tab' ? [{}, {}] : [{tty: () => '/dev/ttys001'}],
                     close: () => {
+                        if (['shared_surface', 'missing_bounds', 'invalid_bounds',
+                             'bounds_changed', 'duplicate_tty'].includes(mode))
+                            throw Error('Unexpected close of unconfirmed surface');
                         if (mode === 'busy') throw Error('Unexpected close of busy tab');
                         if (mode === 'multi_tab')
                             throw Error('Unexpected close of multi-tab window');
-                        if (mode === 'closed') ids = [202];
+                        if (mode === 'closed' || mode === 'negative_origin') ids = [202];
                         if (mode === 'foreign_removed') ids = [];
                     }
                 };
@@ -82,3 +102,29 @@ class TerminalCloseConfirmation(unittest.IsolatedAsyncioTestCase):
             await self.close("busy")
         self.assertIn("Selected terminal is busy", raised.exception.stderr)
         self.assertNotIn("Unexpected close of busy tab", raised.exception.stderr)
+
+    async def test_shared_scripting_surface_or_unknown_binding_never_closes(self):
+        for mode in (
+            "shared_surface",
+            "missing_bounds",
+            "invalid_bounds",
+            "bounds_changed",
+            "duplicate_tty",
+        ):
+            with self.subTest(mode=mode):
+                with self.assertRaises(subprocess.CalledProcessError) as raised:
+                    await self.close(mode)
+                expected = {
+                    "shared_surface": "shared or ambiguous Terminal surface",
+                    "missing_bounds": "Close surface bounds are unavailable",
+                    "invalid_bounds": "Close surface bounds are unavailable",
+                    "bounds_changed": "Close target bounds changed",
+                    "duplicate_tty": "Close target TTY binding changed",
+                }
+                self.assertIn(expected[mode], raised.exception.stderr)
+                self.assertNotIn("Unexpected close of unconfirmed surface", raised.exception.stderr)
+
+    async def test_negative_monitor_coordinates_preserve_valid_standalone_close(self):
+        result = await self.close("negative_origin")
+        self.assertIs(result["closed"], True)
+        self.assertEqual(result["remaining"], 1)

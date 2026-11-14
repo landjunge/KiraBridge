@@ -125,7 +125,29 @@ async def test_persistent_worker_serializes_and_binds_authenticated_owner(monkey
     assert child.killed and child.stdin.closed
 
 
-async def test_keyboard_inspection_renews_only_exhausted_owned_worker(monkeypatch):
+async def test_async_terminal_prereturn_guard_finishes_under_transport_lock_before_send(
+    monkeypatch,
+):
+    worker, child, _ = transport(monkeypatch)
+    trace = []
+
+    async def guard():
+        assert worker.lock.locked() and child.requests == []
+        await asyncio.sleep(0)
+        trace.append("fresh-shell-and-screen")
+
+    try:
+        await worker.request(
+            "terminal.input.return", {}, principal="original-owner", before_send=guard
+        )
+        assert trace == ["fresh-shell-and-screen"]
+        assert child.requests[0]["principal"] == "original-owner"
+    finally:
+        await worker.close()
+
+
+@pytest.mark.parametrize("route", ["keyboard", "terminal.input"])
+async def test_keyboard_inspection_renews_only_exhausted_owned_worker(monkeypatch, route):
     worker, old, _ = transport(monkeypatch)
     renewed_generation = "ffffffff-ffff-ffff-ffff-ffffffffffff"
     renewed = Child(
@@ -150,16 +172,16 @@ async def test_keyboard_inspection_renews_only_exhausted_owned_worker(monkeypatc
     worker.generation = GENERATION
     worker._keyboard_commit_attempts = 255
     try:
-        await worker.request("keyboard.text.commit", {}, principal="alice")
+        await worker.request(route + ".text.commit", {}, principal="alice")
         assert worker._keyboard_commit_attempts == 256 and not old.killed and spawns == []
-        inspected = await worker.request("keyboard.inspect", {}, principal="alice")
+        inspected = await worker.request(route + ".inspect", {}, principal="alice")
         assert inspected["native_helper"]["pid"] == renewed.pid
         assert inspected["native_helper"]["generation"] == renewed_generation
         assert inspected["target"]["target_token"] == "c" * 32
         assert worker.process is renewed and worker._keyboard_commit_attempts == 0
         assert len(spawns) == 1
-        assert [request["operation"] for request in old.requests] == ["keyboard.text.commit"]
-        assert [request["operation"] for request in renewed.requests] == ["keyboard.inspect"]
+        assert [request["operation"] for request in old.requests] == [route + ".text.commit"]
+        assert [request["operation"] for request in renewed.requests] == [route + ".inspect"]
     finally:
         await worker.close()
     assert renewed.killed and worker._keyboard_commit_attempts == 0
@@ -172,19 +194,22 @@ async def test_other_operations_do_not_renew_exhausted_keyboard_worker(monkeypat
         worker._keyboard_commit_attempts = 256
         await worker.request("system.info", {}, principal="alice")
         await worker.request("app.focus", {}, principal="alice")
+        await worker.request("terminal.input.return", {}, principal="alice")
         assert len(calls) == 1 and worker.process is child and not child.killed
         assert worker._keyboard_commit_attempts == 256
         assert [request["operation"] for request in child.requests] == [
             "system.info",
             "system.info",
             "app.focus",
+            "terminal.input.return",
         ]
     finally:
         await worker.close()
     assert worker._keyboard_commit_attempts == 0
 
 
-async def test_denied_keyboard_commit_does_not_consume_worker_budget(monkeypatch):
+@pytest.mark.parametrize("route", ["keyboard", "terminal.input"])
+async def test_denied_keyboard_commit_does_not_consume_worker_budget(monkeypatch, route):
     worker, child, calls = transport(monkeypatch)
 
     def denied():
@@ -192,10 +217,52 @@ async def test_denied_keyboard_commit_does_not_consume_worker_budget(monkeypatch
 
     try:
         with pytest.raises(BridgeError) as error:
-            await worker.request("keyboard.text.commit", {}, principal="alice", before_send=denied)
+            await worker.request(route + ".text.commit", {}, principal="alice", before_send=denied)
         assert error.value.code == "permission_denied"
         assert worker._keyboard_commit_attempts == 0
         assert child.requests == [] and not child.killed and len(calls) == 1
+    finally:
+        await worker.close()
+
+
+async def test_queued_stage_cleanup_never_starts_or_writes_after_worker_replacement(monkeypatch):
+    worker, old, _ = transport(monkeypatch, timeout=1)
+    worker.process, worker.active_contract, worker.generation = old, dict(CONTRACT), GENERATION
+    worker._keyboard_commit_attempts = 256
+    entered, release = asyncio.Event(), asyncio.Event()
+    replacement = Child(response)
+    replacement.pid = old.pid + 1
+    replacement.foreign_stage = object()
+    foreign_stage = replacement.foreign_stage
+    starts = []
+
+    async def spawn(*_args, **_kwargs):
+        starts.append("read-renewal")
+        entered.set()
+        await release.wait()
+        return replacement
+
+    worker.factory = spawn
+    reader = asyncio.create_task(worker.request("keyboard.inspect", {}, principal="other-owner"))
+    await entered.wait()  # Read owns the transport lock and has discarded the old worker.
+    cleanup = asyncio.create_task(
+        worker.request(
+            "terminal.input.text.abort",
+            {"transfer_id": "a" * 64},
+            principal="original-owner",
+            _existing_process=old,
+        )
+    )
+    await asyncio.sleep(0)
+    release.set()
+    try:
+        await reader
+        with pytest.raises(BridgeError) as error:
+            await cleanup
+        assert error.value.code == "system_stage_worker_changed"
+        assert starts == ["read-renewal"]  # Cleanup adds no start.
+        assert [r["operation"] for r in replacement.requests] == ["keyboard.inspect"]
+        assert old.requests == [] and replacement.foreign_stage is foreign_stage
     finally:
         await worker.close()
 

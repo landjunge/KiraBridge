@@ -7,7 +7,7 @@ import re
 import shlex
 import sys
 import time
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from pathlib import Path
@@ -114,6 +114,7 @@ class SessionManager:
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
         self.readiness = ports.readiness
         self.lock = asyncio.Lock()
+        self.native_input = None
         self._selection = ContextVar("kirabridge_visible_selection", default=None)
         self._observation = ContextVar("kirabridge_terminal_observation", default=None)
         self.terminal_app = (
@@ -124,6 +125,19 @@ class SessionManager:
         )
         self.linux = linux if linux is not None else LinuxOwnedTerminal()
         self.desktop = self.terminal_app.desktop
+
+    @asynccontextmanager
+    async def _submission_turn(self, native):
+        if native:
+            if self.native_input is None:
+                raise BridgeError(
+                    "terminal_authority_required", "Native terminal adapter unavailable"
+                )
+            async with self.native_input.desktop_input.transaction() as turn:
+                yield turn
+        else:
+            async with self.lock:
+                yield None
 
     def direct(self, principal):
         return (
@@ -621,7 +635,13 @@ class SessionManager:
         self.authorization.principal(principal, "terminal.execute")
         if "\x00" in args.text:
             raise BridgeError("invalid_arguments", "NUL in input")
-        async with self.lock:
+        if args.pane_id.startswith("terminal:") and args.submit:
+            from kirabridge.terminal_input import terminal_literal
+
+            terminal_literal(args.text)
+        async with self._submission_turn(
+            args.pane_id.startswith("terminal:") and args.submit
+        ) as turn:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
             # Recognition, exact assignment and central handoff are mandatory for
             # every CLI tab, including an unbound idle-looking tab. A raw shortcut
@@ -651,10 +671,20 @@ class SessionManager:
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
                 )
-            elif self.direct(principal):
-                identity = await self.terminal_app.process_identity(selected["expected_pid"])
+            elif args.pane_id.startswith("terminal:"):
+                identity = await self.terminal_app.process_identity(
+                    selected["expected_pid"], detailed=True
+                )
+                cwd = await self.terminal_app.process_working_directory(
+                    selected["expected_pid"], expected_identity=identity
+                )
                 await self.terminal_app.send_confirmed(
-                    selected, args.text, identity, before_transport=before_transport
+                    selected,
+                    args.text,
+                    identity,
+                    before_transport=before_transport,
+                    expected_cwd=cwd,
+                    input_context=self.native_input.bind_stored(principal, task_id, turn),
                 )
             else:
                 identities = None
@@ -733,40 +763,49 @@ class SessionManager:
         )
 
     async def focus(self, principal, pane_id, expected_pid):
-        self.authorization.principal(principal, "session.input")
-        selected = await self.selected(principal, pane_id, expected_pid)
-        if not pane_id.startswith("terminal:"):
-            raise BridgeError("visible_terminal_required", "Focus requires a Terminal.app tab")
-        before = await self.terminal_app.front_tab()
-        await self.terminal_app.focus(pane_id)
-        after = await self.terminal_app.front_tab()
-        return {
-            "pane_id": pane_id,
-            "expected_pid": expected_pid,
-            "visual_window_id": selected.get("visual_window_id"),
-            "tab_index": selected.get("tab_index"),
-            "before": before,
-            "after": after,
-            "focused": after.get("tty") == selected.get("tty")
-            and after.get("window_id") == selected.get("window_id"),
-        }
+        async with self.lock:
+            self.authorization.principal(principal, "session.input")
+            selected = await self.selected(principal, pane_id, expected_pid)
+            if not pane_id.startswith("terminal:"):
+                raise BridgeError("visible_terminal_required", "Focus requires a Terminal.app tab")
+            before = await self.terminal_app.front_tab()
+            await self.terminal_app.focus(pane_id)
+            after = await self.terminal_app.front_tab()
+            return {
+                "pane_id": pane_id,
+                "expected_pid": expected_pid,
+                "visual_window_id": selected.get("visual_window_id"),
+                "tab_index": selected.get("tab_index"),
+                "before": before,
+                "after": after,
+                "focused": after.get("tty") == selected.get("tty")
+                and after.get("window_id") == selected.get("window_id"),
+            }
 
     async def close_tab(self, principal, pane_id, expected_pid):
-        self.authorization.principal(principal, "session.input")
-        selected = await self.selected(principal, pane_id, expected_pid)
-        if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
-            raise BridgeError(
-                "terminal_window_required", "Refusing to close the only visible terminal"
-            )
-        if not pane_id.startswith("terminal:"):
-            raise BridgeError("visible_terminal_required", "Close requires a Terminal.app tab")
-        result = await self.terminal_app.close_tab(pane_id)
-        return {
-            "pane_id": pane_id,
-            "expected_pid": expected_pid,
-            "closed": bool(result.get("closed")),
-            "remaining": result.get("remaining"),
-        }
+        async with self.lock:
+            self.authorization.principal(principal, "session.input")
+            selected = await self.selected(principal, pane_id, expected_pid)
+            from kirabridge.terminal_input import terminal_target_supported
+
+            if not terminal_target_supported(selected):
+                raise BridgeError(
+                    "terminal_window_unsupported",
+                    "Close requires an unambiguous physical single-tab terminal",
+                )
+            if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
+                raise BridgeError(
+                    "terminal_window_required", "Refusing to close the only visible terminal"
+                )
+            if not pane_id.startswith("terminal:"):
+                raise BridgeError("visible_terminal_required", "Close requires a Terminal.app tab")
+            result = await self.terminal_app.close_tab(pane_id)
+            return {
+                "pane_id": pane_id,
+                "expected_pid": expected_pid,
+                "closed": bool(result.get("closed")),
+                "remaining": result.get("remaining"),
+            }
 
     def assigned_agent(self, selected):
         """Recognized CLI input always needs the persistent original binding."""
@@ -915,7 +954,35 @@ class SessionManager:
             await asyncio.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
         return None, None
 
-    async def open(self, principal, args, *, task_id=None, on_created=None):
+    @timed_async("terminal_window_settle_readonly")
+    async def _settle_opened(self, principal, opened, *, inspect_sessions):
+        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+        async with asyncio.timeout(TerminalAppTransport.READ_SCRIPT_TIMEOUT):
+            for _ in range(20):
+                sessions = await self.terminal_app.catalog()
+                matches = [s for s in sessions if s["tty"] == opened["tty"]]
+                if len(matches) > 1 or any(s.get("identity_ambiguous") for s in matches):
+                    raise BridgeError(
+                        "visible_target_ambiguous", "New terminal TTY has several live views"
+                    )
+                selected = matches[0] if matches else None
+                if selected and not selected.get("busy", True):
+                    if inspect_sessions:
+                        view = await self.read(
+                            principal, selected["pane_id"], selected["expected_pid"]
+                        )
+                    else:
+                        await self.terminal_app.verify_opened(opened, principal=principal)
+                        view = {"text": await self.terminal_app.read(selected["pane_id"])}
+                    if empty_shell_prompt(view["text"]):
+                        return selected
+                await asyncio.sleep(0.1)
+        raise UncertainExecution("session_open_pending", "Created shell did not become ready")
+
+    async def open(self, principal, args, *, task_id=None, on_created=None, on_bound=None):
+        # Core entry points supply the durable full-binding recorder. The internal
+        # transport/testing seam without it does not claim persisted readback.
         policy = self.authorization.principal(principal, "session.open")
         self.authorization.principal(principal, "terminal.execute")
         self.authorization.validate_window(principal, task_id, args)
@@ -945,159 +1012,228 @@ class SessionManager:
                 + shlex.quote("KiraBridge visible %% ")
                 + " /bin/zsh -f"
             )
-        async with self.lock:
+        elif argv:
+            command += " && " + shlex.join(argv)
+        if sys.platform == "darwin":
+            from kirabridge.terminal_input import terminal_literal
+
+            terminal_literal(command)
+
+        def revalidate_open_origin():
+            current_policy = self.authorization.principal(principal, "session.open")
+            self.authorization.principal(principal, "terminal.execute")
+            PathScope(current_policy.terminal_roots or current_policy.roots).split(cwd)
+            if (
+                args.argv
+                and check_executable(
+                    args.argv[0],
+                    current_policy.executables,
+                    current_policy.allow_any_executable,
+                    self.environment["PATH"],
+                )
+                != argv[0]
+            ):
+                raise BridgeError("visible_target_changed", "Original session executable changed")
+
+        # This object belongs only to this call; no reusable/global proof cache.
+        # Preparation performs reads only. Hidden-app activation stays in open().
+        prepared = None
+        prepare = getattr(self.terminal_app, "prepare_open", None)
+        if sys.platform == "darwin" and prepare is not None:
+            async with asyncio.timeout(TerminalAppTransport.READ_SCRIPT_TIMEOUT):
+                prepared = await prepare(principal=principal)
+
+        created_receipt = None
+        result = None
+
+        async def created(receipt):
+            nonlocal created_receipt
+            created_receipt = deepcopy(receipt)
+            if on_created is not None:
+                await on_created(receipt)
+
+        async with AsyncExitStack() as submission:
+            turn = await submission.enter_async_context(
+                self._submission_turn(sys.platform == "darwin")
+            )
             self.authorization.check_window(principal, task_id, args)
             if sys.platform.startswith("linux"):
                 return await self._open_owned_linux(principal, task_id, cwd, argv)
             try:
-                result = await self.terminal_app.open(
-                    command, on_created=on_created, principal=principal
-                )
-            except BaseException:
+                if turn is not None:
+                    self.native_input.bind_stored(
+                        principal,
+                        task_id,
+                        turn,
+                        opening=True,
+                        inspect_sessions=bool(argv),
+                        origin_guard=revalidate_open_origin,
+                    )
+                    turn.mark_attempted()
+                options = {"on_created": created, "principal": principal}
+                if prepared is not None:
+                    options["prepared"] = prepared
+                result = await self.terminal_app.open("", **options)
+                if on_bound is not None:
+                    await on_bound(result)
+                # Creation, optional isolation and the durable full binding are
+                # complete. This lease is never renewed to accommodate text.
+                await submission.aclose()
+            except BaseException as cause:
                 self.authorization.window_outcome(principal, task_id, "unknown")
+                if created_receipt is not None or result is not None:
+                    error = UncertainExecution(
+                        getattr(cause, "code", "session_open_unknown"),
+                        "Window creation/binding unconfirmed; never reopen or resend",
+                    )
+                    error.provider_error = {
+                        "creation_receipt": result or created_receipt,
+                        "automatic_retry": False,
+                        "phase": "full_binding" if result is not None else "creation",
+                        "exception_type": type(cause).__name__,
+                        "start_evidence": getattr(cause, "provider_error", None),
+                    }
+                    raise error from cause
                 raise
             self.authorization.window_outcome(principal, task_id, "opened")
             try:
-                for _ in range(20):
-                    sessions = await self.terminal_app.catalog()
-                    matches = [s for s in sessions if s["tty"] == result["tty"]]
-                    if len(matches) > 1 or any(s.get("identity_ambiguous") for s in matches):
-                        raise BridgeError(
-                            "visible_target_ambiguous",
-                            "New terminal TTY has several live views; select an unambiguous view",
-                        )
-                    selected = matches[0] if matches else None
-                    if selected:
-                        if argv:
-                            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
-
-                            if selected.get("busy", True):
-                                await asyncio.sleep(0.1)
-                                continue
-                            view = await self.read(
-                                principal, selected["pane_id"], selected["expected_pid"]
-                            )
-                            if not empty_shell_prompt(view["text"]):
-                                await asyncio.sleep(0.1)
-                                continue
-                            identity = await self.terminal_app.process_identity(
-                                selected["expected_pid"], detailed=True
-                            )
-                            actual_cwd = await self.terminal_app.process_working_directory(
-                                selected["expected_pid"], expected_identity=identity
-                            )
-                            if actual_cwd != cwd:
-                                await asyncio.sleep(0.1)
-                                continue
-                            await self.terminal_app.send_confirmed(
-                                selected,
-                                shlex.join(argv),
-                                identity,
-                                expected_cwd=cwd,
-                                before_transport=lambda: self.terminal_app.verify_opened(
-                                    result, principal=principal
-                                ),
-                            )
-                            command_submitted = bool(argv)
-                            launch_deadline = time.monotonic() + 15
-                        opened_session = {
-                            **selected,
-                            "opened": True,
-                            "agent_processed": False,
-                            "creation_receipt": result,
-                            "separate_window": result.get("separate_window", False),
-                            "lifecycle": {
-                                "window": "confirmed",
-                                "command": "submitted" if argv else "not_requested",
-                                "agent_process": "not_applicable",
-                                "input_readiness": "not_applicable",
-                                "binding": "not_applicable",
-                            },
-                        }
-                        if launched_agent:
-                            started, process = await self._confirm_started_agent(
-                                result["tty"],
-                                launched_agent,
-                                selected["pane_id"],
-                                selected["expected_pid"],
-                                {
-                                    item.get("pid")
-                                    for item in selected.get("processes", [])
-                                    if type(item.get("pid")) is int
-                                },
-                                launch_deadline,
-                            )
-                            if started is None:
-                                error = UncertainExecution(
-                                    "session_open_pending",
-                                    "CLI command was submitted, but its process is not yet "
-                                    "confirmed; never resend",
-                                )
-                                error.provider_error = {
-                                    "creation_receipt": result,
-                                    "command_submitted": True,
-                                    "agent_process": "unknown",
-                                    "automatic_retry": False,
-                                }
-                                raise error
-                            binding_state = "unbound"
-                            if self.ports.agent_started:
-                                bound = await self.ports.agent_started(
-                                    principal, launched_agent, started
-                                )
-                                binding_state = bound.get("state", "unknown")
-                            readiness_state = "unknown"
-                            if self.readiness and binding_state in {"bound", "unchanged"}:
-                                ready_deadline = time.monotonic() + 30
-                                while time.monotonic() < ready_deadline:
-                                    try:
-                                        observed = await asyncio.wait_for(
-                                            self.read_observed(
-                                                principal,
-                                                started["pane_id"],
-                                                started["expected_pid"],
-                                            ),
-                                            timeout=max(0.001, ready_deadline - time.monotonic()),
-                                        )
-                                    except TimeoutError:
-                                        break
-                                    readiness = observed.get("input_readiness") or {}
-                                    readiness_state = (
-                                        "ready"
-                                        if readiness.get("ready")
-                                        else readiness.get("state", "unknown")
-                                    )
-                                    if readiness.get("ready") or readiness_state in {
-                                        "target_changed",
-                                        "binding_missing",
-                                    }:
-                                        break
-                                    await asyncio.sleep(
-                                        min(0.25, max(0, ready_deadline - time.monotonic()))
-                                    )
-                            opened_session = {
-                                **started,
-                                "opened": True,
-                                "agent_processed": False,
-                                "creation_receipt": result,
-                                "separate_window": result.get("separate_window", False),
-                                "lifecycle": {
-                                    "window": "confirmed",
-                                    "command": "submitted",
-                                    "agent_process": "started",
-                                    "agent_pid": process["pid"],
-                                    "binding": binding_state,
-                                    "input_readiness": readiness_state,
-                                },
-                            }
-                        return opened_session
-                    await asyncio.sleep(0.05)
-                if argv:
-                    raise UncertainExecution(
-                        "session_open_pending", "Window opened; argv was not dispatched"
+                selected = await self._settle_opened(principal, result, inspect_sessions=bool(argv))
+                turn = await submission.enter_async_context(
+                    self._submission_turn(sys.platform == "darwin")
+                )
+                # Same persisted original task, a genuinely new turn. Revalidate
+                # before any text/focus effect, never reuse the creation authority.
+                self.native_input.bind_stored(
+                    principal,
+                    task_id,
+                    turn,
+                    opening=True,
+                    inspect_sessions=bool(argv),
+                    origin_guard=revalidate_open_origin,
+                )
+                if command:
+                    identity = await self.terminal_app.process_identity(
+                        selected["expected_pid"], detailed=True
                     )
-                return {**result, "session_handle_pending": True, "agent_processed": False}
-            except Exception as cause:
+                    actual_cwd = await self.terminal_app.process_working_directory(
+                        selected["expected_pid"], expected_identity=identity
+                    )
+                    await self.terminal_app.send_confirmed(
+                        selected,
+                        command,
+                        identity,
+                        expected_cwd=actual_cwd,
+                        input_context=self.native_input.bind_stored(
+                            principal,
+                            task_id,
+                            turn,
+                            opening=True,
+                            inspect_sessions=bool(argv),
+                            origin_guard=revalidate_open_origin,
+                        ),
+                        before_transport=lambda: self.terminal_app.verify_opened(
+                            result, principal=principal
+                        ),
+                    )
+                    command_submitted = bool(argv)
+                    launch_deadline = time.monotonic() + 15
+                opened_session = {
+                    **selected,
+                    "opened": True,
+                    "agent_processed": False,
+                    "creation_receipt": result,
+                    "separate_window": result.get("separate_window", False),
+                    "lifecycle": {
+                        "window": "confirmed",
+                        "command": "submitted" if argv else "not_requested",
+                        "agent_process": "not_applicable",
+                        "input_readiness": "not_applicable",
+                        "binding": "not_applicable",
+                    },
+                }
+                # The single text/Return turn ends here. Agent startup/readiness
+                # observation retains its existing longer deadline without
+                # holding or renewing a desktop input lease.
+                await submission.aclose()
+                if launched_agent:
+                    started, process = await self._confirm_started_agent(
+                        result["tty"],
+                        launched_agent,
+                        selected["pane_id"],
+                        selected["expected_pid"],
+                        {
+                            item.get("pid")
+                            for item in selected.get("processes", [])
+                            if type(item.get("pid")) is int
+                        },
+                        launch_deadline,
+                    )
+                    if started is None:
+                        error = UncertainExecution(
+                            "session_open_pending",
+                            "CLI command was submitted, but its process is not yet "
+                            "confirmed; never resend",
+                        )
+                        error.provider_error = {
+                            "creation_receipt": result,
+                            "command_submitted": True,
+                            "agent_process": "unknown",
+                            "automatic_retry": False,
+                        }
+                        raise error
+                    binding_state = "unbound"
+                    if self.ports.agent_started:
+                        bound = await self.ports.agent_started(principal, launched_agent, started)
+                        binding_state = bound.get("state", "unknown")
+                    readiness_state = "unknown"
+                    if self.readiness and binding_state in {"bound", "unchanged"}:
+                        ready_deadline = time.monotonic() + 30
+                        while time.monotonic() < ready_deadline:
+                            try:
+                                observed = await asyncio.wait_for(
+                                    self.read_observed(
+                                        principal,
+                                        started["pane_id"],
+                                        started["expected_pid"],
+                                    ),
+                                    timeout=max(0.001, ready_deadline - time.monotonic()),
+                                )
+                            except TimeoutError:
+                                break
+                            readiness = observed.get("input_readiness") or {}
+                            readiness_state = (
+                                "ready"
+                                if readiness.get("ready")
+                                else readiness.get("state", "unknown")
+                            )
+                            if readiness.get("ready") or readiness_state in {
+                                "target_changed",
+                                "binding_missing",
+                            }:
+                                break
+                            await asyncio.sleep(
+                                min(0.25, max(0, ready_deadline - time.monotonic()))
+                            )
+                    opened_session = {
+                        **started,
+                        "opened": True,
+                        "agent_processed": False,
+                        "creation_receipt": result,
+                        "separate_window": result.get("separate_window", False),
+                        "lifecycle": {
+                            "window": "confirmed",
+                            "command": "submitted",
+                            "agent_process": "started",
+                            "agent_pid": process["pid"],
+                            "binding": binding_state,
+                            "input_readiness": readiness_state,
+                        },
+                    }
+                return opened_session
+            except BaseException as cause:
+                # The window already exists, including when cancellation occurs
+                # during read-only settling or while waiting for the text turn.
+                self.authorization.window_outcome(principal, task_id, "unknown")
                 error = UncertainExecution(
                     getattr(cause, "code", "session_open_unknown"),
                     "Window opened; later outcome unconfirmed; never reopen or resend",

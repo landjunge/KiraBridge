@@ -6,7 +6,7 @@ import time
 from copy import deepcopy
 from dataclasses import replace
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
@@ -47,6 +47,19 @@ def manager_for_open(tmp_path, rows):
         visible_required=lambda _: True,
     )
     manager = SessionManager(ports, terminal_app=native)
+    from kirabridge.desktop_input import DesktopInput
+
+    desktop = DesktopInput(manager.lock)
+
+    def bind(principal, task_id, turn, **options):
+        desktop.require_turn(turn)
+        assert principal == "chatgpt" and task_id and options["opening"] is True
+        options["origin_guard"]()
+        return SimpleNamespace(owner={"task_id": task_id, "principal": principal})
+
+    # Manager ordering/ambiguity fixture only; actual authority is tested with
+    # persisted tasks and the real adapter in the separate authority tests.
+    manager.native_input = SimpleNamespace(desktop_input=desktop, bind_stored=bind)
     manager.read = AsyncMock(return_value={"text": "KiraBridge visible % "})
     return manager, native, authorization
 
@@ -84,7 +97,10 @@ async def test_new_window_cannot_adopt_ambiguous_tty_view(
     native.send_confirmed.assert_not_awaited()
     native.process_identity.assert_not_awaited()
     manager.read.assert_not_awaited()
-    authorization.window_outcome.assert_called_once_with("chatgpt", "new-window", "opened")
+    assert authorization.window_outcome.call_args_list == [
+        call("chatgpt", "new-window", "opened"),
+        call("chatgpt", "new-window", "unknown"),
+    ]
 
 
 async def test_unique_new_window_keeps_exact_handle_and_command(tmp_path, native_session_platform):
@@ -115,7 +131,13 @@ async def test_interactive_agent_start_reports_bound_process_lifecycle(
     native.catalog = AsyncMock(side_effect=[[shell], [agent]])
     native.read = AsyncMock(return_value={"text": "Codex composer"})
     profile = SimpleNamespace(executable=sys.executable)
-    binding = AsyncMock(return_value={"state": "bound"})
+
+    async def bind_started(*_):
+        # Longer agent lifecycle observation is outside the completed desktop turn.
+        assert not manager.lock.locked()
+        return {"state": "bound"}
+
+    binding = AsyncMock(side_effect=bind_started)
     manager.ports = replace(
         manager.ports,
         agent_registry=lambda: ({"codex": profile}, {}),

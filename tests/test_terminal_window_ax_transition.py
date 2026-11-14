@@ -48,12 +48,12 @@ async def test_detached_wrapper_requires_retained_own_native_identity(
     leaf.system_transport.request = replaced_wrapper
     if hidden and not same_cg:
         with pytest.raises(UncertainExecution) as failure:
-            await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+            await leaf.open("", on_created=created, principal="chatgpt")
         assert failure.value.provider_error["cause_message"] == (
             "Detached own native identity is unconfirmed"
         )
     else:
-        result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        result = await leaf.open("", on_created=created, principal="chatgpt")
         proof = result["physical_window"]
         assert proof["ax_window_token"] == own_new_token
         assert proof["own_identity_basis"] == ("same_cg_window" if same_cg else "same_selected_tab")

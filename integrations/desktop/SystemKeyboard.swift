@@ -1016,14 +1016,16 @@ enum SystemKeyboard {
         let id: String, principal: String, taskID: String, digest: String, epoch: String
         let target: [String: Any]
         let submit: Bool
+        let terminal: Bool
         let byteCount: Int, unitCount: Int, chunkCount: Int, expires: Double
         var units: [UniChar] = []
         var nextIndex = 0
         init(id: String, principal: String, task: String, digest: String, target: [String: Any],
-             submit: Bool, bytes: Int, units: Int, chunks: Int, now: Double) {
+             submit: Bool, bytes: Int, units: Int, chunks: Int, now: Double, terminal: Bool = false) {
             self.id = id; self.principal = principal; taskID = task; self.digest = digest; self.target = target
             byteCount = bytes; unitCount = units; chunkCount = chunks; expires = now + 60
             self.submit = submit
+            self.terminal = terminal
             epoch = SystemBridgeRuntime.generation
             self.units.reserveCapacity(units)
         }
@@ -1046,9 +1048,11 @@ enum SystemKeyboard {
     static func purgeTransfer(_ now: Double) {
         if let current = transfer, now >= current.expires { transfer = nil }
     }
-    static func beginTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime) throws -> [String: Any] {
+    static func beginTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime,
+                              terminal: Bool = false) throws -> [String: Any] {
         purgeTransfer(now)
-        let fields: Set<String> = ["task_id", "principal", "target", "submit", "utf8_bytes", "utf16_units", "sha256", "chunk_count", "encoding"]
+        var fields: Set<String> = ["task_id", "principal", "target", "submit", "utf8_bytes", "utf16_units", "sha256", "chunk_count", "encoding"]
+        if terminal { fields.formUnion(["route", "owner", "terminal"]) }
         try require(Set(args.keys) == fields.union(["transfer_id", "binding_json"]), "Text staging manifest fields differ")
         guard let id = args["transfer_id"] as? String, stageHex(id, length: 64),
               let raw = args["binding_json"] as? String, raw.utf8.count <= 8192,
@@ -1079,22 +1083,25 @@ enum SystemKeyboard {
                     "Text staging manifest exceeds the bounded quota")
         try require(transfer == nil && !consumedTransfers.contains(id) && consumedTransfers.count < 256,
                     "Text staging is occupied, consumed or its epoch budget is exhausted")
+        if terminal { try terminalManifest(args) }
         transfer = TextTransfer(id: id, principal: principal, task: task, digest: digest, target: target,
-                                submit: submit.boolValue, bytes: bytes, units: units, chunks: count, now: now)
+                                submit: submit.boolValue, bytes: bytes, units: units, chunks: count, now: now,
+                                terminal: terminal)
         return ["transfer_id": id, "state": "accepted", "input_attempted": false]
     }
-    static func ownedTransfer(_ args: [String: Any], now: Double) throws -> TextTransfer {
+    static func ownedTransfer(_ args: [String: Any], now: Double, terminal: Bool = false) throws -> TextTransfer {
         purgeTransfer(now)
         guard let current = transfer, args["transfer_id"] as? String == current.id,
               current.principal.utf8.elementsEqual(SystemBridgeRuntime.principal.utf8),
-              current.epoch == SystemBridgeRuntime.generation else {
+              current.epoch == SystemBridgeRuntime.generation, current.terminal == terminal else {
             throw SystemControl.failure("keyboard_staging_invalid", "Text staging is absent, expired, consumed or foreign")
         }
         return current
     }
-    static func chunkTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime) throws -> [String: Any] {
+    static func chunkTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime,
+                              terminal: Bool = false) throws -> [String: Any] {
         try require(Set(args.keys) == Set(["transfer_id", "index", "data_b64"]), "Text staging chunk fields differ")
-        let current = try ownedTransfer(args, now: now)
+        let current = try ownedTransfer(args, now: now, terminal: terminal)
         let index = try stageInteger(args, "index", max: current.chunkCount - 1)
         guard index == current.nextIndex, let encoded = args["data_b64"] as? String, encoded.utf8.count <= 43692,
               let data = Data(base64Encoded: encoded), data.base64EncodedString() == encoded,
@@ -1110,9 +1117,10 @@ enum SystemKeyboard {
                 "received_utf16_units": current.units.count, "input_attempted": false]
     }
     static func commitTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime,
+                               terminal: Bool = false,
                                writer: ([String: Any]) async throws -> [String: Any]) async throws -> [String: Any] {
         try require(Set(args.keys) == Set(["transfer_id"]), "Text commit fields differ")
-        let current = try ownedTransfer(args, now: now)
+        let current = try ownedTransfer(args, now: now, terminal: terminal)
         transfer = nil; consumedTransfers.insert(current.id) // Before validation/writer/any possible input.
         let text = String(decoding: current.units, as: UTF16.self)
         try require(current.nextIndex == current.chunkCount && current.units.count == current.unitCount
@@ -1123,14 +1131,26 @@ enum SystemKeyboard {
         result["transfer_id"] = current.id; result["task_id"] = current.taskID; result["staging_verified"] = true
         return result
     }
-    static func abortTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime) throws -> [String: Any] {
+    static func abortTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime,
+                              terminal: Bool = false) throws -> [String: Any] {
         try require(Set(args.keys) == Set(["transfer_id"]), "Text abort fields differ")
-        let current = try ownedTransfer(args, now: now)
+        let current = try ownedTransfer(args, now: now, terminal: terminal)
         transfer = nil
+        if terminal { terminalBinding = nil }
         return ["transfer_id": current.id, "state": "aborted", "input_attempted": false]
     }
     static func handle(_ operation: String, arguments: [String: Any]) async throws -> [String: Any]? {
         switch operation {
+        case "terminal.input.inspect": return try inspectTerminal(arguments)
+        case "terminal.input.text.begin": return try beginTransfer(arguments, terminal: true)
+        case "terminal.input.text.chunk": return try chunkTransfer(arguments, terminal: true)
+        case "terminal.input.text.commit":
+            return try await commitTransfer(arguments, terminal: true, writer: {
+                var bound = $0; bound["transfer_id"] = arguments["transfer_id"]
+                return try await terminalText(bound)
+            })
+        case "terminal.input.text.abort": return try abortTransfer(arguments, terminal: true)
+        case "terminal.input.return": return try terminalReturn(arguments)
         case "keyboard.inspect": return try snapshot(arguments).response
         case "keyboard.key": return try key(arguments)
         case "keyboard.chord": return try key(arguments, chord: true)
@@ -1142,5 +1162,407 @@ enum SystemKeyboard {
         case "keyboard.text.abort": return try abortTransfer(arguments)
         default: return try SystemShortcuts.handle(operation, arguments: arguments)
         }
+    }
+}
+
+/// Private subroute of an already authorized terminal task. It is deliberately
+/// absent from the public keyboard models: a terminal is not an editable AX field.
+@MainActor
+extension SystemKeyboard {
+    final class TerminalCommit {
+        let owner: [String: Any], target: [String: Any], transferID: String, expected: TextState
+        var consumed = false
+        init(owner: [String: Any], target: [String: Any], transferID: String, expected: TextState) {
+            self.owner = owner; self.target = target; self.transferID = transferID; self.expected = expected
+        }
+    }
+    final class TerminalBinding {
+        let owner: [String: Any], terminal: [String: Any], initial: Snapshot
+        let shellRows: [SystemServices.Record], expires: Double
+        var commit: TerminalCommit?
+        init(owner: [String: Any], terminal: [String: Any], initial: Snapshot,
+             shells: [SystemServices.Record], now: Double) {
+            self.owner = owner; self.terminal = terminal; self.initial = initial; shellRows = shells
+            expires = now + 60
+        }
+        var target: [String: Any] { initial.response["target"] as! [String: Any] }
+    }
+    static var terminalBinding: TerminalBinding?
+    static let terminalOwnerFields: Set<String> = ["task_id", "principal", "operation", "request_sha256"]
+    static let terminalFields: Set<String> = ["cg_window_id", "tty", "shell_pid", "shell_identity_sha256", "cwd_sha256"]
+
+    static func terminalOwner(_ raw: Any?) throws -> [String: Any] {
+        guard let owner = raw as? [String: Any], Set(owner.keys) == terminalOwnerFields,
+              let task = owner["task_id"] as? String,
+              stageTextIdentifier(task),
+              let principal = owner["principal"] as? String, !principal.isEmpty,
+              principal.utf8.elementsEqual(SystemBridgeRuntime.principal.utf8),
+              let operation = owner["operation"] as? String,
+              ["terminal.visible", "terminal.execute", "admin.execute", "session.input", "session.open", "agent.execute"].contains(operation),
+              stageHex(owner["request_sha256"], length: 64) else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Original terminal task owner is invalid")
+        }
+        return owner
+    }
+    static func stageTextIdentifier(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= 128 && value.utf8.allSatisfy {
+            (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 || $0 == 95
+        }
+    }
+    static func terminalDescriptor(_ raw: Any?) throws -> [String: Any] {
+        guard let value = raw as? [String: Any], Set(value.keys) == terminalFields,
+              let tty = value["tty"] as? String,
+              tty.range(of: "\\A/dev/ttys[0-9]{1,12}\\z", options: .regularExpression) != nil,
+              stageHex(value["shell_identity_sha256"], length: 64), stageHex(value["cwd_sha256"], length: 64),
+              try stageInteger(value, "shell_pid", max: Int(Int32.max)) > 0,
+              try stageInteger(value, "cg_window_id", max: Int(UInt32.max)) > 0 else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Exact terminal/shell binding is invalid")
+        }
+        return value
+    }
+    static func terminalLiteral(_ text: String) throws {
+        try validateText(text)
+        try require(text.unicodeScalars.allSatisfy {
+            switch $0.properties.generalCategory {
+            case .control, .format, .surrogate, .lineSeparator, .paragraphSeparator: return false
+            default: return true
+            }
+        }, "Terminal text contains controls, format characters or line separators")
+    }
+    static func terminalAttribute(_ element: AXUIElement, _ name: String) throws -> CFTypeRef? {
+        try timeout(element)
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+        return try terminalAttributeResult(name, status: status, value: value)
+    }
+    static func terminalAttributeResult(_ name: String, status: AXError, value: CFTypeRef?) throws -> CFTypeRef? {
+        if status == .success, let value { return value }
+        if status == .attributeUnsupported && value == nil
+            && [kAXSubroleAttribute, kAXEnabledAttribute, "AXProtectedContent"].contains(name) { return nil }
+        throw SystemControl.failure("keyboard_unsupported", "Exact terminal AX observation failed")
+    }
+    static func terminalField(read: (String) throws -> CFTypeRef?) throws -> Field {
+        let role = try read(kAXRoleAttribute), focused = try read(kAXFocusedAttribute), protected = try read("AXProtectedContent")
+        try require(role as? String == "AXTextArea"
+                    && (focused as? NSNumber)?.boolValue == true
+                    && (protected == nil || (protected as? NSNumber)?.boolValue == false),
+                    "Terminal focus is not a positively focused unprotected AXTextArea")
+        let subrole = try read(kAXSubroleAttribute), enabled = try read(kAXEnabledAttribute)
+        try require((subrole == nil || (subrole as? String) == "")
+                    && (enabled == nil || (enabled as? NSNumber)?.boolValue == true),
+                    "Terminal text role or enabled state changed")
+        guard let count = try read(kAXNumberOfCharactersAttribute) as? NSNumber,
+              CFGetTypeID(count) != CFBooleanGetTypeID(), count.doubleValue.isFinite,
+              count.doubleValue == Double(count.intValue), count.intValue > 0, count.intValue <= maxValueBytes / 2,
+              let value = try read(kAXValueAttribute) as? String, value.utf8.count <= maxValueBytes,
+              value.utf16.count == count.intValue,
+              let raw = try read(kAXSelectedTextRangeAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else {
+            throw SystemControl.failure("keyboard_unsupported", "Bounded terminal value/caret is unavailable")
+        }
+        var selection = CFRange()
+        let wrapped = unsafeBitCast(raw, to: AXValue.self)
+        try require(AXValueGetType(wrapped) == .cfRange && AXValueGetValue(wrapped, .cfRange, &selection)
+                    && selection.length == 0, "Terminal selection is not an empty UTF-16 caret")
+        let metadata: [String: Any] = ["scope": "terminal_shell", "role": "AXTextArea",
+            "focused": true, "enabled": enabled ?? NSNull(), "subrole": subrole ?? NSNull(),
+            "classification_source": "bound_system_terminal", "text_supported": true,
+            "value_utf8_bytes": value.utf8.count, "value_utf16_units": value.utf16.count,
+            "value_sha256": SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined(),
+            "selection_utf16": ["location": selection.location, "length": selection.length]]
+        let field = Field(value: value, selection: selection, metadata: metadata)
+        _ = try expectedText(field, inserting: []) // Bounds and surrogate boundaries, with no normalization.
+        return field
+    }
+    static func terminalApp(_ args: [String: Any]) throws -> NSRunningApplication {
+        // The generic mutating target correctly rejects terminals. This private
+        // route retains PID/start checks and independently proves the system app.
+        let app = try SystemControl.target(args)
+        let path = "/System/Applications/Utilities/Terminal.app"
+        try require(app.bundleIdentifier == "com.apple.Terminal"
+                    && app.bundleURL?.path == path
+                    && app.bundleURL?.resolvingSymlinksInPath().path == path
+                    && SystemServices.codeExecutablePath(app.processIdentifier) == path + "/Contents/MacOS/Terminal",
+                    "Terminal input requires the exact system Terminal application")
+        let process = try SystemServices.kernelRecord(app.processIdentifier)
+        try require(process.uid == getuid() && process.realUID == getuid() && process.savedUID == getuid(),
+                    "Terminal application is not owned by this user")
+        return app
+    }
+    static func terminalShells(_ descriptor: [String: Any]) throws -> [SystemServices.Record] {
+        let tty = descriptor["tty"] as! String
+        var info = stat()
+        try require(lstat(tty, &info) == 0 && info.st_mode & S_IFMT == S_IFCHR && info.st_uid == getuid(),
+                    "Owned terminal device is unavailable")
+        let records = try terminalCensusRecords(SystemServices.kernelSnapshot())
+        let rows = records.filter {
+            $0.tty && $0.terminalDevice == Int64(info.st_rdev)
+        }.sorted { $0.pid < $1.pid }
+        let pid = try stageInteger(descriptor, "shell_pid", max: Int(Int32.max))
+        try terminalShellRowsAllowed(rows, pid: pid, uid: getuid())
+        return rows
+    }
+    static func terminalShellRowsAllowed(_ rows: [SystemServices.Record], pid: Int, uid: uid_t) throws {
+        guard let selected = rows.first(where: { $0.pid == pid }) else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Selected shell has left its exact TTY")
+        }
+        try require(!rows.isEmpty && rows.count <= 32 && rows.allSatisfy { row in
+            let name = row.name.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+            return (row.uid == uid && row.realUID == uid && row.savedUID == uid
+                    && ["zsh", "bash", "sh"].contains(name))
+                || (row.pid == selected.parent && row.uid == 0 && (row.realUID == 0 || row.realUID == uid)
+                    && row.savedUID == 0 && name == "login")
+        }, "Selected TTY contains a foreign or non-shell process")
+    }
+    static func terminalCensusRecords(_ snapshot: SystemServices.Snapshot) throws -> [SystemServices.Record] {
+        try require(snapshot.unavailable.isEmpty && !snapshot.records.isEmpty && snapshot.records.count <= 100000,
+                    "Complete bounded terminal process census is unavailable")
+        return snapshot.records
+    }
+    static func terminalGeometry(_ window: AXUIElement) throws -> CGRect {
+        guard let position = SystemControl.attribute(window, kAXPositionAttribute),
+              let size = SystemControl.attribute(window, kAXSizeAttribute),
+              CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() else {
+            throw SystemControl.failure("keyboard_unsupported", "Terminal AX geometry is unavailable")
+        }
+        var point = CGPoint.zero, dimensions = CGSize.zero
+        try require(AXValueGetValue(unsafeBitCast(position, to: AXValue.self), .cgPoint, &point)
+                    && AXValueGetValue(unsafeBitCast(size, to: AXValue.self), .cgSize, &dimensions)
+                    && point.x.isFinite && point.y.isFinite && dimensions.width.isFinite && dimensions.height.isFinite
+                    && dimensions.width > 0 && dimensions.height > 0, "Terminal AX geometry is invalid")
+        return CGRect(origin: point, size: dimensions)
+    }
+    static func terminalPhysical(_ app: NSRunningApplication, _ window: AXUIElement,
+                                 descriptor: [String: Any]) throws {
+        try require(SystemControl.string(window, kAXRoleAttribute) == "AXWindow"
+                    && SystemControl.string(window, kAXSubroleAttribute) == "AXStandardWindow"
+                    && (SystemControl.attribute(window, kAXMinimizedAttribute) as? NSNumber)?.boolValue == false,
+                    "Terminal physical window is unavailable")
+        let geometry = try terminalGeometry(window)
+        try terminalCGWindow(try SystemBridge.windowRows(titles: false), pid: Int(app.processIdentifier),
+                             id: descriptor["cg_window_id"] as! Int, geometry: geometry)
+        let windows = try SystemBridge.axWindows(app)
+        let coherent = try windows.filter {
+            guard let minimized = SystemControl.attribute($0, kAXMinimizedAttribute) as? NSNumber else {
+                throw SystemControl.failure("keyboard_unsupported", "Terminal AX window state is unavailable")
+            }
+            guard !minimized.boolValue else { return false }
+            return try terminalGeometry($0) == geometry
+        }
+        try require(coherent.count == 1 && CFEqual(coherent[0], window), "Terminal AX window identity is ambiguous")
+        guard let children = SystemControl.attribute(window, kAXChildrenAttribute) as? [AXUIElement], children.count <= 250 else {
+            throw SystemControl.failure("keyboard_unsupported", "Terminal tab inventory is unavailable")
+        }
+        var groups: [AXUIElement] = []
+        for child in children {
+            try SystemControl.checkElementOwner(child, pid: app.processIdentifier)
+            guard let role = try terminalAttribute(child, kAXRoleAttribute) as? String, !role.isEmpty else {
+                throw SystemControl.failure("keyboard_unsupported", "Terminal tab child role is unavailable")
+            }
+            if role == "AXTabGroup" { groups.append(child) }
+        }
+        try require(groups.count <= 1, "Terminal tab group is ambiguous")
+        if let group = groups.first {
+            guard let children = SystemControl.attribute(group, kAXChildrenAttribute) as? [AXUIElement],
+                  !children.isEmpty && children.count <= 250 else {
+                throw SystemControl.failure("keyboard_unsupported", "Terminal tab membership is unavailable")
+            }
+            var roles: [String] = [], selected: [Bool] = []
+            for child in children {
+                try SystemControl.checkElementOwner(child, pid: app.processIdentifier)
+                guard let role = try terminalAttribute(child, kAXRoleAttribute) as? String else {
+                    throw SystemControl.failure("keyboard_unsupported", "Terminal tab role is unavailable")
+                }
+                roles.append(role)
+                if role == "AXRadioButton" {
+                    guard let value = try terminalAttribute(child, kAXValueAttribute) as? NSNumber else {
+                        throw SystemControl.failure("keyboard_unsupported", "Terminal tab selection is unavailable")
+                    }
+                    selected.append(value.boolValue)
+                }
+            }
+            try terminalTabMembership(roles: roles, selected: selected)
+        }
+    }
+    static func terminalTabMembership(roles: [String], selected: [Bool]) throws {
+        try require(roles.allSatisfy { ["AXRadioButton", "AXButton"].contains($0) }
+                    && roles.filter { $0 == "AXRadioButton" }.count == 1 && selected == [true],
+                    "Terminal window has unknown, several or unselected physical tabs")
+    }
+    static func terminalCGWindow(_ rows: [[String: Any]], pid: Int, id: Int, geometry: CGRect) throws {
+        let matching = rows.filter { row in
+            guard row["owner_pid"] as? Int == pid, row["layer"] as? Int == 0,
+                  row["on_screen"] as? Bool == true else { return false }
+            guard let bounds = row["bounds"] as? [String: Any],
+                  let x = bounds["X"] as? Double, let y = bounds["Y"] as? Double,
+                  let width = bounds["Width"] as? Double, let height = bounds["Height"] as? Double else { return false }
+            return geometry == CGRect(x: x, y: y, width: width, height: height)
+        }
+        try require(matching.count == 1 && matching[0]["window_id"] as? Int == id,
+                    "Terminal CG/AX window identity is missing or geometrically ambiguous")
+    }
+    static func observeTerminal(owner: [String: Any], descriptor: [String: Any],
+                                arguments: [String: Any], baseline: TerminalBinding? = nil) throws -> (Snapshot, [SystemServices.Record]) {
+        _ = try terminalOwner(owner)
+        let app = try terminalApp(arguments)
+        try SystemControl.axGranted()
+        if let baseline {
+            try require(ProcessInfo.processInfo.systemUptime < baseline.expires, "Terminal task capability expired")
+            var reference = baseline.target; reference["element_token"] = reference["target_token"]
+            _ = try SystemControl.element(reference, app: app) // Authenticate before remember() can renew a token.
+        }
+        let shells = try terminalShells(descriptor)
+        if let baseline { try require(shells == baseline.shellRows, "Terminal shell process generation changed") }
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        try timeout(root)
+        try require(app.isActive && (SystemControl.attribute(root, kAXFrontmostAttribute) as? NSNumber)?.boolValue == true,
+                    "Terminal is not the frontmost application")
+        guard let window = SystemControl.attribute(root, kAXFocusedWindowAttribute),
+              let element = SystemControl.attribute(root, kAXFocusedUIElementAttribute),
+              CFGetTypeID(window) == AXUIElementGetTypeID(), CFGetTypeID(element) == AXUIElementGetTypeID() else {
+            throw SystemControl.failure("keyboard_unsupported", "Exact terminal focused window/field is unavailable")
+        }
+        let axWindow = unsafeBitCast(window, to: AXUIElement.self), fieldElement = unsafeBitCast(element, to: AXUIElement.self)
+        for item in [axWindow, fieldElement] { try timeout(item); try SystemControl.checkElementOwner(item, pid: app.processIdentifier) }
+        guard let owningWindow = SystemControl.attribute(fieldElement, kAXWindowAttribute),
+              CFGetTypeID(owningWindow) == AXUIElementGetTypeID(), CFEqual(owningWindow, axWindow) else {
+            throw SystemControl.failure("keyboard_unsupported", "Terminal field/window identity is unavailable")
+        }
+        if let baseline {
+            try require(CFEqual(axWindow, baseline.initial.window) && CFEqual(fieldElement, baseline.initial.element),
+                        "Terminal focused window or field changed")
+        }
+        try terminalPhysical(app, axWindow, descriptor: descriptor)
+        let field = try terminalField { try terminalAttribute(fieldElement, $0) }
+        let layout = try inputSource(), application = try SystemControl.appIdentity(app)
+        let windowToken = try SystemControl.remember(axWindow, app: app), token = try SystemControl.remember(fieldElement, app: app)
+        let state = try SystemControl.hash(["field": field.metadata, "owner": owner, "terminal": descriptor])
+        let revision = try SystemControl.hash(["state": state, "application": application, "window_token": windowToken,
+                                               "field_token": token, "layout": layout])
+        let target: [String: Any] = ["pid": Int(app.processIdentifier), "expected_started_at": application["started_at"]!,
+            "target_token": token, "helper_pid": Int(getpid()), "worker_generation": SystemBridgeRuntime.generation,
+            "expected_revision": revision]
+        try require(shells == terminalShells(descriptor), "Terminal process set changed during inspection")
+        let finalField = try terminalField { try terminalAttribute(fieldElement, $0) }
+        let expected = TextState(value: field.value, units: Array(field.value.utf16), selection: field.selection)
+        guard let finalWindow = SystemControl.attribute(root, kAXFocusedWindowAttribute),
+              let finalElement = SystemControl.attribute(root, kAXFocusedUIElementAttribute),
+              CFGetTypeID(finalWindow) == AXUIElementGetTypeID(), CFGetTypeID(finalElement) == AXUIElementGetTypeID(),
+              CFEqual(finalWindow, axWindow), CFEqual(finalElement, fieldElement), app.isActive,
+              (SystemControl.attribute(root, kAXFrontmostAttribute) as? NSNumber)?.boolValue == true,
+              expected.matches(finalField) else {
+            throw SystemControl.failure("keyboard_unsupported", "Terminal focus/value/caret changed during inspection")
+        }
+        return (Snapshot(application: app, window: axWindow, element: fieldElement, field: field,
+            response: ["target": target, "application": application, "field": field.metadata, "layout": layout,
+                       "owner": owner, "terminal": descriptor, "input_attempted": false]), shells)
+    }
+    static func inspectTerminal(_ args: [String: Any]) throws -> [String: Any] {
+        try require(Set(args.keys) == Set(["pid", "expected_started_at", "owner", "terminal"]), "Terminal inspection fields differ")
+        purgeTransfer(ProcessInfo.processInfo.systemUptime)
+        try require(transfer == nil, "Terminal inspection cannot replace a staged input capability")
+        let owner = try terminalOwner(args["owner"]), descriptor = try terminalDescriptor(args["terminal"])
+        let (initial, shells) = try observeTerminal(owner: owner, descriptor: descriptor, arguments: args)
+        terminalBinding = TerminalBinding(owner: owner, terminal: descriptor, initial: initial, shells: shells,
+                                          now: ProcessInfo.processInfo.systemUptime)
+        return initial.response
+    }
+    static func terminalManifest(_ args: [String: Any]) throws {
+        guard let binding = terminalBinding, let owner = args["owner"] as? [String: Any],
+              let descriptor = args["terminal"] as? [String: Any], let target = args["target"] as? [String: Any] else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Terminal task capability is unavailable")
+        }
+        _ = try terminalOwner(owner); _ = try terminalDescriptor(descriptor)
+        try require(args["route"] as? String == "terminal_shell" && args["submit"] as? Bool == false
+                    && args["task_id"] as? String == owner["task_id"] as? String
+                    && SystemControl.hash(owner) == SystemControl.hash(binding.owner)
+                    && SystemControl.hash(descriptor) == SystemControl.hash(binding.terminal)
+                    && SystemControl.hash(target) == SystemControl.hash(binding.target)
+                    && binding.commit == nil && ProcessInfo.processInfo.systemUptime < binding.expires,
+                    "Terminal manifest does not match the original task capability")
+    }
+    static func currentTerminal(_ binding: TerminalBinding, revision: Bool = false) throws -> Snapshot {
+        let (current, _) = try observeTerminal(owner: binding.owner, descriptor: binding.terminal,
+                                               arguments: binding.target, baseline: binding)
+        try matchingBinding(binding.target, current.response["target"] as? [String: Any] ?? [:], revision: revision)
+        try matchingLayout(binding.initial.response["layout"] as? [String: Any] ?? [:], current.response["layout"] as? [String: Any] ?? [:])
+        return current
+    }
+    static func terminalText(_ args: [String: Any]) async throws -> [String: Any] {
+        guard let binding = terminalBinding, let text = args["text"] as? String,
+              let target = args["target"] as? [String: Any], args["submit"] as? Bool == false,
+              let identifier = args["transfer_id"] as? String, consumedTransfers.contains(identifier) else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Terminal text capability is unavailable")
+        }
+        try require(try SystemControl.hash(target) == SystemControl.hash(binding.target), "Terminal text target changed")
+        try terminalLiteral(text)
+        let initial = try currentTerminal(binding, revision: true), field = try requireField(initial.field)
+        let expected = try expectedText(field, inserting: Array(text.utf16))
+        let layout = initial.response["layout"] as? [String: Any] ?? [:]
+        var pair: (CGEvent, CGEvent)?
+        var result = try await writeText(try textChunks(text), prepare: { pair = try unicodeEvents(layout, units: $0) },
+            validate: { index in
+                _ = try currentTerminal(binding, revision: index == 0)
+                try inputAllowed(postAccess: CGPreflightPostEventAccess(), flags: CGEventSource.flagsState(.combinedSessionState),
+                                 keyHeld: CGEventSource.keyState(.hidSystemState, key: 0))
+            }, sameGeneration: { (try? terminalApp(binding.target)) != nil }, post: { down in
+                let app = try terminalApp(binding.target)
+                guard let pair else { throw SystemControl.failure("keyboard_unsupported", "Terminal Unicode pair is unavailable") }
+                (down ? pair.0 : pair.1).postToPid(app.processIdentifier)
+            }, verify: {
+                for attempt in 0..<5 {
+                    if expected.matches(try requireField(currentTerminal(binding).field)) { return true }
+                    if attempt < 4 { try await Task.sleep(nanoseconds: 20_000_000) }
+                }
+                return false
+            })
+        binding.commit = TerminalCommit(owner: binding.owner, target: binding.target, transferID: identifier, expected: expected)
+        result["text_sha256"] = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+        result["value_sha256"] = SHA256.hash(data: Data(expected.value.utf8)).map { String(format: "%02x", $0) }.joined()
+        result["selection_utf16"] = ["location": expected.selection.location, "length": expected.selection.length]
+        result["utf8_bytes"] = text.utf8.count; result["utf16_units"] = text.utf16.count
+        return result
+    }
+    static func performTerminalReturn(_ commit: TerminalCommit, args: [String: Any],
+                                       observe: () throws -> Field, validate: () throws -> Void, sameGeneration: () -> Bool,
+                                       post: (Bool) throws -> Void) throws -> [String: Any] {
+        let owner = try terminalOwner(args["owner"])
+        guard let target = args["target"] as? [String: Any],
+              let selection = args["selection_utf16"] as? [String: Any] else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Terminal Return target/caret is invalid")
+        }
+        let expectedHash = SHA256.hash(data: Data(commit.expected.value.utf8)).map { String(format: "%02x", $0) }.joined()
+        try require(Set(args.keys) == Set(["transfer_id", "owner", "target", "expected_value_sha256", "selection_utf16"])
+                    && args["transfer_id"] as? String == commit.transferID && !commit.consumed
+                    && SystemControl.hash(owner) == SystemControl.hash(commit.owner)
+                    && SystemControl.hash(target) == SystemControl.hash(commit.target)
+                    && args["expected_value_sha256"] as? String == expectedHash
+                    && SystemControl.hash(selection)
+                        == SystemControl.hash(["location": commit.expected.selection.location, "length": commit.expected.selection.length]),
+                    "Terminal Return does not match its original task/text commit")
+        commit.consumed = true // Before validation or the first possible Return event; never replay.
+        return try postPair(validate: {
+            try require(commit.expected.matches(try observe()), "Complete terminal value or UTF-16 caret changed before Return")
+            try validate()
+        }, sameGeneration: sameGeneration, post: post)
+    }
+    static func terminalReturn(_ args: [String: Any]) throws -> [String: Any] {
+        guard let binding = terminalBinding, let commit = binding.commit else {
+            throw SystemControl.failure("terminal_input_binding_invalid", "Verified terminal text commit is unavailable")
+        }
+        let layout = binding.initial.response["layout"] as? [String: Any] ?? [:]
+        let (down, up) = try events(layout, code: CGKeyCode(kVK_Return), flags: [])
+        var result = try performTerminalReturn(commit, args: args, observe: {
+            try requireField(currentTerminal(binding).field)
+        }, validate: {
+            try inputAllowed(postAccess: CGPreflightPostEventAccess(), flags: CGEventSource.flagsState(.combinedSessionState),
+                             keyHeld: CGEventSource.keyState(.hidSystemState, key: CGKeyCode(kVK_Return)))
+            try Task.checkCancellation()
+        }, sameGeneration: { (try? terminalApp(binding.target)) != nil }, post: { isDown in
+            let app = try terminalApp(binding.target)
+            (isDown ? down : up).postToPid(app.processIdentifier)
+        })
+        result["return_posted"] = true; result["return_post_calls_returned"] = 2
+        result["submitted"] = false; result["transfer_id"] = commit.transferID
+        return result
     }
 }

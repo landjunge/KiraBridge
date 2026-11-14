@@ -20,6 +20,34 @@ class KeyboardManager:
     def __init__(self, *, transport, desktop_input, authorize):
         self.transport, self.desktop_input, self.authorize = transport, desktop_input, authorize
 
+    async def terminal_request_in_turn(
+        self, authority, operation, arguments, turn, *, before_send=None
+    ):
+        """A private terminal effect retains its real task, principal and desktop lease."""
+        from kirabridge.terminal_input import TerminalInputAuthority
+
+        if (
+            not isinstance(authority, TerminalInputAuthority)
+            or authority.adapter.keyboard is not self
+            or authority.turn is not turn
+        ):
+            raise BridgeError("terminal_authority_required", "Original terminal authority required")
+        self.desktop_input.require_turn(turn)
+        authority.check(operation)
+
+        async def prepare():
+            self.desktop_input.require_turn(turn)
+            authority.check(operation)
+            if before_send is not None:
+                await before_send()
+            authority.check(operation)
+            if operation in {"terminal.input.text.commit", "terminal.input.return"}:
+                turn.mark_attempted()
+
+        return await self.transport.request(
+            operation, arguments, principal=authority.owner["principal"], before_send=prepare
+        )
+
     async def execute(self, task, args, running, progress=None):
         async with self.desktop_input.transaction() as turn:
             return await self.execute_in_turn(task, args, running, turn, progress)
