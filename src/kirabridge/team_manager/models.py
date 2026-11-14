@@ -66,6 +66,9 @@ class TeamWorkReprocess(Input):
     core_task_id: str = Field(min_length=1, max_length=128)
     expected_result_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     idempotency_key: str = Field(min_length=1, max_length=128)
+    expected_request_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    expected_core_receipt: str | None = Field(default=None, min_length=1, max_length=128)
+    expected_core_attempt: int | None = Field(default=None, ge=1, strict=True)
 
 
 class TeamSessionGet(Input):

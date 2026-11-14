@@ -203,6 +203,24 @@ class TeamDispatcher:
         content = response.structuredContent
         if response.isError or not isinstance(content, dict):
             raise BridgeError("team_receiver_protocol", "Authenticated team call failed")
+        task_id = (
+            arguments.get("request", {}).get("task_id")
+            if tool == "task_submit"
+            else arguments.get("task_id")
+            if tool == "task_get"
+            else None
+        )
+        if (
+            task_id
+            and content.get("id") == task_id
+            and content.get("operation") == "agent.execute"
+            and content.get("state") in _CORE_TERMINAL
+            and isinstance(content.get("request_sha256"), str)
+        ):
+            # A durable terminal Task may carry its own error. It is an
+            # observation, not a rejected/ambiguous submission response;
+            # bind_task still checks its sealed identity before using it.
+            return content
         error = content.get("error")
         if error:
             code = error.get("code") if isinstance(error, dict) else None
@@ -274,6 +292,7 @@ class TeamDispatcher:
             core = await self._task(pool, claimed["core_task_id"])
             if core is None:
                 if existing:
+                    self._defer[claimed["id"]] = time.monotonic() + 5
                     self.teams.fail(
                         claimed["id"],
                         "unknown",
@@ -285,12 +304,37 @@ class TeamDispatcher:
                     core = await self._call(pool, "task_submit", {"request": request.model_dump()})
                 except Exception as exc:
                     code = exc.code if isinstance(exc, BridgeError) else "team_submission_unknown"
+                    evidence = {
+                        "core_task_id": claimed["core_task_id"],
+                        "automatic_retry": False,
+                    }
+                    continuation = getattr(self.bridge, "autonext", None)
+                    if code in {
+                        "peer_unknown",
+                        "peer_connection",
+                        "peer_timeout",
+                        "team_submission_unknown",
+                    } and (
+                        continuation is None
+                        or not continuation.owns(claimed["id"])
+                        or continuation.settings.coordinator_mode
+                    ):
+                        # Only ambiguous transport outcomes opt into original
+                        # observation. Legacy AutoNext retains its stop boundary.
+                        evidence["submission_observation_pending"] = True
                     self.teams.fail(
                         claimed["id"],
                         "unknown",
                         code,
-                        {"core_task_id": claimed["core_task_id"], "automatic_retry": False},
+                        evidence,
                     )
+                    return
+            if claimed["state"] == "unknown":
+                try:
+                    claimed = self.teams.reconcile_submission(claimed["id"], core)
+                except BridgeError:
+                    # Only observe the original. Running/foreign/unproven results stay UNKNOWN.
+                    self._defer[claimed["id"]] = time.monotonic() + 5
                     return
             await self._observe(pool, claimed, core, worker.timeout)
 
