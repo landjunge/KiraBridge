@@ -195,7 +195,7 @@ async def test_native_ps_timeout_is_typed_and_reaps_once_without_input(monkeypat
             await transport.shell_process_snapshot("/dev/ttys004")
 
     assert error.value.code == "session_observation_timeout"
-    assert error.value.provider_error == {
+    provider_error = {
         "phase": {
             "catalog": "native_process_catalog",
             "identity": "native_process_identity",
@@ -203,6 +203,22 @@ async def test_native_ps_timeout_is_typed_and_reaps_once_without_input(monkeypat
         }[phase],
         "reason": "timeout",
     }
+    if phase == "catalog":
+        provider_error.update(
+            stage="stdout_read", stdout_bytes=0, stdout_eof=False, exit_status=None
+        )
+        actual_provider_error = error.value.provider_error
+        assert actual_provider_error.keys() == provider_error.keys() | {"elapsed_ms", "cleanup_ms"}
+        for field in ("elapsed_ms", "cleanup_ms"):
+            assert type(actual_provider_error[field]) is int and actual_provider_error[field] >= 0
+        actual_without_timings = {
+            key: value
+            for key, value in actual_provider_error.items()
+            if key not in {"elapsed_ms", "cleanup_ms"}
+        }
+        assert actual_without_timings == provider_error
+    else:
+        assert error.value.provider_error == provider_error
     spawn.assert_awaited_once()
     reap.assert_awaited_once_with(process, process_group=False)
     transport.insert.assert_not_awaited()
