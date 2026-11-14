@@ -11,8 +11,12 @@ from unittest.mock import AsyncMock
 import pytest
 from test_autonext import scenario, until  # noqa: F401
 from test_autonext_coordinator import configure
+from test_coordinator_runtime import runtime as loop
 from test_mcp import http_bridge  # noqa: F401
 
+from kirabridge.autonext.continuation import validate_source
+from kirabridge.autonext.manager import text_sha
+from kirabridge.autonext.models import AutoNextConfig
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import AgentConfig, TeamConfig, TeamWorkerConfig
 from kirabridge.bridge_core.models import AgentInput, BridgeError
@@ -20,6 +24,7 @@ from kirabridge.capability_routing.hook import DelegationGuard
 from kirabridge.capability_routing.native import native_routed_manager
 from kirabridge.capability_routing.router import NativeRoutingSettings, Runtime, WorkerRouting
 from kirabridge.capability_routing.source import BEGIN, END, ThreadDeskSource
+from kirabridge.whiteboard_read import append_whiteboard, read_whiteboard
 
 PROBES = """import sys,json,pathlib
 argv=sys.argv[1:]
@@ -195,6 +200,128 @@ async def test_native_worker_chain_preserves_visible_and_structured_verdict(rout
     before = len(r.profiles)
     await r.b.autonext.tick()
     assert len(r.profiles) == before and len(starts(r)) == 3
+
+
+async def test_continuation_preview_and_native_tasks_share_routes(routed, tmp_path, monkeypatch):
+    r = routed
+    (r.s["root"] / ".git").write_text("private fixture worktree")
+    matrix = json.loads(r.document["notes"].split(BEGIN)[1].split(END)[0])
+    alternate = {**matrix["clis"][0]["models"][0], "id": "fixture-task-codex"}
+    matrix["clis"][0]["models"].append(alternate)
+    r.guard.runtime.access[0].models.append(alternate["id"])
+    r.document["notes"] = BEGIN + json.dumps(matrix) + END
+    previous = r.b.agents
+    r.b.agents = native_routed_manager(r.b, r.guard)
+    r.b.agents.worktree_guard = previous.worktree_guard
+    r.b.agents.visible_handoffs = previous.visible_handoffs
+    team = r.b.teams.get("codex", "auto-team")
+    anchor = r.b.teams.work_get("codex", team["id"], r.cfg.autonext.after_work_id)
+    profile = dict(
+        cwd=str(r.s["root"]),
+        state_dir=str(r.cfg.state_path),
+        search_path=[],
+        codex=r.cfg.agents["codex"].executable,
+        grok=r.cfg.agents["grok"].executable,
+        workspace=str(r.s["desk"]),
+        threaddesk_source="fixture-source",
+        report_cli="fixture-report",
+        instance="routing-parity-fixture",
+        board_id="board",
+        sandbox="read-only",
+        enabled=True,
+        cards=[],
+        continuation={
+            "authority_ref": "private fixture authority",
+            "allowed_cwds": [str(r.s["root"])],
+            "products": ["KiraBridge"],
+            "checks": r.card["acceptance"]["checks"],
+            "sources": [pin.model_dump() for pin in r.cfg.autonext.cards],
+            "task_routing": {
+                r.card["task_id"]: {
+                    "workload": "implementation",
+                    "model": alternate["id"],
+                    "effort": "high",
+                }
+            },
+        },
+        routing=r.cfg.team.routing.model_dump(),
+        worker_routing={
+            name: r.cfg.team.workers[name].routing.model_dump()
+            for name in ("codex", "grok", "codex_verify")
+        },
+    )
+    original_globals = json.dumps(profile["worker_routing"], sort_keys=True)
+    original_agents = {name: agent.model_dump() for name, agent in r.cfg.agents.items()}
+    profile_path, fixture_path = tmp_path / "profile.json", tmp_path / "preview.json"
+
+    def preview():
+        profile_path.write_text(json.dumps(profile))
+        fixture_path.write_text(
+            json.dumps(
+                {
+                    "matrix": matrix,
+                    "snapshot": {
+                        "entries": read_whiteboard(
+                            str(r.s["desk"]),
+                            "board",
+                            include_content=True,
+                        )["entries"]
+                    },
+                }
+            )
+        )
+        return loop.preview_profile(profile_path, fixture_path)
+
+    decision = preview()["selected"]["routing"]
+    assert (decision["model"], decision["effort"]) == (alternate["id"], "high")
+    r.cfg.autonext = AutoNextConfig(coordinator_mode=True, principal="codex")
+    r.b.autonext.continuation_guard = lambda card: validate_source(r.b, profile, card)
+    monkeypatch.setattr(
+        loop,
+        "quota",
+        AsyncMock(
+            return_value={
+                "observed_at": datetime.now(timezone.utc).timestamp(),
+                "source": "fixture",
+            }
+        ),
+    )
+    active, _ = await loop.advance(r.b, profile, team, anchor, None)
+    assert (await complete(r))["state"] == "complete"
+    argv = starts(r)[0]
+    assert argv[argv.index("--model") + 1] == decision["model"]
+    assert 'model_reasoning_effort="high"' in argv
+
+    second = {**r.card, "task_id": "followup.global"}
+    content = json.dumps(second)
+    entry = append_whiteboard(
+        str(r.s["desk"]),
+        "board",
+        actor="coordinator",
+        actor_type="codex",
+        entry_type="task",
+        content=content,
+    )
+    profile["continuation"]["sources"].append(
+        {
+            "task_id": second["task_id"],
+            "entry_id": entry["id"],
+            "content_sha256": text_sha(content),
+        }
+    )
+    decision = preview()["selected"]["routing"]
+    assert (decision["model"], decision["effort"]) == ("fixture-codex", "max")
+    active, _ = await loop.advance(r.b, profile, team, anchor, active)
+    await until(lambda: r.b.autonext.inspect()["state"] in {"complete", "stopped"}, timeout=20)
+    assert r.b.autonext.inspect()["state"] == "complete", r.b.autonext.inspect()
+    argv = starts(r)[3]
+    assert argv[argv.index("--model") + 1] == "fixture-codex"
+    assert 'model_reasoning_effort="max"' in argv
+    assert r.cfg.team.workers["codex"].routing == WorkerRouting.model_validate(
+        profile["worker_routing"]["codex"]
+    )
+    assert json.dumps(profile["worker_routing"], sort_keys=True) == original_globals
+    assert {name: agent.model_dump() for name, agent in r.cfg.agents.items()} == original_agents
 
 
 @pytest.mark.parametrize(

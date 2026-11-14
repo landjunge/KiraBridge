@@ -247,6 +247,10 @@ Quelländerung: Der Koordinator meldet fachliche Zustandswechsel und sendet unve
 
 Der [Supervisor mit bestehendem Nutzerauftrag](docs/COORDINATOR-CONTINUATION-20261106.md) führt zugeordnete ThreadDesk-Aufgaben ohne weitere Nutzerfreigabe fort. Er gleicht vorhandene Claims und Ergebnisse ab, überspringt erledigte Arbeit und hält unabhängige Aufgaben bei einem Einzelfehler weiter bearbeitbar.
 
+Der neue Quellbefehl `bigplan-loop --profile <Fixtureprofil> preview --fixture <Fixturedaten.json>` prüft ausschließlich private Offline-Fixtures und zeigt eine mögliche Auswahl oder Zurückhaltung samt geprüftem Routing. Die Vorschau ist weder Freigabe noch Claim und startet keine Aufgabe; sie liest kein Live-Board und keinen Core.
+
+Vertrauenswürdige Einträge unter `continuation.task_routing` binden eine Codex-`WorkerRouting`-Regel an eine zugeordnete Task-ID. Vorschau und Ausführung lösen dieselbe Regel auf; Aufgaben ohne eigene Regel behalten das globale Worker-Routing. Alte Profile mit `continuation.assignments` erfordern eine ausdrückliche Migration und werden niemals still umgeschrieben.
+
 Der [Integrationscheckpoint vom 6. November](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) bündelt angenommene Pakete, gemeinsame Remote-/Absturztests und die damals offenen Gates. Für geprüfte Quelle und installierten Pin gilt der [Abgleich vom 7. November](docs/evidence/readme-current-20261107.json); datierte Checkpoints behalten ihre historischen Ergebnisse.
 
 Der integrierte Koordinatorquellstand unterstützt außerdem native Core-Aktivierung, den auf den Eigentümer begrenzten MCP-Aufruf `coordinator_status` und dauerhafte Angenommen-/Stoppmeldungen im vorhandenen Completion-Postfach. Nach erfolgreichem Review und Prüfungen setzt er gepinnte Aufgaben ohne Laden eines Skills fort. [Nativer Vertrag und Prüfnachweise](docs/COORDINATOR-NATIVE-20261106.md) beschreiben den Stand; Desktop- und Liveabnahme bleiben gesondert.

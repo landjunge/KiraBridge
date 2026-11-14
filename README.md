@@ -249,6 +249,10 @@ Source update: the coordinator reports substantive status changes instead of res
 
 The [standing-mandate supervisor](docs/COORDINATOR-CONTINUATION-20261106.md) continues coordinator-assigned ThreadDesk tasks without another user approval. It reconciles existing claims and results, skips completed work and keeps task-local problems separate from independent work.
 
+The source command `bigplan-loop --profile <fixture-profile> preview --fixture <fixture.json>` checks private offline fixtures only and shows a possible selection or hold with the evaluated route. Preview is neither approval nor a claim and starts no task; it reads no live board or Core.
+
+Trusted `continuation.task_routing` entries bind a Codex `WorkerRouting` policy to an assigned task ID. Preview and execution resolve the same policy; tasks without an override retain global worker routing. Legacy `continuation.assignments` profiles require explicit migration and are never silently rewritten.
+
 [The November 6 integration checkpoint](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) records accepted packages, combined remote/crash tests and the gates open at that time. Use the [November 7 verification](docs/evidence/readme-current-20261107.json) for the reviewed source and installed pin; dated checkpoints retain their historical results.
 
 The integrated coordinator source also supports native Core activation, owner-scoped MCP `coordinator_status` and durable accepted/stopped notices through the existing completion inbox. It follows pinned tasks after successful review and checks without loading a skill. See [native coordinator contract and validation](docs/COORDINATOR-NATIVE-20261106.md); desktop and live deployment acceptance remain separate.

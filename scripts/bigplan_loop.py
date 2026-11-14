@@ -15,16 +15,18 @@ import socket
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import uvicorn
 from pydantic import BaseModel, ConfigDict, Field
 
 from kirabridge.autonext.continuation import (
     ContinuationPolicy,
+    DiscoverySnapshot,
     bind_scope,
     checks_allowed,
     discover,
+    resolve_worker_routing,
     restore,
     validate_source,
 )
@@ -32,7 +34,17 @@ from kirabridge.autonext.manager import digest, text_sha
 from kirabridge.autonext.models import ApprovedCard, AutoNextConfig
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config
-from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
+from kirabridge.capability_routing.router import (
+    Matrix,
+    NativeRoutingSettings,
+    RoutingError,
+    Runtime,
+    Task,
+    WorkerRouting,
+)
+from kirabridge.capability_routing.router import (
+    select as select_route,
+)
 from kirabridge.coordinator_reporting import run_status_report
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.team_manager.models import (
@@ -71,8 +83,85 @@ class LoopProfile(BaseModel):
     ] = Field(default_factory=dict)
 
 
+class PreviewFixture(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    matrix: dict[str, Any]
+    snapshot: DiscoverySnapshot
+
+
 def load_profile(path):
-    return LoopProfile.model_validate_json(path.read_text()).model_dump()
+    value = json.loads(path.read_text())
+    if isinstance(value, dict) and isinstance(value.get("continuation"), dict):
+        if "assignments" in value["continuation"]:
+            raise ValueError(
+                "Legacy continuation.assignments is incompatible with this source; "
+                "explicit profile migration is required. The field was not removed."
+            )
+    return LoopProfile.model_validate(value).model_dump()
+
+
+def preview_profile(profile_path, fixture_path, *, now=None):
+    """Read a private offline fixture; never opens Core, ThreadDesk or a provider."""
+    profile = load_profile(profile_path)
+    fixture = PreviewFixture.model_validate_json(Path(fixture_path).read_text())
+    matrix = Matrix.model_validate(fixture.matrix)
+    routing_value = profile.get("routing")
+
+    def route_candidate(card):
+        worker = resolve_worker_routing(profile, card.task_id)
+        if worker is None or routing_value is None:
+            raise RoutingError("Existing Codex worker routing or runtime pin is missing")
+        runtime = Runtime.model_validate(routing_value["runtime"])
+        timeout = profile.get("worker_timeouts", {}).get("codex", 120)
+        if int(timeout) != timeout:
+            raise RoutingError("Router timeout requires exact whole seconds")
+        task = Task(
+            task_id="preview-" + digest(card.task_id),
+            workload=worker.workload,
+            prompt=card.instruction,
+            cwd=card.cwd,
+            ownership_ref="continuation-preview:" + digest([card.task_id, card.cwd]),
+            allowed_clis=["codex"],
+            explicit_cli="codex",
+            explicit_model=worker.model,
+            explicit_effort=worker.effort,
+            min_effort=worker.min_effort,
+            independent_of_provider=worker.independent_of_provider,
+            read_only=card.sandbox == "read-only",
+            timeout_seconds=int(timeout),
+        )
+        decision = select_route(matrix, runtime, task, now=now)
+        return {
+            "cli": decision["cli"],
+            "model": decision["model"],
+            "effort": decision["effort"],
+            "effective_model": decision["effective_model"],
+            "effective_effort": decision["effective_effort"],
+        }
+
+    result = discover(
+        None,
+        profile,
+        snapshot=fixture.snapshot,
+        route_candidate=route_candidate,
+    )
+    selected = result["selected"]
+    selected_view = None
+    if selected:
+        selected_view = {
+            "task_id": selected["card"].task_id,
+            "entry_id": selected["pin"].entry_id,
+            "content_sha256": selected["pin"].content_sha256,
+            "routing": selected["routing"],
+        }
+    return {
+        "preview_only": True,
+        "authorizes_or_starts_work": False,
+        "provider_calls": 0,
+        "source_revision": result["source_revision"],
+        "selected": selected_view,
+        "held": result["held"],
+    }
 
 
 def save(path, value, *, durable=False):
@@ -619,7 +708,7 @@ async def advance(bridge, profile, team, anchor, active_revision):
         intake = discover(bridge, profile)
         if state["state"] != "waiting":
             candidate = intake["selected"]
-        if candidate and not bind_scope(bridge, candidate["card"]):
+        if candidate and not bind_scope(bridge, candidate["card"], profile=profile):
             candidate = None
         revision = candidate["grant_id"] if candidate else active_revision
     pins = [candidate["pin"].model_dump()] if candidate else profile.get("cards", [])
@@ -984,10 +1073,19 @@ def adopt(path, entries):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
-    parser.add_argument("action", choices=["serve", "status", "quota", "approve", "adopt"])
+    parser.add_argument(
+        "action", choices=["serve", "status", "quota", "approve", "adopt", "preview"]
+    )
     parser.add_argument("--entry-id", action="append", default=[])
+    parser.add_argument(
+        "--fixture", type=Path, help="private offline preview fixture (required for preview)"
+    )
     args = parser.parse_args()
-    if args.action == "serve":
+    if args.action == "preview":
+        if args.fixture is None:
+            parser.error("preview requires --fixture and never reads live Board/Core state")
+        print(json.dumps(preview_profile(args.profile, args.fixture), sort_keys=True))
+    elif args.action == "serve":
         asyncio.run(serve(args.profile))
     elif args.action == "approve":
         approve(args.profile, args.entry_id)
