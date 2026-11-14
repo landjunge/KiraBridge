@@ -190,6 +190,10 @@ class SessionManager:
         try:
             rows = await self.tmux.catalog()
         except BridgeError as exc:
+            if transport is None and sys.platform.startswith("linux") and not native_rows:
+                result = await self._linux_catalog()
+                result["transport_errors"]["tmux"] = {"code": exc.code}
+                return result
             return self._catalog_result(
                 native_rows,
                 transport="terminal_app" if native_rows else "tmux",
@@ -638,6 +642,7 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            visible_direct = self.direct(principal) and not args.pane_id.startswith("linux:")
             # Recognition, exact assignment and central handoff are mandatory for
             # every CLI tab, including an unbound idle-looking tab. A raw shortcut
             # cannot establish readiness or the task's durable input intent.
@@ -645,9 +650,9 @@ class SessionManager:
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
                 )
-            if (args.require_idle or self.direct(principal)) and selected.get("busy", True):
+            if (args.require_idle or visible_direct) and selected.get("busy", True):
                 raise BridgeError("session_busy", "Selected terminal is not an idle shell")
-            if self.direct(principal) and not args.pane_id.startswith("terminal:"):
+            if visible_direct and not args.pane_id.startswith("terminal:"):
                 raise BridgeError(
                     "visible_terminal_required",
                     "ChatGPT direct input requires a visible Terminal.app window",
@@ -666,7 +671,7 @@ class SessionManager:
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
                 )
-            elif self.direct(principal):
+            elif visible_direct:
                 identity = await self.terminal_app.process_identity(selected["expected_pid"])
                 await self.terminal_app.send_confirmed(
                     selected, args.text, identity, before_transport=before_transport
@@ -769,6 +774,9 @@ class SessionManager:
     async def close_tab(self, principal, pane_id, expected_pid):
         self.authorization.principal(principal, "session.input")
         selected = await self.selected(principal, pane_id, expected_pid)
+        if pane_id.startswith("linux:"):
+            await self.linux.close(pane_id)
+            return {"pane_id": pane_id, "expected_pid": expected_pid, "closed": True}
         if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
             raise BridgeError(
                 "terminal_window_required", "Refusing to close the only visible terminal"
