@@ -53,6 +53,8 @@ async def test_http_native_timeout_is_durable_failed_without_input_or_replay(
     transport.press_return = AsyncMock()
     bridge.sessions.tmux.catalog = AsyncMock(side_effect=AssertionError("unrelated transport"))
     process = SimpleNamespace(communicate=AsyncMock(side_effect=TimeoutError()), returncode=None)
+    if phase == "native_process_catalog":
+        process.stdout = SimpleNamespace(read=AsyncMock(side_effect=TimeoutError()))
     spawn = AsyncMock(return_value=process)
     monkeypatch.setattr(module.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(module, "reap_process", AsyncMock())

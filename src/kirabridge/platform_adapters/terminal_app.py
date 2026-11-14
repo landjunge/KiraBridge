@@ -17,6 +17,8 @@ from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 from kirabridge.timing import timed, timed_async
 
+MAX_PROCESS_CATALOG_BYTES = 1048576
+
 
 def _process_observation_timeout(phase):
     error = BridgeError(
@@ -26,14 +28,16 @@ def _process_observation_timeout(phase):
     return error
 
 
-def _parse_process_catalog(output, returncode):
-    def invalid(reason):
-        error = BridgeError(
-            "session_observation_invalid", "Complete native process catalog unavailable"
-        )
-        error.provider_error = {"phase": "native_process_catalog", "reason": reason}
-        return error
+def _process_catalog_invalid(reason):
+    error = BridgeError(
+        "session_observation_invalid", "Complete native process catalog unavailable"
+    )
+    error.provider_error = {"phase": "native_process_catalog", "reason": reason}
+    return error
 
+
+def _parse_process_catalog(output, returncode):
+    invalid = _process_catalog_invalid
     if returncode != 0:
         raise invalid("process_failed")
     try:
@@ -278,12 +282,22 @@ class TerminalAppTransport:
             )
             try:
                 async with asyncio.timeout(3):
-                    output, _ = await child.communicate()
+                    # Drain while enforcing the same finite observation budget.
+                    # communicate() accumulates indefinitely until EOF; an already
+                    # oversized, still-open pipe must never become a partial census.
+                    output = bytearray()
+                    while chunk := await child.stdout.read(
+                        min(65536, MAX_PROCESS_CATALOG_BYTES + 1 - len(output))
+                    ):
+                        output.extend(chunk)
+                        if len(output) > MAX_PROCESS_CATALOG_BYTES:
+                            raise _process_catalog_invalid("output_limit")
+                    await child.wait()
             except TimeoutError:
                 raise _process_observation_timeout("native_process_catalog") from None
             finally:
                 await reap_process(child, process_group=False)
-        return output, child.returncode
+        return bytes(output), child.returncode
 
     @timed_async("terminal_catalog")
     async def catalog(self):

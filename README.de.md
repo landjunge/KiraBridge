@@ -72,6 +72,8 @@ Die Bereitschaftsprüfung unterscheidet jetzt Berechtigung, Plattformunterstütz
 
 Im Entwicklungsstand blockieren gültige macOS-Systembenutzer mit negativer UID, etwa `nobody`, nicht mehr den gesamten Terminalkatalog. Ihre Prozesse gelten weiterhin als fremd; fehlerhafte Prozessdaten und belegte Eingabeziele werden weiterhin abgewiesen.
 
+Die Prozesskatalog-Ausgabe ist im Entwicklungsstand innerhalb des bisherigen Lesezeitbudgets von drei Sekunden auf 1 MiB begrenzt. Übergroße Ausgabe wird als ungültige Beobachtung abgewiesen; ein Teilkatalog wird nicht übernommen. Die Ursache früher beobachteter Timeouts ist damit nicht nachgewiesen.
+
 Sichtbare Shell-Eingaben sind im Entwicklungsstand an ihren ursprünglichen autorisierten Auftrag gebunden und benötigen ein eindeutiges Terminalfenster mit einem Tab. Text wird ohne Return eingegeben; vollständiger Terminaltext und Cursorposition müssen vor einem einmaligen Return übereinstimmen. Fokuswechsel und Schließaktionen durch KiraBridge warten laufende Eingaben ab; geschlossen werden nur eindeutig zugeordnete Fenster mit einem Tab. Unbestätigte Eingaben bleiben ohne automatische Wiederholung erhalten. Vor dem Produktiveinsatz bleibt eine echte Terminal-Abnahme einschließlich Zeilenumbruch und Scrollen erforderlich.
 
 Die Release-Smoke-Testkonfiguration beschränkt ihre temporäre lokale Identität auf Erreichbarkeits- und `file.read`-Prüfungen mit automatischer Freigabe. Reguläre Installationen benötigen weiterhin standardmäßig eine Freigabe.

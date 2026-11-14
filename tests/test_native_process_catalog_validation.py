@@ -23,7 +23,9 @@ def catalog_transport(monkeypatch, output, returncode=0):
         return_value=[{"window_id": 123, "tty": "/dev/ttys004", "busy": False}]
     )
     child = SimpleNamespace(
-        communicate=AsyncMock(return_value=(output, b"")), returncode=returncode
+        stdout=SimpleNamespace(read=AsyncMock(side_effect=[output, b""])),
+        wait=AsyncMock(),
+        returncode=returncode,
     )
     spawn = AsyncMock(return_value=child)
     cleanup = AsyncMock()

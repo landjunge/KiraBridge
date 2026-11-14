@@ -174,6 +174,8 @@ async def test_native_ps_timeout_is_typed_and_reaps_once_without_input(monkeypat
 
     monkeypatch.setattr(module, "sys", SimpleNamespace(platform="darwin", exc_info=sys.exc_info))
     process = SimpleNamespace(communicate=AsyncMock(side_effect=TimeoutError()), returncode=None)
+    if phase == "catalog":
+        process.stdout = SimpleNamespace(read=AsyncMock(side_effect=TimeoutError()))
     spawn = AsyncMock(return_value=process)
     reap = AsyncMock()
     monkeypatch.setattr(module.asyncio, "create_subprocess_exec", spawn)
@@ -216,6 +218,8 @@ async def test_native_ps_cancellation_propagates_without_retry(monkeypatch, phas
     process = SimpleNamespace(
         communicate=AsyncMock(side_effect=asyncio.CancelledError()), returncode=None
     )
+    if phase == "catalog":
+        process.stdout = SimpleNamespace(read=AsyncMock(side_effect=asyncio.CancelledError()))
     spawn, reap = AsyncMock(return_value=process), AsyncMock()
     monkeypatch.setattr(module.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(module, "reap_process", reap)
