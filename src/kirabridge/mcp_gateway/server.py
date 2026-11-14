@@ -481,7 +481,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def session_catalog(ctx: Context) -> dict[str, Any]:
-        """List existing Terminal.app tabs and tmux panes with exact input/read handles."""
+        """List native owned Linux PTYs, Terminal.app tabs and supported tmux panes."""
         try:
             return await bridge.terminal_queries.execute(identity(ctx), "session.catalog", {})
         except BridgeError as exc:
@@ -1106,7 +1106,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         argv: list[str] | None = None,
         window_authorization: str = "",
     ) -> dict[str, Any]:
-        """Open a new visible Terminal.app window in cwd, preserving existing tabs.
+        """Open an owned Linux PTY or native Terminal.app window, preserving existing sessions.
 
         Optional argv runs a program in the new window. Read task_get for the resulting
         pane_id and expected_pid; session_read reads output, session.input sends input.
