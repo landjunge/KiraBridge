@@ -81,7 +81,23 @@ async def test_http_native_timeout_is_durable_failed_without_input_or_replay(
 
     assert task["state"] == "failed", task
     assert task["error"]["code"] == "session_observation_timeout"
-    assert task["evidence"]["provider_error"] == {"phase": phase, "reason": "timeout"}
+    provider_error = {"phase": phase, "reason": "timeout"}
+    if phase == "native_process_catalog":
+        provider_error.update(
+            stage="stdout_read", stdout_bytes=0, stdout_eof=False, exit_status=None
+        )
+        actual_provider_error = task["evidence"]["provider_error"]
+        assert actual_provider_error.keys() == provider_error.keys() | {"elapsed_ms", "cleanup_ms"}
+        for field in ("elapsed_ms", "cleanup_ms"):
+            assert type(actual_provider_error[field]) is int and actual_provider_error[field] >= 0
+        actual_without_timings = {
+            key: value
+            for key, value in actual_provider_error.items()
+            if key not in {"elapsed_ms", "cleanup_ms"}
+        }
+        assert actual_without_timings == provider_error
+    else:
+        assert task["evidence"]["provider_error"] == provider_error
     assert task["evidence"]["terminal_input_attempted"] is False
     assert task["evidence"]["automatic_retry"] is False
     assert task["evidence"]["safe_to_retry"] is False

@@ -68,7 +68,15 @@ async def test_catalog_blocked_child_times_out_and_reaps_without_partial_success
     with pytest.raises(BridgeError) as error:
         await transport._ps_catalog()
     assert error.value.code == "session_observation_timeout"
-    assert error.value.provider_error == {"phase": "native_process_catalog", "reason": "timeout"}
+    metadata = error.value.provider_error
+    assert metadata["phase"] == "native_process_catalog"
+    assert metadata["reason"] == "timeout"
+    assert metadata["stage"] == "stdout_read"
+    assert metadata["stdout_bytes"] == len(b"501 1 0 ?? /bin/example\n")
+    assert metadata["stdout_eof"] is False
+    assert metadata["exit_status"] is None
+    assert metadata["elapsed_ms"] >= 3000
+    assert metadata["cleanup_ms"] >= 0
     assert_reaped(children)
 
 
