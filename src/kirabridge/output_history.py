@@ -24,6 +24,8 @@ INLINE_KEYS = {"evidence", "receipt", "content_sha256", "scope", "output_ref"}
 class OutputHistory:
     def __init__(self, config, store):
         self.config, self.store = config, store
+        self._maintenance_after = 0.0
+        self._maintenance_policy = None
         with store.transaction():
             store.db.execute(
                 "CREATE TABLE IF NOT EXISTS output_snapshots ("
@@ -38,6 +40,16 @@ class OutputHistory:
             )
             store.db.execute(
                 "CREATE INDEX IF NOT EXISTS output_snapshot_expiry ON output_snapshots(expires)"
+            )
+            store.db.execute(
+                "CREATE INDEX IF NOT EXISTS output_snapshot_created ON output_snapshots(created)"
+            )
+            store.db.execute(
+                "CREATE INDEX IF NOT EXISTS output_snapshot_budget ON output_snapshots(kind,bytes)"
+            )
+            store.db.execute(
+                "CREATE INDEX IF NOT EXISTS output_snapshot_oldest "
+                "ON output_snapshots(kind,created)"
             )
 
     def _bounded(self, payload, *, tail=False):
@@ -66,12 +78,27 @@ class OutputHistory:
             "format": "canonical_json_utf8_v1",
         }
 
+    def maintain(self):
+        """Coalesce worker housekeeping; captures still enforce budgets synchronously.
+
+        Reads check both expiry boundaries themselves, even between housekeeping
+        ticks. A changed budget/retention policy bypasses this one-second throttle.
+        """
+        now = time.monotonic()
+        policy = (self.config.retention_seconds, self.config.max_entries, self.config.max_bytes)
+        if now < self._maintenance_after and policy == self._maintenance_policy:
+            return
+        self.prune()
+        self._maintenance_after = time.monotonic() + 1.0
+        self._maintenance_policy = policy
+
     def prune(self):
         with self.store.transaction():
             now = time.time()
+            self.store.db.execute("DELETE FROM output_snapshots WHERE expires<=?", (now,))
             self.store.db.execute(
-                "DELETE FROM output_snapshots WHERE expires<=? OR created<=?",
-                (now, now - self.config.retention_seconds),
+                "DELETE FROM output_snapshots WHERE created<=?",
+                (now - self.config.retention_seconds,),
             )
             # Each kind has its own budget: large task results never evict the
             # terminal captures that visible input depends on.

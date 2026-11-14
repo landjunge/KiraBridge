@@ -312,7 +312,7 @@ class Bridge:
 
         def maintain():
             self.messages.voice_policy.expire()
-            self.outputs.prune()
+            self.outputs.maintain()
 
         self.tasks.maintenance = maintain
         self.message_receiver = MessageReceiver(self)
