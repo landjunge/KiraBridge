@@ -39,9 +39,11 @@ async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, 
         )
 
     async def process(*args, **kwargs):
-        return SimpleNamespace(
-            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
-        )
+        output, _ = await communicate()
+        reader = asyncio.StreamReader()
+        reader.feed_data(output)
+        reader.feed_eof()
+        return SimpleNamespace(stdout=reader, returncode=0, wait=AsyncMock(return_value=0))
 
     monkeypatch.setattr(manager.terminal_app, "native", native)
     monkeypatch.setattr(
