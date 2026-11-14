@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from test_native_send_identity import wire_submit
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
@@ -45,7 +46,9 @@ def manager_with_transports(bridge, config, rows, *, incomplete=False):
         press_return=AsyncMock(),
         last_catalog_truncated=False,
     )
-    return SessionManager(bridge.sessions.ports, terminal_app=native, tmux=tmux)
+    manager = SessionManager(bridge.sessions.ports, terminal_app=native, tmux=tmux)
+    wire_submit(bridge, manager)
+    return manager
 
 
 async def test_exact_native_selection_never_observes_unrelated_timed_out_tmux(bridge, config):

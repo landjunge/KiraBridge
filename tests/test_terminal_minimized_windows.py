@@ -59,7 +59,7 @@ async def test_minimized_anchors_allow_one_owned_window_without_restoring_old_wi
     all_minimized,
 ):
     _, leaf, events, _, created = minimized_scene(product, all_minimized=all_minimized)
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["separate_window"]
     assert events == (
         ["create", "receipt", "focus"] if all_minimized else ["create", "receipt", "focus", "move"]
@@ -76,7 +76,7 @@ async def test_minimized_anchor_change_during_creation_stops_without_detach_or_r
 ):
     _, leaf, events, _, created = minimized_scene(product, all_minimized=True, change=change)
     with pytest.raises(UncertainExecution):
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        await leaf.open("", on_created=created, principal="chatgpt")
     assert events == ["create", "receipt", "focus"]
     assert leaf.native.await_count == 2
 
@@ -86,7 +86,7 @@ async def test_visible_count_mismatch_with_minimized_anchors_still_refuses_befor
 ):
     _, leaf, events, _, created = minimized_scene(product, all_minimized=False, incomplete=True)
     with pytest.raises(BridgeError) as error:
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        await leaf.open("", on_created=created, principal="chatgpt")
     assert error.value.code == "session_window_inventory_pending"
     observed = error.value.provider_error["window_observation"]
     assert observed["cg_window_count"] == 0

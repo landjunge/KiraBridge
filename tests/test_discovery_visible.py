@@ -2,6 +2,8 @@
 
 import asyncio
 import copy
+import shlex
+from unittest.mock import AsyncMock
 
 import pytest
 from conftest import request
@@ -13,6 +15,35 @@ from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.permissions import decision
 from kirabridge.session_manager import SessionOpen
 from kirabridge.visible_terminal import VisibleTerminalInput, empty_shell_prompt
+
+
+def owned_shell_setup(bridge, config, monkeypatch):
+    """Window-grant tests use the real task/turn and fake only their native peer."""
+    native, inputs = bridge.sessions.terminal_app, []
+    cwd = config.principals["local"].roots[0]
+    monkeypatch.setattr(native, "read", AsyncMock(return_value="KiraBridge visible % "))
+    monkeypatch.setattr(
+        native,
+        "process_identity",
+        AsyncMock(return_value="501 ttys022 Sat Nov 14 00:00:00 2026 455 /bin/zsh"),
+    )
+    monkeypatch.setattr(native, "process_working_directory", AsyncMock(return_value=cwd))
+    monkeypatch.setattr(native, "verify_opened", AsyncMock())
+
+    async def sent(row, text, identity, *, expected_cwd, input_context, before_transport):
+        input_context.check("terminal.input.inspect")
+        bridge.desktop_input.require_turn(input_context.turn)
+        owner = input_context.owner
+        original = bridge.store.get(owner["task_id"], owner["principal"])
+        assert owner["operation"] == original["operation"] == "session.open"
+        assert owner["request_sha256"] == original["request_sha256"]
+        assert text == "cd -- " + shlex.quote(cwd) and expected_cwd == cwd
+        await before_transport()
+        inputs.append(owner["task_id"])
+        return {"sent": True}
+
+    monkeypatch.setattr(native, "send_confirmed", sent)
+    return inputs
 
 
 async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
@@ -82,9 +113,11 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
     config.principals["local"].permission_level = "full"
     config.principals["local"].capabilities.append("session.inspect")
     calls = []
+    inputs = owned_shell_setup(bridge, config, monkeypatch)
 
     async def opened(command, *, on_created=None, principal):
         assert principal == "local"
+        assert command == ""
         calls.append(command)
         receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
         if on_created is not None:
@@ -92,7 +125,14 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
         return receipt
 
     async def catalog():
-        return [{"pane_id": "terminal:222:ttys022", "expected_pid": 456, "tty": "/dev/ttys022"}]
+        return [
+            {
+                "pane_id": "terminal:222:ttys022",
+                "expected_pid": 456,
+                "tty": "/dev/ttys022",
+                "busy": False,
+            }
+        ]
 
     monkeypatch.setattr(bridge.sessions.terminal_app, "open", opened)
     monkeypatch.setattr(bridge.sessions.terminal_app, "catalog", catalog)
@@ -108,15 +148,18 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
         assert result["result"]["creation_receipt"]["separate_window"] is True
         bridge.prepare("local", value)
     assert len(calls) == 1
+    assert inputs == [value.task_id]
 
 
 async def test_manual_window_task_waits_for_exact_operator_approval(
     bridge, config, monkeypatch, native_session_platform
 ):
     calls = []
+    inputs = owned_shell_setup(bridge, config, monkeypatch)
 
     async def opened(command, *, on_created=None, principal):
         assert principal == "local"
+        assert command == ""
         calls.append(command)
         receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
         if on_created is not None:
@@ -124,7 +167,14 @@ async def test_manual_window_task_waits_for_exact_operator_approval(
         return receipt
 
     async def catalog():
-        return [{"pane_id": "terminal:222:ttys022", "expected_pid": 456, "tty": "/dev/ttys022"}]
+        return [
+            {
+                "pane_id": "terminal:222:ttys022",
+                "expected_pid": 456,
+                "tty": "/dev/ttys022",
+                "busy": False,
+            }
+        ]
 
     monkeypatch.setattr(bridge.sessions.terminal_app, "open", opened)
     monkeypatch.setattr(bridge.sessions.terminal_app, "catalog", catalog)
@@ -137,12 +187,13 @@ async def test_manual_window_task_waits_for_exact_operator_approval(
             await bridge.sessions.open(
                 "local", SessionOpen.model_validate(value.arguments), task_id=value.task_id
             )
-        assert not calls
+        assert not calls and not inputs
         bridge.tasks.approve(value.task_id)
         result = await bridge.tasks.wait("local", value.task_id, 5)
         assert result["state"] == "completed", result
         assert result["result"]["creation_receipt"]["separate_window"] is True
     assert len(calls) == 1
+    assert inputs == [value.task_id]
 
 
 async def test_chatgpt_legacy_terminal_is_visible_while_agent_internal_route_is_preserved(

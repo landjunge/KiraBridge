@@ -45,7 +45,7 @@ async def hidden_scene(fixture):
 
 async def test_hidden_singleton_binds_complete_partition_then_restores_old_ax_anchor(product):  # noqa: F811
     scene, leaf, events, _, created = await hidden_scene(product)
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["physical_window"]["host_identity_basis"] == "hidden_singleton_partition"
     assert result["physical_window"]["move_confirmed"]
     assert events == ["create", "receipt", "focus", "move"]
@@ -87,7 +87,7 @@ async def test_hidden_host_detach_requires_original_anchor_and_coherent_layout(p
 
     leaf.system_transport.request = changed
     with pytest.raises(UncertainExecution) as error:
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        await leaf.open("", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
     assert events == ["create", "receipt", "focus", "move"]
 
@@ -110,7 +110,7 @@ async def test_hidden_candidate_never_substitutes_changed_visible_radio_partitio
 
     leaf.system_transport.request = replaced_radio
     with pytest.raises(UncertainExecution) as error:
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        await leaf.open("", on_created=created, principal="chatgpt")
     assert error.value.provider_error["cause_message"] == (
         "Shared host is not positively bound to the pre-open radio partition"
     )
@@ -192,6 +192,6 @@ async def test_hidden_host_accepts_coherent_height_reflow_only(product):  # noqa
         return result
 
     leaf.system_transport.request = reflow
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["physical_window"]["host_identity_basis"] == "hidden_singleton_partition"
     await leaf.verify_opened(result, principal="chatgpt")

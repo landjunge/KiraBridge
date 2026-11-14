@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.desktop_input import DesktopInput
 from kirabridge.session_manager import SessionInput, SessionManager
 from kirabridge.session_ports import SessionPorts
 
@@ -67,6 +68,10 @@ def manager_without_core(*, rows=None, bound_pid=456):
         clipboard_lock=asyncio.Lock(),
     )
     manager = SessionManager(ports, terminal_app=native, tmux=tmux)
+    manager.native_input = SimpleNamespace(
+        desktop_input=DesktopInput(manager.lock),
+        bind_stored=Mock(side_effect=AssertionError("Denied agent must not reach input authority")),
+    )
     return manager, native, tmux, seen
 
 

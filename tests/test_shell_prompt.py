@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from conftest import request, submit
+from test_native_send_identity import LiteralProtocol, accepted_input, wire_submit
 
 from kirabridge.bridge_core.models import BridgeError, State
 from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
@@ -87,22 +88,47 @@ def direct_shell(bridge, config, monkeypatch):
         "tty": "/dev/ttys004",
         "transport": "terminal_app",
         "busy": False,
+        "window_id": 123,
+        "visual_window_id": 10621,
+        "tab_count": 1,
+        "identity_ambiguous": False,
+        "selection_ambiguous": False,
+        "process_owner_verified": True,
         "processes": [{"pid": 900, "ppid": 800, "name": "zsh", "image": "/bin/zsh"}],
     }
-    identity = "501 ttys004 Fri Oct 30 01:00:00 2026"
+    identity = "501 ttys004 Fri Oct 30 01:00:00 2026 800 /bin/zsh"
     terminal = bridge.sessions.terminal_app
     monkeypatch.setattr(bridge.sessions, "selected", AsyncMock(return_value=row))
     monkeypatch.setattr(terminal, "process_identity", AsyncMock(return_value=identity))
     monkeypatch.setattr(terminal, "read", AsyncMock(return_value="➜  ~ \n\n"))
+    monkeypatch.setattr(terminal, "process_working_directory", AsyncMock(return_value="/owned"))
+    monkeypatch.setattr(terminal, "catalog", AsyncMock(return_value=[row]))
+    terminal.last_catalog_incomplete = False
+
+    def typed(text):
+        terminal.read.return_value += text
+        return terminal.read.return_value
+
+    protocol = LiteralProtocol(typed)
+    wire_submit(bridge, bridge.sessions, protocol)
+    monkeypatch.setattr(terminal, "_fixture_protocol", protocol, raising=False)
     # Executing this fallback would conceal a broken ChatGPT preflight path.
     monkeypatch.setattr(terminal, "send", AsyncMock(side_effect=AssertionError("raw send")))
-    monkeypatch.setattr(terminal, "native", AsyncMock(side_effect=["➜  ~ \n\n", {"sent": True}]))
+    monkeypatch.setattr(terminal, "native", AsyncMock(return_value="➜  ~ \n\n"))
     return bridge, row, identity
 
 
 def arguments(row):
     return SessionInput(
         pane_id=row["pane_id"], expected_pid=row["expected_pid"], text="printf harmless"
+    )
+
+
+async def send_owned(bridge, row, *, before_transport=None):
+    args = arguments(row)
+    task_id = accepted_input(bridge, args)
+    return await bridge.sessions.send(
+        "local", args, task_id=task_id, before_transport=before_transport
     )
 
 
@@ -116,13 +142,12 @@ async def test_chatgpt_session_input_task_uses_confirmed_shell_path(direct_shell
     persisted = bridge.store.get(value.task_id)
     assert persisted["state"] == State.COMPLETED
     terminal = bridge.sessions.terminal_app
-    terminal.process_identity.assert_awaited_once_with(900)
-    terminal.read.assert_awaited_once_with(row["pane_id"])
-    assert terminal.native.await_count == 2
+    terminal.process_identity.assert_any_await(900, detailed=True)
+    terminal.read.assert_any_await(row["pane_id"])
+    assert terminal._fixture_protocol.typed == ["printf harmless"]
+    assert terminal._fixture_protocol.returns == 1
     sources = [call.args[0] for call in terminal.native.await_args_list]
-    assert "app.doScript(" not in sources[0]
-    assert sources[1].count("app.doScript(") == 1
-    assert terminal.native.call_args.kwargs["mutation"] is True
+    assert all("app.doScript(" not in source for source in sources)
     terminal.send.assert_not_awaited()
 
 
@@ -136,11 +161,11 @@ async def test_chatgpt_refusal_never_enters_native_dispatch(direct_shell, failur
     elif failure == "busy":
         row["busy"] = True
     elif failure == "tty":
-        terminal.process_identity.return_value = "501 ttys005 Fri Oct 30 01:00:00 2026"
+        terminal.process_identity.return_value = "501 ttys005 Fri Oct 30 01:00:00 2026 800 /bin/zsh"
     else:
         intent.side_effect = BridgeError("evidence_unavailable", "Cannot persist intent")
     with pytest.raises(BridgeError):
-        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+        await send_owned(bridge, row, before_transport=intent)
     terminal.native.assert_not_awaited()
     terminal.send.assert_not_awaited()
     if failure != "intent":
@@ -169,7 +194,7 @@ async def test_typed_prompt_suffix_never_enters_transport_or_intent(direct_shell
     terminal.read.return_value = screen
     intent = AsyncMock()
     with pytest.raises(BridgeError) as failure:
-        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+        await send_owned(bridge, row, before_transport=intent)
     assert failure.value.code == "visible_input_not_empty"
     intent.assert_not_awaited()
     terminal.native.assert_not_awaited()
@@ -182,7 +207,7 @@ async def test_prompt_sp_row_is_accepted_as_an_empty_shell(direct_shell):
         "      --agent  agent to use  [string]%                   ➜  KiraBridge-Workspace "
     )
     intent = AsyncMock()
-    result = await bridge.sessions.send("local", arguments(row), before_transport=intent)
+    result = await send_owned(bridge, row, before_transport=intent)
     assert result["submitted"] and result["input_handed_to_transport"]
     intent.assert_awaited_once()
     bridge.sessions.terminal_app.send.assert_not_awaited()
@@ -195,7 +220,7 @@ async def test_prompt_sp_row_with_typed_suffix_stays_blocked(direct_shell):
     )
     intent = AsyncMock()
     with pytest.raises(BridgeError) as failure:
-        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+        await send_owned(bridge, row, before_transport=intent)
     assert failure.value.code == "visible_input_not_empty"
     intent.assert_not_awaited()
     bridge.sessions.terminal_app.native.assert_not_awaited()
@@ -210,7 +235,7 @@ async def test_ambiguous_rendered_whitespace_preserves_input_before_intent(direc
     terminal.read.return_value = screen
     intent = AsyncMock()
     with pytest.raises(BridgeError) as failure:
-        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+        await send_owned(bridge, row, before_transport=intent)
     assert failure.value.code == "visible_input_not_empty"
     assert str(failure.value) == (
         "Cannot verify an empty shell prompt; existing or ambiguous input is preserved"
@@ -244,7 +269,7 @@ async def run_dispatch_js(source, state):
         "calls.push(text);}};"
         "const Application=name=>name==='System Events'?"
         "{processes:{byName:()=>({frontmost:()=>true})}}:app;const delay=()=>{};"
-        "Application.currentApplication=()=>({doShellScript:()=>state.identity});"
+        "Application.currentApplication=()=>({doShellScript:c=>c.includes('lsof')?'p900\\nfcwd\\nn/owned':state.identity});"
         "let result;try{result={value:JSON.parse(eval("
         + json.dumps(source)
         + ")),calls,state};}catch(error){result={error:String(error),calls,state};}"
@@ -276,7 +301,7 @@ async def run_dispatch_js(source, state):
         ("before-input", "Selected terminal input changed"),
         ("before-prompt", "Selected terminal input changed"),
         ("focus-input", "Focused shell input is not empty"),
-        ("focus-busy", "Selected terminal is busy"),
+        ("focus-busy", "Terminal changed"),
         ("busy", "Selected terminal is busy"),
         ("identity", "Selected target identity changed"),
     ],
@@ -303,7 +328,6 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
             state["identity"] = identity.replace("01:00", "02:00")
 
     async def native(source, *, mutation=False):
-        assert mutation
         result = await run_dispatch_js(source, state)
         observed.append(result)
         state.update(result["state"])
@@ -311,15 +335,23 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
             raise BridgeError("fixture_native_refused", result["error"])
         return result["value"]
 
+    def typed(text):
+        state["screen"] += text
+        terminal.read.return_value = state["screen"]
+        return state["screen"]
+
+    terminal._fixture_protocol.on_type = typed
     monkeypatch.setattr(terminal, "native", native)
     if error:
         with pytest.raises(BridgeError, match=error) as failure:
-            await bridge.sessions.send("local", arguments(row), before_transport=intent)
+            await send_owned(bridge, row, before_transport=intent)
         assert all(result["calls"] == [] for result in observed)
         if change == "focus-input":
             assert failure.value.code == "visible_input_not_empty"
     else:
-        result = await bridge.sessions.send("local", arguments(row), before_transport=intent)
+        result = await send_owned(bridge, row, before_transport=intent)
         assert result["submitted"] and result["input_handed_to_transport"]
-        assert [call for result in observed for call in result["calls"]] == ["printf harmless"]
+        assert all(result["calls"] == [] for result in observed)
+        assert terminal._fixture_protocol.typed == ["printf harmless"]
+        assert terminal._fixture_protocol.returns == 1
     terminal.send.assert_not_awaited()

@@ -58,10 +58,10 @@ async def test_replaced_host_wrapper_requires_retained_child_and_generation_evid
     leaf.system_transport.request = changed_layout
     if fault:
         with pytest.raises(UncertainExecution):
-            await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+            await leaf.open("", on_created=created, principal="chatgpt")
         assert events == ["create", "receipt", "focus"]
     else:
-        result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        result = await leaf.open("", on_created=created, principal="chatgpt")
         proof = result["physical_window"]
         assert proof["host_identity_basis"] == "retained_tab_identities"
         assert proof["own_identity_basis"] == "same_cg_window"
@@ -97,7 +97,7 @@ async def test_same_host_reflow_or_resize_binds_identity_and_preserves_fresh_lay
         return value
 
     leaf.system_transport.request = changed_layout
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["separate_window"] and result["physical_window"]["move_confirmed"]
     assert events == ["create", "receipt", "focus", "move"]
     await leaf.verify_opened(result, principal="chatgpt")

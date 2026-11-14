@@ -19,6 +19,11 @@ def plain(bridge, config, monkeypatch):
         "tty": "/dev/ttys004",
         "transport": "terminal_app",
         "busy": False,
+        "visual_window_id": 10621,
+        "tab_count": 1,
+        "identity_ambiguous": False,
+        "selection_ambiguous": False,
+        "process_owner_verified": True,
         "processes": [{"pid": 900, "ppid": 800, "name": "zsh", "image": "/bin/zsh"}],
     }
     snapshot = {
@@ -237,20 +242,25 @@ async def test_plain_paste_native_script_compiles_without_executing_ui(plain, tm
     assert compiled.returncode == 0, compiled.stderr
 
 
-async def test_submitted_direct_shell_checks_input_before_intent(plain, monkeypatch):
+async def test_submitted_direct_shell_checks_input_before_intent(plain, monkeypatch, bridge):
+    from test_native_send_identity import accepted_input
+
     sessions, _, _, native = plain
     monkeypatch.setattr(sessions, "direct", lambda principal: True)
     monkeypatch.setattr(
         sessions.terminal_app,
         "process_identity",
-        AsyncMock(return_value=f"{os.getuid()} ttys004 Sat Oct 24 12:00:00 2026"),
+        AsyncMock(return_value=f"{os.getuid()} ttys004 Sat Oct 24 12:00:00 2026 800 /bin/zsh"),
+    )
+    monkeypatch.setattr(
+        sessions.terminal_app, "process_working_directory", AsyncMock(return_value="/owned")
     )
     sessions.terminal_app.read.return_value = "KiraBridge fixture % unfinished user text"
     intent = AsyncMock()
+    args = arguments().model_copy(update={"submit": True})
+    task_id = accepted_input(bridge, args)
     with pytest.raises(BridgeError) as failure:
-        await sessions.send(
-            "local", arguments().model_copy(update={"submit": True}), before_transport=intent
-        )
+        await sessions.send("local", args, task_id=task_id, before_transport=intent)
     assert failure.value.code == "visible_input_not_empty"
     intent.assert_not_awaited()
     native.assert_not_awaited()
