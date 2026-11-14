@@ -6,6 +6,24 @@ import math
 from kirabridge.bridge_core.models import BridgeError
 
 
+def authorize_coordinator_reader(bridge, principal):
+    """Configured actor or current immutable owner of exactly the configured team."""
+    bridge.security.principal(principal, "team.read")
+    cfg = bridge.config.autonext
+    if principal == cfg.principal:
+        return
+    if cfg.team_id:
+        try:
+            team = bridge.teams.get(principal, cfg.team_id)
+        except BridgeError:
+            team = None
+        if team is not None and team["owner"] == principal:
+            return
+    raise BridgeError(
+        "coordinator_owner_required", "Configured coordinator or immutable team owner required"
+    )
+
+
 def _timestamp(value):
     if type(value) not in (int, float):
         return None
@@ -55,13 +73,11 @@ def task_timings(bridge, principal, task_id):
     and acceptance spans Core finish to the stored coordinator receipt. Each
     duration requires its own finite, ordered endpoints.
     """
-    bridge.security.principal(principal, "team.read")
     cfg = bridge.config.autonext
-    if principal != cfg.principal:
-        raise BridgeError("coordinator_owner_required", "Configured coordinator owner required")
-    if not cfg.grant_id or not any(pin.task_id == task_id for pin in cfg.cards):
-        raise BridgeError("not_found", "Current coordinator task was not found")
     with bridge.store.transaction():
+        authorize_coordinator_reader(bridge, principal)
+        if not cfg.grant_id or not any(pin.task_id == task_id for pin in cfg.cards):
+            raise BridgeError("not_found", "Current coordinator task was not found")
         bridge.teams.get(principal, cfg.team_id)
         row = bridge.store.db.execute(
             "SELECT i.task_id,i.work_id,i.state,i.source_ref,i.receipt,"

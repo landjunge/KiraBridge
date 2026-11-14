@@ -9,12 +9,13 @@ from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.autonext.coordinator import CoordinatedAutoNext
 from kirabridge.autonext.manager import AutoNextManager, text_sha
-from kirabridge.autonext.models import ApprovedCard, AutoNextConfig
+from kirabridge.autonext.models import ApprovedCard, AutoNextConfig, AutoNextControl
 from kirabridge.autonext.status import coordinator_status
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.read_query import ReadQuery, read_query_async
+from kirabridge.team_manager.models import TeamCreate
 from kirabridge.whiteboard_read import append_whiteboard
 
 
@@ -67,17 +68,28 @@ async def test_status_is_owner_scoped_bounded_and_does_not_dispatch(
     assert not status["restart_required"] and status["tasks"] == []
     assert b.autonext.worker is None
     assert b.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == count
-    for principal in ("local", "grok"):
-        with pytest.raises(BridgeError) as error:
-            coordinator_status(b, principal)
-        assert error.value.code == "coordinator_owner_required"
+    assert coordinator_status(b, "local") == status
+    with pytest.raises(BridgeError) as error:
+        coordinator_status(b, "grok")
+    assert error.value.code == "coordinator_owner_required"
     policy = s["config"].principals["codex"]
     policy.capabilities.remove("team.read")
     with pytest.raises(BridgeError):
         coordinator_status(b, "codex")
 
 
-@pytest.mark.parametrize("selector", [{"task_id": "other"}, {"wait_seconds": 1}, {"path": "/"}])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        {"task_id": "other"},
+        {"wait_seconds": 1},
+        {"path": "/"},
+        {"owner": "local"},
+        {"team_id": "other"},
+        {"principal": "codex"},
+        {"grant_id": "other"},
+    ],
+)
 def test_cached_status_rejects_unrelated_selectors(selector):
     with pytest.raises(ValueError):
         ReadQuery(operation="coordinator.status", **selector)
@@ -91,6 +103,109 @@ async def test_cached_status_enforces_budget(scenario, tmp_path, monkeypatch):  
             s["bridge"], "codex", ReadQuery(operation="coordinator.status", max_bytes=1)
         )
     assert error.value.code == "read_result_limit"
+
+
+async def test_demoted_immutable_owner_reads_same_task_status_without_private_or_action_rights(
+    scenario,  # noqa: F811
+    tmp_path,
+    monkeypatch,  # noqa: F811
+):
+    s, b = scenario, scenario["bridge"]
+    card = prepared(s, tmp_path, monkeypatch)
+    b.config.autonext.completion_target = "owner-status-test"
+    b.config.autonext.completion_mode = "verified_ack"
+    team = b.teams.get("local", "auto-team")
+    assert team["owner"] == "local" and team["coordinator"] == "codex"
+    assert team["members"]["local"]["role"] == "worker"
+    await s["start"]()
+    await until(lambda: b.autonext.inspect()["state"] in {"complete", "stopped"})
+    assert b.autonext.inspect()["state"] == "complete"
+    before = list(b.store.db.iterdump())
+    async with MCPClientPool() as pool:
+        await pool.connect(Peer("owner", url=s["endpoint"], token="local-test-" + "a" * 40))
+        view = (await pool.call("owner", "coordinator_status", {})).structuredContent
+        assert view == coordinator_status(b, "codex")
+        assert view["tasks"][0]["timings"]["execution_seconds"] is not None
+        cached = (
+            await pool.call("owner", "read_query", {"query": {"operation": "coordinator.status"}})
+        ).structuredContent
+        assert cached == view
+        core_id = view["tasks"][0]["work"]["worker"]["core_task_id"]
+        denied = (await pool.call("owner", "task_get", {"task_id": core_id})).structuredContent
+        assert denied["error"]["code"] == "not_found"
+    assert list(b.store.db.iterdump()) == before
+    rendered = json.dumps(view)
+    assert card["instruction"] not in rendered and "DONE:" not in rendered
+    with pytest.raises(BridgeError) as error:
+        b.autonext.validate_control(
+            "local", AutoNextControl(action="wake", grant_id=b.config.autonext.grant_id)
+        )
+    assert error.value.code == "autonext_operator_required"
+    with pytest.raises(BridgeError):
+        b.autonext.receipt("local", card["task_id"])
+    notice = b.store.db.execute(
+        "SELECT id,receipt FROM completion_notices WHERE source='autonext' "
+        "AND target='owner-status-test'"
+    ).fetchone()
+    with pytest.raises(BridgeError) as error:
+        b.completions.ack("local", notice["id"], notice["receipt"])
+    assert error.value.code == "not_found"
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["no_team", "missing_team", "inactive", "unconfigured", "capability"],
+)
+async def test_owner_status_fresh_team_membership_and_capability_required(
+    scenario,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+    change,  # noqa: F811
+):
+    s, b = scenario, scenario["bridge"]
+    prepared(s, tmp_path, monkeypatch)
+    assert coordinator_status(b, "local")["read_only"]
+    if change == "no_team":
+        b.config.autonext.team_id = ""
+    elif change == "missing_team":
+        b.config.autonext.team_id = "missing"
+    elif change == "inactive":
+        b.store.db.execute(
+            "UPDATE team_members SET active=0 WHERE team_id='auto-team' AND principal='local'"
+        )
+    elif change == "unconfigured":
+        del b.config.team.workers["local"]
+    else:
+        b.config.principals["local"].capabilities.remove("team.read")
+    with pytest.raises(BridgeError):
+        coordinator_status(b, "local")
+
+
+async def test_owner_of_foreign_team_cannot_read_configured_team_and_owner_is_not_cached(
+    scenario,  # noqa: F811
+    tmp_path,
+    monkeypatch,  # noqa: F811
+):
+    s, b = scenario, scenario["bridge"]
+    prepared(s, tmp_path, monkeypatch)
+    b.teams.create(
+        "grok",
+        TeamCreate(
+            team_id="foreign-team",
+            name="Other team",
+            coordinator="grok",
+            members={"grok": "coordinator"},
+            idempotency_key="foreign-owner",
+        ),
+    )
+    assert b.teams.get("grok", "foreign-team")["owner"] == "grok"
+    with pytest.raises(BridgeError) as error:
+        coordinator_status(b, "grok")
+    assert error.value.code == "coordinator_owner_required"
+    assert coordinator_status(b, "local")["team_id"] == "auto-team"
+    b.config.autonext.team_id = "foreign-team"
+    with pytest.raises(BridgeError):
+        coordinator_status(b, "local")
 
 
 async def test_native_followup_and_durable_completion_via_real_mcp(scenario, tmp_path, monkeypatch):  # noqa: F811
