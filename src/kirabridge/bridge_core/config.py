@@ -473,6 +473,7 @@ class VisibleTerminalBinding(BaseModel):
 class VisibleHandoffConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: Literal[True] = True
+    allow_interim_messages: bool = True
     bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
 
 

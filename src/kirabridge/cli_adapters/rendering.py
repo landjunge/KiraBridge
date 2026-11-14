@@ -235,7 +235,9 @@ def codex_full_row_widths(text, columns):
     return tuple(ambiguous)
 
 
-async def check_codex_paste_geometry(sessions, target, binding, text, before):
+async def check_codex_paste_geometry(
+    sessions, target, binding, text, before, *, composer_only=False
+):
     """Refuse a known unprovable representation before input, without widening verification."""
     words = _codex_cursor_words(text) if target == "codex" else None
     if words is None or max(map(len, text.split("\n")), default=0) < 16:
@@ -244,7 +246,10 @@ async def check_codex_paste_geometry(sessions, target, binding, text, before):
     if not selection or not isinstance(selection[2], dict):
         return
     columns = await sessions.terminal_app.input_columns(
-        binding.pane_id, identity_guard=selection[2], expected_screen=before["text"]
+        binding.pane_id,
+        identity_guard=selection[2],
+        expected_screen=before["text"],
+        **({"composer_only": True} if composer_only else {}),
     )
     widths = codex_full_row_widths(text, columns)
     if widths:

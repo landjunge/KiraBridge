@@ -9,10 +9,10 @@ def paste_source(text):
     return (
         "\nfunction observedPaste(before, after, columns) {"
         "if(before===after) return false;"
-        "const prompts=Array.from(after.matchAll(/^[ \\t]*›[^\\n]*/gm));"
+        r"const prompts=Array.from(after.matchAll(/^[ \t]*[›»][^\n]*/gm));"
         "if(!prompts.length) return false;"
         "const current=after.slice(prompts[prompts.length-1].index)"
-        ".replace(/^[ \\t]*› ?/,'');"
+        r".replace(/^[ \t]*[›»] ?/,'');"
         "const forms="
         + json.dumps(codex_payload_forms(text))
         + "; const lines="
