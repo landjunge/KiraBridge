@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -273,6 +274,7 @@ class TerminalAppTransport:
 
     async def _ps_catalog(self):
         with timed("ps_catalog"):
+            started = time.monotonic()
             child = await asyncio.create_subprocess_exec(
                 "/bin/ps",
                 "-axo",
@@ -280,23 +282,48 @@ class TerminalAppTransport:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
+            output = bytearray()
+            eof = False
+            phase = "stdout_read"
+            timeout_error = None
             try:
                 async with asyncio.timeout(3):
                     # Drain while enforcing the same finite observation budget.
                     # communicate() accumulates indefinitely until EOF; an already
                     # oversized, still-open pipe must never become a partial census.
-                    output = bytearray()
-                    while chunk := await child.stdout.read(
-                        min(65536, MAX_PROCESS_CATALOG_BYTES + 1 - len(output))
-                    ):
+                    while True:
+                        chunk = await child.stdout.read(
+                            min(65536, MAX_PROCESS_CATALOG_BYTES + 1 - len(output))
+                        )
+                        if not chunk:
+                            eof = True
+                            break
                         output.extend(chunk)
                         if len(output) > MAX_PROCESS_CATALOG_BYTES:
                             raise _process_catalog_invalid("output_limit")
+                    phase = "exit_wait"
                     await child.wait()
             except TimeoutError:
-                raise _process_observation_timeout("native_process_catalog") from None
+                timeout_error = _process_observation_timeout("native_process_catalog")
+                timeout_error.provider_error.update(
+                    {
+                        "stage": phase,
+                        "stdout_bytes": len(output),
+                        "stdout_eof": eof,
+                        "exit_status": child.returncode,
+                        "elapsed_ms": int((time.monotonic() - started) * 1000),
+                    }
+                )
+                raise timeout_error from None
             finally:
-                await reap_process(child, process_group=False)
+                cleanup_started = time.monotonic()
+                try:
+                    await reap_process(child, process_group=False)
+                finally:
+                    if timeout_error is not None:
+                        timeout_error.provider_error["cleanup_ms"] = int(
+                            (time.monotonic() - cleanup_started) * 1000
+                        )
         return bytes(output), child.returncode
 
     @timed_async("terminal_catalog")
