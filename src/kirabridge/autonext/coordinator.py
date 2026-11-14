@@ -430,10 +430,7 @@ class CoordinatedAutoNext(AutoNextManager):
 
     def _review_complete(self, item, work_id, expected):
         work = self.bridge.teams.work_get(self.settings.principal, self.settings.team_id, work_id)
-        if (
-            work["state"] == "unknown"
-            and work["evidence"].get("submission_observation_pending") is True
-        ):
+        if self._submission_pending(item, work):
             return False  # Observation pending, not permission for another turn.
         if work["state"] in TERMINAL:
             raise BridgeError("autonext_review_unknown", "Review failed or has unknown outcome")
@@ -574,7 +571,9 @@ class CoordinatedAutoNext(AutoNextManager):
                 pending["state"] == "unknown"
                 and pending["evidence"].get("submission_observation_pending") is True
             ):
-                return False
+                if self._submission_pending(item, pending):
+                    return False
+                raise BridgeError("autonext_review_unknown", "Original review outcome is unknown")
             history = self.store.db.execute(
                 "SELECT previous_evidence FROM team_work_reprocess_history WHERE work_id=?",
                 (row["verify_work_id"],),

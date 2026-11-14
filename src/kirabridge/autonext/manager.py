@@ -787,14 +787,38 @@ class AutoNextManager:
             raise BridgeError("autonext_completion_unknown", "No bounded successful core receipt")
         return core
 
+    def _submission_pending(self, item, work):
+        """Wait only for a bounded original observation, never a replacement turn."""
+        if (
+            not self.settings.coordinator_mode
+            or work["state"] != "unknown"
+            or work["evidence"].get("submission_observation_pending") is not True
+        ):
+            return False
+        try:
+            core = self.store.get(work["core_task_id"])
+        except BridgeError as exc:
+            if exc.code != "not_found":
+                raise
+            core = None
+        if core is not None:
+            if core["state"] in TERMINAL:
+                return False
+            if core["state"] == "completed":
+                try:
+                    self.bridge.teams._submission_result(work, core)
+                except BridgeError:
+                    return False
+                # The already completed original may be processed after lease
+                # expiry; this does not authorize any further model execution.
+                return core["finished"] <= item["lease_until"]
+        return time.time() < item["lease_until"]
+
     def _reconcile(self, item):
         work = self.bridge.teams.work_get(
             self.settings.principal, self.settings.team_id, item["work_id"]
         )
-        if (
-            work["state"] == "unknown"
-            and work["evidence"].get("submission_observation_pending") is True
-        ):
+        if self._submission_pending(item, work):
             return False  # Keep only the original observation pending, never dispatch again.
         if work["state"] in TERMINAL:
             self._stop("autonext_work_" + work["state"], item)

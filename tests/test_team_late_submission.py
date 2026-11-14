@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from test_mcp import http_bridge  # noqa: F401
@@ -14,7 +15,57 @@ from test_team_manager import core, domain, work  # noqa: F401
 
 from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.team_manager.dispatcher import TeamDispatcher
 from kirabridge.team_manager.models import TeamWorkReprocess
+
+
+@pytest.mark.parametrize("tool", ["task_submit", "task_get"])
+@pytest.mark.parametrize("state", ["failed", "blocked", "unknown", "cancelled"])
+async def test_durable_terminal_task_error_is_an_observation(tool, state):
+    task = {
+        "id": "team-original",
+        "operation": "agent.execute",
+        "state": state,
+        "request_sha256": "a" * 64,
+        "error": {"code": "peer_unknown"},
+    }
+
+    class Pool:
+        async def call(self, *_):
+            return SimpleNamespace(isError=False, structuredContent=task)
+
+    arguments = (
+        {"request": {"task_id": task["id"]}} if tool == "task_submit" else {"task_id": task["id"]}
+    )
+    dispatcher = TeamDispatcher(SimpleNamespace(teams=None))
+    assert await dispatcher._call(Pool(), tool, arguments) == task
+
+
+@pytest.mark.parametrize("change", ["error_envelope", "foreign_id", "wrong_operation", "no_seal"])
+async def test_submission_error_cannot_masquerade_as_original_task(change):
+    task = {
+        "id": "team-original",
+        "operation": "agent.execute",
+        "state": "unknown",
+        "request_sha256": "a" * 64,
+        "error": {"code": "peer_unknown"},
+    }
+    if change == "error_envelope":
+        task = {"error": task["error"]}
+    elif change == "foreign_id":
+        task["id"] = "foreign"
+    elif change == "wrong_operation":
+        task["operation"] = "file.write"
+    else:
+        del task["request_sha256"]
+
+    class Pool:
+        async def call(self, *_):
+            return SimpleNamespace(isError=False, structuredContent=task)
+
+    dispatcher = TeamDispatcher(SimpleNamespace(teams=None))
+    with pytest.raises(BridgeError, match="Authenticated team call was rejected"):
+        await dispatcher._call(Pool(), "task_submit", {"request": {"task_id": "team-original"}})
 
 
 def lost_submission(domain, *, automatic=False, team_id="test-team"):

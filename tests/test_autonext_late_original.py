@@ -16,6 +16,33 @@ from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.team_manager.models import TeamWorkReprocess
 
 
+@pytest.mark.parametrize("code", ["permission_denied", "autonext_source_changed"])
+async def test_definitive_verifier_rejection_stops_without_pending_observation(
+    scenario, tmp_path, monkeypatch, code
+):
+    b = scenario["bridge"]
+    configure(scenario, tmp_path, monkeypatch)
+    original = b.team_dispatcher._call
+    rejected = []
+
+    async def reject(pool, tool, args):
+        if tool == "task_submit" and args["request"]["arguments"]["agent"] == "codex_verify":
+            rejected.append(args["request"]["task_id"])
+            raise BridgeError(code, "Definitive pre-admission rejection")
+        return await original(pool, tool, args)
+
+    monkeypatch.setattr(b.team_dispatcher, "_call", reject)
+    await scenario["start"]()
+    await until(lambda: b.autonext.inspect()["state"] == "stopped")
+    row = b.store.db.execute("SELECT verify_work_id FROM autonext_coordinator").fetchone()
+    work = b.teams._work(row["verify_work_id"])
+    assert work["state"] == "unknown" and work["error"] == code
+    assert "submission_observation_pending" not in work["evidence"]
+    assert rejected == [work["core_task_id"]]
+    assert b.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+    assert b.store.db.execute("SELECT receipt FROM autonext_items").fetchone()[0] is None
+
+
 async def original_boundary(s, tmp_path, monkeypatch, *, legacy=True):
     card = configure(s, tmp_path, monkeypatch)
     (s["root"] / ".git").write_text("isolated result-only fixture")
@@ -223,6 +250,37 @@ async def test_new_submit_marker_automatically_finishes_original_after_lease(
     assert (
         runtime.process_completions(b, {"completion_target": "late-result-fixture"})["pending"] == 0
     )
+
+
+@pytest.mark.parametrize("outcome", ["failed", "unknown", "running_expired", "missing_expired"])
+async def test_ambiguous_original_terminal_or_expired_observation_stops_without_reexecution(
+    scenario, tmp_path, monkeypatch, outcome
+):
+    b = scenario["bridge"]
+    _, item, work, _, _, _ = await original_boundary(scenario, tmp_path, monkeypatch, legacy=False)
+    assert work["evidence"]["submission_observation_pending"] is True
+    if outcome == "missing_expired":
+        original_get = b.store.get
+
+        def missing(task_id, *args, **kwargs):
+            if task_id == work["core_task_id"]:
+                raise BridgeError("not_found", "Original Core unavailable")
+            return original_get(task_id, *args, **kwargs)
+
+        monkeypatch.setattr(b.store, "get", missing)
+    else:
+        state = "running" if outcome == "running_expired" else outcome
+        b.store.db.execute("UPDATE tasks SET state=? WHERE id=?", (state, work["core_task_id"]))
+    if outcome.endswith("expired"):
+        monkeypatch.setattr(time, "time", lambda: item["lease_until"] + 1)
+    before = [tuple(row) for row in b.store.db.execute("SELECT * FROM tasks")]
+    await b.autonext.tick()
+    assert b.autonext.inspect()["state"] == "stopped"
+    assert b.autonext.inspect()["reason"] == "autonext_review_unknown"
+    assert b.teams._work(work["id"]) == work  # Original ambiguity/history is retained.
+    assert [tuple(row) for row in b.store.db.execute("SELECT * FROM tasks")] == before
+    assert b.store.db.execute("SELECT receipt FROM autonext_items").fetchone()[0] is None
+    assert b.store.db.execute("SELECT count(*) FROM team_work_reprocess_history").fetchone()[0] == 0
 
 
 async def test_locked_cli_accepts_original_grant_and_processes_completion(
