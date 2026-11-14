@@ -172,7 +172,7 @@ Der Server läuft ohne macOS-GUI, Terminal.app oder native Tastatursteuerung.
 Zwischenablage ist optional (`wl-clipboard`/`xclip`). ChatGPT-/Kontoverknüpfung und
 Fernzugriff benötigen eigene Konfiguration.
 
-Der Entwicklungsquellstand unterscheidet jetzt die Terminalwege je Betriebssystem: `terminal.visible` auf macOS, eine eigene Server-Terminalsitzung über `session.open` auf Linux und `windows.console.handoff` auf Windows. Die alternativen Wege bleiben als ungeprüft gekennzeichnet und benötigen separate Freigaben sowie passende Pfad- und Programmrechte. Die Hinweise ändern weder Zugriffsrechte noch die installierte Laufzeit.
+Der Entwicklungsquellstand unterscheidet die Terminalwege je Betriebssystem: `terminal.visible` auf macOS, eine eigene Server-Terminalsitzung über `session.open` auf Linux und `windows.console.handoff` auf Windows. Unter Linux listet die normale Erkennung eigene Sitzungen auch ohne verfügbares tmux; Eingabe und Schließen verwenden die ausgewählte Linux-Kennung mit passender Prozess-ID statt macOS-Fensterprüfungen. Bestehende Nutzerrechte gelten weiter. Diese Quelländerung aktualisiert keine veröffentlichten Downloads und belegt keinen Windows-Laufzeittest.
 
 Das 0.8.0rc41-Archiv ist nativ auf Debian 13.6 x86_64 abgenommen und
 [im getrennten Serverrelease veröffentlicht](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). Der echte Download

@@ -173,7 +173,7 @@ This is a headless server, with no macOS GUI, Terminal.app or native keyboard.
 Clipboard support is optional (`wl-clipboard`/`xclip`). ChatGPT/account linking and
 remote access need separate configuration.
 
-Development source now identifies terminal routes by host: `terminal.visible` on macOS, a separate Bridge-owned terminal through `session.open` on Linux, and `windows.console.handoff` on Windows. The alternative routes remain marked as unprobed and require separate approval and suitable path and executable permissions. This guidance does not change access rights or the installed runtime.
+Development source identifies terminal routes by host: `terminal.visible` on macOS, a separate Bridge-owned terminal through `session.open` on Linux, and `windows.console.handoff` on Windows. On Linux, default discovery now lists owned sessions even when tmux is unavailable; input and close use the selected Linux handle and matching process ID instead of macOS window checks. Existing user permissions still apply. This source change does not update published downloads or attest a Windows runtime test.
 
 The 0.8.0rc41 archive is natively accepted on Debian 13.6 x86_64 and
 [published in its separate server release](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). The downloaded
