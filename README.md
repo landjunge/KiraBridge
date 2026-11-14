@@ -72,6 +72,8 @@ Readiness now distinguishes permission, platform support and unprobed transport.
 
 In development source, valid macOS system users with negative UIDs, such as `nobody`, no longer block the entire Terminal catalog. Their processes remain foreign; malformed process data and busy input targets are still rejected.
 
+Visible shell input in development source is bound to its original authorized task and requires an unambiguous Terminal window with one tab. Text is entered without Return; the complete terminal text and cursor position must match before one Return can be sent. Unconfirmed input is preserved without automatic repetition. Real terminal acceptance, including wrapping and scrolling, remains required before productive use.
+
 The release smoke fixture limits its temporary local identity to health and `file.read` checks with automatic approval. Normal installation defaults continue to require approval.
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.

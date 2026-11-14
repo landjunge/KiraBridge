@@ -7,7 +7,7 @@ import re
 import shlex
 import sys
 import time
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from pathlib import Path
@@ -114,6 +114,7 @@ class SessionManager:
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
         self.readiness = ports.readiness
         self.lock = asyncio.Lock()
+        self.native_input = None
         self._selection = ContextVar("kirabridge_visible_selection", default=None)
         self._observation = ContextVar("kirabridge_terminal_observation", default=None)
         self.terminal_app = (
@@ -124,6 +125,19 @@ class SessionManager:
         )
         self.linux = linux if linux is not None else LinuxOwnedTerminal()
         self.desktop = self.terminal_app.desktop
+
+    @asynccontextmanager
+    async def _submission_turn(self, native):
+        if native:
+            if self.native_input is None:
+                raise BridgeError(
+                    "terminal_authority_required", "Native terminal adapter unavailable"
+                )
+            async with self.native_input.desktop_input.transaction() as turn:
+                yield turn
+        else:
+            async with self.lock:
+                yield None
 
     def direct(self, principal):
         return (
@@ -621,7 +635,13 @@ class SessionManager:
         self.authorization.principal(principal, "terminal.execute")
         if "\x00" in args.text:
             raise BridgeError("invalid_arguments", "NUL in input")
-        async with self.lock:
+        if args.pane_id.startswith("terminal:") and args.submit:
+            from kirabridge.terminal_input import terminal_literal
+
+            terminal_literal(args.text)
+        async with self._submission_turn(
+            args.pane_id.startswith("terminal:") and args.submit
+        ) as turn:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
             # Recognition, exact assignment and central handoff are mandatory for
             # every CLI tab, including an unbound idle-looking tab. A raw shortcut
@@ -651,10 +671,20 @@ class SessionManager:
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
                 )
-            elif self.direct(principal):
-                identity = await self.terminal_app.process_identity(selected["expected_pid"])
+            elif args.pane_id.startswith("terminal:"):
+                identity = await self.terminal_app.process_identity(
+                    selected["expected_pid"], detailed=True
+                )
+                cwd = await self.terminal_app.process_working_directory(
+                    selected["expected_pid"], expected_identity=identity
+                )
                 await self.terminal_app.send_confirmed(
-                    selected, args.text, identity, before_transport=before_transport
+                    selected,
+                    args.text,
+                    identity,
+                    before_transport=before_transport,
+                    expected_cwd=cwd,
+                    input_context=self.native_input.bind_stored(principal, task_id, turn),
                 )
             else:
                 identities = None
@@ -945,13 +975,49 @@ class SessionManager:
                 + shlex.quote("KiraBridge visible %% ")
                 + " /bin/zsh -f"
             )
-        async with self.lock:
+        elif argv:
+            command += " && " + shlex.join(argv)
+        if sys.platform == "darwin":
+            from kirabridge.terminal_input import terminal_literal
+
+            terminal_literal(command)
+
+        def revalidate_open_origin():
+            current_policy = self.authorization.principal(principal, "session.open")
+            self.authorization.principal(principal, "terminal.execute")
+            PathScope(current_policy.terminal_roots or current_policy.roots).split(cwd)
+            if (
+                args.argv
+                and check_executable(
+                    args.argv[0],
+                    current_policy.executables,
+                    current_policy.allow_any_executable,
+                    self.environment["PATH"],
+                )
+                != argv[0]
+            ):
+                raise BridgeError("visible_target_changed", "Original session executable changed")
+
+        async with AsyncExitStack() as submission:
+            turn = await submission.enter_async_context(
+                self._submission_turn(sys.platform == "darwin")
+            )
             self.authorization.check_window(principal, task_id, args)
             if sys.platform.startswith("linux"):
                 return await self._open_owned_linux(principal, task_id, cwd, argv)
             try:
+                if turn is not None:
+                    self.native_input.bind_stored(
+                        principal,
+                        task_id,
+                        turn,
+                        opening=True,
+                        inspect_sessions=bool(argv),
+                        origin_guard=revalidate_open_origin,
+                    )
+                    turn.mark_attempted()
                 result = await self.terminal_app.open(
-                    command, on_created=on_created, principal=principal
+                    "", on_created=on_created, principal=principal
                 )
             except BaseException:
                 self.authorization.window_outcome(principal, task_id, "unknown")
@@ -968,15 +1034,21 @@ class SessionManager:
                         )
                     selected = matches[0] if matches else None
                     if selected:
-                        if argv:
+                        if command:
                             from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
                             if selected.get("busy", True):
                                 await asyncio.sleep(0.1)
                                 continue
-                            view = await self.read(
-                                principal, selected["pane_id"], selected["expected_pid"]
-                            )
+                            if argv:
+                                view = await self.read(
+                                    principal, selected["pane_id"], selected["expected_pid"]
+                                )
+                            else:
+                                # Inspect only the just-created, physically bound own
+                                # window under its original open grant, not all sessions.
+                                await self.terminal_app.verify_opened(result, principal=principal)
+                                view = {"text": await self.terminal_app.read(selected["pane_id"])}
                             if not empty_shell_prompt(view["text"]):
                                 await asyncio.sleep(0.1)
                                 continue
@@ -986,14 +1058,19 @@ class SessionManager:
                             actual_cwd = await self.terminal_app.process_working_directory(
                                 selected["expected_pid"], expected_identity=identity
                             )
-                            if actual_cwd != cwd:
-                                await asyncio.sleep(0.1)
-                                continue
                             await self.terminal_app.send_confirmed(
                                 selected,
-                                shlex.join(argv),
+                                command,
                                 identity,
-                                expected_cwd=cwd,
+                                expected_cwd=actual_cwd,
+                                input_context=self.native_input.bind_stored(
+                                    principal,
+                                    task_id,
+                                    turn,
+                                    opening=True,
+                                    inspect_sessions=bool(argv),
+                                    origin_guard=revalidate_open_origin,
+                                ),
                                 before_transport=lambda: self.terminal_app.verify_opened(
                                     result, principal=principal
                                 ),
@@ -1014,6 +1091,10 @@ class SessionManager:
                                 "binding": "not_applicable",
                             },
                         }
+                        # The single text/Return turn ends here. Agent startup/readiness
+                        # observation retains its existing longer deadline without
+                        # holding or renewing a desktop input lease.
+                        await submission.aclose()
                         if launched_agent:
                             started, process = await self._confirm_started_agent(
                                 result["tty"],

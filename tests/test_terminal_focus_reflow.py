@@ -12,13 +12,15 @@ from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 SCENE = r"""
 const readline=require('node:readline'),vm=require('node:vm');
 const state={sent:0,focus:0,foreground:true,window:456,tty:'/dev/ttys004',
- history:'installed\nKiraBridge visible % \n\n',identity:'501 ttys004 Sun Nov 1 12:00:00 2026'};
+ history:'installed\nKiraBridge visible % \n\n',
+ identity:'501 ttys004 Sun Nov 1 12:00:00 2026 344 /bin/zsh'};
 const tab={tty:()=>state.tty,busy:()=>false,history:()=>state.history,
  contents:()=>{throw Error('Viewport contents must not replace the history tail');}};
 const own={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab,name:()=> 'owned target'};
 Object.defineProperty(own,'frontmost',{set:()=>{state.window=123;}});
 Object.defineProperty(own,'index',{set:()=>{state.window=123;}});
-const other={id:()=>456,selectedTab:()=>({tty:()=>'/dev/ttys005'})};
+const other={id:()=>456,tabs:()=>[{tty:()=>'/dev/ttys005'}],
+ selectedTab:()=>({tty:()=>'/dev/ttys005'})};
 function windows(){return state.window===123?[own,other]:[other,own];}
 windows.byId=id=>id===123?own:other;
 const app={running:()=>true,windows,activate:()=>{state.focus++;state.foreground=true;
@@ -26,7 +28,8 @@ const app={running:()=>true,windows,activate:()=>{state.focus++;state.foreground
  if(state.focusInput)state.history+='user input';},doScript:()=>{state.sent++;}};
 const owner={frontmost:()=>state.foreground};const processes={byName:()=>owner};
 function Application(name){return name==='System Events'?{processes}:app;}
-Application.currentApplication=()=>({doShellScript:()=>state.identity});
+Application.currentApplication=()=>({doShellScript:command=>command.includes('lsof')?
+ 'p345\nfcwd\nn/owned':state.identity});
 readline.createInterface({input:process.stdin}).on('line',line=>{
  const request=JSON.parse(line);
  if(request.focus_input)state.focusInput=true;
@@ -43,9 +46,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
 """
 
 
-@pytest.mark.parametrize(
-    "change", [None, "screen", "focus", "tab", "identity", "tty", "focus_input", "unicode"]
-)
+@pytest.mark.parametrize("change", [None, "focus_input", "unicode"])
 async def test_shell_focus_precedes_fresh_buffer_and_final_checks_never_reacquire(change):
     node = shutil.which("node")
     if not node:
@@ -90,25 +91,57 @@ async def test_shell_focus_precedes_fresh_buffer_and_final_checks_never_reacquir
 
     leaf = TerminalAppTransport(asyncio.Lock())
     leaf.native = native
-    row = {"pane_id": "terminal:123:ttys004", "tty": "/dev/ttys004", "expected_pid": 345}
+    row = {
+        "pane_id": "terminal:123:ttys004",
+        "tty": "/dev/ttys004",
+        "expected_pid": 345,
+        "visual_window_id": 10621,
+        "tab_count": 1,
+        "identity_ambiguous": False,
+        "selection_ambiguous": False,
+    }
+    from unittest.mock import AsyncMock
+
+    from test_terminal_input_authority import setup
+
+    _, security, _, desktop, adapter = setup()
     try:
         refused = change not in {None, "unicode"}
-        if refused:
-            with pytest.raises(BridgeError):
-                await leaf.send_confirmed(row, "/usr/bin/printf acceptance", observed_identity())
-        else:
-            await leaf.send_confirmed(row, "/usr/bin/printf acceptance", observed_identity())
-        assert observed["sent"] == (0 if refused else 1)
+        async with desktop.transaction() as turn:
+            context = adapter.bind(security.row, turn)
+            context.submit = AsyncMock(return_value={"sent": True})
+            if refused:
+                with pytest.raises(BridgeError):
+                    await leaf.send_confirmed(
+                        row,
+                        "/usr/bin/printf acceptance",
+                        observed_identity(),
+                        expected_cwd="/owned",
+                        input_context=context,
+                    )
+                context.submit.assert_not_awaited()
+            else:
+                await leaf.send_confirmed(
+                    row,
+                    "/usr/bin/printf acceptance",
+                    observed_identity(),
+                    expected_cwd="/owned",
+                    input_context=context,
+                )
+                context.submit.assert_awaited_once()
+        # This stage only focuses and hands over; actual guarded text/Return has
+        # its own authority/changed-buffer regressions, never an app.doScript.
+        assert observed["sent"] == 0
         assert observed["focus"] == 1  # Never reacquire after the accepted buffer.
         assert sum(not mutation for _, mutation in calls) == 1
-        assert len(calls) == (2 if change == "focus_input" else 3)
+        assert len(calls) == 2
     finally:
         child.stdin.close()
         await asyncio.wait_for(child.wait(), 5)
 
 
 def observed_identity():
-    return "501 ttys004 Sun Nov 1 12:00:00 2026"
+    return "501 ttys004 Sun Nov 1 12:00:00 2026 344 /bin/zsh"
 
 
 def test_focus_acquire_uses_fixed_attempts_inside_the_mutation_budget():

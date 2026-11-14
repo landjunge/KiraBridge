@@ -821,6 +821,10 @@ class TerminalAppTransport:
         )
 
     def native_open_source(self, command, nonce, proof):
+        if command:
+            raise BridgeError(
+                "terminal_authority_required", "Create an empty shell before bound input"
+            )
         prior = json.dumps(proof.logical_before)
         guard = (
             self.native_identity_guard({proof.app["pid"]: proof.app_identity}) if proof.app else ""
@@ -917,6 +921,10 @@ entries[0].click();JSON.stringify({detached:true});
     async def open(self, command, *, on_created=None, principal="session_open"):
         from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
 
+        if command:
+            raise BridgeError(
+                "terminal_authority_required", "Create an empty shell before bound input"
+            )
         proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)
         await proof.prepare()
         receipt = None
@@ -1064,9 +1072,27 @@ entries[0].click();JSON.stringify({detached:true});
                 await reap_process(child, process_group=False)
 
     async def send_confirmed(
-        self, row, text, identity, *, before_transport=None, expected_cwd=None
+        self, row, text, identity, *, before_transport=None, expected_cwd=None, input_context=None
     ):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
+        from kirabridge.terminal_input import (
+            TerminalInputAuthority,
+            terminal_literal,
+            terminal_target_supported,
+        )
+
+        if not isinstance(input_context, TerminalInputAuthority):
+            raise BridgeError(
+                "terminal_authority_required", "Original task and desktop turn required"
+            )
+        terminal_literal(text)
+        input_context.check("terminal.input.inspect")
+        if not terminal_target_supported(row):
+            raise BridgeError(
+                "terminal_window_unsupported", "A confirmed physical single-tab shell is required"
+            )
+        if expected_cwd is None or len(identity.split(None, 8)) != 9:
+            raise BridgeError("visible_target_changed", "Detailed shell identity and CWD required")
         if identity.split()[1] != Path(row["tty"]).name:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
@@ -1118,6 +1144,8 @@ entries[0].click();JSON.stringify({detached:true});
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
         )
+        input_context.check("terminal.input.inspect")
+        input_context.turn.mark_attempted()
         screen = await self.native(
             target
             + identity_guard
@@ -1137,26 +1165,7 @@ entries[0].click();JSON.stringify({detached:true});
         # or activation in the dispatch.
         if not empty_shell_prompt(screen):
             raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
-        return await self.native(
-            target
-            + identity_guard
-            + own_boundary
-            + identity_check
-            + TerminalAppTransport.native_focus_check(row["pane_id"])
-            + "\ncheckFocus();"
-            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
-            # Use the accepted screen, not a second prompt parser that can drift.
-            + self.native_screen_guard(screen)
-            + ("\ncheckTargetIdentity();" if expected_cwd is not None else "")
-            + own_boundary
-            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
-            + self.native_screen_guard(screen)
-            + "\ncheckFocus();"
-            + "\napp.doScript("
-            + json.dumps(text)
-            + ", {in:tab}); JSON.stringify({sent:true});",
-            mutation=True,
-        )
+        return await input_context.submit(self, row, text, identity, expected_cwd)
 
     async def press_return(
         self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
@@ -1188,18 +1197,7 @@ entries[0].click();JSON.stringify({detached:true});
         )
 
     async def send(self, pane_id, text, *, submit, require_idle, identity_guard=None):
-        if not submit:
-            raise BridgeError("session_submit_required", "Terminal.app input submits a line")
-        if not identity_guard:
-            raise BridgeError(
-                "visible_selection_required", "Native submit requires a bound process identity"
-            )
-        await self.native(
-            self.native_target(pane_id)
-            + ('\nif(tab.busy()) throw Error("Selected terminal is busy");' if require_idle else "")
-            + self.native_identity_guard(identity_guard)
-            + "\napp.doScript("
-            + json.dumps(text)
-            + ", {in:tab}); JSON.stringify({sent:true});",
-            mutation=True,
+        raise BridgeError(
+            "terminal_authority_required",
+            "Terminal submission requires the original task and a live desktop turn",
         )

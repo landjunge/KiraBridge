@@ -285,6 +285,11 @@ class Bridge:
             desktop_input=self.desktop_input,
             authorize=self.security.authorize,
         )
+        from kirabridge.terminal_input import TerminalNativeInput
+
+        self.terminal_input = TerminalNativeInput(self.keyboard, self.security)
+        self.sessions.native_input = self.terminal_input
+        self.visible_terminal.native_input = self.terminal_input
         self.keyboard_control = KeyboardControl(self.keyboard)
         self.keyboard_sequence = KeyboardSequence(self.keyboard_control)
         self.keyboard_actions = KeyboardActionManager(

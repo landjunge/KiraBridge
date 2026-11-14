@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -178,7 +179,11 @@ class NativeSystemTransport:
             await asyncio.gather(active, return_exceptions=True)
         await self._discard()
 
-    async def request(self, operation, arguments, *, principal, before_send=None):
+    async def request(
+        self, operation, arguments, *, principal, before_send=None, _existing_process=None
+    ):
+        if _existing_process is not None and operation != "terminal.input.text.abort":
+            raise BridgeError("system_context_required", "Existing-stage mode is abort-only")
         if (
             not isinstance(principal, str)
             or not principal
@@ -188,11 +193,15 @@ class NativeSystemTransport:
             raise BridgeError(
                 "system_context_required", "Native operation requires its authenticated owner"
             )
-        mutating = operation not in READ_OPERATIONS
+        mutating = operation not in READ_OPERATIONS and operation != "terminal.input.inspect"
         attempted = False
         async with self.lock:
             if self.closed:
                 raise BridgeError("system_transport_closed", "Native system transport is closed")
+            if _existing_process is not None and (
+                self.process is not _existing_process or _existing_process.returncode is not None
+            ):
+                raise BridgeError("system_stage_worker_changed", "Original staging worker is gone")
             contract = self.snapshot_metadata()
             if not contract.get("available"):
                 raise BridgeError(
@@ -229,12 +238,14 @@ class NativeSystemTransport:
             try:
                 async with asyncio.timeout(self.timeout):
                     if (
-                        operation == "keyboard.inspect"
+                        operation in {"keyboard.inspect", "terminal.input.inspect"}
                         and self._keyboard_commit_attempts >= KEYBOARD_COMMIT_LIMIT
                     ):
                         # Only a new inspection may renew handles; never replay a mutation.
                         await self._discard()
                     if self.process is None:
+                        if _existing_process is not None:
+                            raise BridgeError("system_stage_worker_changed", "No staging worker")
                         creation = asyncio.create_task(
                             self.factory(
                                 contract["executable"],
@@ -265,9 +276,11 @@ class NativeSystemTransport:
                     if child.returncode is not None:
                         raise ValueError("Native worker exited")
                     if before_send is not None:
-                        before_send()
+                        prepared = before_send()
+                        if inspect.isawaitable(prepared):
+                            await prepared
                     attempted = True
-                    if operation == "keyboard.text.commit":
+                    if operation in {"keyboard.text.commit", "terminal.input.text.commit"}:
                         self._keyboard_commit_attempts += 1
                     child.stdin.write(payload)
                     await child.stdin.drain()

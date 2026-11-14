@@ -93,7 +93,7 @@ async def product(tmp_path, monkeypatch):
 
 async def test_product_open_records_creation_before_one_move_and_pins_native_ids(product):
     scene, leaf, events, receipt, created = product
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert events == ["create", "receipt", "focus", "move"]
     assert result["separate_window"] and result["physical_window"]["own_tabbar_hidden"]
     assert result["physical_window"]["cg_window_id"] == 777 != receipt["window_id"]
@@ -123,7 +123,7 @@ async def test_product_unknown_move_retains_exact_creation_and_never_sends_or_re
     scene, leaf, events, receipt, created = product
     scene.unknown_move = True
     with pytest.raises(UncertainExecution) as error:
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        await leaf.open("", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
     assert error.value.provider_error["automatic_retry"] is False
     assert events == ["create", "receipt", "focus", "move"]
@@ -132,7 +132,7 @@ async def test_product_unknown_move_retains_exact_creation_and_never_sends_or_re
 async def test_product_initial_separate_hidden_surface_preserves_original_groups(product):
     scene, leaf, events, _, created = product
     scene.already_isolated = True
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["physical_window"]["move_confirmed"] is False
     assert events == ["create", "receipt", "focus"]
 
@@ -161,7 +161,7 @@ async def test_product_cold_terminal_uses_one_returned_tty_without_adopting_rest
         return result
 
     leaf.system_transport.request = cold_request
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["separate_window"] and result["tty"] == "/dev/ttys004"
     assert events == ["create", "receipt", "focus"]
 
@@ -173,6 +173,19 @@ async def test_argv_for_all_principals_waits_for_full_binding_and_fresh_cwd(
     fixture = fixture_module("test_session_open_ambiguity")
     selected = fixture.row()
     manager, native, _ = fixture.manager_for_open(tmp_path, [selected])
+    from kirabridge.desktop_input import DesktopInput
+
+    desktop = DesktopInput(manager.lock)
+    context = object()
+
+    def bind(principal, task_id, turn, **options):
+        desktop.require_turn(turn)
+        assert principal == "chatgpt" and task_id == "owned" and options["opening"] is True
+        options["origin_guard"]()
+        return context
+
+    # This case tests manager ordering; real persisted authority is covered separately.
+    manager.native_input = SimpleNamespace(desktop_input=desktop, bind_stored=bind)
     manager.ports = replace(manager.ports, visible_required=lambda _: direct)
     receipt = {
         "tty": selected["tty"],
@@ -192,8 +205,10 @@ async def test_argv_for_all_principals_waits_for_full_binding_and_fresh_cwd(
         assert value == receipt
         events.append("durable-receipt")
 
-    async def sent(row, text, identity, *, expected_cwd, before_transport):
+    async def sent(row, text, identity, *, expected_cwd, before_transport, input_context):
         assert identity == "full-identity" and expected_cwd == str(tmp_path)
+        assert input_context is context
+        assert text == "cd -- " + __import__("shlex").quote(str(tmp_path)) + " && " + sys.executable
         await before_transport()
         events.append("argv-once")
         return {"sent": True}
@@ -222,9 +237,7 @@ async def test_native_creation_binds_only_doscript_returned_new_tty(product):
     if node is None:
         pytest.skip("JavaScript runtime unavailable")
     prior = [[row["window_id"], [row["tty"]]] for row in scene.rows]
-    source = leaf.native_open_source(
-        "cd -- /private/work", TITLE, SimpleNamespace(logical_before=prior, app=None)
-    )
+    source = leaf.native_open_source("", TITLE, SimpleNamespace(logical_before=prior, app=None))
     for change in (None, "reused", "duplicate"):
         code = (
             "const cfg="
@@ -268,23 +281,39 @@ process.stdout.write(JSON.stringify({receipt,opens,tags}));
             assert not result["receipt"]["creation_bound"] and result["tags"] == 0
 
 
-async def test_real_send_source_checks_full_image_parent_cwd_and_final_empty_screen(tmp_path):
+async def test_focus_source_checks_image_parent_cwd_and_screen_without_submitting(tmp_path):
     node = shutil.which("node")
     if node is None:
         pytest.skip("JavaScript runtime unavailable")
     fixture = fixture_module("test_codex_window_isolation")
     leaf = TerminalAppTransport(asyncio.Lock(), desktop=object())
     leaf.read = AsyncMock(return_value="KiraBridge visible % ")
-    leaf.native = AsyncMock(side_effect=["KiraBridge visible % ", {"sent": True}] * 2)
+    leaf.native = AsyncMock(return_value="KiraBridge visible % ")
     before_transport = AsyncMock()
-    row = {"pane_id": "terminal:123:ttys004", "tty": "/dev/ttys004", "expected_pid": 345}
-    await leaf.send_confirmed(
-        row,
-        "/bin/echo owned",
-        fixture.SHELL,
-        expected_cwd=str(tmp_path),
-        before_transport=before_transport,
-    )
+    row = {
+        "pane_id": "terminal:123:ttys004",
+        "tty": "/dev/ttys004",
+        "expected_pid": 345,
+        "visual_window_id": 10621,
+        "tab_count": 1,
+        "identity_ambiguous": False,
+        "selection_ambiguous": False,
+    }
+    from test_terminal_input_authority import setup
+
+    _, security, _, desktop, adapter = setup()
+    async with desktop.transaction() as turn:
+        context = adapter.bind(security.row, turn)
+        context.submit = AsyncMock(return_value={"sent": True})
+        await leaf.send_confirmed(
+            row,
+            "/bin/echo owned",
+            fixture.SHELL,
+            expected_cwd=str(tmp_path),
+            before_transport=before_transport,
+            input_context=context,
+        )
+        context.submit.assert_awaited_once()
     before_transport.assert_awaited_once()
     source = leaf.native.await_args.args[0]
     for change in (None, "image", "parent", "cwd", "screen", "busy"):
@@ -317,7 +346,7 @@ Application.currentApplication=()=>({doShellScript:command=>{
  }
  return identity;
 }});
-let error;try{vm.runInNewContext(cfg.source,{Application});}catch(e){error=e.message;}
+let error;try{vm.runInNewContext(cfg.source,{Application,delay:()=>{}});}catch(e){error=e.message;}
 process.stdout.write(JSON.stringify({sent,error}));
 """
         )
@@ -330,10 +359,12 @@ process.stdout.write(JSON.stringify({sent,error}));
             timeout=3,
         )
         observed = json.loads(result.stdout)
-        assert observed["sent"] == (1 if change is None else 0), observed
+        assert observed["sent"] == 0, observed
+        assert bool(observed.get("error")) is (change is not None), observed
 
-    await leaf.send_confirmed(row, "/bin/echo owned", fixture.SHELL)
-    assert "targetWindow.tabs().length!==1" not in leaf.native.await_args.args[0]
+    assert "app.doScript(" not in source
+    with pytest.raises(BridgeError, match="Original task"):
+        await leaf.send_confirmed(row, "/bin/echo owned", fixture.SHELL)
 
 
 async def test_preopen_original_radio_replacement_stops_before_any_move(product):
@@ -352,7 +383,7 @@ async def test_preopen_original_radio_replacement_stops_before_any_move(product)
 
     leaf.system_transport.request = replacement
     with pytest.raises(UncertainExecution) as error:
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        await leaf.open("", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
     assert events == ["create", "receipt", "focus"]
 
@@ -425,7 +456,7 @@ async def test_one_confirmed_move_allows_either_split_surface_to_keep_shared_cg(
         return value
 
     leaf.system_transport.request = moved_geometry
-    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    result = await leaf.open("", on_created=created, principal="chatgpt")
     assert result["physical_window"]["cg_window_id"] == own_id
     assert result["physical_window"]["ax_window_token"] == f"{1:032x}"
     assert events == ["create", "receipt", "focus", "move"]
@@ -455,7 +486,7 @@ async def test_postmove_only_count_mismatch_reads_again_without_repeating_move(p
     leaf.system_transport.request = asynchronous_move
     if persistent:
         with pytest.raises(UncertainExecution) as error:
-            await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+            await leaf.open("", on_created=created, principal="chatgpt")
         assert error.value.provider_error["cause_code"] == "session_window_inventory_pending"
         assert error.value.provider_error["cause_message"] == (
             "Native AX/CG window inventory differs (CG=2, AX=1, AX-list=2)"
@@ -463,7 +494,7 @@ async def test_postmove_only_count_mismatch_reads_again_without_repeating_move(p
         assert error.value.provider_error["creation_receipt"] == receipt
         assert postmove_reads == 10
     else:
-        result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        result = await leaf.open("", on_created=created, principal="chatgpt")
         assert result["separate_window"] and result["physical_window"]["move_confirmed"]
         assert postmove_reads == 2
     assert events == ["create", "receipt", "focus", "move"]

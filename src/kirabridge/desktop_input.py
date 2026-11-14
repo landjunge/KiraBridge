@@ -3,7 +3,7 @@
 import asyncio
 import math
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 
@@ -22,6 +22,8 @@ DESKTOP_EFFECT_OPERATIONS = frozenset(
 @dataclass
 class InputTurn:
     attempted: bool = False
+    _desktop: object = field(default=None, init=False, repr=False)
+    _owner: object = field(default=None, init=False, repr=False)
 
     def mark_attempted(self):
         self.attempted = True
@@ -33,6 +35,17 @@ class DesktopInput:
             raise ValueError("Desktop input deadline must be finite and at most 30 seconds")
         self.lock, self.timeout = session_lock, timeout
 
+    def require_turn(self, turn):
+        if (
+            not isinstance(turn, InputTurn)
+            or turn._desktop is not self
+            or turn._owner is not asyncio.current_task()
+            or not self.lock.locked()
+        ):
+            raise BridgeError(
+                "desktop_turn_required", "A live caller-owned desktop turn is required"
+            )
+
     @asynccontextmanager
     async def transaction(self):
         turn = InputTurn()
@@ -40,7 +53,11 @@ class DesktopInput:
         try:
             async with deadline:
                 async with self.lock:
-                    yield turn
+                    turn._desktop, turn._owner = self, asyncio.current_task()
+                    try:
+                        yield turn
+                    finally:
+                        turn._desktop = turn._owner = None
         except TimeoutError:
             if not deadline.expired():
                 raise  # Preserve the responsible phase of an inner observation timeout.

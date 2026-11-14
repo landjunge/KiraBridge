@@ -27,6 +27,12 @@ def command(bridge, config, monkeypatch):
         "expected_pid": 345,
         "tty": "/dev/ttys004",
         "transport": "terminal_app",
+        "window_id": 123,
+        "visual_window_id": 10621,
+        "tab_count": 1,
+        "identity_ambiguous": False,
+        "selection_ambiguous": False,
+        "process_owner_verified": True,
         "busy": False,
         "processes": [{"pid": 345, "ppid": 344, "name": "zsh", "image": "/bin/zsh"}],
     }
@@ -52,18 +58,24 @@ def command(bridge, config, monkeypatch):
         state["reads"].append(state["catalogs"])
         return "host project% "
 
-    async def identity(pid):
+    async def identity(pid, *, detailed=False):
+        assert detailed is True
         state["identities"].append(pid)
-        return "501 ttys004 Wed Nov 4 12:00:00 2026"
+        return f"501 {Path(row['tty']).name} Wed Nov 4 12:00:00 2026 344 /bin/zsh"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, *, expected_cwd, input_context):
         assert all(selected[key] == value for key, value in row.items())
-        assert observed_identity.startswith("501 ttys004 ")
+        assert observed_identity.startswith(f"501 {Path(row['tty']).name} ")
+        assert expected_cwd == policy.roots[0]
+        input_context.check("terminal.input.inspect")
+        bridge.desktop_input.require_turn(input_context.turn)
         state["posts"].append(text)
         state["catalogs_at_dispatch"] = state["catalogs"]
         state["reads_at_dispatch"] = len(state["reads"])
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
+        if state.get("wrong_nonce"):
+            nonce = "0" * len(nonce)
         write_private(script.parent / "result.json", json.dumps({"nonce": nonce, "exit_code": 0}))
 
     transport = bridge.sessions.terminal_app
@@ -71,6 +83,9 @@ def command(bridge, config, monkeypatch):
     monkeypatch.setattr(transport, "catalog", catalog)
     monkeypatch.setattr(transport, "read", read)
     monkeypatch.setattr(transport, "process_identity", identity)
+    monkeypatch.setattr(
+        transport, "process_working_directory", AsyncMock(return_value=policy.roots[0])
+    )
     monkeypatch.setattr(transport, "send_confirmed", send)
     monkeypatch.setattr(bridge.sessions.tmux, "catalog", AsyncMock(return_value=[]))
     args = {
@@ -81,6 +96,13 @@ def command(bridge, config, monkeypatch):
         "create_if_needed": False,
     }
     return bridge, state, args
+
+
+def accepted_original(bridge, args, task_id):
+    bridge.prepare("local", request("terminal.visible", args, task_id=task_id))
+    task = bridge.store.claim_exact(bridge.tasks.owner, bridge.config.lease_seconds, task_id)
+    assert task is not None
+    return task
 
 
 async def test_visible_command_keeps_final_selection_screens_and_no_replay(command):
@@ -153,7 +175,7 @@ async def test_visible_command_retains_canonical_row_for_legacy_and_created_shel
             }
         )
     result = await bridge.visible_terminal.execute(
-        {"id": "canonical-row", "principal": "local"},
+        accepted_original(bridge, args, "canonical-row"),
         VisibleTerminalInput.model_validate(args),
         AsyncMock(),
     )
@@ -208,8 +230,12 @@ async def test_idle_shell_unconfirmed_input_is_not_reported_as_process_busy(comm
     running.assert_not_awaited()
 
 
-async def test_unknown_input_without_safe_shell_does_not_open_replacement_window(command):
+@pytest.mark.parametrize("tab_count", [1, 2])
+async def test_unknown_input_without_safe_shell_does_not_open_replacement_window(
+    command, tab_count
+):
     bridge, state, args = command
+    state["row"]["tab_count"] = tab_count
     bridge.sessions.terminal_app.read = AsyncMock(return_value="host project%    ")
     bridge.sessions.open = AsyncMock(side_effect=AssertionError("must preserve ambiguous input"))
     args.pop("pane_id")
@@ -248,13 +274,138 @@ async def test_auto_selection_uses_existing_safe_shell_beside_unknown_input(comm
     args.pop("expected_pid")
     args["create_if_needed"] = True
     result = await bridge.visible_terminal.execute(
-        {"id": "safe-existing-shell", "principal": "local"},
+        accepted_original(bridge, args, "safe-existing-shell"),
         VisibleTerminalInput.model_validate(args),
         AsyncMock(),
     )
     assert result["pane_id"] == safe["pane_id"] and result["exit_code"] == 0
     assert len(state["posts"]) == 1
     bridge.sessions.open.assert_not_awaited()
+
+
+async def test_verified_input_without_original_nonce_result_is_unknown_and_never_replayed(command):
+    bridge, state, args = command
+    state["wrong_nonce"] = True
+    value = request("terminal.visible", args, task_id="wrong-command-nonce")
+    async with bridge:
+        bridge.prepare("local", value)
+        task = await bridge.tasks.wait("local", value.task_id, 5)
+        assert task["state"] == "unknown" and task["error"]["code"] == "visible_result_unknown"
+        assert len(state["posts"]) == 1
+        before = copy.deepcopy(state)
+        assert bridge.prepare("local", value)["state"] == "unknown"
+        assert state == before
+
+
+@pytest.mark.parametrize("physical", ["multiple_tabs", "missing_visual_id"])
+async def test_explicit_unsupported_physical_view_is_preserved_without_switch_or_input(
+    command, physical
+):
+    bridge, state, args = command
+    if physical == "multiple_tabs":
+        state["row"]["tab_count"] = 2
+    else:
+        state["row"]["visual_window_id"] = None
+    bridge.sessions.open = AsyncMock(
+        side_effect=AssertionError("Do not replace an explicit target")
+    )
+    with pytest.raises(BridgeError) as error:
+        await bridge.visible_terminal.execute(
+            {"id": "unsupported-target", "principal": "local"},
+            VisibleTerminalInput.model_validate(args),
+            AsyncMock(),
+        )
+    assert error.value.code == "terminal_window_unsupported" and not state["posts"]
+    assert not state["reads"]
+    bridge.sessions.open.assert_not_awaited()
+
+
+async def test_automatic_selection_prefers_existing_single_tab_over_multitab(command):
+    bridge, state, args = command
+    safe = state["row"]
+    unsupported = {**copy.deepcopy(safe), "pane_id": "terminal:122:ttys003", "tab_count": 2}
+
+    async def catalog():
+        state["catalogs"] += 1
+        return [copy.deepcopy(unsupported), copy.deepcopy(safe)]
+
+    bridge.sessions.terminal_app.catalog = catalog
+    bridge.sessions.terminal_app.read = AsyncMock(return_value="host project% ")
+    bridge.sessions.open = AsyncMock(
+        side_effect=AssertionError("Use the existing single-tab shell")
+    )
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = True
+    result = await bridge.visible_terminal.execute(
+        accepted_original(bridge, args, "existing-single-tab"),
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert result["pane_id"] == safe["pane_id"] and len(state["posts"]) == 1
+    bridge.sessions.open.assert_not_awaited()
+
+
+async def test_known_empty_multitab_requires_original_creation_grant_when_creation_disabled(
+    command,
+):
+    bridge, state, args = command
+    state["row"]["tab_count"] = 2
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = False
+    bridge.sessions.open = AsyncMock(side_effect=AssertionError("No per-probe replacement windows"))
+    with pytest.raises(BridgeError) as error:
+        await bridge.visible_terminal.execute(
+            {"id": "no-window-growth", "principal": "local"},
+            VisibleTerminalInput.model_validate(args),
+            AsyncMock(),
+        )
+    assert error.value.code == "terminal_window_unsupported" and not state["posts"]
+    bridge.sessions.open.assert_not_awaited()
+
+
+@pytest.mark.parametrize("existing", ["busy_agent", "editor", "foreign", "empty_multitab"])
+async def test_nonreusable_existing_views_do_not_veto_one_authorized_own_shell(command, existing):
+    bridge, state, args = command
+    safe = copy.deepcopy(state["row"])
+    state["row"]["tab_count"] = 2
+    if existing == "busy_agent":
+        state["row"].update(busy=True, identity_ambiguous=True)
+        state["row"]["processes"][0]["name"] = "codex"
+    elif existing == "editor":
+        state["row"]["processes"][0]["name"] = "vim"
+    elif existing == "foreign":
+        state["row"]["process_owner_verified"] = False
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = True
+
+    async def open_owned(principal, options, *, task_id):
+        assert principal == "local" and options.controlled_shell and options.cwd == args["cwd"]
+        assert task_id == "authorized-own-shell"
+        state["row"].clear()
+        state["row"].update(safe)
+        state["row"].update(
+            pane_id="terminal:124:ttys007",
+            window_id=124,
+            visual_window_id=10622,
+            tty="/dev/ttys007",
+        )
+        return {
+            "pane_id": state["row"]["pane_id"],
+            "expected_pid": safe["expected_pid"],
+            "tty": state["row"]["tty"],
+        }
+
+    bridge.sessions.open = AsyncMock(side_effect=open_owned)
+    result = await bridge.visible_terminal.execute(
+        accepted_original(bridge, args, "authorized-own-shell"),
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert result["pane_id"] == "terminal:124:ttys007" and len(state["posts"]) == 1
+    bridge.sessions.open.assert_awaited_once()
 
 
 async def test_dirty_git_prompt_is_confirmed_as_empty_without_posting_input(command):
