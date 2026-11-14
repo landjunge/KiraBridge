@@ -44,6 +44,10 @@ def catalog_transport(monkeypatch, output, returncode=0):
         (VALID + b"501 456 1 ttys005\n", 0),
         (VALID + b"\xff 456 1 ttys005 /bin/zsh\n", 0),
         (VALID + "² 456 1 ttys005 /bin/zsh\n".encode(), 0),
+        (VALID + b"-2 -456 1 ?? /bin/sh\n", 0),
+        (VALID + b"-2 456 -1 ?? /bin/sh\n", 0),
+        (VALID + b"--2 456 1 ?? /bin/sh\n", 0),
+        (VALID + "−2 456 1 ?? /bin/sh\n".encode(), 0),
         (VALID + VALID, 0),
     ],
 )
@@ -99,3 +103,39 @@ async def test_grouped_catalog_keeps_live_views_legacy_root_and_foreign_boundari
     assert all([p["pid"] for p in row["processes"]] == [345, 346] for row in rows)
     assert transport.last_catalog_incomplete is True
     transport.ended_windows.assert_awaited_once_with([100, 101, 102])
+
+
+async def test_signed_system_uids_remain_foreign_and_keep_owned_tty_tree(monkeypatch):
+    output = (
+        b"-2 700 1 ?? /bin/sh\n"
+        b"-2 701 700 ?? /usr/bin/find\n"
+        b"-2 702 700 ?? /usr/libexec/locate.code\n"
+        b"-2 703 702 ?? /bin/sh\n"
+        b"0 344 1 ttys000 /usr/bin/login\n"
+        b"501 345 344 ttys000 /bin/zsh\n"
+        b"501 346 345 ttys000 /Applications/Example Name.app/Contents/MacOS/codex\n"
+        b"-2 704 1 ttys000 /foreign/worker\n"
+        b"-501 705 1 ttys000 /foreign/same-uid-magnitude\n"
+        b"-2 706 1 ttys003 /bin/zsh\n"
+    )
+    transport, child, cleanup = catalog_transport(monkeypatch, output)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.os", SimpleNamespace(getuid=lambda: 501)
+    )
+    transport.native.return_value = [
+        {"window_id": 100, "tty": "/dev/ttys000", "busy": True},
+        {"window_id": 103, "tty": "/dev/ttys003", "busy": False},
+    ]
+
+    rows = await transport.catalog()
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["pane_id"] == "terminal:100:ttys000"
+    assert row["expected_pid"] == 345 and row["legacy_expected_pid"] == 344
+    assert row["busy"] is True and row["process_owner_verified"] is True
+    assert [process["pid"] for process in row["processes"]] == [345, 346]
+    assert row["processes"][1]["ppid"] == 345
+    assert row["processes"][1]["image"].endswith("Example Name.app/Contents/MacOS/codex")
+    assert transport.last_catalog_incomplete is True
+    cleanup.assert_awaited_once_with(child, process_group=False)
