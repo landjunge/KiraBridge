@@ -284,6 +284,8 @@ guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window contr
 The documented Windows 11 installation was verified.
 [Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); the earlier dev2 record remains for rollback notes.
 
+Development source keeps CLI startup independent of the optional Linux PTY module: POSIX terminal dependencies load only when that backend executes. The generated Windows CMD launcher preserves child exit codes, including a rollback that rewrites the caller. A bounded public Windows CI job checks imports, CLI help and this launcher contract; it is not desktop or installer acceptance. Current package and unelevated Windows installation still require their own native evidence.
+
 ### Design source · November 7, 2026
 
 The shared header with five original icons is implemented and locally reviewed.
