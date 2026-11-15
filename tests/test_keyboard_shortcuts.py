@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from pydantic import ValidationError
 
 from kirabridge.bridge_core.models import BridgeError
@@ -32,6 +33,7 @@ def test_shortcut_pages_require_bounded_observed_context(change):
 async def test_shortcut_discovery_uses_authorized_native_read_without_desktop_lease(bridge):
     operation = "keyboard.shortcuts.discover"
     bridge.config.principals["local"].capabilities.append("keyboard.shortcuts.read")
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.native_metadata = lambda: {
         "available": True,
@@ -61,6 +63,7 @@ async def test_keyboard_execution_grant_does_not_authorize_shortcut_discovery(br
     policy = bridge.config.principals["local"]
     policy.capabilities = ["keyboard.execute", "keyboard.inspect"]
     policy.permission_level = "full"
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.native_metadata = lambda: {
         "available": True,
