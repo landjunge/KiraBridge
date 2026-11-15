@@ -150,9 +150,9 @@ async def test_real_stdio_proxy_library_discovery_calls_and_revocation(
     )
     async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
         initialized = await session.initialize()
-        assert (initialized.capabilities.model_extra or {}).get("events") == (
-            {} if events_wrapped else None
-        )
+        # No persistent sender is started by this Library-only test. Even the
+        # opt-in wrapper must preserve tools while withholding Events readiness.
+        assert (initialized.capabilities.model_extra or {}).get("events") is None
         tools = {tool.name: tool for tool in (await session.list_tools()).tools}
         names = ("td_library_query", "td_library_uquery", "td_td_library_uquery")
         assert set(names) <= tools.keys()

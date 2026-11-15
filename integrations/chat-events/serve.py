@@ -30,6 +30,7 @@ from kirabridge.event_push import (  # noqa: E402
     WebhookSender,
     wait_backend_ready,
 )
+from kirabridge.event_readiness import SenderReadiness  # noqa: E402
 
 
 def credentials(config, principal):
@@ -45,6 +46,59 @@ def credentials(config, principal):
     if not isinstance(token, str) or len(token) < 32:
         raise RuntimeError("credentials_missing")
     return token
+
+
+def failed_tool_result(result, *, task_binding=None):
+    """Reject contradictory MCP/error envelopes before looking at identity fields.
+
+    Inspect envelope wrappers only, not message bodies, processing records or
+    user-authored source data. Those may legitimately describe a failed job.
+    """
+
+    def failed(value):
+        if not isinstance(value, dict):
+            return False
+        if "isError" in value and value["isError"] is not False:
+            return True
+        if any(key in value and value[key] is not True for key in ("success", "ok")):
+            return True
+        # task_get returns a full owned task record, including its execution
+        # error/result. A failed task is still readable and needs its completion.
+        # This exception never applies to an error envelope carrying only IDs.
+        if task_binding is not None and (
+            (value.get("id"), value.get("principal")) == task_binding
+            and value.get("api_version") == "1"
+            and value.get("state")
+            in {
+                "created",
+                "queued",
+                "accepted",
+                "running",
+                "completed",
+                "failed",
+                "blocked",
+                "unknown",
+                "cancelled",
+            }
+            and isinstance(value.get("operation"), str)
+            and isinstance(value.get("request_sha256"), str)
+            and len(value["request_sha256"]) == 64
+        ):
+            return False
+        if "error" in value and value["error"] is not None:
+            return True
+        return any(failed(value.get(key)) for key in ("structuredContent", "result", "value"))
+
+    if not isinstance(result, dict) or failed(result):
+        return True
+    for block in result.get("content", []):
+        if isinstance(block, dict) and block.get("type") == "text":
+            try:
+                if failed(json.loads(block.get("text", ""))):
+                    return True
+            except (ValueError, TypeError):
+                pass
+    return False
 
 
 class Backend:
@@ -84,7 +138,11 @@ class Backend:
 
     async def authorize(self, task_id):
         result = await self.call("task_get", {"task_id": task_id})
+        if failed_tool_result(result, task_binding=(task_id, self.principal)):
+            return False
         data = result.get("structuredContent") or {}
+        if not isinstance(data, dict):
+            raise EventError("backend_authorization_unknown")
         if data.get("id") == task_id and data.get("principal") == self.principal:
             return True
         if (data.get("error") or {}).get("code") in {"forbidden", "not_found"}:
@@ -93,7 +151,11 @@ class Backend:
 
     async def authorize_message(self, message_id):
         result = await self.call("message_get", {"message_id": message_id})
+        if failed_tool_result(result):
+            return False
         data = result.get("structuredContent") or {}
+        if not isinstance(data, dict):
+            raise EventError("backend_authorization_unknown")
         if data.get("id") == message_id and data.get("recipient") == self.principal:
             return True
         if (data.get("error") or {}).get("code") in {"forbidden", "not_found"}:
@@ -150,16 +212,20 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
     )
     if not external_sender:
         push.recover()
+    readiness = SenderReadiness(journal, config, principal, allowed_hosts)
+    push.sender_readiness = readiness
 
     async def worker():
         failures = 0
         while True:
             try:
                 await push.deliver_once()
+                readiness.publish("ready")
                 failures = 0
             except asyncio.CancelledError:
                 raise
             except Exception:
+                readiness.publish("unready")
                 # No raw URLs, secrets, event bodies or backend exceptions in logs.
                 failures += 1
                 journal.observe("worker_error", reason="delivery_cycle_failed")
@@ -179,6 +245,7 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
             yield task
         finally:
             if task:
+                readiness.publish("stopped")
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
             await backend.client.aclose()
@@ -322,6 +389,8 @@ async def make_server(
     )
 
     async def events(ctx, params):
+        if not push.sender_readiness.is_ready():
+            raise EventError("event_sender_unavailable")
         journal.observe("rpc_" + ctx.method.replace("/", "_"))
         data = params.model_dump(by_alias=True, exclude={"meta"})
         if ctx.method == "events/list":
@@ -345,8 +414,9 @@ async def make_server(
             if ctx.method in {"server/discover", "initialize"}:
                 # Both initialize and MCP2 discovery support this extension. Handlers
                 # are registered below; this is not a promise of a received chat turn.
-                result["capabilities"]["events"] = {}
-                journal.observe("rpc_server_discover")
+                if push.sender_readiness.is_ready():
+                    result["capabilities"]["events"] = {}
+                journal.observe("rpc_" + ctx.method.replace("/", "_"))
             return result
         except EventError as exc:
             journal.observe("request_rejected", reason=exc.reason)
