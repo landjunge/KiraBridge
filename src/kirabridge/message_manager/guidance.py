@@ -6,6 +6,20 @@ from kirabridge.bridge_core.models import AgentInput, BridgeError, canonical, di
 from kirabridge.message_manager.receiver import separate_managed_eligible
 
 
+def _payload(rows):
+    return {
+        "managed_guidance_batch": 1,
+        "instruction": "Read these original guidance notes as context at this safe boundary. "
+        "Summarize the accepted priorities and unresolved limits briefly. Do not execute old "
+        "work, send messages, call Apps/tools/network, delegate, change services or claim UI "
+        "wake. The controller owns delivery and ACK. Notes request no automatic reply.",
+        "messages": [
+            {k: row[k] for k in ("id", "sender", "recipient", "conversation_id", "body")}
+            for row in rows
+        ],
+    }
+
+
 def ready(receiver, recipient):
     cfg = receiver.bridge.config
     if recipient not in cfg.messaging.receivers or cfg.messaging.separate_managed_after is None:
@@ -77,6 +91,25 @@ async def consume(receiver, recipient, pool):
         if not separate_managed_eligible(cfg, row["created"]):
             return False
         receiver.messages._row(recipient, row["id"])
+    # Validate the complete serialized envelope, not just individual note
+    # lengths, before reservation or delivery. Remaining notes stay pending.
+    settings = cfg.messaging.receivers[recipient]
+    selected, prepared = [], None
+    for row in rows:
+        prompt = canonical(_payload([*selected, row]))
+        if len(prompt.encode("utf-8")) > 262144:
+            break
+        prepared = AgentInput(
+            agent=recipient,
+            prompt=prompt,
+            cwd=settings.cwd,
+            timeout=settings.timeout,
+            wait_for_reply=True,
+        )
+        selected.append(row)
+    if prepared is None:
+        return False
+    rows = selected
     with store.transaction():
         # Existing job reservation is the sole deduplication ledger. UNKNOWNs
         # already have a row and never enter this query or get redispatched.
@@ -85,11 +118,21 @@ async def consume(receiver, recipient, pool):
                 "SELECT 1 FROM message_jobs WHERE message_id=?", (row["id"],)
             ).fetchone():
                 return False
+        if not store.can_claim(first["created"]):
+            return False
         store.db.execute(
             "INSERT INTO message_jobs(message_id,state) VALUES(?,'queued')", (first["id"],)
         )
         claimed = receiver._claim(first["id"])
         if not claimed:
+            # _claim may retain a quota/stale blocked outcome. Only retract our
+            # own never-claimed queued reservation on transient denial, so it
+            # cannot escape to the ordinary raw-work dispatcher.
+            store.db.execute(
+                "DELETE FROM message_jobs WHERE message_id=? AND state='queued' "
+                "AND run_id IS NULL AND claimed IS NULL AND started IS NULL",
+                (first["id"],),
+            )
             return False
         _, run_id = claimed
         for n, row in enumerate(rows[1:], 1):
@@ -145,27 +188,9 @@ async def consume(receiver, recipient, pool):
             if not item or item["id"] != row["id"]:
                 raise BridgeError("guidance_delivery", "Original guidance delivery changed")
             receipts[row["id"]] = item["receipt"]
-        payload = {
-            "managed_guidance_batch": 1,
-            "instruction": "Read these original guidance notes as context at this safe boundary. "
-            "Summarize the accepted priorities and unresolved limits briefly. Do not execute old "
-            "work, send messages, call Apps/tools/network, delegate, change services or claim UI "
-            "wake. The controller owns delivery and ACK. Notes request no automatic reply.",
-            "messages": [
-                {k: row[k] for k in ("id", "sender", "recipient", "conversation_id", "body")}
-                for row in rows
-            ],
-        }
-        settings = cfg.messaging.receivers[recipient]
         result = await bridge.agents.execute(
             {"id": run_id, "principal": recipient},
-            AgentInput(
-                agent=recipient,
-                prompt=canonical(payload),
-                cwd=settings.cwd,
-                timeout=settings.timeout,
-                wait_for_reply=True,
-            ),
+            prepared,
             policy,
             running,
             progress,

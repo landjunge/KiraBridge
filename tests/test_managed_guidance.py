@@ -151,3 +151,39 @@ async def test_budget_and_owner_isolation(managed):
     assert not await consume(b.message_receiver, "codex_channel", pool)
     assert not calls and not b.messages.get("chatgpt", n["id"])["acknowledged"]
     assert not await consume(b.message_receiver, "chatgpt", pool)
+    assert b.messages.get("chatgpt", n["id"])["processing"]["state"] == "blocked"
+
+
+@pytest.mark.parametrize("during_claim", [False, True])
+async def test_transient_admission_does_not_leak_to_raw_dispatch(
+    managed, monkeypatch, during_claim
+):
+    b, cfg, pool, calls = managed
+    n = note(b, "transient")
+    original = b.store.can_claim
+    attempts = []
+
+    def temporarily_denied(*a, **k):
+        attempts.append(1)
+        return during_claim and len(attempts) != 2
+
+    monkeypatch.setattr(b.store, "can_claim", temporarily_denied)
+    assert not await consume(b.message_receiver, "codex_channel", pool)
+    assert b.messages.get("chatgpt", n["id"])["processing"] is None
+    assert not b.store.db.execute("select 1 from message_jobs").fetchone()
+    monkeypatch.setattr(b.store, "can_claim", original)
+    assert await consume(b.message_receiver, "codex_channel", pool)
+    assert len(calls) == 1 and calls[0]["managed_guidance_batch"] == 1
+
+
+async def test_large_legal_notes_are_bounded_before_claim(managed):
+    b, cfg, pool, calls = managed
+    cfg.messaging.max_body_bytes = 65536
+    original = [note(b, "large-" + str(i), "x" * 65536) for i in range(8)]
+    assert await consume(b.message_receiver, "codex_channel", pool)
+    assert 0 < len(calls[0]["messages"]) < 8
+    completed = len(calls[0]["messages"])
+    for n in original[completed:]:
+        actual = b.messages.get("chatgpt", n["id"])
+        assert actual["processing"] is None and actual["delivered"] is None
+    assert len(json.dumps(calls[0]).encode()) < 262144
