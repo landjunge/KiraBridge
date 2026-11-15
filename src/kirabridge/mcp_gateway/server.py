@@ -1472,11 +1472,21 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     }
                     for peer in policy.message_peers
                 },
-                "session_scope": "existing_visible_terminal"
+                "session_scope": "per_recipient"
+                if config.visible_handoffs.native_codex is not None
+                else "existing_visible_terminal"
                 if config.visible_handoffs.enabled
                 else "separate_managed_session",
                 "visible_handoffs": config.visible_handoffs.model_dump(),
                 "binding_runtime_status": "not_probed",
+                "native_codex_route": {
+                    "configured": config.visible_handoffs.native_codex is not None,
+                    "recipient": "codex",
+                    "scope": "new_direct_messages_to_assigned_root",
+                    "session_scope": "existing_native_codex_root",
+                    "validation": "fresh_host_and_root_on_each_attempt",
+                    "automatic_history_retry": False,
+                },
                 "existing_session_attached": False,
                 "attachment_meaning": "no_persistent_agent_protocol_attachment; "
                 "exact_existing_UI_target_revalidated_on_each_action",
