@@ -78,12 +78,20 @@ class MessageReceiver:
                 if self._reply_can_finish(row):
                     self.recovered_handoffs.add(row["message_id"])
                     continue  # Return already happened; do not interrupt or paste again.
+                previous = json.loads(row["evidence"])
+                native = (
+                    previous
+                    if isinstance(previous, dict)
+                    and previous.get("session_scope") == "existing_native_codex_root"
+                    else {}
+                )
                 self._finish(
                     row[0],
                     "unknown",
                     {
+                        **native,
                         "reason": "receiver_restart",
-                        "last_observation": json.loads(row["evidence"]),
+                        "last_observation": previous,
                     },
                     "interrupted",
                 )
@@ -173,7 +181,7 @@ class MessageReceiver:
         elif job["state"] in {"failed", "blocked", "cancelled", "unknown"}:
             result["error"] = {
                 "code": job["error"] or job["evidence"].get("reason", "delivery_not_admitted"),
-                "message": "Visible delivery unconfirmed; inspect this message ID, never replay",
+                "message": "Message delivery unconfirmed; inspect this message ID, never replay",
             }
         return result
 
@@ -636,15 +644,16 @@ class MessageReceiver:
             "finished": now,
             "result": {"text": evidence.get("response_preview", "")},
         }
-        delivery_only = evidence.get("completion_scope") == "visible_input_delivery"
+        delivery_scope = evidence.get("completion_scope")
+        delivery_only = delivery_scope in {"visible_input_delivery", "native_input_delivery"}
         if delivery_only:
-            task["operation"] = "message.visible_input_delivery"
+            task["operation"] = "message." + delivery_scope
             task["result"] = {
                 "submitted": True,
                 "agent_confirmed": False,
                 "agent_work_completion_verified": False,
                 "request_reply_satisfied": False,
-                "scope": "visible_input_delivery",
+                "scope": delivery_scope,
             }
         local_reply = evidence.get("completion_scope") == "local_agent_turn"
         if local_reply:
@@ -663,7 +672,7 @@ class MessageReceiver:
             payload["supersedes"] = evidence["supersedes_notice_id"]
         if delivery_only:
             payload.update(
-                completion_scope="visible_input_delivery",
+                completion_scope=delivery_scope,
                 agent_confirmed=False,
                 agent_work_completion_verified=False,
                 request_reply_satisfied=False,
@@ -685,7 +694,7 @@ class MessageReceiver:
             payload,
         )
 
-    def _claim(self, message_id, *, direct=False, interim=False):
+    def _claim(self, message_id, *, direct=False, interim=False, native=False):
         config = self.bridge.config.messaging
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
@@ -758,7 +767,9 @@ class MessageReceiver:
                 return None
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
-                "separate_managed_session"
+                "existing_native_codex_root"
+                if native
+                else "separate_managed_session"
                 if separate_managed_eligible(self.bridge.config, row["created"])
                 else "existing_visible_terminal"
                 if self.bridge.config.visible_handoffs.enabled

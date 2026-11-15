@@ -470,11 +470,38 @@ class VisibleTerminalBinding(BaseModel):
         return self
 
 
+class NativeCodexBinding(BaseModel):
+    """An administratively assigned ordinary root thread on an existing local host.
+
+    Thread IDs from request bodies, environment variables and child tool calls
+    never populate this assignment. Physical process/socket identities are fresh
+    observations, so a host restart does not change this logical destination.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    thread_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    session_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    codex_home: str = Field(min_length=1, max_length=4096)
+    host_executable: str = Field(min_length=1, max_length=4096)
+    source: Literal["cli", "vscode", "appServer"]
+    protocol_version: Literal["0.169.0"] = "0.169.0"
+
+    @model_validator(mode="after")
+    def absolute_paths(self):
+        if any(
+            not Path(getattr(self, key)).is_absolute()
+            for key in ("codex_home", "host_executable")
+        ):
+            raise ValueError("Native Codex host paths must be absolute")
+        return self
+
+
 class VisibleHandoffConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: Literal[True] = True
     allow_interim_messages: bool = True
     bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
+    native_codex: NativeCodexBinding | None = None
 
 
 class OutputHistoryConfig(BaseModel):

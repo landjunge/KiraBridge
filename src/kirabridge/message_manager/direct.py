@@ -10,8 +10,9 @@ import asyncio
 import json
 import re
 import sqlite3
+import time
 
-from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
 
@@ -42,6 +43,14 @@ class DirectDelivery:
         "invalid_arguments",
         "interim_messages_disabled",
         "interim_transport_unavailable",
+        "native_codex_binding_changed",
+        "native_codex_host_unverified",
+        "native_codex_host_unavailable",
+        "native_codex_host_unsupported",
+        "native_codex_target_not_ready",
+        "native_codex_target_changed",
+        "native_codex_rpc_rejected",
+        "native_codex_scope_changed",
     }
 
     def __init__(self, receiver):
@@ -55,6 +64,9 @@ class DirectDelivery:
         self._expired = set()
         self._stop_task = None
         self._claimed = {}
+        from kirabridge.platform_adapters.codex_host import CodexHost
+
+        self.codex_host = CodexHost()
 
     def submit(self, principal, message_id):
         """Only the new-record send hook calls this; reads never re-admit a job."""
@@ -226,6 +238,7 @@ class DirectDelivery:
                 if self.receiver._reply_can_finish(row):
                     return  # The normal receiver recovers the delivered reply waiter.
             possible = uncertain or row["started"] is not None or row["acknowledged"] is not None
+            native = None
             # Internal message_receive records a transport receipt before checking
             # the target. Known pre-input guards plus the absence of input evidence
             # prove no paste; a receipt itself must not be called execution.
@@ -240,6 +253,14 @@ class DirectDelivery:
             else:
                 if not isinstance(evidence, dict) or evidence.get("terminal_input_attempted"):
                     possible = True
+                elif evidence.get("session_scope") == "existing_native_codex_root":
+                    native = evidence
+                    possible = possible or evidence.get("native_input_attempted") is True
+            if native is None and code.startswith("native_codex_"):
+                native = {
+                    "session_scope": "existing_native_codex_root",
+                    "native_input_attempted": False,
+                }
             handoffs = bridge.store.db.execute(
                 "SELECT id,state,evidence FROM visible_handoffs WHERE message_id=?", (message_id,)
             ).fetchall()
@@ -266,6 +287,13 @@ class DirectDelivery:
                 "terminal_input_attempted": "unconfirmed" if possible else False,
                 "automatic_retry": False,
             }
+            if native is not None:
+                evidence = {
+                    **native,
+                    **evidence,
+                    "phase": "native_direct_delivery",
+                    "terminal_input_attempted": False,
+                }
             if observation:
                 evidence["observation"] = observation
             if (
@@ -338,6 +366,12 @@ class DirectDelivery:
                 raise BridgeError("execution_busy", "Recipient already owns an active turn")
             self.targets.add(recipient_key)
             leases.add(recipient_key)
+            native_binding = bridge.config.visible_handoffs.native_codex
+            if recipient == "codex" and native_binding is not None:
+                await self._deliver_native(
+                    principal, message, event, native_binding.model_copy(deep=True)
+                )
+                return
             binding = None
             if bridge.config.visible_handoffs.enabled:
                 await bridge.visible_handoffs.dispatch_ready(principal, recipient)
@@ -378,6 +412,105 @@ class DirectDelivery:
         finally:
             self.targets.difference_update(leases)
             event.set()
+
+    async def _deliver_native(self, principal, message, event, binding):
+        """One new-record attempt on the assigned root; old messages stay untouched."""
+        bridge, identifier = self.receiver.bridge, message["id"]
+        policy = bridge.security.principal(principal, "agent.execute")
+        if "codex" not in policy.agents:
+            raise BridgeError("agent_denied", "Codex is not granted to this identity")
+        for capability in ("session.inspect", "session.input"):
+            bridge.security.principal(principal, capability)
+        prepared = await self.codex_host.prepare(binding)
+        if (
+            prepared["operation"] == "turn/steer"
+            and not bridge.config.visible_handoffs.allow_interim_messages
+        ):
+            raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
+        if not self._unclaimed(identifier):
+            return
+        claimed = self.receiver._claim(
+            identifier, direct=True, interim=prepared["operation"] == "turn/steer", native=True
+        )
+        if claimed is None:
+            return
+        run_id = claimed[1]
+        self._claimed[identifier] = run_id
+
+        async def before_send(observation):
+            with bridge.store.transaction():
+                current = bridge.config.visible_handoffs.native_codex
+                receiver = bridge.config.messaging.receivers.get("codex")
+                row = bridge.store.db.execute(
+                    "SELECT j.state,j.run_id,j.execution_cwd,m.delivered,m.receipt,m.acknowledged "
+                    "FROM message_jobs j JOIN messages m ON m.id=j.message_id WHERE m.id=?",
+                    (identifier,),
+                ).fetchone()
+                forbidden = (
+                    current is None
+                    or digest(current.model_dump()) != prepared["binding_sha256"]
+                    or row is None
+                    or row["state"] != "running"
+                    or row["run_id"] != run_id
+                    or receiver is None
+                    or row["execution_cwd"] != receiver.cwd
+                    or any(row[key] is not None for key in ("delivered", "receipt", "acknowledged"))
+                    or bridge.store.db.execute(
+                        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=? "
+                        "UNION ALL SELECT 1 FROM queue_withdrawals "
+                        "WHERE queue_id='messages' AND item_id=?",
+                        (identifier, identifier),
+                    ).fetchone()
+                    or bridge.store.db.execute(
+                        "SELECT 1 FROM message_events WHERE message_id=? "
+                        "AND kind='message.native_submitting'", (identifier,)
+                    ).fetchone()
+                )
+                if forbidden:
+                    raise BridgeError(
+                        "native_codex_scope_changed", "Native message ownership changed"
+                    )
+                if (
+                    prepared["operation"] == "turn/steer"
+                    and not bridge.config.visible_handoffs.allow_interim_messages
+                ):
+                    raise BridgeError(
+                        "interim_messages_disabled", "Interim Codex input is disabled"
+                    )
+                # Re-check authority after awaited host IO, before durable attempt/IO.
+                latest = bridge.security.principal(principal, "agent.execute")
+                if "codex" not in latest.agents:
+                    raise BridgeError("agent_denied", "Codex is no longer granted")
+                for capability in ("session.inspect", "session.input"):
+                    bridge.security.principal(principal, capability)
+                bridge.store.assert_accepting(continuation_id=run_id, owned_execution=True)
+                evidence = {
+                    **observation,
+                    "run_id": run_id,
+                    "session_scope": "existing_native_codex_root",
+                    "native_input_attempted": True,
+                    "terminal_input_attempted": False,
+                    "automatic_retry": False,
+                }
+                bridge.store.db.execute(
+                    "UPDATE message_jobs SET started=?,evidence=? WHERE message_id=? AND run_id=?",
+                    (time.time(), canonical(evidence), identifier, run_id),
+                )
+                bridge.messages._event(identifier, "message.native_submitting", principal, evidence)
+
+        evidence = await self.codex_host.deliver(
+            binding, prepared, identifier, message["body"], before_send
+        )
+        evidence.update(run_id=run_id, session_scope="existing_native_codex_root")
+        with bridge.store.transaction():
+            row = bridge.store.db.execute(
+                "SELECT state,run_id FROM message_jobs WHERE message_id=?", (identifier,)
+            ).fetchone()
+            if row and row["state"] == "running" and row["run_id"] == run_id:
+                bridge.messages._event(identifier, "message.native_submitted", principal, evidence)
+                self.receiver._finish(identifier, "completed", evidence)
+        # Acceptance is transport evidence; never fabricate recipient fetch, ACK or reply.
+        event.set()
 
     async def stop(self):
         """Cancel only this instance's attempts; preserve delivered reply waiters."""
