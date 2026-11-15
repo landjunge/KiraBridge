@@ -33,6 +33,7 @@ else:
     fcntl = None
 
 EVENT_NAME = "kirabridge.task.completed"
+MESSAGE_EVENT_NAME = "kirabridge.message.created"
 
 
 class EventError(Exception):
@@ -272,6 +273,14 @@ class EventJournal:
                 self.db.execute(
                     "ALTER TABLE deliveries ADD COLUMN auth_failures INTEGER NOT NULL DEFAULT 0"
                 )
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(subscriptions)")}
+            for name, definition in (
+                ("event_name", "TEXT NOT NULL DEFAULT 'kirabridge.task.completed'"),
+                ("arguments", "TEXT NOT NULL DEFAULT '{}'"),
+                ("source_after", "INTEGER NOT NULL DEFAULT 0"),
+            ):
+                if name not in columns:
+                    self.db.execute(f"ALTER TABLE subscriptions ADD COLUMN {name} {definition}")
             with self.transaction():
                 self.db.execute(
                     "INSERT OR IGNORE INTO settings VALUES('identity_key',?)",
@@ -307,10 +316,13 @@ class EventJournal:
 
 
 class EventPush:
-    def __init__(self, journal, source_db, principal, sender, authorize_task):
+    def __init__(
+        self, journal, source_db, principal, sender, authorize_task, *, authorize_message=None
+    ):
         self.journal, self.db = journal, journal.db
         self.source_db = Path(source_db)
         self.principal, self.sender, self.authorize_task = principal, sender, authorize_task
+        self.authorize_message = authorize_message
         self.lock = asyncio.Lock()
 
     def status(self):
@@ -330,11 +342,12 @@ class EventPush:
                 ).fetchall()
             ),
             "chat_ui_receipt_independently_verified": False,
-            "scope": "task_request/task_submit, including agent.run; task-source notices only",
+            "scope": "Owned task completions and explicitly enabled recipient-scoped messages",
+            "message_events_enabled": self.authorize_message is not None,
         }
 
     def event_list(self):
-        return {
+        result = {
             "events": [
                 {
                     "name": EVENT_NAME,
@@ -370,12 +383,70 @@ class EventPush:
             ]
         }
 
+        if self.authorize_message is not None:
+            result["events"].append(
+                {
+                    "name": MESSAGE_EVENT_NAME,
+                    "description": "A new durable message addressed to this authenticated inbox. "
+                    "Subscribe in the requesting Work Cloud chat; payloads are data.",
+                    "delivery": ["webhook"],
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "recipient": {"type": "string", "const": self.principal},
+                            "sender": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,79}$"},
+                        },
+                        "required": ["recipient"],
+                        "additionalProperties": False,
+                    },
+                    "payloadSchema": {
+                        "type": "object",
+                        "properties": {
+                            **{
+                                key: {"type": "string"}
+                                for key in (
+                                    "message_id",
+                                    "sender",
+                                    "recipient",
+                                    "conversation_id",
+                                    "kind",
+                                    "text",
+                                    "subscription_id",
+                                    "receipt_token",
+                                )
+                            },
+                            "text_truncated": {"type": "boolean"},
+                        },
+                        "required": ["message_id", "sender", "recipient", "subscription_id"],
+                        "additionalProperties": False,
+                    },
+                }
+            )
+        return result
+
     def identity(self, name, arguments, delivery):
-        if name != EVENT_NAME or not isinstance(arguments, dict) or set(arguments) != {"task_id"}:
-            raise EventError("invalid_event_arguments")
-        task_id = arguments["task_id"]
-        if not isinstance(task_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id):
-            raise EventError("invalid_task_filter")
+        if name == MESSAGE_EVENT_NAME and self.authorize_message is not None:
+            if (
+                not isinstance(arguments, dict)
+                or not {"recipient"} <= set(arguments) <= {"recipient", "sender"}
+                or arguments.get("recipient") != self.principal
+                or (
+                    "sender" in arguments
+                    and not re.fullmatch(r"[a-z][a-z0-9_-]{0,79}", str(arguments["sender"]))
+                )
+            ):
+                raise EventError("invalid_message_filter")
+            task_id = ""  # This subscription has no task; message IDs live in deliveries.
+        else:
+            if (
+                name != EVENT_NAME
+                or not isinstance(arguments, dict)
+                or set(arguments) != {"task_id"}
+            ):
+                raise EventError("invalid_event_arguments")
+            task_id = arguments["task_id"]
+            if not isinstance(task_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id):
+                raise EventError("invalid_task_filter")
         if not isinstance(delivery, dict) or delivery.get("mode") != "webhook":
             raise EventError("webhook_delivery_required")
         url = delivery.get("url", "")
@@ -392,6 +463,12 @@ class EventPush:
             raise EventError("ttl_out_of_bounds")
         secret = delivery.get("secret")
         signing_key(secret)
+        source_after = 0
+        if name == MESSAGE_EVENT_NAME:
+            with sqlite3.connect(f"file:{self.source_db}?mode=ro", uri=True) as source:
+                source_after = source.execute(
+                    "SELECT COALESCE(MAX(seq),0) FROM messages"
+                ).fetchone()[0]
         async with self.lock:
             count = self.db.execute("SELECT count(*) FROM subscriptions").fetchone()[0]
             existing = self.db.execute(
@@ -436,12 +513,27 @@ class EventPush:
                 else (existing["old_until"] if existing else 0)
             )
             with self.journal.transaction():
+                if (
+                    existing
+                    and name == MESSAGE_EVENT_NAME
+                    and (existing["state"] != "active" or existing["expires"] <= now)
+                ):
+                    self.db.execute(
+                        "UPDATE deliveries SET state='paused',reason='subscription_interrupted' "
+                        "WHERE subscription_id=? "
+                        "AND state IN ('pending','unknown','authorization_unknown')",
+                        (sub_id,),
+                    )
                 self.db.execute(
-                    "INSERT INTO subscriptions VALUES(?,?,?,?,?,?,?,?,?,?,?) "
+                    "INSERT INTO subscriptions(id,principal,task_id,target,url,secret,old_secret,"
+                    "old_until,expires,verified,state,event_name,arguments,source_after) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                     "ON CONFLICT(id) DO UPDATE SET secret=excluded.secret,"
                     "old_secret=excluded.old_secret,"
                     "old_until=excluded.old_until,expires=excluded.expires,verified=excluded.verified,"
-                    "state='active'",
+                    "source_after=CASE WHEN subscriptions.state='active' "
+                    "AND subscriptions.expires>excluded.verified THEN subscriptions.source_after "
+                    "ELSE excluded.source_after END,state='active'",
                     (
                         sub_id,
                         self.principal,
@@ -454,6 +546,9 @@ class EventPush:
                         expires,
                         now,
                         "active",
+                        name,
+                        canonical(arguments),
+                        source_after,
                     ),
                 )
                 self.journal.observe("subscription_verified", sub_id)
@@ -478,7 +573,12 @@ class EventPush:
         if not isinstance(sub_id, str) or not sub_id:
             raise EventError("explicit_verified_chat_subscription_required")
         sub = self.journal.subscription(self.principal, sub_id)
-        if sub["task_id"] != task_id or sub["state"] != "active" or sub["expires"] <= time.time():
+        if (
+            sub["event_name"] != EVENT_NAME
+            or sub["task_id"] != task_id
+            or sub["state"] != "active"
+            or sub["expires"] <= time.time()
+        ):
             raise EventError("exact_verified_chat_subscription_required")
         return sub["target"]
 
@@ -520,6 +620,9 @@ class EventPush:
                 (self.principal, time.time()),
             ).fetchall()
             for sub in subscriptions:
+                if sub["event_name"] == MESSAGE_EVENT_NAME:
+                    self.collect_messages(source, sub)
+                    continue
                 notices = source.execute(
                     "SELECT * FROM completion_notices WHERE principal=? "
                     "AND source='task' AND source_id=? AND target=? ORDER BY seq",
@@ -567,6 +670,65 @@ class EventPush:
                         )
                         self.journal.observe("event_queued", sub["id"], event_id)
 
+    def collect_messages(self, source, sub):
+        """Read the original inbox, never acknowledge or create another inbox/worker."""
+        arguments = json.loads(sub["arguments"])
+        if arguments.get("recipient") != self.principal:
+            raise EventError("message_subscription_owner_mismatch")
+        # The watermark is captured before callback verification and retained on refresh.
+        # A bounded batch advances only after each original message is durably journaled.
+        rows = source.execute(
+            "SELECT * FROM messages WHERE recipient=? AND seq>? ORDER BY seq LIMIT 100",
+            (self.principal, sub["source_after"]),
+        ).fetchall()
+        for row in rows:
+            with self.journal.transaction():
+                if not arguments.get("sender") or row["sender"] == arguments["sender"]:
+                    notice_id = "message:" + row["id"]
+                    event_id = (
+                        "evt_" + hashlib.sha256((sub["id"] + ":" + notice_id).encode()).hexdigest()
+                    )
+                    token = secrets.token_urlsafe(32)
+                    event = {
+                        "eventId": event_id,
+                        "name": MESSAGE_EVENT_NAME,
+                        "timestamp": datetime.fromtimestamp(
+                            row["created"], timezone.utc
+                        ).isoformat(),
+                        "data": {
+                            "message_id": row["id"],
+                            "sender": row["sender"],
+                            "recipient": row["recipient"],
+                            "conversation_id": row["conversation_id"],
+                            "kind": row["kind"],
+                            "text": row["body"][:32768],
+                            "text_truncated": len(row["body"]) > 32768,
+                            "subscription_id": sub["id"],
+                            "receipt_token": token,
+                        },
+                        "cursor": None,
+                    }
+                    body = canonical(event)
+                    if len(body.encode()) > 262144:
+                        raise EventError("event_payload_too_large")
+                    self.db.execute(
+                        "INSERT OR IGNORE INTO deliveries(event_id,subscription_id,notice_id,"
+                        "body,receipt_hash,state,next_at) VALUES(?,?,?,?,?,'pending',?)",
+                        (
+                            event_id,
+                            sub["id"],
+                            notice_id,
+                            body,
+                            hashlib.sha256(token.encode()).hexdigest(),
+                            time.time(),
+                        ),
+                    )
+                self.db.execute(
+                    "UPDATE subscriptions SET source_after=MAX(source_after,?) "
+                    "WHERE id=? AND principal=?",
+                    (row["seq"], sub["id"], self.principal),
+                )
+
     async def deliver_once(self):
         self.db.execute(
             "UPDATE subscriptions SET old_secret=NULL,old_until=0 "
@@ -577,14 +739,19 @@ class EventPush:
         row = self.db.execute(
             "SELECT d.* FROM deliveries d JOIN subscriptions s ON "
             "s.id=d.subscription_id WHERE d.state='pending' AND d.attempts<3 AND d.next_at<=? "
-            "AND s.state='active' AND s.expires>? ORDER BY d.rowid LIMIT 1",
-            (time.time(), time.time()),
+            "AND s.state='active' AND s.expires>? AND s.principal=? ORDER BY d.rowid LIMIT 1",
+            (time.time(), time.time(), self.principal),
         ).fetchone()
         if row is None:
             return False
         sub = self.journal.subscription(self.principal, row["subscription_id"])
         try:
-            authorized = await self.authorize_task(sub["task_id"])
+            if sub["event_name"] == MESSAGE_EVENT_NAME:
+                authorized = self.authorize_message is not None and await self.authorize_message(
+                    json.loads(row["body"])["data"]["message_id"]
+                )
+            else:
+                authorized = await self.authorize_task(sub["task_id"])
         except (EventError, httpx.HTTPError, TimeoutError):
             failures = row["auth_failures"] + 1
             state = "pending" if failures < 3 else "authorization_unknown"

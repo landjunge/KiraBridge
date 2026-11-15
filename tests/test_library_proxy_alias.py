@@ -69,10 +69,12 @@ def test_ambiguous_or_occupied_alias_is_not_advertised():
     assert "td_library_uquery" in occupied and "td_td_library_uquery" not in occupied
 
 
+@pytest.mark.parametrize("events_wrapped", [False, True])
 async def test_real_stdio_proxy_library_discovery_calls_and_revocation(
     http_bridge,  # noqa: F811
     tmp_path,
     monkeypatch,
+    events_wrapped,
 ):
     # Both transports are real: MCP client -> stdio proxy -> HTTP daemon ->
     # ThreadDesk stdio process. Only temporary stores and a synthetic token.
@@ -122,17 +124,35 @@ async def test_real_stdio_proxy_library_discovery_calls_and_revocation(
         f"data_dir = {json.dumps(str(tmp_path / 'proxy-state'))}\n"
         f"port = {bridge.config.port}\n[principals.local]\n"
         'token_env = "BRIDGE_TEST_TOKEN"\n'
+        'capabilities = ["task.read", "message.read"]\n'
     )
+    child_args = ["-m", "kirabridge.cli", "--config", str(config), "connect"]
+    if events_wrapped:
+        child_args = [
+            str(Path(__file__).resolve().parents[1] / "integrations/chat-events/connect.py"),
+            "--config",
+            str(config),
+            "--principal",
+            "local",
+            "--state",
+            str(tmp_path / "events"),
+            "--",
+            sys.executable,
+            *child_args,
+        ]
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "kirabridge.cli", "--config", str(config), "connect"],
+        args=child_args,
         env={
             "PYTHONPATH": str(Path(kirabridge.__file__).resolve().parent.parent),
             "BRIDGE_TEST_TOKEN": "local-test-" + "a" * 40,
         },
     )
     async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
-        await session.initialize()
+        initialized = await session.initialize()
+        assert (initialized.capabilities.model_extra or {}).get("events") == (
+            {} if events_wrapped else None
+        )
         tools = {tool.name: tool for tool in (await session.list_tools()).tools}
         names = ("td_library_query", "td_library_uquery", "td_td_library_uquery")
         assert set(names) <= tools.keys()

@@ -91,6 +91,15 @@ class Backend:
             return False
         raise EventError("backend_authorization_unknown")
 
+    async def authorize_message(self, message_id):
+        result = await self.call("message_get", {"message_id": message_id})
+        data = result.get("structuredContent") or {}
+        if data.get("id") == message_id and data.get("recipient") == self.principal:
+            return True
+        if (data.get("error") or {}).get("code") in {"forbidden", "not_found"}:
+            return False
+        raise EventError("backend_authorization_unknown")
+
 
 RECEIPT_TOOL = {
     "name": "completion_chat_receipt",
@@ -133,6 +142,11 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
         principal,
         sender or WebhookSender(allowed_hosts),
         backend.authorize,
+        authorize_message=(
+            backend.authorize_message
+            if "message.read" in config.principals[principal].capabilities
+            else None
+        ),
     )
     if not external_sender:
         push.recover()
@@ -308,8 +322,6 @@ async def make_server(
     )
 
     async def events(ctx, params):
-        if ctx.protocol_version != "2026-07-28":
-            raise EventError("mcp_2026_07_28_required")
         journal.observe("rpc_" + ctx.method.replace("/", "_"))
         data = params.model_dump(by_alias=True, exclude={"meta"})
         if ctx.method == "events/list":
@@ -330,9 +342,9 @@ async def make_server(
     async def event_extension(ctx, call_next):
         try:
             result = await call_next(ctx)
-            if ctx.method == "server/discover":
-                # Draft Events is not yet a typed core SDK capability. Add it after
-                # the SDK's core schema serialization, without faking a legacy initialize.
+            if ctx.method in {"server/discover", "initialize"}:
+                # Both initialize and MCP2 discovery support this extension. Handlers
+                # are registered below; this is not a promise of a received chat turn.
                 result["capabilities"]["events"] = {}
                 journal.observe("rpc_server_discover")
             return result
