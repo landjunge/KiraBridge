@@ -65,6 +65,9 @@ ERROR_CODES = {
     "question_limit",
     "source_configuration",
     "scope_conflict",
+    "object_in_trash",
+    "object_changed_in_trash",
+    "lifecycle_conflict",
 }
 
 
@@ -300,7 +303,9 @@ class ThreadDeskManager:
                     cause="peer_initialization_failed",
                 ) from None
 
-    def decode(self, result, *, mutation: bool, expected: dict | None = None):
+    def decode(
+        self, result, *, mutation: bool, expected: dict | None = None, management_request=None
+    ):
         def invalid(code):
             cls = UncertainExecution if mutation else BridgeError
             raise cls(code, "ThreadDesk response cannot be confirmed; read the known operation ID")
@@ -319,9 +324,12 @@ class ThreadDeskManager:
             invalid("threaddesk_result_limit")
         if result.isError:
             code = value.get("code") if isinstance(value, dict) else None
-            code = code if code in ERROR_CODES else "threaddesk_rejected"
+            code = code if isinstance(code, str) and code in ERROR_CODES else "threaddesk_rejected"
             return False, safe_peer_error(
-                code, value, contract=self.tool_schemas.get("thread_manage")
+                code,
+                value,
+                contract=self.tool_schemas.get("thread_manage"),
+                management_request=management_request if mutation else None,
             )
 
         if mutation:
@@ -415,7 +423,10 @@ class ThreadDeskManager:
                     ) from None
                 raise
             success, value = self.decode(
-                result, mutation=mutation, expected=values if mutation else None
+                result,
+                mutation=mutation,
+                expected=values if mutation else None,
+                management_request=values if isinstance(args, ThreadDeskManageInput) else None,
             )
         return {
             "success": success,
