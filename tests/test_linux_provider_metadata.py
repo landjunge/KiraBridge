@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 
 import kirabridge.bridge_core.bridge as bridge_module
 from kirabridge.bridge_core.bridge import Bridge
@@ -158,6 +159,24 @@ def test_metadata_does_not_grant_an_existing_actor_a_missing_capability(linux_br
     assert policy.model_dump() == before
     with pytest.raises(BridgeError):
         linux_bridge.security.principal("local", "session.input")
+
+
+def test_explicit_mac_fixture_keeps_other_linux_bindings_and_policy_unchanged(linux_bridge):
+    original = linux_bridge.macos
+    config = linux_bridge.config.model_dump()
+    native = bind_macos_provider(linux_bridge)
+    assert type(native) is MacOSProvider
+    assert linux_bridge.native_queries.provider is native
+    assert native.permission_probe is original.permission_probe
+    assert native.descriptors == original.descriptors
+    assert native.leaves["files"] is original.leaves["files"]
+    assert bind_macos_provider(linux_bridge) is native
+    native.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
+    assert native.snapshot()["provider_id"] == "macos.existing_native"
+    assert native.snapshot()["capabilities"]["files"]["available"]
+    assert original.snapshot()["provider_id"] == "linux.existing_native"
+    assert original.snapshot()["capabilities"]["files"]["available"] is False
+    assert linux_bridge.config.model_dump() == config
 
 
 @pytest.mark.parametrize("platform", ["darwin", "win32"])

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from pydantic import ValidationError
 
 from kirabridge import keyboard_profiles
@@ -48,6 +49,7 @@ def definition(*, modifiers=(), provenance="user", key="enter"):
 
 def setup(bridge, config, **definition_args):
     config.principals["local"].capabilities += ["keyboard.execute", "keyboard.profiles.read"]
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.native_metadata = lambda: {
         "available": True,

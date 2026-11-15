@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.keyboard_models import KeyboardKeyInput
@@ -25,6 +26,7 @@ TARGET = {
 
 def setup_keyboard(bridge):
     bridge.config.principals["local"].capabilities.append("keyboard.execute")
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.native_metadata = lambda: {
         "available": True,

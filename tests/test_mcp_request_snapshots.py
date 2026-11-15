@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock
 
+from macos_provider_fixture import bind_macos_provider
 from test_mcp import http_bridge  # noqa: F401 -- real authenticated HTTP fixture
 
 from kirabridge.bridge_core.models import BridgeError
@@ -15,6 +16,7 @@ def observed_metadata(bridge, monkeypatch):
         calls.append(True)
         return {"available": True, "keyboard_protocol": 1, "revision": "test-native"}
 
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     monkeypatch.setattr(bridge.macos.capability_probe, "native_metadata", metadata)
     terminal = AsyncMock(return_value={"status": "available", "sessions": []})

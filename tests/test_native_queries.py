@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from pydantic import ValidationError
 from test_mcp import http_bridge  # noqa: F401
 
@@ -52,6 +53,7 @@ class FixtureTransport:
 def native(bridge):
     fixture = FixtureTransport()
     bridge.system_modules.transport = fixture
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     for policy in bridge.config.principals.values():
         policy.permission_level = "full"
