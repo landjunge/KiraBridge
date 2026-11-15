@@ -12,6 +12,7 @@ import httpx
 from kirabridge.agent_manager.acp import ACPClient
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.agent_manager.cli_support import login_identity
+from kirabridge.agent_manager.codex_package import inspect_codex_package
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
 from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
@@ -567,6 +568,7 @@ class AgentManager:
                             "sandbox_mode": config.sandbox_mode,
                             "project_rules_enabled": True,
                             "mcp_servers_enabled": config.bridge_tools,
+                            "runtime_package": inspect_codex_package(config.executable),
                         }
                         if config.kind == "codex"
                         else {}
