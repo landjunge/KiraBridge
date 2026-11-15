@@ -775,6 +775,7 @@ class MessageReceiver:
                 from kirabridge.message_manager.guidance_context import prepare
 
                 if context := prepare(self.bridge, row):
+                    context["claim_run_id"] = run_id
                     evidence["managed_guidance_context"] = context
             self.bridge.store.db.execute(
                 "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=?,"
@@ -794,7 +795,12 @@ class MessageReceiver:
                 row["recipient"],
                 {"run_id": run_id, "session_scope": scope},
             )
-            return dict(row), run_id
+            message = dict(row)
+            if "managed_guidance_context" in evidence:
+                # Keep the original binding even if later job evidence changes;
+                # losing stored proof must never turn this claim into raw work.
+                message["_managed_guidance_context"] = evidence["managed_guidance_context"]
+            return message, run_id
 
     def _waiting(self, message_id, reason, observation=None):
         """A pre-dispatch observation is not a failed turn or an input attempt."""
@@ -1097,12 +1103,51 @@ class MessageReceiver:
         claimed = self.bridge.store.db.execute(
             "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
-        context = json.loads(claimed["evidence"]).get("managed_guidance_context")
+        context = message.get("_managed_guidance_context")
+        if context is None:
+            context = json.loads(claimed["evidence"]).get("managed_guidance_context")
+        adapter_attempted = False
+        reply_id = None
+
+        def owns_claim():
+            return (
+                context is None
+                or self.bridge.store.db.execute(
+                    "SELECT 1 FROM message_jobs WHERE message_id=? "
+                    "AND state='running' AND run_id=?",
+                    (message_id, run_id),
+                ).fetchone()
+                is not None
+            )
+
+        def require_owner():
+            if not owns_claim():
+                raise BridgeError("receiver_claim_changed", "Receiver no longer owns this claim")
+
+        def validate_context(*, receipt=None, acknowledged=False):
+            if context is not None:
+                from kirabridge.message_manager.guidance_context import render_pinned
+
+                return render_pinned(
+                    self.bridge,
+                    message,
+                    context,
+                    run_id=run_id,
+                    receipt=receipt,
+                    acknowledged=acknowledged,
+                )
+            return message["body"]
 
         def retain_context(evidence):
             if context is None:
                 return evidence
             return {**evidence, "managed_guidance_context": context}
+
+        def last_observation(raw):
+            try:
+                return json.loads(raw)
+            except (TypeError, ValueError):
+                return {"invalid_evidence_sha256": digest(raw)}
 
         async def call(tool, arguments):
             result = await pool.call("daemon", tool, arguments)
@@ -1114,6 +1159,7 @@ class MessageReceiver:
         async def progress(evidence):
             evidence = retain_context(evidence)
             with self.bridge.store.transaction():
+                require_owner()
                 self.bridge.store.db.execute(
                     "UPDATE message_jobs SET evidence=? WHERE message_id=?",
                     (canonical(evidence), message_id),
@@ -1130,6 +1176,7 @@ class MessageReceiver:
 
         async def running(evidence):
             with self.bridge.store.transaction():
+                require_owner()
                 self.bridge.store.db.execute(
                     "UPDATE message_jobs SET started=COALESCE(started,?) WHERE message_id=?",
                     (time.time(), message_id),
@@ -1139,6 +1186,7 @@ class MessageReceiver:
                 delivery_event.set()
 
         try:
+            validate_context()
             delivered = await call(
                 "message_receive",
                 {
@@ -1155,11 +1203,7 @@ class MessageReceiver:
             # Visible delivery and work without processed managed guidance keep
             # the exact current body. Only the pinned same-scope managed context
             # may frame prior original notes around it; never mutate the message.
-            prompt = message["body"]
-            if context is not None:
-                from kirabridge.message_manager.guidance_context import render_pinned
-
-                prompt = render_pinned(self.bridge, message, context)
+            prompt = validate_context(receipt=receipt)
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
             args = AgentInput(
@@ -1175,6 +1219,9 @@ class MessageReceiver:
             if pinned is None or pinned[0] != receiver.cwd:
                 raise BridgeError("receiver_scope_changed", "Claimed receiver worktree changed")
             policy = self.bridge.security.principal(recipient, "message.read")
+            # Last synchronous check before handing control to an adapter.
+            validate_context(receipt=receipt)
+            adapter_attempted = True
             if interim is not None:
                 from kirabridge.interim_message import execute as steer
                 from kirabridge.session_manager import SessionInput
@@ -1209,6 +1256,7 @@ class MessageReceiver:
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
                 raise BridgeError("agent_failed", "Receiving agent did not complete successfully")
+            validate_context(receipt=receipt)
             if visible and result.get("scope") == "local_agent_turn":
                 evidence = self._local_reply_evidence(message_id, run_id, result)
                 with self.bridge.store.transaction():
@@ -1241,7 +1289,6 @@ class MessageReceiver:
                     "response_preview": result.get("text", "")[:320],
                 }
             )
-            reply_id = None
             if message["request_reply"]:
                 text = result.get("text", "")
                 if not isinstance(text, str) or not text.strip():
@@ -1270,12 +1317,18 @@ class MessageReceiver:
                 assert reply["sender"] == recipient
                 reply_id = reply["id"]
                 evidence["response_truncated"] = len(text.encode()) > limits.max_body_bytes
+            # Reply delivery awaits a peer and may have lost the claim or gained
+            # a hold. Revalidate after it, immediately before the final ACK.
+            validate_context(receipt=receipt)
             ack = await call("message_ack", {"message_id": message_id, "receipt": receipt})
             assert ack["acknowledged"] is not None
             with self.bridge.store.transaction():
+                validate_context(receipt=receipt, acknowledged=True)
                 self._finish(message_id, "completed", evidence, reply_id=reply_id)
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
+                if not owns_claim():
+                    raise  # Preserve an UNKNOWN or another owner's exact state/evidence.
                 job = self.bridge.store.db.execute(
                     "SELECT message_id,evidence FROM message_jobs WHERE message_id=?",
                     (message_id,),
@@ -1297,13 +1350,16 @@ class MessageReceiver:
                     retain_context(
                         {
                             "run_id": run_id,
-                            "last_observation": json.loads(observed),
+                            "last_observation": last_observation(observed),
                         }
                     ),
                     "receiver_interrupted",
+                    reply_id=reply_id,
                 )
             raise
         except Exception as exc:
+            if not owns_claim():
+                return  # Never finish/requeue or rewrite progress for a lost claim.
             if delivery_event is not None:
                 self.direct.fail(message_id, exc)
                 return  # One admission attempt; no pre-input requeue or replay.
@@ -1317,6 +1373,7 @@ class MessageReceiver:
                 "unknown"
                 if isinstance(exc, UncertainExecution)
                 or (isinstance(exc, BridgeError) and exc.code == "peer_unknown")
+                or (context is not None and adapter_attempted)
                 else "failed"
             )
             # Preserve the last observed adapter/session evidence, never raw exception texts.
@@ -1324,14 +1381,16 @@ class MessageReceiver:
                 "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
             ).fetchone()[0]
             with self.bridge.store.transaction():
-                self._finish(
-                    message_id,
-                    state,
-                    retain_context(
-                        {
-                            "run_id": run_id,
-                            "last_observation": json.loads(observed),
-                        }
-                    ),
-                    exc.code if isinstance(exc, BridgeError) else "receiver_failed",
-                )
+                if owns_claim():
+                    self._finish(
+                        message_id,
+                        state,
+                        retain_context(
+                            {
+                                "run_id": run_id,
+                                "last_observation": last_observation(observed),
+                            }
+                        ),
+                        exc.code if isinstance(exc, BridgeError) else "receiver_failed",
+                        reply_id=reply_id,
+                    )

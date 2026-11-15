@@ -28,6 +28,33 @@ def _sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _work_hash(message):
+    # Delivery/receipt/ACK may change during processing; every original work
+    # field, including the actual body, is pinned independently of request_hash.
+    return digest(
+        {
+            key: message[key]
+            for key in (
+                "seq",
+                "id",
+                "conversation_id",
+                "position",
+                "sender",
+                "recipient",
+                "kind",
+                "body",
+                "idem",
+                "request_hash",
+                "reply_to",
+                "task_id",
+                "depth",
+                "request_reply",
+                "created",
+            )
+        }
+    )
+
+
 def _authority(bridge):
     return {
         "scope": "same_local_store_and_loaded_runtime",
@@ -168,6 +195,7 @@ def prepare(bridge, message):
         "authority": _authority(bridge),
         "message_id": message["id"],
         "body_sha256": _sha(message["body"]),
+        "current_work_sha256": _work_hash(message),
         "sender": message["sender"],
         "recipient": message["recipient"],
         "conversation_id": message["conversation_id"],
@@ -206,9 +234,56 @@ def prepare(bridge, message):
     return binding
 
 
-def render_pinned(bridge, message, binding):
+def validate_current(bridge, message, binding, *, run_id=None, receipt=None, acknowledged=False):
+    """Read the current work and its exact running owner at each effect boundary."""
+    invalid = BridgeError("guidance_context_changed", "Pinned managed guidance scope changed")
+    current = bridge.store.db.execute(
+        "SELECT * FROM messages WHERE id=?", (message["id"],)
+    ).fetchone()
+    job = bridge.store.db.execute(
+        "SELECT * FROM message_jobs WHERE message_id=?", (message["id"],)
+    ).fetchone()
+    try:
+        evidence = json.loads(job["evidence"]) if job is not None else None
+    except (TypeError, ValueError):
+        evidence = None
+    if (
+        current is None
+        or job is None
+        or job["state"] != "running"
+        or not binding.get("claim_run_id")
+        or job["run_id"] != binding["claim_run_id"]
+        or (run_id is not None and job["run_id"] != run_id)
+        or job["execution_cwd"] != binding.get("execution_cwd")
+        or not isinstance(evidence, dict)
+        or evidence.get("managed_guidance_context") != binding
+        or binding.get("current_work_sha256") != _work_hash(message)
+        or binding["current_work_sha256"] != _work_hash(current)
+        or (current["acknowledged"] is not None) != acknowledged
+        or (receipt is not None and current["receipt"] != receipt)
+        or bridge.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?",
+            (message["id"],),
+        ).fetchone()
+    ):
+        raise invalid
+
+
+def render_pinned(bridge, message, binding, *, run_id=None, receipt=None, acknowledged=False):
+    # One bounded, consistent store observation. Never hold a DB transaction
+    # across an adapter or peer await.
+    with bridge.store.transaction():
+        return _render_pinned(
+            bridge, message, binding, run_id=run_id, receipt=receipt, acknowledged=acknowledged
+        )
+
+
+def _render_pinned(bridge, message, binding, *, run_id, receipt, acknowledged):
     """Never refresh/reselect sources after claim; changed scope fails before the model."""
     invalid = BridgeError("guidance_context_changed", "Pinned managed guidance scope changed")
+    validate_current(
+        bridge, message, binding, run_id=run_id, receipt=receipt, acknowledged=acknowledged
+    )
     if (
         not _eligible(bridge, message)
         or not _peers(bridge, message)
