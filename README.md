@@ -52,6 +52,8 @@ Development is ongoing: KiraBridge cannot yet reliably or fully control every ap
 
 ## AI agents and project workflows
 
+Codex inventory and Doctor now separate executable-file presence from [passive package-layout observations](docs/providers/CODEX-PACKAGE-DIAGNOSTICS.md). Covered official 0.169 metadata can expose missing companions/resources; opaque launchers and other versions remain unknown. No CLI or login is started, no execution is blocked, and observed files do not prove matching versions, package integrity or working tools.
+
 Alongside direct control, KiraBridge can pass work to **Codex and Grok** through configured visible terminal sessions and track their replies. As of November 10, the local inventory also reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**. OpenCode can additionally use its local HTTP API with Basic authentication from environment variables; that adapter creates one new session per task and reports status and results back. Finding an adapter does not prove sign-in, a ready session or a successful end-to-end task.
 
 The development source supports interim questions to an explicitly selected, working Codex session without stopping its work or submitting another agent job. The current native route uses the existing macOS terminal; uncertain delivery is retained without automatic repetition, and users can disable interim messages. Live macOS acceptance and native Windows/Linux/server transport acceptance are recorded separately and remain open.

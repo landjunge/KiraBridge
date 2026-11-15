@@ -52,6 +52,8 @@ Die Entwicklung ist nicht abgeschlossen: KiraBridge steuert noch nicht jede Anwe
 
 ## Mit KI-Agenten und Projekten arbeiten
 
+Codex-Inventar und Doctor trennen nun die ausführbare Programmdatei von [passiven Paketlayout-Beobachtungen](docs/providers/CODEX-PACKAGE-DIAGNOSTICS.md). Unterstützte offizielle 0.169-Metadaten können fehlende Companions/Ressourcen sichtbar machen; undurchsichtige Launcher und andere Versionen bleiben unbekannt. Dabei startet weder CLI noch Anmeldung, und keine Ausführung wird gesperrt. Vorhandene Dateien beweisen keine passenden Versionen, Paketintegrität oder funktionierenden Werkzeuge.
+
 Neben der direkten Computersteuerung kann KiraBridge Aufträge an **Codex und Grok** in eingerichteten, sichtbaren Terminalfenstern übergeben und deren Rückmeldungen verfolgen. Laut lokalem Inventar vom 10. November sind außerdem ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. OpenCode kann zusätzlich seine lokale HTTP-API mit Basic-Authentifizierung aus Umgebungsvariablen nutzen; dieser Adapter legt pro Auftrag eine neue Sitzung an und meldet Status und Ergebnis zurück. Ein erkannter Adapter ist noch kein Nachweis für Anmeldung, eine einsatzbereite Sitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag.
 
 Der Entwicklungsstand unterstützt Zwischenfragen an eine ausdrücklich ausgewählte, arbeitende Codex-Sitzung, ohne ihre Arbeit zu stoppen oder einen weiteren Agentenauftrag zu starten. Der aktuelle native Weg nutzt das bestehende macOS-Terminal; unklare Zustellungen bleiben ohne automatische Wiederholung erhalten, und Nutzende können Zwischenfragen ausschalten. Die Live-Abnahme auf macOS und die nativen Transportabnahmen auf Windows/Linux/Server werden getrennt belegt und sind noch offen.
