@@ -44,6 +44,7 @@ CATALOG_BACKSTOP_SECONDS = 0.5
 # remains fresh, and the pool binds reuse to connection, epoch and list_changed.
 OPERATION_CATALOG_MAX_AGE_SECONDS = 1.0
 ERROR_CODES = {
+    "workspace_mismatch",
     "validation_error",
     "invalid_state",
     "not_found",

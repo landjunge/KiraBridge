@@ -37,6 +37,7 @@ _MAX_SCHEMA_NODES = 2048
 _STATUS_MUTATIONS = {"thread_manage", "td_thread_umanage", "td_whiteboard__append"}
 _PEER_CODES = frozenset(
     {
+        "workspace_mismatch",
         "validation_error",
         "invalid_state",
         "not_found",

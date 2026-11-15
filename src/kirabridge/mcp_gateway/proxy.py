@@ -20,6 +20,9 @@ from kirabridge.mcp_gateway.schema_validation import (
 from kirabridge.mcp_gateway.timing import ToolSpan, instrument_server
 
 SCHEMA_CACHE_SECONDS = 30.0
+# A previously published Apps descriptor added a second host prefix. Keep only
+# this known read alias; every call still resolves its current authorized peer.
+READ_ONLY_COMPATIBILITY_ALIASES = {"td_td_library_uquery": "td_library_uquery"}
 
 
 class DaemonConnection:
@@ -147,6 +150,54 @@ class DaemonConnection:
 def dynamic_tool_name(name):
     """One "td_" namespace: ThreadDesk command tools already carry it (no td_td_*)."""
     return name if name.startswith("td_") else "td_" + name
+
+
+def dynamic_compatibility_aliases(names):
+    """Never invent peer names or extend compatibility to mutations."""
+    aliases = {}
+    for alias, current in READ_ONLY_COMPATIBILITY_ALIASES.items():
+        item = names.get(current)
+        if (
+            item is not None
+            and alias not in names
+            and item.get("name") == current
+            and item.get("readOnly") is True
+            and item.get("requires_operation_id") is False
+            and item.get("annotations", {}).get("readOnlyHint") is True
+            and item.get("annotations", {}).get("destructiveHint") is False
+        ):
+            aliases[alias] = item
+    return aliases
+
+
+def dynamic_catalog_names(entries):
+    """Reject ambiguous public names before adding the single known read alias."""
+    names, ambiguous = {}, set()
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        name, schema = item.get("name"), item.get("inputSchema")
+        if (
+            isinstance(name, str)
+            and name.startswith(tuple("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+            and name.replace("_", "").replace("-", "").isalnum()
+            and len(name) <= 64
+            and isinstance(schema, dict)
+        ):
+            public = dynamic_tool_name(name)
+            if public in names:
+                ambiguous.add(public)
+            else:
+                names[public] = item
+    for name in ambiguous:
+        names.pop(name, None)
+    aliases = dynamic_compatibility_aliases(names)
+    # A real peer entry occupying a reserved compatibility name is a conflict,
+    # never an opportunity to expose a mutation under the old read descriptor.
+    for name in READ_ONLY_COMPATIBILITY_ALIASES:
+        names.pop(name, None)
+    names.update(aliases)
+    return names
 
 
 def dynamic_input_schema(item):
@@ -278,22 +329,7 @@ async def connect_stdio(config, principal, *, task_policy=None):
                     return dynamic_unavailable(
                         "threaddesk_catalog_failed", "ThreadDesk catalog was not usable"
                     )
-                names = {}
-                for item in entries:
-                    if not isinstance(item, dict):
-                        continue
-                    name = item.get("name")
-                    schema = item.get("inputSchema")
-                    if (
-                        isinstance(name, str)
-                        and name.startswith(
-                            tuple("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-                        )
-                        and name.replace("_", "").replace("-", "").isalnum()
-                        and len(name) <= 64
-                        and isinstance(schema, dict)
-                    ):
-                        names.setdefault(dynamic_tool_name(name), item)
+                names = dynamic_catalog_names(entries)
                 dynamic_problem.clear()
                 return names
             except Exception as exc:
