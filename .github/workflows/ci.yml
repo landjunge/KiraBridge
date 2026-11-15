@@ -130,5 +130,5 @@ jobs:
       - run: uv sync --locked --dev
       - name: Check imports and native generated launcher, without provider turns
         run: uv run --locked python -B -m pytest -q -p no:cacheprovider tests/test_windows_import_boundary.py tests/test_windows_launcher_native.py
-      - run: uv run --locked python -B -m kirabridge --help
-      - run: uv run --locked python -B -m kirabridge setup --help
+      - run: uv run --locked python -B -m kirabridge.cli --help
+      - run: uv run --locked python -B -m kirabridge.cli setup --help
