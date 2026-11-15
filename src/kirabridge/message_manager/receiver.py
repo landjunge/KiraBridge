@@ -739,10 +739,19 @@ class MessageReceiver:
             # cost and queue growth. They are not identity, authentication or
             # dedupe guards: those are enforced before this point and must never
             # depend on these counters.
+            # Exempt only the exact run claimed by DirectDelivery for steering.
+            # A queued interim target can instead reach agents.execute through
+            # the managed cutoff route, so the original message is not proof.
+            delivery_only_claim = (
+                "AND NOT EXISTS (SELECT 1 FROM message_events e WHERE e.message_id=m.id "
+                "AND e.kind='message.processing_claimed' "
+                "AND json_extract(e.evidence,'$.run_id')=j.run_id "
+                "AND json_type(e.evidence,'$.interim_delivery')='true')"
+            )
             since = time.time() - 3600
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
-                "WHERE m.conversation_id=? AND j.claimed>?",
+                "WHERE m.conversation_id=? AND j.claimed>? " + delivery_only_claim,
                 (row["conversation_id"], since),
             ).fetchone()[0]
             if not interim and count >= config.max_runs_per_conversation:
@@ -750,7 +759,7 @@ class MessageReceiver:
                 return None
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
-                "WHERE m.recipient=? AND j.claimed>?",
+                "WHERE m.recipient=? AND j.claimed>? " + delivery_only_claim,
                 (row["recipient"], since),
             ).fetchone()[0]
             if not interim and count >= config.max_runs_per_hour:
@@ -780,7 +789,11 @@ class MessageReceiver:
                 message_id,
                 "message.processing_claimed",
                 row["recipient"],
-                {"run_id": run_id, "session_scope": scope},
+                {
+                    "run_id": run_id,
+                    "session_scope": scope,
+                    **({"interim_delivery": True} if direct and interim else {}),
+                },
             )
             return dict(row), run_id
 
