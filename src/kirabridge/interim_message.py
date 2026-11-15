@@ -4,6 +4,8 @@ The caller owns the durable task/message and records the attempt before native I
 No replay, queue, agent.execute, Escape, Ctrl-C or process fallback exists here.
 """
 
+import asyncio
+import hashlib
 import json
 import re
 
@@ -55,10 +57,32 @@ async def execute(bridge, task, args, target, binding, running, progress):
                 original = json.loads(row[0])
                 if original.get("pane_id") == binding.pane_id:
                     raise BridgeError("visible_target_busy", "Earlier input needs reconciliation")
-            before = await bridge.sessions.terminal_app.read(binding.pane_id)
-            state = adapter.interim_readiness(before, binding)
-            if not state["ready"]:
-                raise BridgeError("visible_target_not_ready", state["reason"])
+            # Use the same bounded, identity-bound observation as session.read.
+            # A transient renderer frame may be observed again before any input;
+            # this never repeats a paste or re-admits an existing failed task.
+            for attempt in range(3):
+                output = await bridge.visible_handoffs.check_target(principal, target, binding)
+                state = await bridge.visible_handoffs.binding_readiness(
+                    principal, target, binding, output
+                )
+                await progress(
+                    {
+                        "evidence_type": "codex_interim_preflight",
+                        "terminal_input_attempted": False,
+                        "automatic_retry": False,
+                        "observation": state,
+                        "screen_sha256": hashlib.sha256(output["text"].encode()).hexdigest(),
+                        "observation_attempt": attempt + 1,
+                    }
+                )
+                if state.get("interim_ready"):
+                    before = output["text"]
+                    break
+                if state.get("state") not in {"unknown", "working"} or attempt == 2:
+                    error = BridgeError("visible_target_not_ready", state["reason"])
+                    error.observation = state
+                    raise error
+                await asyncio.sleep(0.1)
             approved = bridge.tasks.input_policy.dispatch(principal, args, task["id"])
             await adapter.preflight_input(
                 bridge.sessions, binding, approved.text, {"text": before}, composer_only=True
