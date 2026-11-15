@@ -265,6 +265,8 @@ Mit ausdrücklich gesetztem `autonext.completion_mode="verified_ack"` verarbeite
 
 Der konfigurierte Koordinator und der frisch bestätigte unveränderliche Owner seines konfigurierten Teams dürfen denselben begrenzten `coordinator_status` mit aufgezeichneten Zeiten lesen. Die Team-Ownerschaft gewährt nur diese Statusansicht; Steuerung, Completion-ACKs und private Core-Daten behalten ihre bisherigen Rechte.
 
+Der Entwicklungsstand trennt außerdem den gespeicherten `ledger_state` vom Workflowstatus einer Aufgabe. Eine gebundene terminale Ablehnung, ein Fehler oder Stopp ersetzt ein veraltetes angezeigtes `waiting` nur bei passenden Aufgaben-/Quellmetadaten und bekannten terminalen Work-/Core-Zuständen; aktive oder unbekannte Bindungen bleiben unverändert. Die Zähler folgen dem angezeigten Workflowstatus. Diese reine Leseprojektion stoppt keine Nativeffekte, gibt keine Leases frei und bestätigt keinen Projektabschluss; Installation und Liveabnahme bleiben getrennt.
+
 Sein Status zeigt gespeicherte Warte-, Ausführungs- und Abnahmezeiten aus dem gebundenen Core und Receipt. Fehlende oder ungültige Zeitwerte bleiben unbekannt; das Lesen startet keine Arbeit.
 
 Das optionale [native Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) verwendet die geprüfte CLI-Matrix für versiegelte Managed-Aufträge; sichtbare Sitzungen und das eigene strukturierte Grok-Reviewprotokoll bleiben erhalten. Angeforderte Modell-/Effortwerte und beobachtete Metadaten bleiben getrennt; lokale Fixturetests sind keine Provider- oder Deploymentabnahme.

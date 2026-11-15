@@ -267,6 +267,8 @@ An explicitly configured `autonext.completion_mode="verified_ack"` lets that sam
 
 The configured coordinator and the freshly verified immutable owner of its configured team can read the same bounded `coordinator_status`, including recorded timings. Team ownership grants this status view only; control, completion ACKs and private Core data retain their existing permissions.
 
+Development source also distinguishes the stored `ledger_state` from task workflow status. A bound terminal rejection, failure or stop can replace a stale displayed `waiting` only with matching task/source metadata and known terminal work/Core states; active or unknown bindings stay unchanged. Counts follow the displayed workflow state. This read-only projection does not stop native effects, release leases or verify project completion; installation and live acceptance remain separate.
+
 Its status projects recorded queue, execution and acceptance times from the bound Core and receipt. Missing or invalid timestamps remain unknown; reading the projection starts no work.
 
 The optional [native worker routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) reuses the verified CLI matrix for sealed managed tasks, preserving visible sessions and the separate structured Grok review protocol. Requested model/effort and observed metadata remain distinct; local fixture tests do not establish provider or deployment acceptance.
