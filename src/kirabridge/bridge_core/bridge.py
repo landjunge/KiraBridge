@@ -294,13 +294,20 @@ class Bridge:
             authorize=self.security.authorize,
         )
         self.sessions.terminal_app.system_transport = self.system_modules.transport
-        self.macos = MacOSProvider(
+        provider_type, provider_options = MacOSProvider, {}
+        if sys.platform.startswith("linux"):
+            from kirabridge.platform_adapters.linux.provider import LinuxProvider
+
+            provider_type = LinuxProvider
+            provider_options["owned_terminal"] = self.sessions.linux
+        self.macos = provider_type(
             terminal_app=self.sessions.terminal_app,
             clipboard=self.clipboard,
             files=self.filesystem,
             processes=self.processes,
             system_modules=self.system_modules,
             system_reports=self.terminal,
+            **provider_options,
         )
         from kirabridge.native_queries import NativeQueries
 

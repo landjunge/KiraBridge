@@ -175,6 +175,8 @@ remote access need separate configuration.
 
 Development source identifies terminal routes by host: a confirmed visible shell on macOS, native owned PTYs on Linux, and `windows.console.handoff` on Windows. On Linux, `terminal_control` / `terminal.visible` and ChatGPT's default `terminal.execute` execute exact argv in a fresh temporary PTY, returning its PID/TTY, output, observed exit status and cleanup evidence. Existing user sessions are preserved; `create_if_needed` controls macOS windows only. Explicit pane targets and privileged direct execution are unsupported on Linux. Separate interactive owned sessions use `session.open`; discovery lists them even without tmux, and input/close retain exact handle/PID checks. Existing permissions, executable and working-directory limits still apply. This source change does not update published downloads or establish live Voice acceptance of the new route.
 
+Linux discovery identifies its provider as `linux.existing_native`. It distinguishes bound file, process and owned-PTY adapters from unprobed transport availability: a binding reports `state=unknown`, `runtime_availability=not_probed` and does not assert `available=true`. Desktop transports remain unsupported. These passive metadata do not change operation descriptors, permission checks or terminal dispatch; macOS and Windows retain their existing paths. Installed-version and native platform acceptance require separate evidence.
+
 The 0.8.0rc41 archive is natively accepted on Debian 13.6 x86_64 and
 [published in its separate server release](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). The downloaded
 archive matches GitHub's digest and the release checksums. Ubuntu 24.04 is a
