@@ -69,7 +69,7 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
             input=stdin,
             cwd=task.cwd,
             timeout=task.timeout_seconds,
-            env=subscription_environment(),
+            env=subscription_environment(decision["cli"]),
         )
         # Exit 0 is transport completion, not accepted work or verified model identity.
         output = state / (task.task_id + ".stdout")

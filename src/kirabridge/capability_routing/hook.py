@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -22,8 +23,23 @@ def version_identity(cli, text):
     return text
 
 
-def subscription_environment():
+def subscription_environment(cli=None):
     """Prevent inherited API keys/endpoints from changing the granted billing route."""
+    if cli == "claude":
+        # Keep the same HOME/keychain subscription; never inherit API/provider,
+        # model/effort overrides, plugins or auth-helper environment settings.
+        allowed = {
+            "HOME",
+            "USER",
+            "LOGNAME",
+            "PATH",
+            "LANG",
+            "LC_ALL",
+            "LC_CTYPE",
+            "TMPDIR",
+            "TERM",
+        }
+        return {key: value for key, value in os.environ.items() if key in allowed}
     env = dict(os.environ)
     for key in list(env):
         if key in {
@@ -61,7 +77,7 @@ def before_delegation(source, runtime, task, *, probe=True):
             capture_output=True,
             text=True,
             timeout=10,
-            env=subscription_environment(),
+            env=subscription_environment(decision["cli"]),
         )
         # Complete first-line equality, not substring matching (0.166.01 != 0.166.0).
         observed = (result.stdout or result.stderr).strip().splitlines()
@@ -87,7 +103,7 @@ def before_delegation(source, runtime, task, *, probe=True):
                 capture_output=True,
                 text=True,
                 timeout=10,
-                env=subscription_environment(),
+                env=subscription_environment(decision["cli"]),
             )
             text = auth.stdout + auth.stderr
             marker = (
@@ -104,6 +120,35 @@ def before_delegation(source, runtime, task, *, probe=True):
             decision["observed_auth_route"] = (
                 "chatgpt" if decision["cli"] == "codex" else "grok.com"
             )
+        if decision["access_kind"] == "subscription" and decision["cli"] == "claude":
+            auth = subprocess.run(
+                [str(exe), "auth", "status", "--json"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=subscription_environment("claude"),
+            )
+            try:
+                status = json.loads(auth.stdout)
+            except (ValueError, TypeError):
+                status = None
+            if (
+                auth.returncode
+                or not isinstance(status, dict)
+                or status.get("loggedIn") is not True
+                or status.get("authMethod") != "claude.ai"
+                or status.get("apiProvider") != "firstParty"
+                or status.get("subscriptionType")
+                not in {"pro", "max", "ultra", "team", "enterprise"}
+            ):
+                raise RoutingError(
+                    "Claude subscription authentication changed; no API/account fallback"
+                )
+            # Never expose status identity/token fields or infer model entitlement.
+            decision["observed_auth_route"] = "claude.ai"
+            decision["requested_model_kind"] = "cli_alias"
+            decision["per_model_access_attested"] = False
     return decision
 
 
@@ -155,6 +200,39 @@ def command_for(decision, task):
             "--single",
             task.prompt,
         ], None
+    if decision["cli"] == "claude":
+        if not task.read_only or model != "opus" or effort != "xhigh":
+            raise RoutingError("Claude profile permits only read-only opus/xhigh text review")
+        # --bare would disable OAuth/keychain and require API credentials. Keep
+        # normal subscription auth; restricted/safe-mode retain managed policy.
+        # No builtin tools, MCP, skills, session resume or model fallback.
+        return [
+            exe,
+            "--print",
+            "--model",
+            model,
+            "--effort",
+            effort,
+            "--restricted",
+            "--safe-mode",
+            "--permission-mode",
+            "plan",
+            "--tools",
+            "",
+            "--strict-mcp-config",
+            "--mcp-config",
+            '{"mcpServers":{}}',
+            "--disallowed-tools",
+            "mcp__*",
+            "--disable-slash-commands",
+            "--no-session-persistence",
+            "--max-turns",
+            "1",
+            "--output-format",
+            "json",
+            "--settings",
+            '{"switchModelsOnFlag":false}',
+        ], task.prompt.encode()
     raise RoutingError("CLI researched but execution adapter not yet verified for this launcher")
 
 
