@@ -133,8 +133,13 @@ async def serve(
             if response is not None:
                 await emit(response)
             if forwarded is not None:
-                child.stdin.write(forwarded)
-                await child.stdin.drain()
+                try:
+                    child.stdin.write(forwarded)
+                    await child.stdin.drain()
+                except (BrokenPipeError, ConnectionResetError) as error:
+                    # Only this owned stdin closure can yield to an actual child
+                    # exit. Host framing/output and other transport errors raise.
+                    return error
         child.stdin.close()
 
     async def child_to_host():
@@ -174,13 +179,18 @@ async def serve(
             task.result()
         # EOF in either direction gets one finite grace period. A natural child
         # exit may precede stdout EOF; preserve its buffered final response too.
-        if not await bounded_wait(drain_timeout):
+        natural_exit = await bounded_wait(drain_timeout)
+        if not natural_exit:
             await stop_owned_child()
         try:
             await asyncio.wait_for(asyncio.shield(downstream), drain_timeout)
         except TimeoutError:
             downstream.cancel()
             raise RuntimeError("owned_mcp_child_output_did_not_close") from None
+        if upstream.done():
+            stdin_error = upstream.result()  # Preserve unrelated late host errors.
+            if stdin_error is not None and not natural_exit:
+                raise RuntimeError("owned_mcp_child_closed_stdin_before_exit") from stdin_error
         return child.returncode
     finally:
         try:

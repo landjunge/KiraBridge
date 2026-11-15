@@ -187,6 +187,7 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
     journal = EventJournal(state)
     # Exactly one persistent sender. MCP frontends can close without stopping it.
     lock_fd = None
+    readiness = SenderReadiness(journal, config, principal, allowed_hosts)
     if not external_sender:
         lock_fd = os.open(
             Path(state) / "sender.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
@@ -197,6 +198,12 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
             os.close(lock_fd)
             journal.db.close()
             raise RuntimeError("event_sender_already_running") from None
+        try:
+            readiness.start(lock_fd)
+        except BaseException:
+            os.close(lock_fd)
+            journal.db.close()
+            raise
     backend = Backend(config, principal)
     push = EventPush(
         journal,
@@ -212,7 +219,6 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
     )
     if not external_sender:
         push.recover()
-    readiness = SenderReadiness(journal, config, principal, allowed_hosts)
     push.sender_readiness = readiness
 
     async def worker():
@@ -244,8 +250,9 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
                 task = asyncio.create_task(worker())
             yield task
         finally:
-            if task:
+            if not external_sender:
                 readiness.publish("stopped")
+            if task:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
             await backend.client.aclose()
