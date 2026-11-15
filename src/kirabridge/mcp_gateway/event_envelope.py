@@ -18,8 +18,9 @@ EVENT_METHODS = {"events/list", "events/subscribe", "events/unsubscribe"}
 
 
 class EventEnvelope:
-    def __init__(self, push):
+    def __init__(self, push, *, ready=None):
         self.push = push
+        self.ready = ready or (lambda: push is not None)
         self.initializations = set()
 
     @staticmethod
@@ -44,6 +45,8 @@ class EventEnvelope:
             return None, None  # Requests are required; never emit a notification response.
         response = {"jsonrpc": "2.0", "id": value["id"]}
         try:
+            if not self.ready():
+                raise EventError("event_sender_unavailable")
             params = value.get("params", {})
             if not isinstance(params, dict):
                 raise EventError("invalid_event_params")
@@ -81,7 +84,7 @@ class EventEnvelope:
             return line
         self.initializations.remove(key)
         result = value.get("result")
-        if self.push is None or not isinstance(result, dict):
+        if self.push is None or not self.ready() or not isinstance(result, dict):
             return line
         capabilities = result.get("capabilities")
         if not isinstance(capabilities, dict):
@@ -98,8 +101,17 @@ class EventEnvelope:
         return json.dumps(value, separators=(",", ":")).encode() + b"\n"
 
 
-async def serve(envelope, child_argv, reader, write):
-    """Run one existing proxy child, with ordered bounded stdio forwarding."""
+async def serve(
+    envelope,
+    child_argv,
+    reader,
+    write,
+    *,
+    drain_timeout=2.0,
+    terminate_timeout=3.0,
+    kill_timeout=2.0,
+):
+    """Preserve the exact child's status; bound EOF drain and own-child cleanup."""
     child = await asyncio.create_subprocess_exec(
         *child_argv,
         stdin=asyncio.subprocess.PIPE,
@@ -129,34 +141,73 @@ async def serve(envelope, child_argv, reader, write):
         while line := await child.stdout.readline():
             await emit(envelope.from_child(line))
 
-    tasks = [asyncio.create_task(host_to_child()), asyncio.create_task(child_to_host())]
+    async def bounded_wait(timeout):
+        try:
+            await asyncio.wait_for(asyncio.shield(exited), timeout)
+            return True
+        except TimeoutError:
+            return False
+
+    async def stop_owned_child():
+        if child.returncode is not None:
+            return
+        try:
+            child.terminate()
+        except ProcessLookupError:
+            pass
+        if await bounded_wait(terminate_timeout):
+            return
+        try:
+            child.kill()
+        except ProcessLookupError:
+            pass
+        if not await bounded_wait(kill_timeout):
+            raise RuntimeError("owned_mcp_child_did_not_exit_after_kill")
+
+    upstream = asyncio.create_task(host_to_child())
+    downstream = asyncio.create_task(child_to_host())
+    exited = asyncio.create_task(child.wait())
+    tasks = (upstream, downstream, exited)
     try:
         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for task in done:
             task.result()
-        if tasks[0] in done:
-            await tasks[1]  # Drain the final child responses after host EOF.
+        # EOF in either direction gets one finite grace period. A natural child
+        # exit may precede stdout EOF; preserve its buffered final response too.
+        if not await bounded_wait(drain_timeout):
+            await stop_owned_child()
+        try:
+            await asyncio.wait_for(asyncio.shield(downstream), drain_timeout)
+        except TimeoutError:
+            downstream.cancel()
+            raise RuntimeError("owned_mcp_child_output_did_not_close") from None
+        return child.returncode
     finally:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        if child.returncode is None:
-            child.terminate()
-            try:
-                await asyncio.wait_for(child.wait(), 5)
-            except TimeoutError:
-                child.kill()
-                await child.wait()
-    return child.returncode
+        try:
+            await stop_owned_child()
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def stdio(envelope, child_argv):
+    loop = asyncio.get_running_loop()
     reader = asyncio.StreamReader(limit=MAX_LINE)
     protocol = asyncio.StreamReaderProtocol(reader)
-    await asyncio.get_running_loop().connect_read_pipe(lambda: protocol, sys.stdin.buffer)
+    input_transport, _ = await loop.connect_read_pipe(lambda: protocol, sys.stdin.buffer)
+    output_transport, output_protocol = await loop.connect_write_pipe(
+        asyncio.streams.FlowControlMixin, sys.stdout.buffer
+    )
+    writer = asyncio.StreamWriter(output_transport, output_protocol, None, loop)
 
     async def write(line):
-        sys.stdout.buffer.write(line)
-        sys.stdout.buffer.flush()
+        writer.write(line)
+        await writer.drain()
 
-    return await serve(envelope, child_argv, reader, write)
+    try:
+        return await serve(envelope, child_argv, reader, write)
+    finally:
+        input_transport.close()
+        output_transport.close()

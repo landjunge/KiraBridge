@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import signal
 import sys
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from serve import Backend  # noqa: E402
 
 from kirabridge.bridge_core.config import load_config  # noqa: E402
 from kirabridge.event_push import EventJournal, EventPush, WebhookSender  # noqa: E402
+from kirabridge.event_readiness import SenderReadiness  # noqa: E402
 from kirabridge.mcp_gateway.event_envelope import EventEnvelope, stdio  # noqa: E402
 
 
@@ -50,10 +52,40 @@ async def main_async(args):
     if child[0] == "--":
         child = child[1:]
     try:
-        await stdio(EventEnvelope(push), child)
+        readiness = SenderReadiness(journal, config, args.principal, args.allow_callback_host)
+        return await stdio(EventEnvelope(push, ready=readiness.is_ready), child)
     finally:
         await backend.client.aclose()
         journal.db.close()
+
+
+async def run_signalled(args):
+    """SIGINT/SIGTERM cancel once and allow bounded cleanup of our own child."""
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    interrupted = None
+    previous = {}
+
+    def interrupt(number):
+        nonlocal interrupted
+        if interrupted is None:
+            interrupted = number
+            task.cancel()
+
+    for number in (signal.SIGINT, signal.SIGTERM):
+        previous[number] = signal.getsignal(number)
+        loop.add_signal_handler(number, interrupt, number)
+    try:
+        code = await main_async(args)
+        return 128 - code if code < 0 else code
+    except asyncio.CancelledError:
+        if interrupted is None:
+            raise
+        return 128 + interrupted
+    finally:
+        for number, handler in previous.items():
+            loop.remove_signal_handler(number)
+            signal.signal(number, handler)
 
 
 def main():
@@ -63,7 +95,7 @@ def main():
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--allow-callback-host", action="append", default=[])
     parser.add_argument("child", nargs=argparse.REMAINDER)
-    asyncio.run(main_async(parser.parse_args()))
+    raise SystemExit(asyncio.run(run_signalled(parser.parse_args())))
 
 
 if __name__ == "__main__":

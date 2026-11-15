@@ -90,3 +90,98 @@ turn without a user prompt, message_receive, long poll or tool wait. Compare the
 original message, subscription and event IDs and measure latency. Only that
 independent chat observation proves the requested return ping. Mac-offline
 operation must then be independently observed with both processes on the server.
+
+## V2 lifecycle, sender readiness and activation order
+
+The first candidate is superseded by a separate correction after independent
+review found exit-status propagation, an unbounded EOF drain, and contradictory
+error envelopes being accepted for authorization. The wrapper now propagates the
+child's exit status (including signal status), allows at most two seconds of EOF
+grace, then terminates only its own child with a three-second wait and a two-second
+kill/reap bound. Output drain is bounded; incomplete drain is an error. SIGINT and
+SIGTERM cancel once, permitting that cleanup. Other processes are never targeted.
+
+Authorization rejects an unsuccessful MCP envelope before using positive IDs,
+including conflicting `isError`, `success`, `ok`, and error wrapper/content fields.
+An owned full `task_get` record may describe its task's failed execution; this is
+source data, not a failed read. That exception requires its bound task/principal,
+API version, state, operation and request hash, and never overrides `isError`.
+Message bodies and processing records remain data and are not interpreted as
+read-authorization envelopes.
+
+A separate persistent sender must hold the existing private `sender.lock` and
+publish a fresh private readiness marker. The marker is bound to the complete
+parsed configuration, authenticated principal, source database and callback-host
+allowlist. It contains no callback secret or credentials. A successful delivery
+cycle refreshes readiness; cycle failure removes it, three consecutive failures
+stop the worker, and shutdown marks it stopped. A missing lock, mismatch, stopped
+worker or heartbeat older than fifteen seconds withholds the Events capability.
+The existing tools continue through the original proxy. Event requests received
+while unready fail closed. This is local transport readiness, not a host
+subscription, webhook receipt, displayed message or latency guarantee.
+
+Use this activation sequence only after the exact source/overlay and a separate
+independent review have passed; these instructions do not activate anything:
+
+1. Pin the existing tunnel binary, complete private profile hash, daemon PID/source,
+   unchanged configuration hash and current `connect` argv. Parse the **complete**
+   installed configuration with the proposed runtime source and import dependent
+   Bridge/MCP modules using the actual front interpreter. Check the source DB path
+   and the actual backend's `message_get`/`task_get` schemas through authorized
+   read-only MCP requests. A cold configuration subset is insufficient.
+2. Extract the reviewed overlay onto an independent copy of the pinned front
+   source. Do not hardlink or overwrite the active release. Use the installed
+   interpreter/dependencies already proven compatible. Keep a fixed persistent
+   journal outside the source release, for example
+   `/home/daniel/.local/state/kirabridge-chat-events-server`; both processes must
+   receive exactly that path, principal and host allowlist. Directory mode 0700,
+   journal/lock/WAL/SHM files 0600, service `UMask=0077`. Never log callback URLs,
+   signing secrets, authorization headers or credential files.
+3. Verify the **outer installed tunnel transport** forwards Events methods to the
+   child. An isolated `tunnel-client dev proxy` with loopback ingress, fixture auth
+   and the same installed binary is an appropriate runtime-compatibility check.
+   It does not attest the separately hosted OpenAI ingress edge or a true host
+   subscription. Those remain part of final acceptance.
+4. Coordinate one quiet MCP window with all active workers. Under a fresh short
+   SQLite read transaction inspect active native tasks and queued/running receiver
+   jobs, and record the exact snapshot. Do not switch with unknown/in-flight front
+   calls or tasks. Recheck the daemon PID/config/profile hashes immediately before
+   mutation. A new job or intervening profile change invalidates the window; no
+   uncertain work is replayed to recover the window.
+5. Save the original tunnel profile privately, preserving its exact bytes and
+   metadata, with a hash and rollback receipt. Prepare a dedicated **user** sender
+   service using the reviewed source and `serve.py --sender-only`, authenticated
+   as `chatgpt`, with `Restart=no`, `UMask=0077`, and bounded stop timeout. This
+   grants no new Bridge capability or receiver role. `codex_channel` remains the
+   original producer; the sender only reads the authorized `chatgpt` inbox.
+6. Start only that sender. Confirm the singleton lock is held, the same-route
+   readiness marker stays fresh, initial backend readiness and source collection
+   succeed, and a duplicate sender is rejected. No subscription or model work is
+   created by startup. If readiness fails, stop this sender and leave the original
+   tunnel command intact. Restart requires diagnosis; do not create a crash loop.
+7. Replace **only** the selected existing profile command atomically after a hash
+   CAS, with the wrapper command shown above and the exact old command retained as
+   its child argv. All other profile fields, tunnel identity/runtime-key binding,
+   daemon configuration, source DB, credentials, roles and services stay bytewise
+   unchanged. Restart only the existing owned tunnel service. Independently verify
+   its process ancestry is tunnel -> wrapper -> pinned original connect, local
+   Events discovery is present, and existing tools/Library aliases still work.
+   An unsupported or unready path must not advertise Events.
+8. On any failed verification, restore the saved profile **only if** its current
+   hash still equals this activation's candidate hash. Restart the same owned
+   tunnel service, verify the exact previous child argv and baseline tools, then
+   stop/disable only the newly created sender service. If another edit intervened,
+   stop and reconcile instead of overwriting it. Preserve the new private journal,
+   subscriptions, delivery history and receipts; never restore a stale Bridge DB.
+
+The callback allowlist starts empty unless a previously verified real host is
+already evidenced. The first actual host subscription can return the safe reason
+`callback_host_not_allowed:<hostname>`. Validate that **actual** hostname, prepare
+both process arguments with the same allowlist and fresh readiness binding, then
+repeat the guarded quiet-window reload and ask the host to retry the subscription.
+Do not guess a callback, signing secret, chat ID or user grant. The actual original
+ChatGPT conversation must support Work web or desktop Work+Cloud and event-triggered
+work. Refresh/rescan and host subscription are platform actions, not a fabricated
+MCP tool. Observe the later assistant turn independently and measure latency only
+after a real subscribed webhook; an open tool wait, long poll, inbox ACK or a
+synthetic callback never satisfies that acceptance.
