@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass, field
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.platform_adapters import reap_process, spawn_process
 
 _PROMPT = "KIRA_OWNED> "
 _TEXT = re.compile(r"^[^\x00-\x1f\x7f]+$")
@@ -29,6 +30,93 @@ class LinuxOwnedTerminal:
 
     def __init__(self):
         self._sessions: dict[str, _Owned] = {}
+
+    async def execute_argv(self, argv, cwd_fd, env, *, timeout, max_output, running):
+        """Run exact argv in a fresh short-lived PTY; never select an existing shell.
+
+        The caller holds the authorized directory descriptor for the entire spawn.
+        This resource is intentionally absent from the reusable session catalog.
+        """
+        loop = asyncio.get_running_loop()
+        master, slave = pty.openpty()
+        process = None
+        captured, total = bytearray(), 0
+        timed_out = False
+        nonblocking = False
+
+        def drain():
+            nonlocal total
+            # Bounded per callback so an output flood cannot starve timeout/cleanup.
+            for _ in range(16):
+                try:
+                    chunk = os.read(master, 8192)
+                except BlockingIOError:
+                    return
+                except OSError:
+                    loop.remove_reader(master)
+                    return
+                if not chunk:
+                    loop.remove_reader(master)
+                    return
+                total += len(chunk)
+                captured.extend(chunk[: max(0, max_output - len(captured))])
+
+        try:
+            tty_name = os.ttyname(slave)
+            os.set_blocking(master, False)
+            nonblocking = True
+            loop.add_reader(master, drain)
+            process = await spawn_process(
+                argv, cwd_fd, env, stdin=slave, stdout=slave, stderr=slave
+            )
+            os.close(slave)
+            slave = -1
+            identity = {
+                "pane_id": f"linux:{process.pid}",
+                "expected_pid": process.pid,
+                "pid": process.pid,
+                "tty": tty_name,
+                "execution_route": "linux_owned_pty",
+                "transport": "linux",
+            }
+            await running({**identity, "evidence_type": "local_process_spawned"})
+            try:
+                async with asyncio.timeout(timeout):
+                    await asyncio.shield(process.wait())
+            except TimeoutError:
+                timed_out = True
+        finally:
+            try:
+                if process is not None:
+                    # Also reap owned descendants after a successful leader exit.
+                    # Cancellation and a failed running callback take this same path.
+                    await reap_process(process)
+            finally:
+                if nonblocking:
+                    loop.remove_reader(master)
+                    drain()
+                os.close(master)
+                if slave != -1:
+                    os.close(slave)
+        return {
+            **identity,
+            "exit_code": process.returncode,
+            "success": process.returncode == 0 and not timed_out,
+            "terminal_output": captured.decode("utf-8", "replace"),
+            "output_scope": "merged stdout/stderr from this owned PTY only",
+            "output_bytes": total,
+            "output_truncated": total > len(captured),
+            "timed_out": timed_out,
+            "terminated": timed_out,
+            "pty_closed": True,
+            "owned_processes_reaped": True,
+            "evidence": {
+                "argv_executed_directly": True,
+                "owned_pty": True,
+                "exit_code": process.returncode,
+                "automatic_retry": False,
+            },
+        }
 
     async def open_shell(self, cwd: str) -> dict:
         if os.name != "posix":

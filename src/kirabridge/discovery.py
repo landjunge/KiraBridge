@@ -7,6 +7,7 @@ import time
 from kirabridge import __version__
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.permissions import decision, direct_terminal_required, permission_revision
+from kirabridge.platform_adapters import current_platform
 
 
 def _snapshot_facts(bridge, principal):
@@ -55,6 +56,7 @@ def epoch(bridge, principal):
 
 def snapshot(bridge, principal):
     policy, observed, current_permissions, platform, revision = _snapshot_facts(bridge, principal)
+    linux_direct = current_platform().name == "linux"
     return {
         "version": __version__,
         "instance_id": bridge.runtime["instance_id"],
@@ -115,13 +117,18 @@ def snapshot(bridge, principal):
         "direct_terminal": {
             "tool": "terminal_control",
             "operation": "terminal.visible",
-            "legacy_terminal_execute_route": "visible_terminal"
+            "legacy_terminal_execute_route": (
+                "linux_owned_pty" if linux_direct else "visible_terminal"
+            )
             if direct_terminal_required(bridge.config, principal)
             else "managed_process",
             "rule_scope": (
                 "ChatGPT direct KiraBridge terminal control; not internal Codex/Grok execution"
             ),
-            "selection": "confirmed idle visible shell; otherwise a separate visible window",
+            "selection": "fresh short-lived owned PTY; exact argv; no existing session selected"
+            if linux_direct
+            else "confirmed idle visible shell; otherwise a separate visible window",
+            "create_if_needed_scope": "macOS visible window only",
             "hidden_fallback": False,
             "permission": decision(bridge.config, principal, "terminal.visible"),
             "new_window_permission": decision(bridge.config, principal, "session.open"),

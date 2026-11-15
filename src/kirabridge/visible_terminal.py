@@ -1,4 +1,4 @@
-"""Direct terminal work in a freshly confirmed visible shell; never a hidden fallback."""
+"""Platform-native direct terminal work: macOS visible shell or Linux owned PTY."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.platform_adapters import current_platform
 from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 from kirabridge.private_files import private_json, write_private
 from kirabridge.session_manager import SessionOpen, SessionReference
@@ -23,7 +24,13 @@ from kirabridge.timing import timed
 class VisibleTerminalInput(TerminalInput):
     pane_id: str | None = Field(default=None, pattern=r"^terminal:[0-9]+:ttys[0-9]+$")
     expected_pid: int | None = Field(default=None, gt=0)
-    create_if_needed: bool = True
+    create_if_needed: bool = Field(
+        default=True,
+        description=(
+            "Allow a new visible macOS window. Linux direct argv always uses a fresh "
+            "short-lived owned PTY; this option does not select or create a persistent session."
+        ),
+    )
 
     @model_validator(mode="after")
     def exact_pair(self):
@@ -86,6 +93,31 @@ class VisibleTerminal:
             self.environment["PATH"],
         )
         argv = [executable, *args.argv[1:]]
+        if current_platform().name == "linux":
+            if args.pane_id is not None:
+                raise BridgeError(
+                    "unsupported_terminal_target",
+                    "Linux direct commands use a fresh owned PTY; "
+                    "use session.input for a selected session",
+                )
+            if privileged:
+                raise BridgeError(
+                    "unsupported_platform", "Privileged visible terminal execution requires macOS"
+                )
+            if any("\x00" in item for item in argv):
+                raise BridgeError("invalid_arguments", "NUL in command")
+            # Opening the directory is read-only and descriptor-bound. No session or
+            # executable is created by readiness or before authorization above.
+            with scope.directory(cwd) as cwd_fd:
+                result = await self.sessions.linux.execute_argv(
+                    argv,
+                    cwd_fd,
+                    self.environment,
+                    timeout=args.timeout,
+                    max_output=args.max_output,
+                    running=running,
+                )
+            return {**result, "cwd": cwd, "task_id": task["id"]}
         if privileged:
             self.security.principal(principal, "admin.execute")
             # Authorization stays in the confirmed visible TTY; the user types any

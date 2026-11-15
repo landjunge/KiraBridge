@@ -30,17 +30,17 @@ def terminal_access(config, principal):
     alternative = None
     if host == "linux":
         requirements = [
-            "bridge-owned PTY for the separate session.open route",
-            "explicit session.open authorization",
-            "fresh owned session/TTY/PID identity",
+            "fresh short-lived bridge-owned PTY for direct argv",
+            "terminal.execute, session.inspect and session.input authorization",
             "permitted working directory and executable",
         ]
         description = (
-            "Unter Linux ist terminal.visible als Vordergrundpfad nicht unterstützt. "
-            "Der vorhandene separate Weg session.open erzeugt eine Bridge-eigene PTY; "
-            "er übernimmt keine bestehenden Benutzerterminals. Freigabe, Pfade und "
-            "erlaubte Programme müssen getrennt geprüft werden; "
-            "die Laufzeitverfügbarkeit wurde nicht geprüft."
+            "Unter Linux führen terminal_control/terminal.visible und direkte "
+            "terminal.execute-Aufrufe argv in einer neuen kurzlebigen Bridge-eigenen PTY aus. "
+            "Ausgabe und beobachteter Exitstatus gehören nur zu diesem Auftrag; "
+            "die PTY wird danach geschlossen. Bestehende Benutzerterminals werden nicht "
+            "übernommen. create_if_needed betrifft nur macOS-Fenster. "
+            "Freigabe ist keine Laufzeitprüfung."
         )
         alternative = {"transport": "linux", "operation": "session.open"}
     elif host == "windows":
@@ -76,7 +76,9 @@ def terminal_access(config, principal):
         "input_operation": "session.input",
         "direct_command_tool": "terminal_control",
         "direct_command_operation": "terminal.visible",
-        "direct_command_availability": "not_probed" if host == "macos" else "unsupported_platform",
+        "direct_command_availability": "not_probed"
+        if host in {"macos", "linux"}
+        else "unsupported_platform",
         "direct_command_decision": decision(config, principal, "terminal.visible"),
         "new_window_decision": decision(config, principal, "session.open"),
         "runtime_requirements": requirements,

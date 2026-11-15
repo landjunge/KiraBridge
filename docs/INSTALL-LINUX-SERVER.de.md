@@ -93,6 +93,18 @@ nicht automatisch her.
 
 ## Grenzen
 
+Direkte Befehle über `terminal_control` / `terminal.visible` sowie ChatGPTs normale
+`terminal.execute`-Route führen exakte argv in einer neuen kurzlebigen Linux-PTY
+der Bridge aus. Ergebnisse binden Auftrag, PID und TTY an zusammengeführte
+stdout/stderr-Ausgabe, beobachteten Exitstatus und Cleanupbelege. Ein Timeout
+beendet nur diese eigene Prozesssitzung. Die PTY wird danach geschlossen; bestehende
+Benutzershells werden nicht übernommen. Ausgabe über `terminal.output` am
+Originalauftrag nachlesen; unsichere Befehle nicht wiederholen. Rechte-, Programm-
+und Arbeitsverzeichnisprüfungen gelten weiter. `create_if_needed` betrifft nur
+macOS-Fenster; beide Werte verwenden unter Linux eine temporäre PTY. Explizite
+Pane-Ziele und privilegierte Direktausführung sind nicht unterstützt. Für vorhandene
+eigene interaktive Sitzungen dienen die getrennten Sessionwerkzeuge.
+
 Auf diesem Server gibt es keine macOS-GUI, kein Terminal.app, keine native
 Tastatursteuerung und keine Desktop-Sitzung. Die Zwischenablage ist nur
 verfügbar, wenn `wl-clipboard` oder `xclip` vorhanden ist, und der Server

@@ -21,6 +21,7 @@ from kirabridge.permissions import (
     state_exclusions,
     visible_execution,
 )
+from kirabridge.platform_adapters import current_platform
 from kirabridge.terminal_manager import check_executable
 
 
@@ -134,7 +135,8 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
             bridge.security.principal(principal, "process.terminate")
         if name.startswith(("threaddesk.", "handoff.")) and name != "handoff.status":
             bridge.threaddesk.check_configuration()
-        if visible_route(name) and not bridge.sessions.terminal_app.available:
+        linux_direct = current_platform().name == "linux" and name != "admin.execute"
+        if visible_route(name) and not linux_direct and not bridge.sessions.terminal_app.available:
             raise BridgeError("unsupported_platform", "Visible Terminal.app requires macOS")
         if name in {"terminal.execute", "terminal.visible", "admin.execute"} and not (
             policy.executables or policy.allow_any_executable
