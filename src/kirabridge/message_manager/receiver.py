@@ -78,12 +78,18 @@ class MessageReceiver:
                 if self._reply_can_finish(row):
                     self.recovered_handoffs.add(row["message_id"])
                     continue  # Return already happened; do not interrupt or paste again.
+                observed = json.loads(row["evidence"])
                 self._finish(
                     row[0],
                     "unknown",
                     {
                         "reason": "receiver_restart",
-                        "last_observation": json.loads(row["evidence"]),
+                        "last_observation": observed,
+                        **(
+                            {"managed_guidance_context": observed["managed_guidance_context"]}
+                            if "managed_guidance_context" in observed
+                            else {}
+                        ),
                     },
                     "interrupted",
                 )
@@ -764,6 +770,12 @@ class MessageReceiver:
                 if self.bridge.config.visible_handoffs.enabled
                 else "separate_managed_session"
             )
+            evidence = {"session_scope": scope}
+            if not direct and not interim:
+                from kirabridge.message_manager.guidance_context import prepare
+
+                if context := prepare(self.bridge, row):
+                    evidence["managed_guidance_context"] = context
             self.bridge.store.db.execute(
                 "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=?,"
                 "execution_cwd=? "
@@ -771,7 +783,7 @@ class MessageReceiver:
                 (
                     run_id,
                     time.time(),
-                    canonical({"session_scope": scope}),
+                    canonical(evidence),
                     config.receivers[row["recipient"]].cwd,
                     message_id,
                 ),
@@ -1082,6 +1094,15 @@ class MessageReceiver:
         message_id, recipient = message["id"], message["recipient"]
         limits = self.bridge.config.messaging
         receiver = limits.receivers[recipient]
+        claimed = self.bridge.store.db.execute(
+            "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+        ).fetchone()
+        context = json.loads(claimed["evidence"]).get("managed_guidance_context")
+
+        def retain_context(evidence):
+            if context is None:
+                return evidence
+            return {**evidence, "managed_guidance_context": context}
 
         async def call(tool, arguments):
             result = await pool.call("daemon", tool, arguments)
@@ -1091,6 +1112,7 @@ class MessageReceiver:
             return content
 
         async def progress(evidence):
+            evidence = retain_context(evidence)
             with self.bridge.store.transaction():
                 self.bridge.store.db.execute(
                     "UPDATE message_jobs SET evidence=? WHERE message_id=?",
@@ -1130,9 +1152,14 @@ class MessageReceiver:
             receipt = delivered["messages"][0]["receipt"]
             separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
             visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
-            # The body is the complete authorized input on every receiver route.
-            # Routing, parent IDs and receipts stay in durable transport metadata.
+            # Visible delivery and work without processed managed guidance keep
+            # the exact current body. Only the pinned same-scope managed context
+            # may frame prior original notes around it; never mutate the message.
             prompt = message["body"]
+            if context is not None:
+                from kirabridge.message_manager.guidance_context import render_pinned
+
+                prompt = render_pinned(self.bridge, message, context)
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
             args = AgentInput(
@@ -1203,15 +1230,17 @@ class MessageReceiver:
                 with self.bridge.store.transaction():
                     self._finish(message_id, "completed", evidence)
                 return
-            evidence = {
-                **result.get("evidence", {}),
-                "run_id": run_id,
-                "session_scope": "existing_visible_terminal"
-                if visible
-                else "separate_managed_session",
-                "response_sha256": digest(result.get("text", "")),
-                "response_preview": result.get("text", "")[:320],
-            }
+            evidence = retain_context(
+                {
+                    **result.get("evidence", {}),
+                    "run_id": run_id,
+                    "session_scope": "existing_visible_terminal"
+                    if visible
+                    else "separate_managed_session",
+                    "response_sha256": digest(result.get("text", "")),
+                    "response_preview": result.get("text", "")[:320],
+                }
+            )
             reply_id = None
             if message["request_reply"]:
                 text = result.get("text", "")
@@ -1265,10 +1294,12 @@ class MessageReceiver:
                 self._finish(
                     message_id,
                     "unknown",
-                    {
-                        "run_id": run_id,
-                        "last_observation": json.loads(observed),
-                    },
+                    retain_context(
+                        {
+                            "run_id": run_id,
+                            "last_observation": json.loads(observed),
+                        }
+                    ),
                     "receiver_interrupted",
                 )
             raise
@@ -1296,9 +1327,11 @@ class MessageReceiver:
                 self._finish(
                     message_id,
                     state,
-                    {
-                        "run_id": run_id,
-                        "last_observation": json.loads(observed),
-                    },
+                    retain_context(
+                        {
+                            "run_id": run_id,
+                            "last_observation": json.loads(observed),
+                        }
+                    ),
                     exc.code if isinstance(exc, BridgeError) else "receiver_failed",
                 )
