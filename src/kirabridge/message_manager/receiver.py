@@ -1045,6 +1045,13 @@ class MessageReceiver:
                     if self.stopping:
                         return
                     self._reconcile_recovered_handoffs(recipient)
+                    from kirabridge.message_manager.guidance import consume, ready
+
+                    if ready(self, recipient):
+                        async with MCPClientPool(call_timeout=15) as pool:
+                            await pool.connect(peer(self.bridge.config, recipient))
+                            if await consume(self, recipient, pool):
+                                continue
                     dispatched = await self._dispatch_next(recipient, include_visible=False)
                 fault_recorded = False
                 if dispatched:
