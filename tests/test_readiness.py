@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -195,6 +196,9 @@ def test_readiness_checks_secondary_capabilities_before_calling_an_operation(bri
 
 
 def test_readiness_reports_native_platform_blocker_from_passive_metadata(bridge, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.readiness.current_platform", lambda: SimpleNamespace(name="macos")
+    )
     bridge.config.principals["local"].approval_mode = "automatic"
     bridge.config.principals["local"].capabilities.append("session.inspect")
     monkeypatch.setattr(
@@ -295,6 +299,9 @@ def test_readiness_separates_empty_executable_allowlist_from_operation_permissio
 async def test_readiness_aliases_follow_visible_route_without_blocking_internal_execution(
     bridge, monkeypatch, operation, client_type, native_available
 ):
+    monkeypatch.setattr(
+        "kirabridge.readiness.current_platform", lambda: SimpleNamespace(name="macos")
+    )
     policy = bridge.config.principals["local"]
     policy.approval_mode = "automatic"
     policy.client_type = client_type

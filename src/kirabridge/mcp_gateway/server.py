@@ -62,8 +62,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     server = FastMCP(
         "KiraBridge",
         instructions="Direct ChatGPT terminal commands use terminal_control (terminal.visible); "
-        "terminal.execute for chatgpt also uses a confirmed visible shell. "
-        "If no suitable idle window exists, open a separate visible window "
+        "terminal.execute for chatgpt uses the same native direct route: a confirmed visible "
+        "shell on macOS, a fresh short-lived owned PTY with exact argv on Linux. "
+        "On macOS, if no suitable idle window exists, open a separate visible window "
         "under the same task grant. "
         "Never type into busy/unconfirmed windows or fall back to a hidden session. "
         "This direct-control rule does not prescribe Codex/Grok internal workflows. "
@@ -646,6 +647,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         def action():
             from kirabridge.operations import OPERATIONS
             from kirabridge.permissions import LEVELS, decision, level_for, permission_summary
+            from kirabridge.platform_adapters import current_platform
             from kirabridge.terminal_access import terminal_access
             from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
             from kirabridge.windows_setup_verification import verification_catalog
@@ -672,6 +674,22 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     )
                 }
             )
+            if current_platform().name == "linux":
+                permission = decision(bridge.config, identity(ctx), "terminal.visible")
+                platform_rows["terminal.visible"] = {
+                    "operation": "terminal.visible",
+                    "provider_id": "linux.owned_pty",
+                    "provider_version": "1",
+                    "leaf": "direct_argv",
+                    "technical_available": True,
+                    "permissions": [],
+                    "policy": permission,
+                    "eligible_for_submission": permission["authorized"],
+                    "approval_required": permission["approval_required"],
+                    "requires_fresh_policy_and_target_check": True,
+                    "os_permission_state": "current_user_process",
+                    "runtime_availability": "not_probed",
+                }
             platform_rows.update(
                 {
                     row["operation"]: row
@@ -1138,12 +1156,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         create_if_needed: bool = True,
         timeout: float = 60,
     ) -> dict[str, Any]:
-        """Direct work in a confirmed visible shell, with no hidden replacement.
+        """Direct native terminal work with task-bound output and observed exit status.
 
         Reuses one suitable empty existing Terminal.app shell or opens a separate visible
         window under the same exact-task/standing grant. Busy agents are preserved.
         Optional pane_id/expected_pid binds an explicit current target. Inspect task_get
         for actual visible command completion; an uncertain outcome must never be replayed.
+        On Linux, executes exact argv in a fresh short-lived owned PTY and closes it after
+        completion/timeout. No existing shell or GUI is used. Explicit pane targets and
+        privileged execution are unsupported. create_if_needed only controls macOS windows;
+        both values use a temporary PTY on Linux. Read terminal.output using the task_id.
         Codex/Grok internal execution and ThreadDesk are separate access paths.
         """
         return await task_request(

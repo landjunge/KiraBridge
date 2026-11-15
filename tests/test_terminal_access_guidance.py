@@ -54,7 +54,9 @@ def test_host_guidance_preserves_policy_and_unprobed_runtime(
             else "Terminalrechte sind nicht vollständig erteilt."
         )
     else:
-        assert result["direct_command_availability"] == "unsupported_platform"
+        assert result["direct_command_availability"] == (
+            "not_probed" if host == "linux" else "unsupported_platform"
+        )
         assert "macOS desktop" not in " ".join(result["runtime_requirements"])
         alternative = result["alternative_terminal_route"]
         assert alternative["availability"] == "not_probed"
@@ -62,4 +64,4 @@ def test_host_guidance_preserves_policy_and_unprobed_runtime(
         assert alternative["operation"] == (
             "session.open" if host == "linux" else "windows.console.handoff"
         )
-        assert "nicht unterstützt" in result["description"]
+        assert ("kurzlebigen" if host == "linux" else "nicht unterstützt") in result["description"]
