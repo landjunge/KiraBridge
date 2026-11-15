@@ -1,18 +1,21 @@
 """Lifecycle/auth/readiness regressions; synthetic configs and owned child processes only."""
 
 import asyncio
+import http.server
 import importlib.util
 import json
 import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 
+from kirabridge.bridge_core.config import load_config
 from kirabridge.event_push import EventJournal
 from kirabridge.event_readiness import SenderReadiness
 from kirabridge.mcp_gateway.event_envelope import EventEnvelope, serve
@@ -102,6 +105,53 @@ def test_exact_child_exit_reaches_wrapper_exit(tmp_path, code):
         timeout=10,
     )
     assert result.returncode == code, result.stderr.decode()
+
+
+@pytest.mark.parametrize("code", [0, 23])
+def test_concurrent_valid_host_input_preserves_early_child_exit(tmp_path, code):
+    result = subprocess.run(
+        front_command(tmp_path, [sys.executable, "-c", f"raise SystemExit({code})"]),
+        input=b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n' * 50000,
+        capture_output=True,
+        env=synthetic_env(),
+        timeout=10,
+    )
+    assert result.returncode == code, result.stderr.decode()
+    assert not result.stdout
+    assert not result.stderr
+
+
+async def test_own_stdin_closure_without_child_exit_remains_an_error():
+    reader = asyncio.StreamReader(limit=1024 * 1024)
+    reader.feed_data(b"x" * 500000 + b"\n")
+
+    async def write(line):
+        pass
+
+    with pytest.raises(RuntimeError, match="owned_mcp_child_closed_stdin_before_exit"):
+        await serve(
+            EventEnvelope(None),
+            [sys.executable, "-c", "import os,time;os.close(0);time.sleep(60)"],
+            reader,
+            write,
+            drain_timeout=0.1,
+            terminate_timeout=0.2,
+        )
+
+
+async def test_child_exit_does_not_suppress_host_output_error():
+    reader = asyncio.StreamReader()
+
+    async def write(line):
+        raise BrokenPipeError("host_output_closed")
+
+    with pytest.raises(BrokenPipeError, match="host_output_closed"):
+        await serve(
+            EventEnvelope(None),
+            [sys.executable, "-c", "print('response',flush=True);raise SystemExit(23)"],
+            reader,
+            write,
+        )
 
 
 async def test_host_eof_stops_and_reaps_only_owned_nonending_child():
@@ -209,7 +259,22 @@ def test_readiness_requires_held_lock_matching_route_and_fresh_marker(config, tm
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert not ready.is_ready()
+        ready.start(fd)
+        assert not ready.is_ready()
         ready.publish("ready")
+        assert ready.is_ready()
+        for field in ("pid", "process_start", "generation", "binding"):
+            row = json.loads(
+                journal.db.execute(
+                    "SELECT value FROM settings WHERE key='sender_readiness'"
+                ).fetchone()[0]
+            )
+            row[field] = "different"
+            journal.db.execute(
+                "UPDATE settings SET value=? WHERE key='sender_readiness'", (json.dumps(row),)
+            )
+            assert not ready.is_ready(), field
+            ready.publish("ready")
         assert ready.is_ready()
         assert not SenderReadiness(journal, config, "other", ["callbacks.example.test"]).is_ready()
         assert not SenderReadiness(journal, config, "local", ["other.example.test"]).is_ready()
@@ -232,6 +297,108 @@ def test_readiness_requires_held_lock_matching_route_and_fresh_marker(config, tm
         assert not ready.is_ready()
     finally:
         os.close(fd)
+        journal.db.close()
+
+
+def test_actual_replacement_sender_cannot_inherit_dead_generation_readiness(tmp_path):
+    class Backend(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            raw = json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request["id"],
+                    "result": {"isError": False, "structuredContent": {"dispatcher_active": True}},
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Backend)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    cfg = tmp_path / "sender.toml"
+    cfg.write_text(
+        f"data_dir={json.dumps(str(tmp_path / 'core'))}\nport={server.server_port}\n"
+        '[principals.chatgpt]\ntoken_env="SYNTHETIC_EVENTS_TOKEN"\n'
+        'capabilities=["task.read","message.read"]\n'
+    )
+    config = load_config(str(cfg))
+    config.state_path.mkdir(parents=True)
+    import sqlite3
+
+    sqlite3.connect(config.state_path / "bridge.sqlite3").close()
+    journal = EventJournal(tmp_path / "events")
+    readiness = SenderReadiness(journal, config, "chatgpt", [])
+    command = [
+        sys.executable,
+        str(ROOT / "integrations/chat-events/serve.py"),
+        "--config",
+        str(cfg),
+        "--state",
+        str(tmp_path / "events"),
+        "--sender-only",
+    ]
+    children = []
+    try:
+        first = subprocess.Popen(
+            command, env=synthetic_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        children.append(first)
+        deadline = time.monotonic() + 8
+        while not readiness.is_ready():
+            assert first.poll() is None
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        old = json.loads(
+            journal.db.execute(
+                "SELECT value FROM settings WHERE key='sender_readiness'"
+            ).fetchone()[0]
+        )
+        # Unclean exit preserves a genuinely ready marker from the first sender.
+        first.kill()
+        first.communicate(timeout=5)
+        assert not readiness.is_ready()
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        replacement = subprocess.Popen(
+            command, env=synthetic_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        children.append(replacement)
+        deadline = time.monotonic() + 8
+        while True:
+            assert replacement.poll() is None
+            marker = json.loads(
+                journal.db.execute(
+                    "SELECT value FROM settings WHERE key='sender_readiness'"
+                ).fetchone()[0]
+            )
+            assert not readiness.is_ready()
+            if marker.get("pid") == replacement.pid:
+                break
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        assert marker["state"] == "starting"
+        assert marker["generation"] != old["generation"]
+        assert marker["binding"] == old["binding"]
+        # No ready heartbeat from the unavailable backend on a later cycle either.
+        time.sleep(0.3)
+        assert not readiness.is_ready()
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.terminate()
+            child.communicate(timeout=5)
+        if thread.is_alive():
+            server.shutdown()
+            thread.join(timeout=2)
+        server.server_close()
         journal.db.close()
 
 

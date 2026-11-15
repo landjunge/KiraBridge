@@ -120,6 +120,26 @@ The existing tools continue through the original proxy. Event requests received
 while unready fail closed. This is local transport readiness, not a host
 subscription, webhook receipt, displayed message or latency guarantee.
 
+The V3 correction closes two further independent restart/input regressions. Every
+singleton acquisition creates a new random generation and immediately records
+`starting` before backend startup. The lock lease and heartbeat must agree on that
+generation, PID, kernel process birth identity, and a digest of the five runtime
+Events source files as well as the complete route/config binding. A dead/reaped
+sender's fresh heartbeat cannot authorize a starting replacement. Linux uses the
+kernel process start ticks; macOS uses the kernel's microsecond birth timestamp.
+Unsupported or unavailable process identity fails closed. Only a successful cycle
+of the current generation may publish `ready`.
+
+An early child exit while the host is still writing valid JSONL may close the
+owned child's stdin. Only `BrokenPipeError`/`ConnectionResetError` raised by that
+specific stdin write/drain are deferred for the existing bounded child-exit wait.
+If the child exits during that wait, its exact status is returned after output
+drain. If it stays alive, cleanup terminates/reaps it and the closure remains an
+error. Host output, framing, and unrelated or late input errors still propagate.
+Regression coverage includes the actual killed/reaped sender replacement with an
+unavailable backend, 2.75 MB concurrent valid host input with child exits 0/23, and
+the preserved error paths. These are local fixtures, not genuine host acceptance.
+
 Use this activation sequence only after the exact source/overlay and a separate
 independent review have passed; these instructions do not activate anything:
 
