@@ -134,6 +134,8 @@ ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funkt
 Ist ThreadDesk eingerichtet, bringt das Paket die gepinnte ThreadDesk-Bibliothek mit. Der
 Installer stellt `[threaddesk]` `source_root` und `command` auf sie und auf das Python der
 Release um; der Rollback setzt beide Werte zurück. Andere Einstellungen bleiben unverändert.
+Der Entwicklungsstand erhält den früher veröffentlichten lesenden Apps-Bibliotheksalias;
+aktuelle ThreadDesk-Rechte und die Workspace-Bindung werden bei jedem Aufruf geprüft.
 
 ## Loslegen
 
