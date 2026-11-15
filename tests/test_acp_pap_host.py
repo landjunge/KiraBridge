@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -287,3 +288,111 @@ async def test_wrong_library_pin_fails_before_synthetic_spawn(host, monkeypatch)
     assert final["state"] == "failed", final
     assert final["error"]["code"] == "acp_dependency_unavailable"
     assert not trace.exists()
+
+
+@pytest.mark.parametrize(
+    "revoked", [None, "agent", "file.read", "lease", "roots", "read_roots", "host_roots", "symlink"]
+)
+async def test_read_reply_revalidates_delivery_without_repeating_read(
+    host, tmp_path, monkeypatch, revoked
+):
+    from kirabridge.agent_manager.acp_pap_host import _BoundClient
+
+    bridge, config, adapter, trace, connection = host
+    principal = config.principals["local"]
+    extra = tmp_path / "extra"
+    extra.mkdir()
+    extra_scope = revoked in {"read_roots", "host_roots"}
+    path = (extra if extra_scope else Path(principal.roots[0])) / "protected.txt"
+    path.write_text("SYNTHETIC_PROTECTED")
+    value = owned_task(config, "read:" + str(path))
+    if extra_scope:
+        principal.read_roots = [str(extra)]
+        adapter.profile = replace(adapter.profile, read_roots=(str(extra),))
+        value.arguments["mcp_read_roots"] = [str(extra)]
+    original_call, original_read = connection.call_tool, _BoundClient.read_text_file
+    reads, returned = [], []
+
+    async def deferred_call(name, arguments, **kwargs):
+        result = await original_call(name, arguments, **kwargs)
+        if name == "read_query":
+            reads.append(result.structuredContent["text"])
+            if revoked == "agent":
+                principal.agents.remove("pap")
+            elif revoked == "file.read":
+                principal.capabilities.remove("file.read")
+            elif revoked == "lease":
+                bridge.store.db.execute(
+                    "UPDATE tasks SET lease_until=0 WHERE id=?", (value.task_id,)
+                )
+            elif revoked == "roots":
+                principal.roots = []
+            elif revoked == "read_roots":
+                principal.read_roots = []
+            elif revoked == "host_roots":
+                adapter.profile = replace(adapter.profile, read_roots=())
+            elif revoked == "symlink":
+                outside = tmp_path / "outside.txt"
+                outside.write_text("OUTSIDE")
+                path.unlink()
+                path.symlink_to(outside)
+        return result
+
+    async def record_return(self, *args, **kwargs):
+        result = await original_read(self, *args, **kwargs)
+        returned.append(result.content)
+        return result
+
+    monkeypatch.setattr(connection, "call_tool", deferred_call)
+    monkeypatch.setattr(_BoundClient, "read_text_file", record_return)
+    submit(bridge, value)
+    final = await bridge.tasks.wait("local", value.task_id, timeout=12)
+    assert reads == ["SYNTHETIC_PROTECTED"]  # One authorized read already happened.
+    assert trace.read_text().splitlines() == ["spawn", "prompt"]
+    if revoked is None:
+        assert returned == ["SYNTHETIC_PROTECTED"]
+        assert final["state"] == "completed" and final["result"]["host_authority_valid"]
+        assert final["result"]["text"] == "SYNTHETIC_PROTECTED"
+    else:
+        assert returned == []
+        assert "SYNTHETIC_PROTECTED" not in str(final)
+        if revoked in {"agent", "lease"}:
+            assert final["state"] == "failed"
+            assert not final["result"]["host_authority_valid"]
+            assert final["result"]["text"] == ""
+        else:
+            assert final["state"] == "completed"
+            assert final["result"]["text"] == "read-rejected"
+            assert final["result"]["host_authority_valid"]
+
+
+@pytest.mark.parametrize("revoked", ["agent", "agent.execute", "lease"])
+async def test_final_outcome_revalidates_authority_after_async_process_cleanup(
+    host, monkeypatch, revoked
+):
+    from acp_pap.client import ConnectedAgent
+
+    bridge, config, _, trace, _ = host
+    original_close = ConnectedAgent.close
+
+    async def revoke_on_close(self):
+        await original_close(self)
+        principal = config.principals["local"]
+        if revoked == "agent":
+            principal.agents.remove("pap")
+        elif revoked == "agent.execute":
+            principal.capabilities.remove("agent.execute")
+        else:
+            bridge.store.db.execute("UPDATE tasks SET lease_until=0 WHERE id='pap-owned'")
+
+    monkeypatch.setattr(ConnectedAgent, "close", revoke_on_close)
+    final = await run_task(host, "captured before revocation")
+    assert final["state"] == "failed", final
+    result = final["result"]
+    assert result["stop_reason"] == "end_turn" and not result["success"]
+    assert result["text"] == "" and not result["host_authority_valid"]
+    assert result["evidence"]["host_authority_valid"] is False
+    assert result["delivery_failures"] == []  # The final guard, not a delivery error.
+    assert trace.read_text().splitlines() == ["spawn", "prompt"]
+    notice = bridge.completions.receive("local", source_id=final["id"])["notices"][0]
+    assert notice["payload"]["outcome"] != "success"

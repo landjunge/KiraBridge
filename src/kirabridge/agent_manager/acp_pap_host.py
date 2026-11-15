@@ -124,8 +124,11 @@ class _BoundClient:
         await self.restriction.authorize(
             self.connection, "read_query", arguments, definition=definitions.get("read_query")
         )
-        self.validate(pap_binding)
+        self.validate_read(path, pap_binding)
         response = await self.connection.call_tool("read_query", arguments)
+        # The daemon may have read while the grant was valid. Recheck delivery
+        # authority after the await without issuing another read or budget claim.
+        self.validate_read(path, pap_binding)
         data = response.structuredContent
         if response.isError or not isinstance(data, dict) or data.get("error"):
             raise BridgeError(
@@ -142,6 +145,24 @@ class _BoundClient:
                 text.splitlines(keepends=True)[start : None if limit is None else start + limit]
             )
         return self.schema.ReadTextFileResponse(content=text)
+
+    def validate_read(self, path, binding):
+        self.validate(binding)
+        principal = self.adapter.bridge.security.principal(self.task["principal"], "file.read")
+        scope = PathScope(
+            [*principal.roots, *principal.read_roots],
+            excluded=state_exclusions(self.adapter.bridge.config, principal),
+        )
+        scope.split(path)
+        resolved = Path(path).resolve()
+        scope.split(str(resolved))
+        if "file.read" not in self.restriction.operations or not any(
+            resolved.is_relative_to(Path(root))
+            for root in [self.args.cwd, *self.args.mcp_read_roots]
+        ):
+            raise BridgeError("agent_task_denied", "Read reply exceeds the current task scope")
+        for root in self.args.mcp_read_roots:
+            PathScope(list(self.adapter.profile.read_roots)).split(root)
 
     async def request_permission(self, session_id, tool_call, options, *, pap_binding, **kwargs):
         self.validate(pap_binding)
@@ -288,29 +309,38 @@ class ACPHostAdapter:
                     ) from error
                 finally:
                     self.active.pop(stored["id"], None)
-                return {
-                    "success": result.stop_reason == "end_turn",
-                    "stop_reason": result.stop_reason,
-                    "terminated": result.stop_reason == "cancelled",
-                    "text": "".join(client.text),
-                    "session_id": session.session_id,
-                    "connection_id": agent.connection_id,
-                    "request_sha256": stored["request_sha256"],
-                    "grant_ref": grant_ref,
-                    "delivery_failures": [
-                        {
-                            "target": failure.target,
-                            "count": failure.count,
-                            "error_type": failure.error_type,
-                        }
-                        for failure in result.delivery_failures
-                    ],
-                    "ingress_rejection_count": agent.ingress_rejection_count,
-                    "library_commit": LIBRARY_COMMIT,
-                    "evidence": {
-                        "source": "acp_terminal_response",
-                        "stop_reason": result.stop_reason,
-                        "session_id": session.session_id,
-                        "automatic_retry": False,
-                    },
+        authority_error = None
+        try:
+            client.validate(client.binding)
+        except BridgeError as error:
+            authority_error = error.code
+        return {
+            "success": result.stop_reason == "end_turn" and authority_error is None,
+            "host_authority_valid": authority_error is None,
+            "host_authority_error": authority_error,
+            "stop_reason": result.stop_reason,
+            "terminated": result.stop_reason == "cancelled",
+            "text": "".join(client.text) if authority_error is None else "",
+            "session_id": session.session_id,
+            "connection_id": agent.connection_id,
+            "request_sha256": stored["request_sha256"],
+            "grant_ref": grant_ref,
+            "delivery_failures": [
+                {
+                    "target": failure.target,
+                    "count": failure.count,
+                    "error_type": failure.error_type,
                 }
+                for failure in result.delivery_failures
+            ],
+            "ingress_rejection_count": agent.ingress_rejection_count,
+            "library_commit": LIBRARY_COMMIT,
+            "evidence": {
+                "source": "acp_terminal_response",
+                "stop_reason": result.stop_reason,
+                "session_id": session.session_id,
+                "automatic_retry": False,
+                "host_authority_valid": authority_error is None,
+                "host_authority_error": authority_error,
+            },
+        }

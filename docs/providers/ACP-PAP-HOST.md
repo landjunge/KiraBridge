@@ -59,6 +59,11 @@ coding profiles are outside this first host seam. In particular the adapter
 does not select or switch a provider account. Qwen's existing adapter and sessions
 are separate and unchanged.
 
+With the production visible-handoff policy enabled, a sealed Team worker must
+explicitly select `separate_managed_session` to reach this embedded adapter.
+Direct Core work retains the required visible route. Registration alone does
+not reroute that work to ACP.
+
 ## Capability advertisement and authority
 
 ACP `ClientCapabilities` describes what the client can implement. It grants
@@ -74,6 +79,15 @@ also be inside the host profile's read roots and the principal's existing roots.
 The daemon still checks current principal permissions, excluded bridge state,
 and descriptor-relative no-symlink file traversal. The adapter returns only a
 complete, bounded, lossless UTF-8 result, then applies optional line slicing.
+
+The host rechecks delivery authority after the awaited MCP read returns: current
+Core task/binding/agent/lease, current `file.read`, principal and task path scopes,
+excluded bridge state, resolved path and host-approved additional read roots.
+This synchronous check performs no second file read or call-budget claim. A read
+already performed under the original grant remains a completed access; revocation
+blocks its still-outstanding reply from reaching ACP and cannot undo that access.
+A file-right or path-scope denial can legitimately finish as a successful agent
+turn containing `read-rejected`, without the protected content.
 
 File writes, terminal RPCs, arbitrary MCP grants and operations other than
 `file.read` are unsupported. They are not advertised and no handler is installed.
@@ -109,6 +123,15 @@ notification-handler failure can therefore leave incomplete captured output;
 callers must inspect `delivery_failures`, not infer complete delivery from
 `success` alone.
 
+After asynchronous connection/process cleanup, the adapter revalidates the
+current Core task authority before returning its final result. A received
+terminal response with revoked task/agent/lease authority is recorded with
+`success=false`, `host_authority_valid=false` and a bounded error code; captured
+text is suppressed. Its actual ACP stop reason remains evidence. A rejected
+notification alone cannot establish this final authority check or turn a revoked
+task into completed success. Existing Core lease ownership still controls who
+may persist a terminal outcome; a stolen lease is not reclaimed by this adapter.
+
 ## Trust and platform limits
 
 This adapter limits host RPC authority; it does not isolate the child process's
@@ -137,7 +160,9 @@ The tests exercise actual Core and Team dispatch, original request sealing,
 read-through MCP, receipts/consumer ACK, outside/symlink/unowned-session rejection,
 unsupported terminal calls, event delivery failure, pending-permission
 cancellation, default permission denial, capability/agent/lease revocation,
-missing task read grant, EOF/local-timeout UNKNOWN without replay, and a wrong
+deferred-read delivery revocation and unchanged-right positive controls, final
+authority loss during asynchronous cleanup, missing task read grant,
+EOF/local-timeout UNKNOWN without replay, and a wrong
 library pin before process start. The synthetic peer imports the actual ACP SDK;
 it starts no external model, login or account operation. Independent review,
 real-provider parity and any runtime activation remain separate acceptance steps.
