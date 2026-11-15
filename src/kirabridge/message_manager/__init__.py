@@ -151,9 +151,10 @@ class MessageManager:
         )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
-            if result["processing"]["evidence"].get("completion_scope") == "visible_input_delivery":
+            delivery_scope = result["processing"]["evidence"].get("completion_scope")
+            if delivery_scope in {"visible_input_delivery", "native_input_delivery"}:
                 result["processing"].update(
-                    completion_scope="visible_input_delivery",
+                    completion_scope=delivery_scope,
                     agent_confirmed=False,
                     agent_work_completion_verified=False,
                     request_reply_satisfied=False,
@@ -169,7 +170,7 @@ class MessageManager:
                     result=local,
                 )
             scope = result["processing"]["evidence"].get("session_scope")
-            if scope == "existing_visible_terminal":
+            if scope in {"existing_visible_terminal", "existing_native_codex_root"}:
                 result["processing_route"] = scope
             elif (
                 not visible
