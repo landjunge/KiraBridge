@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import math
+from collections import Counter
 
 from kirabridge.bridge_core.models import BridgeError
 
@@ -144,15 +145,16 @@ class TerminalWindowProof:
             "windows",
         )
         require(cg.get("titles_redacted") is False, "Native window titles are unavailable")
-        windows = [w for w in cg["windows"] if w["layer"] == 0]
+        surfaces = cg["windows"]
+        windows = [w for w in surfaces if w["layer"] == 0]
         require(
-            len({w["window_id"] for w in windows}) == len(windows)
+            len({w["window_id"] for w in surfaces}) == len(surfaces)
             and all(
                 w["on_screen"] is True
                 and w["title_available"] is True
                 and w["owner_pid"] == self.app["pid"]
                 and w["application_start"] == f"{self.app['started_at']:.6f}"
-                for w in windows
+                for w in surfaces
             ),
             "Native CG window inventory changed",
         )
@@ -185,7 +187,7 @@ class TerminalWindowProof:
 
         if len(ax_windows) != ax_list_count:
             raise inventory_pending()
-        groups, minimized = [], []
+        groups, minimized, ancillary_ax = [], [], []
         for window in ax_windows:
             observed = await self.ax(window["element_token"])
             element = observed["element"]
@@ -194,6 +196,29 @@ class TerminalWindowProof:
                 # A minimized AXDialog can legitimately have no on-screen CG
                 # surface. Preserve only its anchor; never adopt or restore it.
                 minimized.append({"token": observed["element_token"], "minimized": True})
+                continue
+            if element.get("subrole") == "AXUnknown":
+                # Terminal's full-screen menu surfaces are real AXWindow objects,
+                # but not terminal windows. They grant no creation/input target.
+                # Accept only the observed complete empty shape, later matched
+                # as a cohort to the same owner's CG layer-26 surfaces.
+                require(
+                    element.get("minimized") is False
+                    and element.get("focused") is False
+                    and element.get("title") == ""
+                    and element.get("title_truncated") is False
+                    and element.get("identifier") == ""
+                    and element.get("description") == ""
+                    and element.get("actions") == ["AXRaise"]
+                    and not observed["children"]
+                    and geometry_pair(element.get("position")) is not None
+                    and geometry_pair(element.get("size")) is not None,
+                    "Unknown native AX window is not a proved ancillary surface",
+                )
+                ancillary_ax.append({
+                    "token": observed["element_token"],
+                    "position": element["position"], "size": element["size"],
+                })
                 continue
             require(
                 element["role"] == "AXWindow"
@@ -234,9 +259,52 @@ class TerminalWindowProof:
             )
         tokens = [r["token"] for group in groups for r in group["radios"] or []]
         require(len(tokens) == len(set(tokens)), "Native AX radio appears in several groups")
-        if len(groups) != len(windows):
-            raise inventory_pending(len(groups), len(minimized))
-        return {"cg": windows, "ax": groups, "minimized": minimized}
+        unknown_geometry = Counter(tuple(g["position"] + g["size"]) for g in ancillary_ax)
+        menu_surfaces = [
+            w for w in surfaces
+            if w["layer"] == 26 and w["title"] == ""
+            and tuple(w["bounds"][key] for key in ("X", "Y", "Width", "Height"))
+            in unknown_geometry
+        ]
+        menu_geometry = Counter(
+            tuple(w["bounds"][key] for key in ("X", "Y", "Width", "Height"))
+            for w in menu_surfaces
+        )
+        require(
+            unknown_geometry == menu_geometry,
+            "Ancillary AX/CG surface cohort is incomplete or ambiguous",
+        )
+        # Positive AX/CG binding defines normal windows. A leftover CG toolbar
+        # is passive inventory, never an own/host candidate or evidence by title.
+        matched = []
+        for group in groups:
+            candidates = [
+                w for w in windows
+                if group["position"] == [w["bounds"]["X"], w["bounds"]["Y"]]
+                and group["size"] == [w["bounds"]["Width"], w["bounds"]["Height"]]
+            ]
+            coherent_titles = [w for w in candidates if w["title"] == group["title"]]
+            if coherent_titles:
+                candidates = coherent_titles
+            # A working CLI's spinner/title can change between the two reads.
+            # A sole geometry match binds retained inventory only; own() still
+            # requires the exact creation nonce in both native title channels.
+            if len(candidates) != 1:
+                raise inventory_pending(len(groups), len(minimized))
+            matched.append(candidates[0])
+        require(
+            len({w["window_id"] for w in matched}) == len(matched),
+            "Several native AX windows matched the same CG surface",
+        )
+        matched_ids = {w["window_id"] for w in matched}
+        ancillary = {
+            "cg": sorted([
+                {key: w[key] for key in ("window_id", "owner_pid", "layer", "bounds", "on_screen")}
+                for w in surfaces if w["window_id"] not in matched_ids
+            ], key=lambda w: w["window_id"]),
+            "ax": sorted(ancillary_ax, key=lambda g: g["token"]),
+        }
+        return {"cg": matched, "ax": groups, "minimized": minimized, "ancillary": ancillary}
 
     async def prepare(self):
         self.logical_before = logical_windows(await self.terminal.window_inventory())
@@ -304,6 +372,11 @@ class TerminalWindowProof:
 
     def retained(self, before, after, *, exclude=None):
         require(
+            before.get("ancillary", {"cg": [], "ax": []})
+            == after.get("ancillary", {"cg": [], "ax": []}),
+            "Original ancillary native surfaces changed",
+        )
+        require(
             sorted(item["token"] for item in before.get("minimized", []))
             == sorted(item["token"] for item in after.get("minimized", [])),
             "Original minimized native AX anchors changed",
@@ -338,6 +411,7 @@ class TerminalWindowProof:
                     [[g["token"], self.members(g)] for g in snapshot["ax"] if g is not own]
                 ),
                 "minimized": sorted(item["token"] for item in snapshot.get("minimized", [])),
+                "ancillary": snapshot.get("ancillary", {"cg": [], "ax": []}),
             }
         )
 
@@ -442,6 +516,12 @@ class TerminalWindowProof:
         logical = await self.logical(receipt)
         before = await self.snapshot()
         own_cg, own = self.own(before, nonce=receipt["nonce"])
+        original_ancillary = self.before.get("ancillary", {"cg": [], "ax": []})
+        require(
+            own_cg["window_id"] not in {w["window_id"] for w in original_ancillary["cg"]}
+            and own["token"] not in {w["token"] for w in original_ancillary["ax"]},
+            "Created target was an original ancillary surface",
+        )
         radios = own["radios"]
         selected = [r["token"] for r in radios or [] if r["selected"]]
         if radios is not None:

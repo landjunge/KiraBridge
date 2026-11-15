@@ -58,6 +58,8 @@ The development source supports interim questions to an explicitly selected, wor
 
 The development source also offers an optional [native Codex root binding](docs/NATIVE-CODEX-BINDING.md) for new direct messages on macOS with Codex 0.169. It verifies the assigned logical root on the existing host for every attempt, refreshing host process and socket observations automatically instead of retaining an old terminal handle. Parallel sessions keep their own identities; acceptance, recipient acknowledgement and reply remain separate. This route is not activated or live accepted by the source tests.
 
+The development [Terminal window proof](docs/TERMINAL-ANCILLARY-SURFACES.md) also retains full-screen menu and toolbar surfaces separately from actual terminal windows. These passive surfaces never become input targets; an incomplete or changed inventory still stops creation or command submission.
+
 The source also includes [Qwen Code 0.27.2 via ACP and task-scoped MCP](docs/providers/QWEN.md): explicit existing authentication, native model/effort selection, configurable operator budgets and policy-filtered KiraBridge tools for read or explicitly granted coding tasks. Same-session recovery requires a proven owned binding; native turn completion remains separate from project acceptance. Production activation and full task acceptance remain gated.
 
 The development source now includes a shared ACP client and an `opencode_acp` adapter for isolated text-only tasks, with session validation, bounded output and explicit timeout or disconnect results. This adapter creates its own process; observing that same session in the OpenCode app and the full macOS workflow still require acceptance. These changes have not been installed in the published runtime.

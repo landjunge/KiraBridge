@@ -102,6 +102,24 @@ and their receipts remain unchanged. There is no historical queue release and no
 second retry loop. Busy delivery retains the existing delivery-only model-budget
 classification; an idle start consumes the ordinary model-run budget.
 
+## Remote reconnect and conversation identity
+
+The authenticated connector principal, a message's caller-supplied
+`conversation_id`, the configured native root and a Terminal handle are separate
+identities. The conversation groups messages and limits their processing; it does
+not write either the terminal refresh overlay or the native root assignment.
+The API does not expose or attest an actual ChatGPT chat ID through that field.
+A different conversation therefore supplies no session-selection authority.
+
+An isolated test cancels the remote send observer after a synthetic native host
+has accepted input. The existing delivery driver finishes independently; a
+reconnected observer using the original send key sees the original result, with
+no repeated input or invented receipt. A second test sends two new originals from
+different channel conversations to the same configured root and host generation.
+These deterministic tests do not disconnect a Mac's network or establish the
+behavior or timing of a real external tunnel reconnect. Loss of WAN connectivity
+alone supplies no evidence that a local Codex process or logical root changed.
+
 ## Minimal operational rollout
 
 1. Review the frozen commit, focused test logs and private root/host evidence. Check
