@@ -109,3 +109,26 @@ jobs:
           PYTEST_ADDOPTS: ''
           PYTEST_PLUGINS: ''
       - run: uv build
+  windows-startup:
+    name: Windows import and CLI startup (3.11)
+    if: github.event_name != 'workflow_dispatch' || inputs.scope == 'all'
+    runs-on: windows-2025
+    timeout-minutes: 5
+    env:
+      UV_PYTHON: '3.11'
+      UV_PYTHON_DOWNLOADS: never
+      PYTHONNOUSERSITE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: '0.11.6'
+      - run: uv sync --locked --dev
+      - name: Check imports and native generated launcher, without provider turns
+        run: uv run --locked python -B -m pytest -q -p no:cacheprovider tests/test_windows_import_boundary.py tests/test_windows_launcher_native.py
+      - run: uv run --locked python -B -m kirabridge --help
+      - run: uv run --locked python -B -m kirabridge setup --help

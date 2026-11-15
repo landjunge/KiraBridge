@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import pty
 import re
 import signal
 import time
@@ -37,6 +36,8 @@ class LinuxOwnedTerminal:
         The caller holds the authorized directory descriptor for the entire spawn.
         This resource is intentionally absent from the reusable session catalog.
         """
+        import pty
+
         loop = asyncio.get_running_loop()
         master, slave = pty.openpty()
         process = None
@@ -121,6 +122,8 @@ class LinuxOwnedTerminal:
     async def open_shell(self, cwd: str) -> dict:
         if os.name != "posix":
             raise BridgeError("unsupported_platform", "An owned PTY requires POSIX")
+        import pty
+
         shell = "/bin/bash" if os.path.isfile("/bin/bash") else "/bin/sh"
         master, slave = pty.openpty()
         tty_name = os.ttyname(slave)

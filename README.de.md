@@ -283,6 +283,8 @@ abgesicherter Fenstersteuerung. Die dokumentierte Windows 11-Installation ist
 geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
 der frühere dev2-Nachweis bleibt für Rückfallhinweise erhalten.
 
+Im Entwicklungsstand bleibt der CLI-Start vom optionalen Linux-PTY-Modul unabhängig: POSIX-Terminalabhängigkeiten werden erst bei dessen Ausführung geladen. Der erzeugte Windows-CMD-Starter erhält Kindprozess-Exitcodes, auch wenn ein Rollback die aufrufende Datei neu schreibt. Ein begrenzter öffentlicher Windows-CI-Job prüft Import, CLI-Hilfe und diesen Startervertrag; das ist keine Desktop- oder Installerabnahme. Aktuelles Paket und Windows-Installation ohne erhöhte Rechte benötigen weiterhin eigene native Belege.
+
 ### Designquellstand · 7. November 2026
 
 Der gemeinsame Header mit fünf Originalicons ist implementiert und lokal geprüft.

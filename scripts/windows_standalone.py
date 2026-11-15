@@ -25,14 +25,18 @@ from kirabridge.windows_runtime import validate_bundled_runtime  # noqa: E402
 def launcher(root: Path) -> None:
     current = status(root)["current"]
     release = root / "releases" / current["release"]
-    # CMD must exit from this already parsed line: rollback can rewrite this
-    # batch file to a different length while the Python process is running.
+    # Exit from this parsed line: rollback can rewrite the batch file. CALL
+    # expands the child's errorlevel after Python returns, without enabling
+    # delayed expansion for literal application arguments containing '!'.
+    # An inherited ERRORLEVEL variable shadows CMD's dynamic value; clear it
+    # only inside this launcher's local environment, preserving the caller.
     command = (
-        '@echo off\r\n"%~dp0releases\\'
+        '@echo off\r\nsetlocal\r\nset "ERRORLEVEL="\r\n"%~dp0releases\\'
         + current["release"]
         + '\\runtime\\python.exe" -I -B "%~dp0releases\\'
         + current["release"]
-        + '\\scripts\\windows_standalone.py" --root "%~dp0." %* & exit /b\r\n'
+        + '\\scripts\\windows_standalone.py" --root "%~dp0." %* '
+        "& call exit /b %%errorlevel%%\r\n"
     )
     target = root / "KiraBridge.cmd"
     if target.is_symlink():
