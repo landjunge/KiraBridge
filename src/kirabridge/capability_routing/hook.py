@@ -38,8 +38,29 @@ def subscription_environment(cli=None):
             "LC_CTYPE",
             "TMPDIR",
             "TERM",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+            "no_proxy",
+            "NODE_EXTRA_CA_CERTS",
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
         }
-        return {key: value for key, value in os.environ.items() if key in allowed}
+        env = {key: value for key, value in os.environ.items() if key in allowed}
+        # Only this new child: retain egress trust/proxy policy and force privacy
+        # and a stable version instead of silently re-enabling background traffic.
+        for key in (
+            "DISABLE_TELEMETRY",
+            "DISABLE_ERROR_REPORTING",
+            "DISABLE_AUTOUPDATER",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+        ):
+            env[key] = "1"
+        return env
     env = dict(os.environ)
     for key in list(env):
         if key in {
@@ -67,8 +88,17 @@ def before_delegation(source, runtime, task, *, probe=True):
     exe = Path(decision["executable"])
     if not exe.is_absolute() or not exe.is_file() or not os.access(exe, os.X_OK):
         raise RoutingError("Trusted runtime executable is unavailable")
+    decision["requested_executable"] = str(exe)
+    exe = exe.resolve(strict=True)
+    decision["executable"] = str(exe)
+    decision["execution_cwd"] = str(cwd)
+    restricted = (
+        ["--restricted", "--safe-mode", "--setting-sources", ""]
+        if decision["cli"] == "claude"
+        else []
+    )
     if probe:
-        argv = [str(exe), "--version"]
+        argv = [str(exe), *restricted, "--version"]
         if decision["cli"] == "grok":
             argv.insert(1, "--no-auto-update")
         result = subprocess.run(
@@ -122,7 +152,7 @@ def before_delegation(source, runtime, task, *, probe=True):
             )
         if decision["access_kind"] == "subscription" and decision["cli"] == "claude":
             auth = subprocess.run(
-                [str(exe), "auth", "status", "--json"],
+                [str(exe), *restricted, "auth", "status", "--json"],
                 cwd=cwd,
                 capture_output=True,
                 text=True,
@@ -215,6 +245,8 @@ def command_for(decision, task):
             effort,
             "--restricted",
             "--safe-mode",
+            "--setting-sources",
+            "",
             "--permission-mode",
             "plan",
             "--tools",

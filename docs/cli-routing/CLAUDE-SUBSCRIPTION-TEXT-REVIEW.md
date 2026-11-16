@@ -6,12 +6,14 @@ self-contained in the bounded task prompt: no built-in tools, MCP tools, skills,
 session resume or subdelegation are enabled. It does not add a bridge, queue,
 managed AgentManager route or production profile. Codex/Grok adapters are retained.
 
-Before every plan/start, the existing hook rereads the canonical matrix and checks
+Before execution (and normal probed plans), the hook rereads the matrix and checks
 the exact CLI version. The Claude reader additionally requires successful
 `auth status --json`, `loggedIn:true`, `authMethod:claude.ai`, `apiProvider:firstParty`
 and a subscription plan. Identity/token fields are neither returned nor logged.
-Only basic OS environment keys pass to Claude, preserving the same HOME/keychain
-login and excluding inherited API/provider/model/effort overrides.
+Basic OS and egress proxy/CA policy pass to Claude, preserving the same HOME/keychain
+login and excluding inherited API/provider/model/effort overrides. Updater,
+telemetry, error reporting and nonessential traffic are disabled for this child.
+Metadata probes use the run's restricted/safe-mode and empty settings-source flags.
 
 The session uses `--restricted --safe-mode`, plan permissions, empty built-in tools,
 strict empty MCP configuration plus MCP deny, disabled slash commands, no session
@@ -31,6 +33,8 @@ cap effort; output remains unverified until separately assessed. Native remainin
 quota was unavailable; the user's budget report remains attributed to the user.
 Flags follow the [CLI reference](https://code.claude.com/docs/en/cli-reference).
 
+Execution cannot disable native probes. Static no-effect plans may skip them.
+Resolved paths and evidence expiry are rechecked at the runner boundary.
 Planning is the existing default (no `--execute`), with metadata probes only and no
 receipt/model effect. A later explicitly assigned start uses the same existing
 admission receipt, fsync, matrix recheck, bounded process runner, output files and
@@ -38,3 +42,12 @@ no-replay behavior. `process_completed` means transport completion, not accepted
 review, provider identity, Core/Team completion or ACK. Root must inspect the owned
 native result and process the result/receipt; no automatic acceptance is added.
 UNKNOWN must reconcile its original task ID, never spawn a replacement.
+
+The authentication check confirms route/type, not an account/org fingerprint.
+The adapter never logs in, selects another account or falls back to an API key;
+an external same-kind account switch is outside this attestation. Post-run
+processing failures remain UNKNOWN; known pre-run failures are blocked/no-process.
+Write leases remain until non-start or confirmed exit. Cancellation is recorded
+before propagation and own-child cleanup/reap is bounded. Result creation uses
+exclusive0600/NOFOLLOW, then file/directory fsync; power-loss guarantees remain
+filesystem/platform dependent. See [native triage](CLAUDE-NATIVE-REVIEW-TRIAGE-20261116.md).

@@ -116,3 +116,13 @@ Gastprüfungen bestanden, einschließlich Ctrl-/Alt-/Shift-Kombinationen und
 abgesicherter Fenstersteuerung. Veröffentlichte Downloads und die getrennte
 Windows 11-Installation sind geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
 dev2 bleibt als Rückfallmöglichkeit erhalten.
+
+## Entwicklung: begrenzter Claude-Prüfstarter
+
+Der vorhandene optionale Big-Plan-Starter hat ein Quellkandidatenprofil für
+`opus/xhigh`-Textprüfungen mit bestehendem Abo und ohne Modellwerkzeuge. Zulassung,
+UNKNOWN ohne Wiederholung und private Ergebnisdateien sind gezielt getestet; ein
+erfolgreicher CLI-Exit ist keine fachliche Abnahme. Dieser Kandidat gehört nicht
+zum veröffentlichten Paket und benötigt eine eigene Zuordnung und Quellabnahme.
+Siehe [Profil und Grenzen](docs/cli-routing/CLAUDE-SUBSCRIPTION-TEXT-REVIEW.md) sowie
+[Triage des nativen Reviews](docs/cli-routing/CLAUDE-NATIVE-REVIEW-TRIAGE-20261116.md).

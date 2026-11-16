@@ -1,83 +1,156 @@
-"""Own new process only; durable at-most-once admission, no session manipulation."""
+"""Own new process only; exclusive admission and conservative result reconciliation."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
-import subprocess
+import stat
 from pathlib import Path
 
 from .evidence import native_metadata
 from .hook import before_delegation, command_for, subscription_environment
 from .process import run_bounded
-from .router import RoutingError
+from .router import RoutingError, fingerprint, select
 
 
 class OutcomeUncertain(RoutingError):
-    """The effect boundary was crossed; never label a lost receipt as not started."""
+    """The runner boundary was crossed; never label lost evidence as not started."""
+
+
+def _identity(path):
+    info = path.lstat()
+    return info.st_dev, info.st_ino
+
+
+def _write_new(path, payload):
+    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _sync_directory(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _save_result(receipt, identity, result):
+    temp = receipt.with_suffix(".tmp")
+    _write_new(temp, json.dumps(result, indent=2).encode())
+    if _identity(receipt) != identity:
+        raise RoutingError("Admission receipt owner changed")
+    temp.replace(receipt)
+    _sync_directory(receipt.parent)
 
 
 def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bounded):
+    if execute and not probe:
+        raise RoutingError("Execution requires current native version/authentication probes")
     decision = before_delegation(source, runtime, task, probe=probe)
     argv, stdin = command_for(decision, task)
     if not execute:
         return {**decision, "state": "planned", "starts_model": False}
     if decision["access_kind"] != "subscription":
         raise RoutingError("This launcher implements only the existing subscription routes")
+    cwd = Path(task.cwd).resolve(strict=True)
+    roots = [
+        Path(root).resolve(strict=True)
+        for root in runtime.allowed_roots
+        if cwd.is_relative_to(Path(root).resolve(strict=True))
+    ]
+    if not roots:
+        raise RoutingError("Task cwd no longer matches a granted root")
+    workroot = min(roots, key=lambda root: len(root.parts))
     state = Path(runtime.state_dir)
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = state.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise RoutingError("Existing admission directory must be private and owned")
     receipt = state / (task.task_id + ".json")
-    # Claim before the process boundary; crash/timeout/unclear submission NEVER retries.
+    lease = state / ("cwd-" + hashlib.sha256(str(workroot).encode()).hexdigest() + ".lock")
+    result = {
+        **decision,
+        "automatic_retry": False,
+        "state": "admitted",
+        "effect_boundary_crossed": False,
+        "process_exit_confirmed": False,
+    }
     try:
-        fd = os.open(receipt, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        fd = os.open(receipt, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
     except FileExistsError:
         raise RoutingError("Task ID already admitted; inspect its receipt, never replay") from None
-    with os.fdopen(fd, "w") as stream:
-        json.dump({**decision, "state": "admitted", "automatic_retry": False}, stream)
-        stream.flush()
-        os.fsync(stream.fileno())
-    # Persist the directory entry as well as the receipt before any model effect.
-    directory_fd = os.open(state, os.O_RDONLY)
+    opened = os.fstat(fd)
+    identity = (opened.st_dev, opened.st_ino)
     try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
-    # Lock the outermost granted root: root/subdir must not become parallel writers.
-    roots = [
-        Path(root).resolve()
-        for root in runtime.allowed_roots
-        if Path(task.cwd).resolve().is_relative_to(Path(root).resolve())
-    ]
-    workroot = min(roots, key=lambda root: len(root.parts))
-    lease = state / ("cwd-" + hashlib.sha256(str(workroot).encode()).hexdigest() + ".lock")
-    locked = False
-    result = {**decision, "automatic_retry": False}
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(json.dumps(result).encode())
+            stream.flush()
+            os.fsync(stream.fileno())
+        _sync_directory(state)
+    except BaseException as error:
+        result.update(
+            state="blocked",
+            error="Admission persistence failed; no process invoked",
+            error_type=type(error).__name__,
+        )
+        try:
+            _save_result(receipt, identity, result)
+        except (OSError, RoutingError):
+            pass  # O_EXCL original remains protected even if the update cannot be confirmed.
+        if not isinstance(error, Exception):
+            raise
+        raise RoutingError(
+            "Admission persistence failed; no process invoked; inspect original"
+        ) from None
+    lease_identity = None
+    interrupted = None
+    phase = "pre_process"
     try:
         if not task.read_only:
-            lease_fd = os.open(lease, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            os.close(lease_fd)
-            locked = True
-        # Re-read authoritative revision at the effect boundary; no stale decision launch.
+            try:
+                lease_fd = os.open(
+                    lease, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600
+                )
+            except FileExistsError:
+                raise RoutingError("Workspace already leased by this launcher") from None
+            with os.fdopen(lease_fd, "wb"):
+                lease_identity = _identity(lease)
         matrix, binding = source.load()
-        from .router import fingerprint
-
-        if binding != decision["thread_desk"] or fingerprint(matrix) != decision["matrix_sha256"]:
-            raise RoutingError("ThreadDesk changed during preflight; new decision required")
+        if (
+            binding != decision["thread_desk"]
+            or fingerprint(matrix) != decision["matrix_sha256"]
+            or fingerprint(runtime) != decision["runtime_sha256"]
+        ):
+            raise RoutingError("ThreadDesk/runtime changed during preflight; new decision required")
+        select(matrix, runtime, task)  # Time can expire even while all pinned bytes remain equal.
+        if Path(task.cwd).resolve(strict=True) != cwd:
+            raise RoutingError("Task cwd changed after preflight")
+        requested_exe = decision.get("requested_executable", decision["executable"])
+        if str(Path(requested_exe).resolve(strict=True)) != decision["executable"]:
+            raise RoutingError("Executable target changed after preflight")
+        result["effect_boundary_crossed"] = (
+            True  # Conservative boundary, not a provider-start claim.
+        )
         child = runner(
             argv,
             input=stdin,
-            cwd=task.cwd,
+            cwd=str(cwd),
             timeout=task.timeout_seconds,
             env=subscription_environment(decision["cli"]),
         )
-        # Exit 0 is transport completion, not accepted work or verified model identity.
+        phase = "result_persistence"
+        result["process_exit_confirmed"] = type(child.returncode) is int
+        if not result["process_exit_confirmed"]:
+            raise OutcomeUncertain("Runner did not confirm child exit")
         output = state / (task.task_id + ".stdout")
-        output.write_bytes(child.stdout or b"")
-        output.chmod(0o600)
         errors = state / (task.task_id + ".stderr")
-        errors.write_bytes(getattr(child, "stderr", b"") or b"")
-        errors.chmod(0o600)
+        _write_new(output, child.stdout or b"")
+        _write_new(errors, getattr(child, "stderr", b"") or b"")
         result.update(
             state="process_completed" if child.returncode == 0 else "process_failed",
             exit_code=child.returncode,
@@ -86,24 +159,48 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
             output_truncated=getattr(child, "output_truncated", False),
         )
         if child.returncode == 0:
+            phase = "native_metadata"
             result.update(native_metadata(decision["cli"], child.stdout, decision["model"]))
-    except FileExistsError:
-        result.update(state="blocked", error="Workspace already leased by this launcher")
-    except RoutingError as exc:
-        result.update(state="blocked", error=str(exc))
-    except (OSError, subprocess.SubprocessError):
-        result.update(state="unknown", error="Own process outcome uncertain; no automatic retry")
+    except BaseException as error:
+        if result["effect_boundary_crossed"]:
+            result.update(
+                state="unknown", error="Own process/result outcome uncertain; no automatic retry"
+            )
+            result["process_exit_confirmed"] |= (
+                getattr(error, "owned_process_exit_confirmed", False) is True
+            )
+        else:
+            result.update(state="blocked", error="Pre-process guard failed; no process invoked")
+        result["error_type"] = type(error).__name__
+        result["failure_phase"] = phase
+        owned_pid = getattr(error, "owned_process_pid", None)
+        if type(owned_pid) is int and owned_pid > 0:
+            result["owned_process_pid"] = owned_pid
+        if not isinstance(error, Exception):
+            interrupted = error
     finally:
-        # Unknown may still have living child processes; preserve the lease.
-        if locked and result.get("state") != "unknown":
-            lease.unlink()
+        if lease_identity and (
+            not result["effect_boundary_crossed"] or result["process_exit_confirmed"]
+        ):
+            try:
+                if _identity(lease) != lease_identity:
+                    raise RoutingError("Lease owner changed")
+                lease.unlink()
+            except (OSError, RoutingError) as error:
+                result.update(
+                    state="unknown" if result["effect_boundary_crossed"] else "blocked",
+                    lease_release_error=type(error).__name__,
+                )
     try:
-        temp = receipt.with_suffix(".tmp")
-        temp.write_text(json.dumps(result, indent=2))
-        temp.chmod(0o600)
-        temp.replace(receipt)
-    except OSError:
-        raise OutcomeUncertain(
-            "Final receipt could not be saved; inspect admitted task; no replay"
+        _save_result(receipt, identity, result)
+    except Exception:
+        if result["effect_boundary_crossed"]:
+            raise OutcomeUncertain(
+                "Final receipt not confirmed; inspect admitted task; no replay"
+            ) from None
+        raise RoutingError(
+            "No process invoked; final receipt not confirmed; inspect original"
         ) from None
+    if interrupted:
+        raise interrupted
     return result

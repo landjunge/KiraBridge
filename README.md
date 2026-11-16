@@ -112,3 +112,12 @@ native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window control.
 Published downloads and the separate Windows 11 installation were verified.
 [Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); dev2 remains available for rollback.
+
+## Development: bounded Claude review starter
+
+The optional existing Big Plan starter has a source-only `opus/xhigh` subscription
+text-review profile with no model tools. Admission, UNKNOWN/no-replay handling and
+private results are covered by focused tests; a successful CLI exit is not accepted
+work. This candidate is separate from the published package and requires its own
+assignment and source acceptance. See the [profile and limits](docs/cli-routing/CLAUDE-SUBSCRIPTION-TEXT-REVIEW.md)
+and [native review triage](docs/cli-routing/CLAUDE-NATIVE-REVIEW-TRIAGE-20261116.md).

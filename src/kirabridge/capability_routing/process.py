@@ -40,19 +40,26 @@ def run_bounded(argv, *, input, cwd, timeout, env):
         threading.Thread(target=drain, args=(process.stderr, 1, 65536), daemon=True),
         threading.Thread(target=feed, daemon=True),
     ]
-    for thread in threads:
-        thread.start()
     try:
+        for thread in threads:
+            thread.start()
         process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        # Only this exact newly spawned CLI, never existing agent sessions.
-        process.kill()
-        process.wait()
+        for thread in threads:
+            thread.join(timeout=0.5)
+        if any(thread.is_alive() for thread in threads):
+            raise subprocess.TimeoutExpired(argv[0], timeout)
+    except BaseException as error:
+        # Interrupts also own a child. Cleanup is bounded and never targets an
+        # existing foreign session. Unconfirmed exit stays unknown to the caller.
+        try:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        error.owned_process_exit_confirmed = process.poll() is not None
+        error.owned_process_pid = process.pid
         raise
-    for thread in threads:
-        thread.join(timeout=0.5)
-    if any(thread.is_alive() for thread in threads):
-        raise subprocess.TimeoutExpired(argv[0], timeout)
     return SimpleNamespace(
         returncode=process.returncode,
         stdout=bytes(buffers[0]),

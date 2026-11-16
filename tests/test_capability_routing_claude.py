@@ -103,9 +103,9 @@ def profile(tmp_path, monkeypatch):
 
     def metadata(argv, **kwargs):
         calls.append((argv, kwargs))
-        if argv[1:] == ["--version"]:
+        if argv[-1:] == ["--version"]:
             return SimpleNamespace(returncode=0, stdout="2.1.322 (Claude Code)\n", stderr="")
-        assert argv[1:] == ["auth", "status", "--json"]
+        assert argv[-3:] == ["auth", "status", "--json"]
         return SimpleNamespace(returncode=0, stdout=json.dumps(status), stderr="")
 
     monkeypatch.setattr("kirabridge.capability_routing.hook.subprocess.run", metadata)
@@ -236,7 +236,7 @@ def test_failed_auth_exit_or_malformed_json_denied(profile, monkeypatch):
         def metadata(argv, code=code, body=body, **kwargs):
             return (
                 SimpleNamespace(returncode=0, stdout="2.1.322 (Claude Code)", stderr="")
-                if argv[1:] == ["--version"]
+                if argv[-1:] == ["--version"]
                 else SimpleNamespace(returncode=code, stdout=body, stderr="private-token")
             )
 
@@ -249,3 +249,14 @@ def test_imported_owned_candidate_source():
     from kirabridge.capability_routing import hook
 
     assert Path(hook.__file__).resolve().is_relative_to(Path(__file__).resolve().parents[1])
+
+
+def test_claude_metadata_probes_have_same_config_isolation(profile):
+    source, runtime, task, calls, _ = profile
+    before_delegation(source, runtime, task)
+    assert len(calls) == 2
+    for argv, kwargs in calls:
+        assert {"--restricted", "--safe-mode", "--setting-sources"} <= set(argv)
+        assert argv[argv.index("--setting-sources") + 1] == ""
+        assert kwargs["env"]["DISABLE_AUTOUPDATER"] == "1"
+        assert kwargs["env"]["DISABLE_TELEMETRY"] == "1"
