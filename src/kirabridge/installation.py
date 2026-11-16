@@ -225,10 +225,15 @@ def activate_managed(config_path: Path, release_root: Path, *, service=True):
             "service": service,
             "version": __import__("kirabridge").__version__,
         }
+        console_update: dict = {}
         try:
             if service:
                 if sys.platform == "darwin":
                     install_service(config_path, command=str(launcher))
+                    from kirabridge.console_runtime import reconcile_console_service
+
+                    # Move an existing approvals LaunchAgent to this release's interpreter.
+                    console_update = reconcile_console_service(config_path, str(python))
                 else:
                     linux_service(config_path, str(launcher))
                 if previous and previous.get("release_root") != str(release_root):
@@ -242,6 +247,10 @@ def activate_managed(config_path: Path, release_root: Path, *, service=True):
             replace_private(manifest_path, json.dumps(record, indent=2) + "\n")
         except BaseException:
             # Restore only our launcher; never restore old databases or credentials.
+            if console_update.get("changed"):
+                from kirabridge.console_runtime import restore_console_service
+
+                restore_console_service(console_update)
             if previous:
                 restored = backup / ("launcher-" + name)
                 replace_private(launcher, restored.read_text())

@@ -138,10 +138,12 @@ Python; rollback restores both values. Other settings stay unchanged.
 
 ## Get started
 
-1. **Install or update.** Download and fully extract `KiraBridge-macos.tar.gz`.
-   Run `sh ./install.sh --desktop --require-visible-terminal` from the extracted
-   `KiraBridge` directory in a separate Terminal window and follow its confirmation.
-   Preserve running agent sessions.
+1. **Install or update.** If your download is a DMG, open it, drag `KiraBridge.app`
+   to `Applications` and launch it. Otherwise download and fully extract
+   `KiraBridge-macos.tar.gz`, then run `sh ./install.sh --desktop
+   --require-visible-terminal` from the extracted `KiraBridge` directory in a
+   separate Terminal window. Follow its confirmation. Preserve running agent
+   sessions.
 2. **Open the app.** The installer updates the service and desktop app together.
    Open `KiraBridge.app` in `~/Applications`. Existing settings and credentials
    remain; the installer creates a rollback backup.
