@@ -39,8 +39,8 @@ def _sync_directory(path):
         os.close(fd)
 
 
-def _save_result(receipt, identity, result):
-    temp = receipt.with_suffix(".tmp")
+def _save_result(receipt, identity, result, *, staging_suffix=".tmp"):
+    temp = receipt.with_suffix(staging_suffix)
     _write_new(temp, json.dumps(result, indent=2).encode())
     if _identity(receipt) != identity:
         raise RoutingError("Admission receipt owner changed")
@@ -144,6 +144,9 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
             env=subscription_environment(decision["cli"]),
         )
         phase = "result_persistence"
+        owned_pid = getattr(child, "owned_process_pid", None)
+        if type(owned_pid) is int and owned_pid > 0:
+            result["owned_process_pid"] = owned_pid
         result["process_exit_confirmed"] = type(child.returncode) is int
         if not result["process_exit_confirmed"]:
             raise OutcomeUncertain("Runner did not confirm child exit")
@@ -193,14 +196,32 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
                 )
     try:
         _save_result(receipt, identity, result)
-    except Exception:
+    except BaseException as error:
+        result.update(
+            state="unknown" if result["effect_boundary_crossed"] else "blocked",
+            error="Final receipt persistence interrupted; inspect original evidence",
+            error_type=type(error).__name__,
+            failure_phase="final_receipt_persistence",
+        )
+        # One journal-only recovery, not a process retry. Preserve a partial .tmp
+        # and use a separate exclusive stage so evidence is never overwritten.
+        try:
+            _save_result(receipt, identity, result, staging_suffix=".failure.tmp")
+        except BaseException:
+            if result["effect_boundary_crossed"]:
+                raise OutcomeUncertain(
+                    "Final receipt not confirmed after process boundary; no replay"
+                ) from None
+            raise RoutingError(
+                "No process invoked; final receipt not confirmed; inspect original"
+            ) from None
+        if not isinstance(error, Exception):
+            raise
         if result["effect_boundary_crossed"]:
             raise OutcomeUncertain(
-                "Final receipt not confirmed; inspect admitted task; no replay"
+                "Final persistence failed; UNKNOWN receipt saved; no replay"
             ) from None
-        raise RoutingError(
-            "No process invoked; final receipt not confirmed; inspect original"
-        ) from None
+        raise RoutingError("No process invoked; guard failure receipt saved") from None
     if interrupted:
         raise interrupted
     return result
