@@ -159,6 +159,12 @@ class MessageManager:
                     agent_work_completion_verified=False,
                     request_reply_satisfied=False,
                 )
+            if (
+                delivery_scope == "native_input_delivery"
+                and job["state"] == "completed"
+                and job["error"] is None
+            ):
+                self._native_mailbox_reply(result)
             if result["processing"]["evidence"].get("completion_scope") == "local_agent_turn":
                 local = result["processing"]["evidence"].pop("local_reply_result", None)
                 result["processing"].update(
@@ -201,6 +207,34 @@ class MessageManager:
                     result["processing"]["handoff"] = handoff
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
+
+    def _native_mailbox_reply(self, message):
+        """Project an existing authenticated reply; never finish/replay a native turn.
+
+        The stored input-delivery evidence and completion notices describe their
+        original instant. A later mailbox reply enriches this read only, without
+        attesting native turn/work completion or manufacturing an inbox receipt.
+        """
+        reply = self.store.db.execute(
+            "SELECT id FROM messages WHERE reply_to=? AND conversation_id=? "
+            "AND sender=? AND recipient=? AND kind IN ('answer','result') "
+            "AND request_reply=0 AND task_id IS ? AND depth=? AND seq>? "
+            "ORDER BY seq LIMIT 1",
+            (
+                message["id"], message["conversation_id"], message["recipient"],
+                message["sender"], message["task_id"], message["depth"] + 1, message["seq"],
+            ),
+        ).fetchone()
+        processing = message["processing"]
+        processing["reply_id"] = reply["id"] if reply else None
+        if reply:
+            observed = {
+                "reply_id": reply["id"],
+                "reply_source": "authenticated_bridge_mailbox",
+                "request_reply_satisfied": bool(message["request_reply"]),
+            }
+            processing.update(observed)
+            processing["evidence"].update(observed)
 
     def interim_target(self, message_id):
         row = self.store.db.execute(

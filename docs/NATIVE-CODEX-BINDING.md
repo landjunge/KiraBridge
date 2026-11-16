@@ -95,6 +95,17 @@ fabricate an inbox read, transport receipt, agent ACK, final reply or work compl
 `message_get` and completion notices report those limits explicitly. Recipient
 fetch/ACK and responses retain the existing authenticated message operations.
 
+For a completed native input delivery, `message_get` also projects an already
+stored authenticated `answer` or `result` that reverses the exact sender/recipient,
+preserves the conversation/task/depth and directly references the original message.
+The first valid final reply supplies `processing.reply_id`, its mailbox source and
+`request_reply_satisfied` for a requested reply. An inbox ACK alone does not satisfy
+the request, and a genuine reply does not manufacture an ACK. Both the processing
+view and its projected evidence retain `native_input_delivery` and false native
+agent/work completion claims. This read writes no messages, job state, evidence,
+receipts or completion notices; their original delivery-time evidence stays intact.
+Failed/UNKNOWN jobs and the legacy/managed reply paths are unchanged.
+
 Any cancellation, rejected or malformed response, disconnect or timeout after the
 durable attempt remains UNKNOWN. Reads, repeated send keys, process replacement,
 host refresh and daemon restart do not replay it. Old failed/UNKNOWN/held messages
