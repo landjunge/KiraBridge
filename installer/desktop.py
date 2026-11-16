@@ -85,6 +85,30 @@ def app_processes(app):
     return result
 
 
+def verified_existing_app_commit(app):
+    """Return the recorded source commit for a valid, signed KiraBridge app."""
+    info = app / "Contents/Info.plist"
+    if app.is_symlink() or info.is_symlink() or not info.is_file():
+        return None
+    try:
+        metadata = plistlib.loads(info.read_bytes())
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return None
+    commit = metadata.get("KiraBridgeSourceCommit")
+    if (
+        metadata.get("CFBundleIdentifier") != "de.netzwerkpunkt.kirabridge"
+        or not isinstance(commit, str)
+        or not re.fullmatch(r"[a-f0-9]{40}", commit)
+    ):
+        return None
+    verified = subprocess.run(
+        ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)],
+        capture_output=True,
+        timeout=30,
+    )
+    return commit if verified.returncode == 0 else None
+
+
 def stop_app(app):
     for process in app_processes(app):
         pid = process["pid"]
@@ -121,6 +145,8 @@ def snapshot(api, args, release, old, backup):
     app = home / "Applications/KiraBridge.app"
     api.validate_destination(app)
     app_before = files(app) if app.exists() else None
+    app_before_commit = None
+    app_before_drift = False
     if app_before is not None:
         expected = {
             k.removeprefix("native/KiraBridge.app/"): v
@@ -128,10 +154,15 @@ def snapshot(api, args, release, old, backup):
             if k.startswith("native/KiraBridge.app/")
         }
         if not expected or app_before != expected:
-            raise RuntimeError("Existing desktop app differs from recorded installation; preserved")
+            app_before_commit = verified_existing_app_commit(app)
+            if app_before_commit is None:
+                raise RuntimeError("Existing desktop app differs from recorded installation; preserved")
+            app_before_drift = True
     state = {
         "app": str(app),
         "app_before": app_before,
+        "app_before_source_commit": app_before_commit,
+        "app_before_manifest_drift": app_before_drift,
         "app_was_running": bool(app_processes(app)),
         "services": [],
     }
