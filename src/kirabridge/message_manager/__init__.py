@@ -211,22 +211,28 @@ class MessageManager:
     def _native_mailbox_reply(self, message):
         """Project an existing authenticated reply; never finish/replay a native turn.
 
-        The stored input-delivery evidence and completion notices describe their
-        original instant. A later mailbox reply enriches this read only, without
-        attesting native turn/work completion or manufacturing an inbox receipt.
+        Recorded reply references/evidence/notices keep their original meaning.
+        A separate current mailbox projection never attests native turn/work
+        completion, changes a recorded reply target or creates an inbox receipt.
         """
         reply = self.store.db.execute(
-            "SELECT id FROM messages WHERE reply_to=? AND conversation_id=? "
-            "AND sender=? AND recipient=? AND kind IN ('answer','result') "
-            "AND request_reply=0 AND task_id IS ? AND depth=? AND seq>? "
-            "ORDER BY seq LIMIT 1",
+            "SELECT r.id FROM messages r WHERE r.reply_to=? AND r.conversation_id=? "
+            "AND r.sender=? AND r.recipient=? AND r.kind IN ('answer','result') "
+            "AND r.request_reply=0 AND r.task_id IS ? AND r.depth=? AND r.seq>? "
+            "AND (? IS NULL OR r.id=?) "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=r.id) "
+            "AND NOT EXISTS (SELECT 1 FROM queue_withdrawals w "
+            "WHERE w.queue_id='messages' AND w.item_id=r.id) "
+            "AND NOT EXISTS (SELECT 1 FROM voice_message_buffers b "
+            "WHERE b.id=r.id AND b.state!='released') ORDER BY r.seq LIMIT 1",
             (
                 message["id"], message["conversation_id"], message["recipient"],
                 message["sender"], message["task_id"], message["depth"] + 1, message["seq"],
+                message["processing"]["reply_id"], message["processing"]["reply_id"],
             ),
         ).fetchone()
         processing = message["processing"]
-        processing["reply_id"] = reply["id"] if reply else None
         if reply:
             observed = {
                 "reply_id": reply["id"],
@@ -234,7 +240,13 @@ class MessageManager:
                 "request_reply_satisfied": bool(message["request_reply"]),
             }
             processing.update(observed)
-            processing["evidence"].update(observed)
+            processing["mailbox_reply"] = {
+                **observed,
+                "read_only_projection": True,
+                "completion_scope": "native_input_delivery",
+                "agent_confirmed": False,
+                "agent_work_completion_verified": False,
+            }
 
     def interim_target(self, message_id):
         row = self.store.db.execute(

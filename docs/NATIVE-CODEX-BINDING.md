@@ -98,12 +98,18 @@ fetch/ACK and responses retain the existing authenticated message operations.
 For a completed native input delivery, `message_get` also projects an already
 stored authenticated `answer` or `result` that reverses the exact sender/recipient,
 preserves the conversation/task/depth and directly references the original message.
-The first valid final reply supplies `processing.reply_id`, its mailbox source and
-`request_reply_satisfied` for a requested reply. An inbox ACK alone does not satisfy
-the request, and a genuine reply does not manufacture an ACK. Both the processing
-view and its projected evidence retain `native_input_delivery` and false native
-agent/work completion claims. This read writes no messages, job state, evidence,
-receipts or completion notices; their original delivery-time evidence stays intact.
+If no reply reference is recorded, the first valid released final reply supplies
+`processing.reply_id`, its mailbox source and `request_reply_satisfied` for a
+requested reply. A recorded non-null reply reference is never replaced or cleared;
+only that exact reply can be validated. An invalid/held reference remains historical
+and does not prove a satisfied reply. Held, withdrawn and unreleased buffered replies
+are excluded. An inbox ACK alone does not satisfy the request, and a genuine reply
+does not manufacture an ACK. `processing.mailbox_reply` explicitly identifies this
+current read-only projection, with `native_input_delivery` and false native
+agent/work completion claims. `processing.evidence` remains the unchanged recorded
+delivery-time evidence; it can correctly still say the reply was unconfirmed then.
+The projection writes no messages, job state, evidence, receipts or completion
+notices. Existing voice-buffer expiry behavior is separate and unchanged.
 Failed/UNKNOWN jobs and the legacy/managed reply paths are unchanged.
 
 Any cancellation, rejected or malformed response, disconnect or timeout after the
