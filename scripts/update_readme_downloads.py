@@ -410,13 +410,13 @@ def self_test():
             "tag_name": "v0.8.0rc49",
             "draft": False,
             "published_at": "2026-11-12",
-            "assets": [{"name": "KiraBridge-macos.tar.gz", "state": "uploaded"}],
+            "assets": [{"name": "KiraBridge-macos.tar.gz", "state": "uploaded", "browser_download_url": "https://example.test/macos.tar.gz"}],
         },
         {
             "tag_name": "linux-v0.8.0rc41",
             "draft": False,
             "published_at": "2026-11-07",
-            "assets": [{"name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz", "state": "uploaded"}],
+            "assets": [{"name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz", "state": "uploaded", "browser_download_url": "https://example.test/debian.tar.gz"}],
         },
         {
             "tag_name": "linux-v0.8.0rc40",
