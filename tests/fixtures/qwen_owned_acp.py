@@ -86,11 +86,15 @@ for line in sys.stdin:
         r = {"configOptions": [option]}
     elif method == "qwen/status/session/context":
         r = {
+            "v": 1,
+            "sessionId": session,
+            "workspaceCwd": cwd,
             "state": {
+                "_meta": {"authType": "qwen-subscription"},
                 "models": {"currentModelId": "fixture-model(qwen-subscription)"},
                 "modes": {"currentModeId": mode},
                 "configOptions": [option],
-            }
+            },
         }
     elif method == "qwen/status/session/resources":
         r = {

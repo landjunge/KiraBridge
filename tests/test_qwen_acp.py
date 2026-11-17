@@ -28,11 +28,16 @@ for line in sys.stdin:
  m=json.loads(line);method=m.get('method')
  if method=='initialize':
   assert m['params']['clientCapabilities']=={}
-  version='0.27.2' if mode!='version' else '0.28.0'
+  version='0.28.0' if mode=='version' else '0.27.3' if mode=='patch_version' else '0.27.2'
   r={'protocolVersion':1,'agentInfo':{'name':'qwen-code','version':version}}
  elif method=='session/new':
   assert not m['params']['mcpServers']
   r={'sessionId':session}
+ elif method=='qwen/status/session/context':
+  model='foreign-model' if mode=='model_mismatch' else 'fixture-model(qwen-subscription)'
+  r={'v':1,'sessionId':session,'workspaceCwd':os.getcwd(),
+     'state':{'_meta':{'authType':'qwen-subscription'},
+              'models':{'currentModelId':model},'modes':{'currentModeId':'plan'}}}
  elif method=='session/prompt':
   assert m['params']['sessionId']==session
   if mode=='disconnect':sys.exit(0)
@@ -83,7 +88,7 @@ async def turn(tmp_path, mode="ok", **changes):
     return result, started, progress
 
 
-@pytest.mark.parametrize("mode", ["ok", "permission", "cancelled"])
+@pytest.mark.parametrize("mode", ["ok", "patch_version", "permission", "cancelled"])
 async def test_bound_turn_and_permission_denial(tmp_path, mode):
     result, started, progress = await turn(tmp_path, mode)
     assert result["success"] == (mode != "cancelled")
@@ -92,6 +97,9 @@ async def test_bound_turn_and_permission_denial(tmp_path, mode):
     assert "PRIVATE_THOUGHT" not in json.dumps(result)
     assert started.await_count == 1
     evidence = result["evidence"]
+    assert evidence["version"] == ("0.27.3" if mode == "patch_version" else "0.27.2")
+    assert evidence["session_model_id"] == "fixture-model(qwen-subscription)"
+    assert evidence["effective_model_status"] == "unknown"
     assert (evidence["session_id"], evidence["task_id"], evidence["owner"], evidence["cwd"]) == (
         "fixture-qwen",
         "qwen-task",
@@ -125,6 +133,12 @@ async def test_version_refuses_before_session_or_prompt(tmp_path):
     with pytest.raises(BridgeError) as error:
         await turn(tmp_path, "version")
     assert error.value.code == "agent_version"
+
+
+async def test_new_session_model_mismatch_refuses_before_prompt(tmp_path):
+    with pytest.raises(BridgeError) as error:
+        await turn(tmp_path, "model_mismatch")
+    assert error.value.code == "agent_selection_unsupported"
 
 
 async def test_resume_and_new_local_rights_refused_before_spawn(tmp_path):
@@ -233,7 +247,7 @@ def test_config_never_inherits_xai_key_or_accepts_api_provider():
         AgentConfig(kind="codex", qwen_auth_type="qwen-oauth")
 
 
-async def test_effort_requires_native_set_and_independent_readback():
+async def test_effort_requires_native_set_and_independent_readback(tmp_path):
     offered = {
         "configOptions": [
             {
@@ -244,16 +258,23 @@ async def test_effort_requires_native_set_and_independent_readback():
         ]
     }
     selected = {"configOptions": [{"id": "reasoning_effort", "currentValue": "xhigh"}]}
-    client = SimpleNamespace(request=AsyncMock(side_effect=[selected, {"state": selected}]))
+    context = {
+        "v": 1,
+        "sessionId": "session",
+        "workspaceCwd": str(tmp_path),
+        "state": {"_meta": {"authType": "qwen-subscription"}, **selected},
+    }
+    client = SimpleNamespace(request=AsyncMock(side_effect=[selected, context]))
     adapter = QwenACPAdapter()
-    assert await adapter._set_effort(client, "session", offered, "xhigh", 3) == "xhigh"
+    kwargs = {"cwd": str(tmp_path), "auth_type": "qwen-subscription"}
+    assert await adapter._set_effort(client, "session", offered, "xhigh", 3, **kwargs) == "xhigh"
     assert [c.args[0] for c in client.request.await_args_list] == [
         "session/set_config_option",
         "qwen/status/session/context",
     ]
     client.request.reset_mock()
     with pytest.raises(BridgeError):
-        await adapter._set_effort(client, "session", offered, "max", 3)
+        await adapter._set_effort(client, "session", offered, "max", 3, **kwargs)
     client.request.assert_not_awaited()
 
 

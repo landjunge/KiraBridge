@@ -1,4 +1,4 @@
-"""Qwen Code 0.27.2 policy and lifecycle on the shared ACP stdio transport.
+"""Qwen Code 0.27.2/0.27.3 policy on the shared ACP stdio transport.
 
 Task-owned MCP turns and explicitly proven owned-session recovery are supported.
 Never authenticate, adopt an interactive session, retry a prompt, or infer acceptance.
@@ -23,6 +23,7 @@ from kirabridge.platform_adapters import reap_process, spawn_process
 
 class QwenACPAdapter:
     interface_version = "1"
+    supported_versions = frozenset({"0.27.2", "0.27.3"})
 
     def __init__(self, terminal=None, bridge_config=None):
         self.terminal = terminal
@@ -111,7 +112,7 @@ class QwenACPAdapter:
             "--model",
             config.model,
         ]
-        # Bare mode registers only these builtins in 0.27.2. Explicitly deny
+        # Bare mode registers only these builtins in the supported versions. Deny
         # them even when the single task-scoped MCP call is enabled.
         command += [
             "--exclude-tools",
@@ -243,9 +244,18 @@ class QwenACPAdapter:
                 if not isinstance(init, dict) or init.get("protocolVersion") != 1:
                     raise BridgeError("agent_protocol", "Qwen requires ACP v1")
                 info = init.get("agentInfo", {})
-                if info.get("name") != "qwen-code" or info.get("version") != "0.27.2":
-                    raise BridgeError("agent_version", "Qwen ACP requires verified version 0.27.2")
-                await progress({**binding, "event": "acp_initialized", "version": "0.27.2"})
+                if not isinstance(info, dict):
+                    raise BridgeError("agent_version", "Qwen ACP agent identity is invalid")
+                version = info.get("version")
+                if (
+                    info.get("name") != "qwen-code"
+                    or not isinstance(version, str)
+                    or version not in self.supported_versions
+                ):
+                    raise BridgeError(
+                        "agent_version", "Qwen ACP requires verified version 0.27.2 or 0.27.3"
+                    )
+                await progress({**binding, "event": "acp_initialized", "version": version})
                 if recovery_binding is not None or owned_session_proof is not None:
                     if init.get("agentCapabilities", {}).get("loadSession") is not True:
                         raise BridgeError(
@@ -268,18 +278,19 @@ class QwenACPAdapter:
                         {"sessionId": session, "modeId": "default" if mcp_enabled else "plan"},
                         timeout,
                     )
-                    state = await client.request(
-                        "qwen/status/session/context", {"sessionId": session}, timeout
+                    state = await self._session_context(
+                        client, session, args.cwd, config.qwen_auth_type, timeout
                     )
                     expected_model = config.model + "(" + config.qwen_auth_type + ")"
+                    models, modes = state.get("models"), state.get("modes")
                     if (
-                        state.get("state", {}).get("models", {}).get("currentModelId")
-                        != expected_model
+                        not isinstance(models, dict)
+                        or models.get("currentModelId") != expected_model
                     ):
                         raise BridgeError(
                             "agent_recovery_denied", "Recovered Qwen model readback differs"
                         )
-                    if state.get("state", {}).get("modes", {}).get("currentModeId") != (
+                    if not isinstance(modes, dict) or modes.get("currentModeId") != (
                         "default" if mcp_enabled else "plan"
                     ):
                         raise BridgeError(
@@ -308,20 +319,32 @@ class QwenACPAdapter:
                     await progress({**binding, "session_id": session, "event": "session_created"})
                 selected_effort = None
                 if config.qwen_reasoning_effort:
-                    selected_effort = await self._set_effort(
-                        client, session, new, config.qwen_reasoning_effort, timeout
+                    await self._set_effort(
+                        client,
+                        session,
+                        new,
+                        config.qwen_reasoning_effort,
+                        timeout,
+                        cwd=args.cwd,
+                        auth_type=config.qwen_auth_type,
                     )
+                if mcp_enabled:
+                    await self._mcp_ready(client, session, args.cwd, timeout, progress, binding)
+                # Use one final, identity-bound snapshot after tool discovery.
+                # An earlier effort confirmation cannot attest a changed setting.
+                settings = await self._session_settings(
+                    client, session, args.cwd, config, mcp_enabled, timeout
+                )
+                session_model = settings["session_model_id"]
+                selected_effort = settings["session_reasoning_effort"]
                 await progress(
                     {
                         **binding,
                         "session_id": session,
                         "event": "session_settings_confirmed",
-                        "session_reasoning_effort": selected_effort,
-                        "mode": "default" if mcp_enabled else "plan",
+                        **settings,
                     }
                 )
-                if mcp_enabled:
-                    await self._mcp_ready(client, session, args.cwd, timeout, progress, binding)
                 if owned_session_proof:
                     owned_session_proof.validate_effect(task, args, config)
                 prompt_sent = True
@@ -377,8 +400,10 @@ class QwenACPAdapter:
                         **binding,
                         "adapter": "qwen_acp",
                         "pid": process.pid,
-                        "version": "0.27.2",
+                        "version": version,
                         "requested_model": config.model,
+                        "session_model_id": session_model,
+                        "session_auth_type": settings["session_auth_type"],
                         "session_reasoning_effort": selected_effort,
                         "requested_effort": config.qwen_reasoning_effort,
                         "effective_model_status": "unknown",
@@ -545,11 +570,76 @@ class QwenACPAdapter:
             "agent_mcp_unavailable", "Qwen MCP discovery deadline elapsed; no prompt sent"
         )
 
-    async def _set_effort(self, client, session, new, effort, timeout):
-        option = next(
-            (o for o in new.get("configOptions", []) if o.get("category") == "thought_level"), None
+    @staticmethod
+    def _thought_option(options):
+        if not isinstance(options, list) or any(not isinstance(o, dict) for o in options):
+            return None
+        matched = [o for o in options if o.get("category") == "thought_level"]
+        return matched[0] if len(matched) == 1 else None
+
+    async def _session_context(self, client, session, cwd, auth_type, timeout):
+        response = await client.request(
+            "qwen/status/session/context", {"sessionId": session}, timeout
         )
-        if option is None or effort not in {o.get("value") for o in option.get("options", [])}:
+        if (
+            not isinstance(response, dict)
+            or type(response.get("v")) is not int
+            or response["v"] != 1
+            or response.get("sessionId") != session
+            or not isinstance(response.get("workspaceCwd"), str)
+            or not Path(response["workspaceCwd"]).is_absolute()
+            or not isinstance(response.get("state"), dict)
+        ):
+            raise BridgeError("agent_identity", "Qwen context is not bound to this session")
+        try:
+            same_cwd = Path(response["workspaceCwd"]).resolve(strict=True) == Path(cwd).resolve(
+                strict=True
+            )
+        except (OSError, ValueError, RuntimeError):
+            same_cwd = False
+        state = response["state"]
+        metadata = state.get("_meta")
+        if not same_cwd or not isinstance(metadata, dict) or metadata.get("authType") != auth_type:
+            raise BridgeError("agent_identity", "Qwen context cwd or authentication differs")
+        return state
+
+    async def _session_settings(self, client, session, cwd, config, mcp_enabled, timeout):
+        state = await self._session_context(client, session, cwd, config.qwen_auth_type, timeout)
+        models, modes = state.get("models"), state.get("modes")
+        mode = "default" if mcp_enabled else "plan"
+        if (
+            not isinstance(models, dict)
+            or models.get("currentModelId") != config.model + "(" + config.qwen_auth_type + ")"
+            or not isinstance(modes, dict)
+            or modes.get("currentModeId") != mode
+        ):
+            raise BridgeError(
+                "agent_selection_unsupported", "Qwen session model or mode readback differs"
+            )
+        effort = config.qwen_reasoning_effort
+        if effort:
+            option = self._thought_option(state.get("configOptions"))
+            if option is None or option.get("currentValue") != effort:
+                raise BridgeError(
+                    "agent_selection_unsupported", "Qwen final reasoning effort readback differs"
+                )
+        return {
+            "session_model_id": models["currentModelId"],
+            "session_auth_type": state["_meta"]["authType"],
+            "session_reasoning_effort": effort,
+            "mode": mode,
+        }
+
+    async def _set_effort(self, client, session, new, effort, timeout, *, cwd, auth_type):
+        option = self._thought_option(new.get("configOptions")) if isinstance(new, dict) else None
+        values = option.get("options") if option else None
+        if (
+            option is None
+            or not isinstance(option.get("id"), str)
+            or not isinstance(values, list)
+            or any(not isinstance(o, dict) for o in values)
+            or effort not in [o.get("value") for o in values]
+        ):
             raise BridgeError(
                 "agent_selection_unsupported", "Requested Qwen reasoning effort is unavailable"
             )
@@ -558,13 +648,17 @@ class QwenACPAdapter:
             {"sessionId": session, "configId": option["id"], "value": effort},
             timeout,
         )
-        state = await client.request("qwen/status/session/context", {"sessionId": session}, timeout)
+        state = await self._session_context(client, session, cwd, auth_type, timeout)
         for options in [
-            changed.get("configOptions", []),
-            state.get("state", {}).get("configOptions", []),
+            changed.get("configOptions") if isinstance(changed, dict) else None,
+            state.get("configOptions", []),
         ]:
-            matched = next((o for o in options if o.get("id") == option["id"]), {})
-            if matched.get("currentValue") != effort:
+            matched = (
+                [o for o in options if isinstance(o, dict) and o.get("id") == option["id"]]
+                if isinstance(options, list)
+                else []
+            )
+            if len(matched) != 1 or matched[0].get("currentValue") != effort:
                 raise BridgeError(
                     "agent_selection_unsupported", "Qwen reasoning effort readback differs"
                 )

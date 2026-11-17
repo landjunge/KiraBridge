@@ -1,6 +1,22 @@
 # Qwen Code über ACP und KiraBridge-MCP / Qwen Code via ACP and KiraBridge MCP
 
-Stand / checked version: **Qwen Code 0.27.2**, 12.11.2026. Quellintegration;
+Quellunterstützung / source support: **Qwen Code 0.27.2 und 0.27.3**, 15.11.2026.
+Die ACP-Identität wird gegen diese exakten Versionen geprüft und die beobachtete
+Version im Ergebnis gespeichert. Jede Kontextantwort muss die eigene `sessionId`,
+das kanonische Arbeitsverzeichnis und die native `state._meta.authType` bestätigen.
+Neue und geladene Sitzungen müssen Modell, Authroute, Berechtigungsmodus und
+angeforderte Denkstufe im letzten gebundenen Snapshot vor dem Prompt bestätigen.
+`session_model_id` ist diese Sitzungseinstellung; die unabhängige
+Backendmodellidentität bleibt ohne zusätzliche Attestierung unbekannt.
+
+Every context response must match the owned session, canonical working directory
+and native authentication type. Both new and loaded sessions must confirm model,
+auth route, permission mode and requested effort in the final bound snapshot before
+a prompt is sent. Evidence records the observed CLI version, `session_model_id`
+and `session_auth_type`; this does not attest the backend
+model identity. Qwen is additive; existing Codex defaults and verifier roles remain.
+
+Quellintegration;
 keine automatische Installation oder Änderung bestehender Anmeldungen.
 
 ## Betreiberprofil / Operator profile
@@ -123,7 +139,7 @@ select the other supported Qwen authentication types without a routing fallback.
 ## Werkzeugrechte und Grenzen / Tool permissions and limits
 
 Der Adapter startet `--acp --bare --safe-mode` und schließt die in Bare registrierten
-nativen Shell-/Datei-/Goal-/Exec-Tools explizit aus. In 0.27.2 bleiben ausdrücklich
+nativen Shell-/Datei-/Goal-/Exec-Tools explizit aus. In den unterstützten Versionen bleiben ausdrücklich
 über `session/new` bzw. `session/load` übergebene MCP-Server trotz Safe Mode verfügbar.
 Der Adapter wartet auf native MCP-Bereitschaft und den tatsächlichen Werkzeugkatalog,
 bevor er den Prompt sendet. Implizite Projekt-MCPs, Hooks und Skills werden nicht
