@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
+from claim_seal_support import with_stored_seal
 from test_direct_delivery import delivery  # noqa: F401
 from test_visible_handoff import visible  # noqa: F401
 
@@ -92,7 +93,16 @@ def recovered_local(bridge):
     )
     bridge.store.db.execute(
         "UPDATE message_jobs SET evidence=? WHERE message_id=?",
-        (canonical({"handoff_id": run_id, "state": "sent", "agent_confirmed": False}), sent["id"]),
+        (
+            canonical(
+                with_stored_seal(
+                    bridge,
+                    sent["id"],
+                    {"handoff_id": run_id, "state": "sent", "agent_confirmed": False},
+                )
+            ),
+            sent["id"],
+        ),
     )
     bridge.message_receiver.recovered_handoffs.add(sent["id"])
     return sent, run_id, result

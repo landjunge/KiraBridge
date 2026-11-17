@@ -40,7 +40,19 @@ def completed_handoff(visible, monkeypatch):
         "INSERT INTO message_jobs(message_id,state,run_id) VALUES(?,'running',?)",
         (message_id, run_id),
     )
-    prior_evidence = {"reason": "reply_unconfirmed", "original_observation": {"return_sent": True}}
+    # Genuine production seal over the stored message row, run_id and the job's
+    # own execution_cwd (unset in this visible-only fixture); the UNKNOWN
+    # failure evidence keeps it as failure_evidence does (strict fence).
+    seal = bridge.message_receiver.claim_seal(
+        bridge.store.db.execute("SELECT * FROM messages WHERE id=?", (message_id,)).fetchone(),
+        run_id,
+        None,
+    )
+    prior_evidence = {
+        "reason": "reply_unconfirmed",
+        "original_observation": {"return_sent": True},
+        "claim_seal": seal,
+    }
     bridge.message_receiver._finish(message_id, "unknown", prior_evidence, "visible_reply_unknown")
     bridge.store.db.execute(
         "INSERT INTO visible_handoffs VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -464,3 +476,116 @@ async def test_status_endpoint_keeps_existing_mailbox_permission_checks(
     assert not response.isError
     assert response.structuredContent["error"]["code"] == "forbidden"
     assert snapshot(bridge) == before
+
+
+def _set_unknown(bridge, message_id, evidence, error):
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=?,error=? WHERE message_id=?",
+        (canonical(evidence), error, message_id),
+    )
+
+
+def _valid_seal(bridge, message_id, run_id):
+    row = bridge.store.db.execute("SELECT * FROM messages WHERE id=?", (message_id,)).fetchone()
+    return bridge.message_receiver.claim_seal(row, run_id, "/tmp/codex-cwd")
+
+
+def _fence(bridge, message_id, run_id, case):
+    seal = _valid_seal(bridge, message_id, run_id)
+    if case == "claim_seal_broken":
+        _set_unknown(
+            bridge,
+            message_id,
+            {"reason": "claim_seal_broken", "seal_reason": "seal_broken",
+             "last_observation": {"claim_seal": seal}, "automatic_retry": False},
+            "claim_seal_broken",
+        )
+    elif case == "seal_mismatch":
+        _set_unknown(
+            bridge,
+            message_id,
+            {"run_id": run_id, "claim_seal_mismatch": True,
+             "last_observation": {"claim_seal": {**seal, "fields_sha256": "0" * 64}}},
+            "receiver_interrupted",
+        )
+    elif case == "context_mismatch":
+        _set_unknown(
+            bridge,
+            message_id,
+            {"run_id": run_id, "claim_seal_mismatch": True,
+             "last_observation": {"claim_seal": seal, "managed_guidance_context": {"x": 1}}},
+            "guidance_context_changed",
+        )
+    elif case == "tampered_seal":
+        _set_unknown(
+            bridge,
+            message_id,
+            {"reason": "reply_unconfirmed", "claim_seal": {**seal, "fields_sha256": "0" * 64}},
+            "visible_reply_unknown",
+        )
+    elif case == "hold":
+        bridge.store.db.execute(
+            "INSERT INTO queue_holds VALUES('messages',?,'local',1,'preserve')", (message_id,)
+        )
+
+
+FENCES = ["claim_seal_broken", "seal_mismatch", "context_mismatch", "tampered_seal", "hold"]
+
+
+@pytest.mark.parametrize("case", FENCES)
+async def test_status_tool_never_completes_fenced_unknown(completed_handoff, http_bridge, case):
+    bridge, transport, message_id, run_id, _, _ = completed_handoff
+    _, endpoint = http_bridge
+    _fence(bridge, message_id, run_id, case)
+    before = snapshot(bridge)
+    async with MCPClientPool() as pool:
+        await pool.connect(Peer("daemon", url=endpoint, token="local-test-" + "a" * 40))
+        response = await pool.call("daemon", "visible_handoff_status", {"handoff_id": run_id})
+    assert not response.isError
+    value = response.structuredContent
+    assert value["state"] == "completed"  # the handoff itself; the job stays UNKNOWN
+    assert value["receiver_reconciliation"]["reconciled"] is False
+    assert value["receiver_reconciliation"]["state"] == "unknown"
+    assert bridge.messages.get("local", message_id)["processing"]["state"] == "unknown"
+    # No completion event or notice; everything byte-identical.
+    assert snapshot(bridge) == before
+    assert transport["calls"] == []
+
+
+@pytest.mark.parametrize("case", FENCES)
+def test_local_reply_route_never_completes_fenced_unknown(completed_handoff, case):
+    bridge, _, message_id, run_id, reply_id, _ = completed_handoff
+    bridge.store.db.execute("UPDATE messages SET acknowledged=NULL WHERE id=?", (message_id,))
+    bridge.store.db.execute("UPDATE messages SET reply_to=NULL WHERE id=?", (reply_id,))
+    install_local_reply_result(bridge, message_id, run_id)
+    _fence(bridge, message_id, run_id, case)
+    before = snapshot(bridge)
+    result = bridge.message_receiver.reconcile_completed_handoff("local", run_id)
+    assert result["reconciled"] is False and result["state"] == "unknown"
+    assert snapshot(bridge) == before
+
+
+@pytest.mark.parametrize("case", FENCES)
+def test_record_finish_itself_fences_unknown_promotion(completed_handoff, case):
+    bridge, _, message_id, run_id, _, _ = completed_handoff
+    _fence(bridge, message_id, run_id, case)
+    before = snapshot(bridge)
+    job = bridge.store.db.execute(
+        "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
+    ).fetchone()
+    with pytest.raises(BridgeError) as exc:
+        bridge.message_receiver._record_finish(job, "completed", {"forged": True})
+    assert exc.value.code == "receiver_claim_changed"
+    assert snapshot(bridge) == before
+
+
+def test_unknown_with_intact_seal_still_reconciles(completed_handoff):
+    bridge, _, message_id, run_id, reply_id, _ = completed_handoff
+    seal = _valid_seal(bridge, message_id, run_id)
+    _set_unknown(
+        bridge, message_id, {"reason": "reply_unconfirmed", "claim_seal": seal},
+        "visible_reply_unknown",
+    )
+    result = bridge.message_receiver.reconcile_completed_handoff("local", run_id)
+    assert result["reconciled"] is True and result["reply_id"] == reply_id
+    assert bridge.messages.get("local", message_id)["processing"]["state"] == "completed"

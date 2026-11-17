@@ -110,3 +110,45 @@ def test_ack_without_claim_unchanged_and_bad_claim_rejected(channel):
     assert err.value.code == "invalid_claim"
     good = b.message_receiver._claim_contract(message, run_id)
     assert b.messages.ack("codex_channel", work["id"], receipt, good)["acknowledged"]
+
+
+def audit_count(b):
+    return b.store.db.execute("SELECT count(*) FROM audit").fetchone()[0]
+
+
+def progress_events(b, mid):
+    return b.store.db.execute(
+        "SELECT count(*) FROM message_events WHERE message_id=? AND kind='message.agent_progress'",
+        (mid,),
+    ).fetchone()[0]
+
+
+@pytest.mark.parametrize("callback", ["running", "progress"])
+async def test_owner_mismatch_callback_writes_no_evidence_progress_or_audit(channel, callback):
+    b, cfg, h = channel
+    work = send(b, "own-cb-" + callback, "Current task", kind="work")
+    message, run_id = b.message_receiver._claim(work["id"])
+    seen = {}
+
+    async def execute(task, args, policy, running, progress, **kw):
+        if callback == "progress":
+            await running({"session_id": "old"})
+        handoff(b, work["id"])
+        seen["audit"], seen["events"] = audit_count(b), progress_events(b, work["id"])
+        try:
+            await (running if callback == "running" else progress)({"late": True})
+        except BridgeError as exc:
+            seen["code"] = exc.code
+        seen["audit_after"] = audit_count(b)
+        raise BridgeError("agent_timeout", "old run timed out")
+
+    b.agents.execute = execute
+    await b.message_receiver._process(h, message, run_id)
+    # Checked outside the adapter: _process swallows assertion errors raised there.
+    assert seen.get("code") == "receiver_claim_changed"
+    assert seen["audit_after"] == seen["audit"] == audit_count(b)
+    row = job(b, work["id"])
+    assert (row["state"], row["run_id"], row["error"]) == ("running", OTHER, None)
+    assert json.loads(row["evidence"]) == {"owner": "new"}
+    assert row["acknowledged"] is None
+    assert progress_events(b, work["id"]) == seen["events"]

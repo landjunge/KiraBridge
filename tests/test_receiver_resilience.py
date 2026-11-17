@@ -8,6 +8,7 @@ Only test adapters are replaced; no live terminal, credentials or service is use
 import asyncio
 
 import pytest
+from claim_seal_support import seal_running_job
 from test_visible_dispatch_wait import enqueue, fake_receiver
 from test_visible_handoff import visible  # noqa: F401
 
@@ -21,10 +22,7 @@ def _running_handoff(bridge, key, state):
     sent = enqueue(bridge, key=key)
     binding = bridge.config.visible_handoffs.bindings["grok"]
     handoff_id = "channel-" + key
-    bridge.store.db.execute(
-        "UPDATE message_jobs SET state='running',run_id=?,evidence=? WHERE message_id=?",
-        (handoff_id, canonical({"handoff_id": handoff_id, "state": state}), sent["id"]),
-    )
+    seal_running_job(bridge, sent["id"], handoff_id, {"handoff_id": handoff_id, "state": state})
     bridge.store.db.execute(
         "INSERT INTO visible_handoffs VALUES(?,?, 'grok','hash',?,?, ?,1,1,?)",
         (

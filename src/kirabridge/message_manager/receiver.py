@@ -85,11 +85,12 @@ class MessageReceiver:
                     {
                         "reason": "receiver_restart",
                         "last_observation": observed,
-                        **(
-                            {"managed_guidance_context": observed["managed_guidance_context"]}
-                            if "managed_guidance_context" in observed
-                            else {}
-                        ),
+                        # Keep the claim proofs verbatim; never refresh them on restart.
+                        **{
+                            key: observed[key]
+                            for key in ("managed_guidance_context", "claim_seal")
+                            if key in observed
+                        },
                     },
                     "interrupted",
                 )
@@ -370,6 +371,41 @@ class MessageReceiver:
                 if row is None or row["state"] != "running" or not self._reply_can_finish(row):
                     self.recovered_handoffs.discard(message_id)
                     continue  # In particular, never reconcile an unknown or blocked history.
+                try:
+                    stored_evidence = json.loads(row["evidence"])
+                except (TypeError, ValueError):
+                    stored_evidence = None
+                seal_reason = self._stored_seal_reason(
+                    message_id, row["recipient"], row["run_id"], stored_evidence
+                )
+                if seal_reason == "hold_placed":
+                    continue  # A hold keeps the recovered waiter; never complete it.
+                if seal_reason is not None:
+                    # Missing/replaced/drifted binding: no visible recovery completion
+                    # and no repair; the stored evidence is preserved verbatim.
+                    self.bridge.store.audit(
+                        "message.claim_revalidation_failed",
+                        "local",
+                        None,
+                        {"message_id": message_id, "run_id": row["run_id"],
+                         "reason": seal_reason, "recovery": True},
+                    )
+                    self._finish(
+                        message_id,
+                        "unknown",
+                        {
+                            "reason": "claim_seal_broken",
+                            "seal_reason": seal_reason,
+                            "last_observation": stored_evidence
+                            if isinstance(stored_evidence, dict)
+                            else {"invalid_evidence_sha256": digest(row["evidence"])},
+                            "automatic_retry": False,
+                        },
+                        "claim_seal_broken",
+                        run_id=row["run_id"],
+                    )
+                    self.recovered_handoffs.discard(message_id)
+                    continue
                 local_handoff = self.bridge.store.db.execute(
                     "SELECT state,evidence FROM visible_handoffs WHERE id=? AND message_id=? "
                     "AND principal=? AND target=?",
@@ -406,6 +442,7 @@ class MessageReceiver:
                                 "automatic_retry": False,
                             },
                             reply_id=reply_id,
+                            run_id=row["run_id"],
                         )
                         self.recovered_handoffs.discard(message_id)
                         continue
@@ -434,7 +471,17 @@ class MessageReceiver:
                         self.recovered_handoffs.discard(message_id)
                         continue
                     if has_local:
-                        self._finish(message_id, "completed", local)
+                        local = {
+                            **local,
+                            "claim_seal": stored_evidence["claim_seal"],
+                            **(
+                                {"managed_guidance_context":
+                                 stored_evidence["managed_guidance_context"]}
+                                if "managed_guidance_context" in stored_evidence
+                                else {}
+                            ),
+                        }
+                        self._finish(message_id, "completed", local, run_id=row["run_id"])
                         self.recovered_handoffs.discard(message_id)
                         continue
                 if not reply_id:
@@ -460,6 +507,7 @@ class MessageReceiver:
                         "automatic_retry": False,
                     },
                     reply_id=reply_id,
+                    run_id=row["run_id"],
                 )
             self.recovered_handoffs.discard(message_id)
 
@@ -509,6 +557,9 @@ class MessageReceiver:
                 return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
             if not isinstance(previous, dict):
                 return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
+            fence = self._unknown_promotion_fence(job, previous)
+            if fence is not None:
+                return {**unchanged, "state": "unknown", "reason": fence}
 
             # Preserve the authenticated mailbox route whenever its ACK and
             # exact reply are present. Otherwise accept only a persisted local
@@ -610,17 +661,72 @@ class MessageReceiver:
         self._record_finish(job, state, evidence, error=error, reply_id=reply_id)
         return True
 
+    SEAL_FAILURE_ERRORS = frozenset({"claim_seal_broken", "guidance_context_changed"})
+
+    def _unknown_promotion_fence(self, job, previous):
+        """Recovery fence for UNKNOWN -> completed (caller owns the transaction).
+
+        A seal failure marker, damaged seal/context binding or an active hold
+        keeps the job UNKNOWN; a late ACK/reply never overrides it. Strictly
+        fail-closed: evidence without a claim_seal is never promotable.
+        """
+        if job["error"] in self.SEAL_FAILURE_ERRORS:
+            return "seal_failure_recorded"
+        if not isinstance(previous, dict):
+            return "invalid_prior_evidence"
+        if previous.get("claim_seal_mismatch") or previous.get("reason") == "claim_seal_broken":
+            return "seal_failure_recorded"
+        held = self.bridge.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?",
+            (job["message_id"],),
+        ).fetchone()
+        if held is not None:
+            return "hold_placed"
+        if "claim_seal" not in previous:
+            return "seal_missing"
+        seal = previous["claim_seal"]
+        row = self.bridge.store.db.execute(
+            "SELECT * FROM messages WHERE id=?", (job["message_id"],)
+        ).fetchone()
+        context = previous.get("managed_guidance_context")
+        try:
+            if (
+                row is None
+                or not isinstance(seal, dict)
+                or seal.get("run_id") != job["run_id"]
+                or self.claim_seal(row, job["run_id"], seal.get("execution_cwd"), context) != seal
+            ):
+                return "seal_broken"
+        except (KeyError, TypeError, ValueError, RecursionError):
+            return "seal_broken"
+        return None
+
     def _record_finish(self, job, state, evidence, error=None, reply_id=None):
         """Caller has validated the exact prior state and owns the transaction."""
         from kirabridge.completion_manager import completion_payload, record_notice
 
         message_id = job["message_id"]
+        if job["state"] == "unknown":
+            # Single UNKNOWN promotion path: re-check the fence in the same
+            # transaction as the CAS write below.
+            try:
+                previous = json.loads(job["evidence"])
+            except (TypeError, ValueError, RecursionError):
+                previous = None
+            fence = self._unknown_promotion_fence(job, previous)
+            if fence is not None:
+                raise BridgeError("receiver_claim_changed", "UNKNOWN job is fenced: " + fence)
         now = time.time()
-        self.bridge.store.db.execute(
+        # Compare-and-set on the exact observed state/run_id (ABA fence): a
+        # requeue/new claim between observation and write must not be finished.
+        updated = self.bridge.store.db.execute(
             "UPDATE message_jobs SET state=?,finished=?,evidence=?,error=?,reply_id=? "
-            "WHERE message_id=?",
-            (state, now, canonical(evidence), error, reply_id, message_id),
-        )
+            "WHERE message_id=? AND state=? AND run_id IS ?",
+            (state, now, canonical(evidence), error, reply_id, message_id, job["state"],
+             job["run_id"]),
+        ).rowcount
+        if updated != 1:
+            raise BridgeError("receiver_claim_changed", "Job changed before finish write")
         row = self.bridge.store.db.execute(
             "SELECT * FROM messages WHERE id=?", (message_id,)
         ).fetchone()
@@ -774,12 +880,16 @@ class MessageReceiver:
                 else "separate_managed_session"
             )
             evidence = {"session_scope": scope}
+            cwd = config.receivers[row["recipient"]].cwd
             if not direct and not interim:
                 from kirabridge.message_manager.guidance_context import prepare
 
                 if context := prepare(self.bridge, row):
                     context["claim_run_id"] = run_id
                     evidence["managed_guidance_context"] = context
+            evidence["claim_seal"] = self.claim_seal(
+                row, run_id, cwd, evidence.get("managed_guidance_context")
+            )
             self.bridge.store.db.execute(
                 "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=?,"
                 "execution_cwd=? "
@@ -788,7 +898,7 @@ class MessageReceiver:
                     run_id,
                     time.time(),
                     canonical(evidence),
-                    config.receivers[row["recipient"]].cwd,
+                    cwd,
                     message_id,
                 ),
             )
@@ -803,6 +913,7 @@ class MessageReceiver:
                 # Keep the original binding even if later job evidence changes;
                 # losing stored proof must never turn this claim into raw work.
                 message["_managed_guidance_context"] = evidence["managed_guidance_context"]
+            message["_claim_seal"] = evidence["claim_seal"]
             return message, run_id
 
     def _waiting(self, message_id, reason, observation=None):
@@ -880,11 +991,16 @@ class MessageReceiver:
                 )
             ):
                 return False
-            self.bridge.store.db.execute(
-                "UPDATE message_jobs SET state='queued',run_id=NULL,claimed=NULL,started=NULL,"
-                "finished=NULL,error=NULL,reply_id=NULL,execution_cwd=NULL WHERE message_id=?",
-                (message_id,),
-            )
+            if (
+                self.bridge.store.db.execute(
+                    "UPDATE message_jobs SET state='queued',run_id=NULL,claimed=NULL,"
+                    "started=NULL,finished=NULL,error=NULL,reply_id=NULL,execution_cwd=NULL "
+                    "WHERE message_id=? AND state=? AND run_id=? AND started IS NULL",
+                    (message_id, state, run_id),
+                ).rowcount
+                != 1
+            ):
+                return False  # ABA: never requeue a different/started claim
             evidence = {
                 "previous_run_id": run_id,
                 "previous_state": state,
@@ -1109,6 +1225,140 @@ class MessageReceiver:
             claim["context_sha256"] = digest(context)
         return claim
 
+    SEAL_SCHEMA = "kirabridge.message-claim-seal.v1"
+    SEAL_FIELDS = (
+        "id", "seq", "position", "body", "request_reply", "kind", "sender", "recipient",
+        "conversation_id", "reply_to", "task_id", "depth", "idem", "request_hash", "created",
+    )
+
+    def claim_seal(self, row, run_id, cwd, context=None):
+        """Hash-bound claim seal: current message fields + run_id + cwd + pinned context."""
+        fields = {k: row[k] for k in self.SEAL_FIELDS}
+        return {
+            "schema": self.SEAL_SCHEMA,
+            "run_id": run_id,
+            "execution_cwd": cwd,
+            "request_reply": bool(row["request_reply"]),
+            "fields_sha256": digest(fields),
+            "context_sha256": digest(context) if context is not None else None,
+            "seal_sha256": digest(
+                {"fields": fields, "run_id": run_id, "cwd": cwd,
+                 "context": digest(context) if context is not None else None}
+            ),
+        }
+
+    def _seal_reason(self, message_id, recipient, run_id, seal, context=None):
+        """Pure fresh read (caller owns the transaction); None means the seal holds."""
+        row = self.bridge.store.db.execute(
+            "SELECT m.*,j.state AS job_state,j.run_id AS job_run_id,"
+            "j.execution_cwd AS job_cwd,j.evidence AS job_evidence FROM messages m "
+            "JOIN message_jobs j ON j.message_id=m.id WHERE m.id=?",
+            (message_id,),
+        ).fetchone()
+        held = self.bridge.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?",
+            (message_id,),
+        ).fetchone()
+        receiver = self.bridge.config.messaging.receivers.get(recipient)
+        try:
+            stored_evidence = json.loads(row["job_evidence"]) if row else None
+        except (TypeError, ValueError, RecursionError):
+            stored_evidence = None
+        if not isinstance(stored_evidence, dict):
+            stored_evidence = {}
+        stored = stored_evidence.get("claim_seal")
+        reason = None
+        if row is None:
+            reason = "message_missing"
+        elif not isinstance(seal, dict) or seal.get("run_id") != run_id:
+            reason = "seal_missing"
+        elif row["job_state"] != "running":
+            reason = "job_state_changed"
+        elif row["job_run_id"] != run_id:
+            reason = "run_owner_changed"
+        elif held is not None:
+            reason = "hold_placed"
+        elif receiver is None or row["job_cwd"] != receiver.cwd:
+            reason = "receiver_scope_changed"
+        elif stored != seal or self.claim_seal(row, run_id, row["job_cwd"], context) != seal:
+            reason = "seal_broken"
+        elif not self._stored_context_intact(stored_evidence, context):
+            # The stored managed_guidance_context binding must still equal the
+            # claim's process copy; a removed/altered binding is never repaired.
+            reason = "context_binding_changed"
+        return reason
+
+    @staticmethod
+    def _stored_context_intact(stored_evidence, context):
+        if not isinstance(stored_evidence, dict):
+            return False
+        if context is None:
+            return stored_evidence.get("managed_guidance_context") is None
+        if "managed_guidance_context" not in stored_evidence:
+            return False
+        try:
+            return digest(stored_evidence["managed_guidance_context"]) == digest(context)
+        except (TypeError, ValueError, RecursionError):
+            return False
+
+    # Stored claim/context integrity damage, as opposed to a normal owner/run
+    # handoff or state change. These always settle fail-closed.
+    SEAL_INTEGRITY_REASONS = frozenset(
+        {"message_missing", "seal_missing", "seal_broken", "context_binding_changed"}
+    )
+
+    def _stored_binding_intact(self, message_id, seal, context):
+        """Pure read (caller owns the transaction): stored seal/context still ours."""
+        row = self.bridge.store.db.execute(
+            "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+        ).fetchone()
+        try:
+            stored = json.loads(row["evidence"]) if row else None
+        except (TypeError, ValueError, RecursionError):
+            return False
+        return (
+            isinstance(stored, dict)
+            and isinstance(seal, dict)
+            and stored.get("claim_seal") == seal
+            and self._stored_context_intact(stored, context)
+        )
+
+    def _seal_failed(self, message_id, run_id, reason, seal=None, context=None):
+        with self.bridge.store.transaction():
+            self.bridge.store.audit(
+                "message.claim_revalidation_failed",
+                "local",
+                None,
+                {"message_id": message_id, "run_id": run_id, "reason": reason},
+            )
+            integrity = reason in self.SEAL_INTEGRITY_REASONS
+            if reason == "seal_broken" and self._stored_binding_intact(message_id, seal, context):
+                # Stored seal/context untouched: plain message field drift, a
+                # normal claim change (the fence still recomputes the seal).
+                integrity = False
+        error = BridgeError("guidance_context_changed", "Claim seal broken: " + reason)
+        error.seal_integrity_reason = reason if integrity else None
+        raise error
+
+    def verify_seal(self, message, run_id, seal, context=None):
+        """Central fresh read: job running with same run_id, no hold, no field drift."""
+        with self.bridge.store.transaction():
+            reason = self._seal_reason(message["id"], message["recipient"], run_id, seal, context)
+        if reason is not None:
+            self._seal_failed(message["id"], run_id, reason, seal, context)
+
+    def _stored_seal_reason(self, message_id, recipient, run_id, evidence):
+        """Recovery: the stored seal must still bind the fresh message/run/cwd/context."""
+        if not isinstance(evidence, dict):
+            return "seal_missing"
+        return self._seal_reason(
+            message_id,
+            recipient,
+            run_id,
+            evidence.get("claim_seal"),
+            evidence.get("managed_guidance_context"),
+        )
+
     def _revalidate_claim(self, message, run_id, *, receipt=None, acknowledged=False):
         """Claim contract for work without managed context (same blocking set).
 
@@ -1165,9 +1415,22 @@ class MessageReceiver:
         claimed = self.bridge.store.db.execute(
             "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
+        # Stored evidence is untrusted at process start: malformed JSON or a
+        # non-object never escapes to DirectDelivery settlement (which would
+        # replace it); it is settled fail-closed below, kept verbatim.
+        try:
+            claimed_evidence = json.loads(claimed["evidence"])
+        except (TypeError, ValueError, RecursionError):
+            claimed_evidence = None
+        start_damage = None if isinstance(claimed_evidence, dict) else "seal_broken"
+        if start_damage is not None:
+            claimed_evidence = {}
         context = message.get("_managed_guidance_context")
         if context is None:
-            context = json.loads(claimed["evidence"]).get("managed_guidance_context")
+            context = claimed_evidence.get("managed_guidance_context")
+        seal = message.get("_claim_seal") or claimed_evidence.get("claim_seal")
+        # request_reply comes only from the seal, never from a later read.
+        request_reply = bool(seal.get("request_reply")) if isinstance(seal, dict) else None
         adapter_attempted = False
         visible = False
         reply_id = None
@@ -1183,11 +1446,23 @@ class MessageReceiver:
                 is not None
             )
 
-        def require_owner():
-            if not owns_claim():
-                raise BridgeError("receiver_claim_changed", "Receiver no longer owns this claim")
+        def verify_seal_now():
+            try:
+                self.verify_seal(message, run_id, seal, context)
+            except BridgeError as exc:
+                if context is not None:
+                    raise
+                integrity = getattr(exc, "seal_integrity_reason", None)
+                if integrity is not None:
+                    # Integrity damage keeps a stable fail-closed code without
+                    # managed context too; never downgraded to claim_changed.
+                    error = BridgeError("claim_seal_broken", "Claim seal broken: " + integrity)
+                    error.seal_integrity_reason = integrity
+                    raise error from None
+                raise BridgeError("claim_changed", "Claim seal broken") from None
 
         def validate_context(*, receipt=None, acknowledged=False):
+            verify_seal_now()
             if context is not None:
                 # Pinned managed scope: guidance_context.validate_current owns
                 # body/request_reply/state/run_id/hold/receipt checks.
@@ -1217,15 +1492,51 @@ class MessageReceiver:
             return message["body"]
 
         def retain_context(evidence):
+            if isinstance(seal, dict):
+                evidence = {**evidence, "claim_seal": seal}
             if context is None:
                 return evidence
             return {**evidence, "managed_guidance_context": context}
 
+        def failure_evidence(integrity=None):
+            # Terminal failure write (caller owns the finish transaction): read
+            # the stored evidence fresh in that same transaction, keep our seal
+            # only if the stored one is still identical; otherwise record the
+            # drift and leave the stored value verbatim inside last_observation.
+            observed = self.bridge.store.db.execute(
+                "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()[0]
+            observation = last_observation(observed)
+            stored = observation.get("claim_seal") if isinstance(observation, dict) else None
+            evidence = {"run_id": run_id, "last_observation": observation}
+            if integrity is not None:
+                evidence["seal_failure_reason"] = integrity
+            if stored != seal or not self._stored_context_intact(observation, context):
+                # No top-level process context/seal: the damaged stored binding
+                # stays only inside last_observation, never repaired.
+                evidence["claim_seal_mismatch"] = True
+                return evidence
+            return retain_context(evidence)
+
+        def stored_damage():
+            # Caller owns the transaction: integrity reason if the stored seal or
+            # context binding no longer matches this claim, else None.
+            observed = self.bridge.store.db.execute(
+                "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()[0]
+            observation = last_observation(observed)
+            if not isinstance(observation, dict) or observation.get("claim_seal") != seal:
+                return "seal_broken"
+            if not self._stored_context_intact(observation, context):
+                return "context_binding_changed"
+            return None
+
         def last_observation(raw):
             try:
                 return json.loads(raw)
-            except (TypeError, ValueError):
-                return {"invalid_evidence_sha256": digest(raw)}
+            except (TypeError, ValueError, RecursionError):
+                # Unparsable stored evidence stays byte-identical (never repaired).
+                return {"invalid_evidence": raw, "invalid_evidence_sha256": digest(raw)}
 
         async def call(tool, arguments):
             result = await pool.call("daemon", tool, arguments)
@@ -1238,34 +1549,75 @@ class MessageReceiver:
                 raise BridgeError("receiver_protocol", "Recipient MCP call was rejected")
             return content
 
-        async def progress(evidence):
+        def sealed_write(evidence, *, start=False):
+            # Fresh seal check and evidence write in ONE transaction: a removed,
+            # replaced or drifted stored seal (or hold/run_id/state/body drift) is
+            # never overwritten from this process's snapshot; abort instead.
+            # Adapters call running/progress directly before visible input, so
+            # this is also the last fence immediately before every input effect.
             evidence = retain_context(evidence)
             with self.bridge.store.transaction():
-                require_owner()
-                self.bridge.store.db.execute(
-                    "UPDATE message_jobs SET evidence=? WHERE message_id=?",
-                    (canonical(evidence), message_id),
-                )
-                self.messages._event(
-                    message_id,
-                    "message.agent_progress",
-                    recipient,
-                    {
-                        "run_id": run_id,
-                        "evidence_sha256": digest(evidence),
-                    },
-                )
+                reason = self._seal_reason(message_id, recipient, run_id, seal, context)
+                if reason is None:
+                    if start:
+                        self.bridge.store.db.execute(
+                            "UPDATE message_jobs SET started=COALESCE(started,?) "
+                            "WHERE message_id=? AND state='running' AND run_id=?",
+                            (time.time(), message_id, run_id),
+                        )
+                    self.bridge.store.db.execute(
+                        "UPDATE message_jobs SET evidence=? WHERE message_id=? "
+                        "AND state='running' AND run_id=?",
+                        (canonical(evidence), message_id, run_id),
+                    )
+                    self.messages._event(
+                        message_id,
+                        "message.agent_progress",
+                        recipient,
+                        {
+                            "run_id": run_id,
+                            "evidence_sha256": digest(evidence),
+                        },
+                    )
+            if reason == "run_owner_changed":
+                # Lost claim: existing contract, no evidence write and no audit.
+                raise BridgeError("receiver_claim_changed", "Receiver no longer owns this claim")
+            if reason is not None:
+                self._seal_failed(message_id, run_id, reason, seal, context)
+
+        async def progress(evidence):
+            sealed_write(evidence)
 
         async def running(evidence):
-            with self.bridge.store.transaction():
-                require_owner()
-                self.bridge.store.db.execute(
-                    "UPDATE message_jobs SET started=COALESCE(started,?) WHERE message_id=?",
-                    (time.time(), message_id),
-                )
-            await progress(evidence)
+            sealed_write(evidence, start=True)
             if delivery_event is not None:
                 delivery_event.set()
+
+        def sealed_finish(evidence, **kwargs):
+            # Visible completion keeps the original seal and checks it atomically.
+            evidence = retain_context(evidence)
+            with self.bridge.store.transaction():
+                reason = self._seal_reason(message_id, recipient, run_id, seal, context)
+                if reason is None:
+                    self._finish(message_id, "completed", evidence, run_id=run_id, **kwargs)
+            if reason is not None:
+                self._seal_failed(message_id, run_id, reason, seal, context)
+
+        if start_damage is not None:
+            # Damaged stored evidence at process start: no input happened yet, so
+            # terminal FAILED with claim_seal_broken; the raw stored value stays
+            # verbatim inside last_observation with the mismatch marker. The
+            # claim's verified seal is only the expected value, never a repair.
+            with self.bridge.store.transaction():
+                if owns_claim():
+                    self._finish(
+                        message_id,
+                        "failed",
+                        failure_evidence(start_damage),
+                        "claim_seal_broken",
+                        run_id=run_id,
+                    )
+            return
 
         try:
             validate_context()
@@ -1293,7 +1645,7 @@ class MessageReceiver:
                 prompt=prompt,
                 cwd=receiver.cwd,
                 timeout=receiver.timeout,
-                wait_for_reply=bool(message["request_reply"]),
+                wait_for_reply=request_reply,
             )
             pinned = self.bridge.store.db.execute(
                 "SELECT execution_cwd FROM message_jobs WHERE message_id=?", (message_id,)
@@ -1341,8 +1693,7 @@ class MessageReceiver:
             validate_context(receipt=receipt)
             if visible and result.get("scope") == "local_agent_turn":
                 evidence = self._local_reply_evidence(message_id, run_id, result)
-                with self.bridge.store.transaction():
-                    self._finish(message_id, "completed", evidence, run_id=run_id)
+                sealed_finish(evidence)
                 return
             if visible and result.get("scope") == "visible_input_delivery":
                 # Native Paste+Return confirms delivery only. No protocol text
@@ -1357,8 +1708,7 @@ class MessageReceiver:
                     "request_reply_satisfied": False,
                     "automatic_retry": False,
                 }
-                with self.bridge.store.transaction():
-                    self._finish(message_id, "completed", evidence, run_id=run_id)
+                sealed_finish(evidence)
                 return
             evidence = retain_context(
                 {
@@ -1371,7 +1721,7 @@ class MessageReceiver:
                     "response_preview": result.get("text", "")[:320],
                 }
             )
-            if message["request_reply"]:
+            if request_reply:
                 text = result.get("text", "")
                 if not isinstance(text, str) or not text.strip():
                     raise BridgeError("agent_no_text", "Receiving agent returned no answer")
@@ -1431,18 +1781,10 @@ class MessageReceiver:
                     # Shutdown loses only the waiter, not the authenticated
                     # return path. Startup observes ACK/late reply without input.
                     raise
-                observed = self.bridge.store.db.execute(
-                    "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
-                ).fetchone()[0]
                 self._finish(
                     message_id,
                     "unknown",
-                    retain_context(
-                        {
-                            "run_id": run_id,
-                            "last_observation": last_observation(observed),
-                        }
-                    ),
+                    failure_evidence(),
                     "receiver_interrupted",
                     reply_id=reply_id,
                     run_id=run_id,
@@ -1451,9 +1793,40 @@ class MessageReceiver:
         except Exception as exc:
             if not owns_claim():
                 return  # Never finish/requeue or rewrite progress for a lost claim.
-            if delivery_event is not None:
-                self.direct.fail(message_id, exc)
-                return  # One admission attempt; no pre-input requeue or replay.
+            integrity = getattr(exc, "seal_integrity_reason", None)
+            if integrity is not None or delivery_event is not None:
+                # Seal/context integrity damage: fail-closed UNKNOWN with a seal
+                # failure code, the damaged stored evidence kept verbatim. Never
+                # routed through DirectDelivery settlement (which replaces
+                # evidence) nor requeued. Direct failures re-check the stored
+                # seal fresh in the same transaction as their settlement.
+                with self.bridge.store.transaction():
+                    if not owns_claim():
+                        return
+                    if integrity is None:
+                        integrity = stored_damage()
+                    if integrity is None:
+                        # Stored seal freshly verified intact in this transaction:
+                        # settlement keeps it (and the pinned context) so a later
+                        # reconciliation re-validates the same seal. Never a replay/ACK.
+                        self.direct.fail(message_id, exc, retain=retain_context({}))
+                        return  # One admission attempt; no pre-input requeue or replay.
+                    code = (
+                        exc.code
+                        if isinstance(exc, BridgeError) and exc.code in self.SEAL_FAILURE_ERRORS
+                        else "claim_seal_broken"
+                    )
+                    # Before any adapter attempt no input happened: terminal
+                    # FAILED (never promotable); afterwards UNKNOWN, fenced.
+                    self._finish(
+                        message_id,
+                        "unknown" if adapter_attempted else "failed",
+                        failure_evidence(integrity),
+                        code,
+                        reply_id=reply_id,
+                        run_id=run_id,
+                    )
+                return
             if (
                 delivery_event is None
                 and isinstance(exc, BridgeError)
@@ -1468,20 +1841,12 @@ class MessageReceiver:
                 else "failed"
             )
             # Preserve the last observed adapter/session evidence, never raw exception texts.
-            observed = self.bridge.store.db.execute(
-                "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
-            ).fetchone()[0]
             with self.bridge.store.transaction():
                 if owns_claim():
                     self._finish(
                         message_id,
                         state,
-                        retain_context(
-                            {
-                                "run_id": run_id,
-                                "last_observation": last_observation(observed),
-                            }
-                        ),
+                        failure_evidence(),
                         exc.code if isinstance(exc, BridgeError) else "receiver_failed",
                         reply_id=reply_id,
                         run_id=run_id,

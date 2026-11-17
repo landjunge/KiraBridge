@@ -194,8 +194,12 @@ class DirectDelivery:
                 result[key] = value[key]
         return result or None
 
-    def fail(self, message_id, error):
-        """The receiver uses the same classification for an admission/input race."""
+    def fail(self, message_id, error, *, retain=None):
+        """The receiver uses the same classification for an admission/input race.
+
+        retain: identity fields (claim_seal, managed_guidance_context) the caller
+        verified fresh against the stored evidence in the same transaction.
+        """
         self._settle(
             message_id,
             error.code if isinstance(error, BridgeError) else "delivery_failed",
@@ -203,9 +207,13 @@ class DirectDelivery:
             or isinstance(error, BridgeError)
             and error.code == "peer_unknown",
             observation=self._observation(error),
+            retain=retain,
         )
 
-    def _settle(self, message_id, code, *, uncertain, observation=None, preserve_delivered=False):
+    def _settle(
+        self, message_id, code, *, uncertain, observation=None, preserve_delivered=False,
+        retain=None,
+    ):
         bridge = self.receiver.bridge
         with bridge.store.transaction():
             row = bridge.store.db.execute(
@@ -268,6 +276,10 @@ class DirectDelivery:
             }
             if observation:
                 evidence["observation"] = observation
+            if retain:
+                for key in ("claim_seal", "managed_guidance_context"):
+                    if key in retain:
+                        evidence[key] = retain[key]
             if (
                 not possible
                 and not bridge.store.db.execute(
