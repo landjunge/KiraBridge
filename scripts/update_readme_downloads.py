@@ -8,7 +8,7 @@ prereleases count because the products currently ship previews only.
 Based on the shared family updater. This KiraBridge version selects desktop
 buttons from the newest unprefixed ``v*`` release. KiraBridge's Debian server
 track (``linux-*`` tags) is a second lane
-and shows as optional ``Debian Remote``. ``windows-*`` tags stay unused.
+and shows as optional ``Debian Server``. ``windows-*`` tags stay unused.
 Only the block between the AUTO-DOWNLOADS markers in README.md / README.de.md
 and the generated ``assets/readme/download-<platform>.svg`` buttons are
 touched. Other ``download-*.svg`` files are never removed.
@@ -53,7 +53,7 @@ BRAND = {
 }
 
 # Display order of the buttons. "Debian Remote" is filled only from linux-* tags.
-ORDER = ["macOS Apple Silicon", "macOS Intel", "Windows", "Linux", "Debian Remote"]
+ORDER = ["macOS Apple Silicon", "macOS Intel", "Windows", "Linux Desktop", "Debian Server"]
 
 PACKAGE = re.compile(r"\.(?:dmg|pkg|exe|msi|appimage|deb|rpm|zip|tar\.gz)$", re.IGNORECASE)
 NOT_PACKAGE = re.compile(
@@ -72,7 +72,7 @@ def slug(label):
     return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
 
 
-MANAGED = {f"download-{slug(label)}.svg" for label in ORDER}
+MANAGED = {f"download-{slug(label)}.svg" for label in ORDER} | {"download-debian-remote.svg", "download-linux.svg"}
 
 
 def platforms(name):
@@ -82,7 +82,7 @@ def platforms(name):
     if WINDOWS.search(name):
         return ["Windows"]
     if LINUX.search(name):
-        return ["Linux"]
+        return ["Linux Desktop"]
     if MAC.search(name):
         if UNIVERSAL.search(name):
             return ["macOS Apple Silicon", "macOS Intel"]
@@ -178,22 +178,22 @@ def newest_lane(releases, wanted, required=None):
 
 
 def choose(releases):
-    """Newest desktop release plus newest linux-* Debian Remote, independently.
+    """Newest desktop release plus newest linux-* Debian Server, independently.
 
     Desktop (unprefixed v*) still offers only that one release: missing
     platforms stay empty. linux-* is a second track; its Linux installer
-    becomes ``Debian Remote``. windows-* tags never fill a button. A 4AllPass
+    becomes ``Debian Server``. windows-* tags never fill a button. A 4AllPass
     AppImage on v* stays ``Linux``.
     """
     chosen = {}
     desktop = newest_lane(releases, "desktop")
     if desktop:
         chosen.update(pick_from(desktop))
-    remote = newest_lane(releases, "remote", required="Linux")
+    remote = newest_lane(releases, "remote", required="Linux Desktop")
     if remote:
-        linux = pick_from(remote).get("Linux")
+        linux = pick_from(remote).get("Linux Desktop")
         if linux:
-            chosen["Debian Remote"] = linux
+            chosen["Debian Server"] = linux
     return chosen
 
 
@@ -347,7 +347,7 @@ def self_test():
         "ThreadDesk-Windows.exe": ["Windows"],
         "KiraBridge-0.8.0rc36-Intel-Installer.zip": ["macOS Intel"],
         "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip": ["Windows"],
-        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz": ["Linux"],
+        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz": ["Linux Desktop"],
         "App-universal.dmg": ["macOS Apple Silicon", "macOS Intel"],
         "SHA256SUMS": [],
         "third-party-notices-macOS.zip": [],
@@ -387,7 +387,7 @@ def self_test():
         },
     ]
     picked = {label: tag for label, (tag, _) in choose(releases).items()}
-    if picked != {"Linux": "v0.8.0rc2"}:
+    if picked != {"Linux Desktop": "v0.8.0rc2"}:
         failed.append(f"choose-desktop: {picked}")
     dual = [
         {
@@ -416,7 +416,7 @@ def self_test():
         },
     ]
     picked = {label: tag for label, (tag, _) in choose(dual).items()}
-    if picked != {"macOS Intel": "v0.8.0rc49", "Debian Remote": "linux-v0.8.0rc41"}:
+    if picked != {"macOS Intel": "v0.8.0rc49", "Debian Server": "linux-v0.8.0rc41"}:
         failed.append(f"choose-lanes: {picked}")
     if version_of("linux-v0.8.0rc41") != "0.8.0rc41":
         failed.append(f"version_of linux tag: {version_of('linux-v0.8.0rc41')}")
@@ -432,7 +432,7 @@ def self_test():
         }
     ]
     picked = {label: tag for label, (tag, _) in choose(appimage).items()}
-    if picked != {"macOS Intel": "v0.1.2-rc.2", "Linux": "v0.1.2-rc.2"}:
+    if picked != {"macOS Intel": "v0.1.2-rc.2", "Linux Desktop": "v0.1.2-rc.2"}:
         failed.append(f"choose-appimage: {picked}")
     foreign = {
         "tag_name": "docs-2099-01-01",
@@ -458,7 +458,7 @@ def self_test():
             for page in ("README.md", "README.de.md"):
                 Path(page).write_text(stale)
             BUTTON_DIR.mkdir(parents=True)
-            stale_button = BUTTON_DIR / "download-debian-remote.svg"
+            stale_button = BUTTON_DIR / "download-debian-server.svg"
             stale_button.write_text("old")
             unrelated = BUTTON_DIR / "download-custom.svg"
             unrelated.write_text("preserve")
