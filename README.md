@@ -88,7 +88,8 @@ tracks, so their version numbers can differ.
 
 | Download | Intended use | Installation guide |
 | --- | --- | --- |
-| **macOS (Intel; Apple Silicon when packaged)** | Desktop app and local KiraBridge service. Currently a verified Intel download is linked above; no Apple Silicon download is shown without a matching package. | [Install, verify and get help](docs/INSTALL-EN.md) |
+| **macOS Intel** | Desktop app and local KiraBridge service. Current verified Intel download is linked above. | [Install, verify and get help](docs/INSTALL-EN.md) |
+| **macOS Apple Silicon (M-series)** | Native Apple Silicon desktop installation. **No verified Apple Silicon installer published yet; download button will appear once available.** | [All releases](https://github.com/landjunge/KiraBridge/releases) |
 | **Windows Desktop** | Local Windows computer control. **No current downloadable installer in the selected desktop release.** | [Windows setup guide](docs/WINDOWS-SETUP.md) |
 | **Linux Desktop (Ubuntu / Debian Desktop)** | Local graphical computer control. **No separately verified desktop installer currently linked.** This is not the server package. | [All releases](https://github.com/landjunge/KiraBridge/releases) |
 | **Debian Server (Debian Remote)** | Headless Debian/Linux x86_64 server with remote-agent and MCP capabilities; **not a Linux desktop app**. The separate server download is linked above. | [Debian server installation](docs/INSTALL-LINUX-SERVER.md) |
