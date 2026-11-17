@@ -11,7 +11,12 @@ import uuid
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 
 TERMINAL = {"completed", "failed", "cancelled", "unknown", "blocked"}
-SOURCE_CAPABILITIES = {"task": "task.read", "message": "message.read", "autonext": "team.read"}
+SOURCE_CAPABILITIES = {
+    "task": "task.read",
+    "message": "message.read",
+    "autonext": "team.read",
+    "team": "team.read",
+}
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS message_completion_routes ("
     "message_id TEXT PRIMARY KEY REFERENCES messages(id), target TEXT NOT NULL)",
@@ -238,40 +243,26 @@ class CompletionManager:
             raise BridgeError(
                 "capability_denied", "Own task.read, message.read or team.read required"
             )
+        allowed = tuple(source if source in sources else "-" for source in SOURCE_CAPABILITIES)
         with self.store.transaction():
             if source_id is None:
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND acknowledged IS NULL AND source IN (?,?,?) "
+                    "AND acknowledged IS NULL AND source IN (?,?,?,?) "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
                     "ORDER BY seq LIMIT ?",
-                    (
-                        principal,
-                        target,
-                        "task" if "task" in sources else "-",
-                        "message" if "message" in sources else "-",
-                        "autonext" if "autonext" in sources else "-",
-                        limit,
-                    ),
+                    (principal, target, *allowed, limit),
                 ).fetchall()
             else:
                 # A known source is readable even when older unacked notices fill the inbox.
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?,?) "
+                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?,?,?) "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
                     "ORDER BY seq LIMIT ?",
-                    (
-                        principal,
-                        target,
-                        source_id,
-                        "task" if "task" in sources else "-",
-                        "message" if "message" in sources else "-",
-                        "autonext" if "autonext" in sources else "-",
-                        limit,
-                    ),
+                    (principal, target, source_id, *allowed, limit),
                 ).fetchall()
             notices = []
             for row in rows:

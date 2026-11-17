@@ -384,3 +384,21 @@ Grok-ACP-Sitzungen erzeugt. Runde 1 lief parallel; zwischen Runde 1 und Runde 2
 wurde der Bridge-Prozess beendet und neu gestartet. Alle drei Bearbeiter setzten
 ihre exakt gespeicherte Sitzung fort. Tokens, Prompts mit Geheimnissen und rohe
 Provider-Ausgaben sind nicht Teil des Belegs.
+
+## Automatische Koordinator-Fortsetzung (17.11.2026)
+
+Jeder Abschluss eines delegierten Teamauftrags (`finish`, `fail`, manuelle
+`work_complete`) schreibt in derselben Transaktion eine Completion-Meldung der
+Quelle `team` an den Auftraggeber (Ziel `team:<team_id>`). Sie bindet Work-ID,
+Wurzel-ID, ursprünglichen Delegations-Schlüssel, ggf. AutoNext-Task-ID,
+Ergebnis-Hash und Zustand; Eindeutigkeit über `(source, event_seq)`. Ein Auftrag,
+den der Koordinator an sich selbst vergibt, meldet sich nicht zurück an sich.
+
+Mit `team.coordinator_resume = true` (Standard aus) legt der Dispatcher je Meldung
+genau einen idempotenten Koordinationsauftrag für einen automatisierten Auftraggeber
+an (`team_coordinator_resumes`: Meldung → Wiederaufnahme-Auftrag). Ausführung,
+Sitzungsfortsetzung, Core-Belege und Neustart-Abgleich übernimmt der vorhandene
+TeamDispatcher; ein Neustart startet weder doppelt noch wiederholt er ein
+UNKNOWN. Die Meldung wird erst zusammen mit der Verknüpfung quittiert. Endlosketten
+begrenzt `max_runs_per_hour`. Nachweis: `tests/test_team_coordinator_resume.py`
+(Auftrag → Agent → Ergebnis → Koordinator → Folgeauftrag/Abschluss, Neustart).
