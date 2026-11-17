@@ -34,6 +34,8 @@
 </p>
 <!-- AUTO-DOWNLOADS:END -->
 
+<sub>macOS DMG builds: not notarized by Apple. On first launch, macOS may require approval in System Settings → Privacy & Security. The existing macOS archive is not a DMG.</sub>
+
 <p align="center"><strong>Talk to your AI. KiraBridge connects your voice to direct computer control.</strong></p>
 
 ## One tool family, one shared voice interface
