@@ -33,6 +33,7 @@ def notices(domain):
 
 
 def test_completion_is_bound_uniquely_to_the_original_order(domain):
+    domain.config.team.coordinator_resume = True
     work_id = finish_grok_work(domain)
     (notice,) = notices(domain)
     payload = json.loads(notice["payload"])
@@ -50,6 +51,7 @@ def test_completion_is_bound_uniquely_to_the_original_order(domain):
 
 
 def test_failed_and_manual_completions_are_also_recorded(domain):
+    domain.config.team.coordinator_resume = True
     failed = domain.delegate("codex", work(assignee="grok", idempotency_key="order-f"))
     domain.fail(failed["id"], "failed", "agent_timeout", {})
     manual = domain.delegate("codex", work(assignee="chatgpt", idempotency_key="order-m"))
@@ -71,6 +73,7 @@ def test_failed_and_manual_completions_are_also_recorded(domain):
 def test_resume_is_opt_in(domain):
     finish_grok_work(domain)
     assert domain.resume_coordinators() == 0
+    assert not notices(domain)  # off: no new inbox entries at all
     assert not domain.store.db.execute("SELECT 1 FROM team_coordinator_resumes").fetchall()
 
 
@@ -84,8 +87,9 @@ def test_codex_is_resumed_exactly_once_and_survives_restart(domain):
     resume = domain.work_get("codex", "test-team", link["resume_work_id"])
     assert link["work_id"] == work_id
     assert resume["assignee"] == "codex" and resume["assigned_by"] == "codex"
+    payload_hash = json.loads(notices(domain)[0]["payload"])["result_sha256"]
     assert resume["state"] == "queued" and work_id in resume["body"]
-    assert "Grok result" in resume["body"]
+    assert payload_hash in resume["body"]
     assert notices(domain)[0]["acknowledged"] is not None
 
 
@@ -143,6 +147,7 @@ def test_manual_delegator_is_not_resumed(domain):
 
 
 def test_receive_returns_team_notice_to_its_delegator(domain, bridge):
+    domain.config.team.coordinator_resume = True
     work_id = finish_grok_work(domain)
     got = bridge.completions.receive("codex", "team:test-team")
     assert [n["payload"]["work_id"] for n in got["notices"]] == [work_id]
@@ -244,7 +249,7 @@ async def test_order_agent_result_coordinator_followup_and_completion_chain(
     assert decision["result"] == "COORDINATOR_FINAL_DECISION"
     # The coordinator was woken by the exact finished order, once, with its result.
     prompts = [json.loads(line) for line in (root / "coord-prompts").read_text().splitlines()]
-    assert len(prompts) == 2 and agent["id"] in prompts[1] and "GROK_CHILD_DONE" in prompts[1]
+    assert len(prompts) == 2 and agent["id"] in prompts[1]
     (link,) = bridge.store.db.execute("SELECT * FROM team_coordinator_resumes").fetchall()
     assert (link["work_id"], link["resume_work_id"]) == (agent["id"], decision["id"])
     # Final decision had no actions: the chain ends here, nothing else starts.
@@ -292,7 +297,20 @@ async def test_interrupted_coordinator_is_resumed_after_restart_without_duplicat
                 await asyncio.sleep(0.05)
         await bridge.team_dispatcher.stop()
     prompts = (root / "coord-prompts").read_text().splitlines()
-    assert len(prompts) == 1 and "RESULT_BEFORE_RESTART" in json.loads(prompts[0])
+    assert len(prompts) == 1 and item["id"] in json.loads(prompts[0])
     assert (
         bridge.store.db.execute("SELECT count(*) FROM team_coordinator_resumes").fetchone()[0] == 1
     )
+
+
+def test_blocked_delegator_does_not_starve_other_coordinators(domain):
+    from kirabridge.completion_manager import record_notice
+
+    domain.config.team.coordinator_resume = True
+    with domain.store.transaction():
+        for index in range(10):  # a manual delegator never acks; ten unresumable notices
+            record_notice(
+                domain.store, "chatgpt", "team:test-team", "team", f"x{index}", 9000 + index, {}
+            )
+    finish_grok_work(domain)
+    assert domain.resume_coordinators() == 1
