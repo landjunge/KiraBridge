@@ -72,7 +72,10 @@ def slug(label):
     return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
 
 
-MANAGED = {f"download-{slug(label)}.svg" for label in ORDER} | {"download-debian-remote.svg", "download-linux.svg"}
+MANAGED = {f"download-{slug(label)}.svg" for label in ORDER} | {
+    "download-debian-remote.svg",
+    "download-linux.svg",
+}
 
 
 def platforms(name):
@@ -282,7 +285,7 @@ def placeholder_svg(label):
         '<svg xmlns="http://www.w3.org/2000/svg" width="190" height="52" '
         'viewBox="0 0 190 52" role="img" '
         f'aria-label="{label}: In Vorbereitung / Coming soon">'
-        f'<title>{label}: In Vorbereitung / Coming soon</title>'
+        f"<title>{label}: In Vorbereitung / Coming soon</title>"
         '<rect x="1" y="1" width="188" height="50" rx="10" '
         'fill="#555b64" stroke="#858b94"/>'
         f'<text x="95" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
@@ -410,13 +413,25 @@ def self_test():
             "tag_name": "v0.8.0rc49",
             "draft": False,
             "published_at": "2026-11-12",
-            "assets": [{"name": "KiraBridge-macos.tar.gz", "state": "uploaded", "browser_download_url": "https://example.test/macos.tar.gz"}],
+            "assets": [
+                {
+                    "name": "KiraBridge-macos.tar.gz",
+                    "state": "uploaded",
+                    "browser_download_url": "https://example.test/macos.tar.gz",
+                }
+            ],
         },
         {
             "tag_name": "linux-v0.8.0rc41",
             "draft": False,
             "published_at": "2026-11-07",
-            "assets": [{"name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz", "state": "uploaded", "browser_download_url": "https://example.test/debian.tar.gz"}],
+            "assets": [
+                {
+                    "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+                    "state": "uploaded",
+                    "browser_download_url": "https://example.test/debian.tar.gz",
+                }
+            ],
         },
         {
             "tag_name": "linux-v0.8.0rc40",
