@@ -1,0 +1,42 @@
+name: Native macOS DMG installers
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dmg:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x86_64
+            suffix: Intel
+          - runner: macos-15
+            arch: arm64
+            suffix: AppleSilicon
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and validate native drag-and-drop DMG
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 scripts/build_desktop_app.py --out dist/KiraBridge.app
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          file dist/KiraBridge.app/Contents/MacOS/KiraBridge | grep "${{ matrix.arch }}"
+          codesign --verify --deep --strict dist/KiraBridge.app
+          mkdir -p dist/dmg
+          cp -R dist/KiraBridge.app dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname KiraBridge -srcfolder dist/dmg -format UDZO -ov "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg"
+          hdiutil verify "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg"
+          shasum -a 256 "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg" > "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KiraBridge-macOS-${{ matrix.suffix }}-DMG
+          path: |
+            dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg
+            dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg.sha256
+          retention-days: 14
