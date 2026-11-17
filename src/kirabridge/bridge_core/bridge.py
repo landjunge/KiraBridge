@@ -256,6 +256,7 @@ class Bridge:
 
         self.completions = CompletionManager(self.store, self.security)
         self.messages = MessageManager(config, self.store, self.security)
+        self.messages.pinned_context_check = self._check_pinned_context
         from kirabridge.visible_handoff import VisibleHandoffs
 
         self.visible_handoffs = VisibleHandoffs(
@@ -345,6 +346,14 @@ class Bridge:
 
         self.queues = QueueManager(
             self.store, self.security, self.tasks, self.messages, self.visible_handoffs, self.teams
+        )
+
+    def _check_pinned_context(self, row, binding, *, run_id, receipt):
+        """Full pinned guidance binding incl. sources; caller holds the ACK transaction."""
+        from kirabridge.message_manager.guidance_context import _render_pinned
+
+        _render_pinned(
+            self, dict(row), binding, run_id=run_id, receipt=receipt, acknowledged=False
         )
 
     def validate(self, request: TaskRequest) -> None:

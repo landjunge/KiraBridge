@@ -1411,9 +1411,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": "internal_error", "message": "Message receive failed"}}
 
     @server.tool(annotations=delivery)
-    def message_ack(message_id: str, receipt: str, ctx: Context) -> dict[str, Any]:
-        """Idempotently acknowledge an incoming message using its delivery receipt."""
-        return safe(lambda: bridge.messages.ack(identity(ctx), message_id, receipt))
+    def message_ack(
+        message_id: str, receipt: str, ctx: Context, claim: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Idempotently acknowledge an incoming message using its delivery receipt.
+
+        Optional claim {run_id, snapshot_sha256} is verified atomically with the ACK write."""
+        return safe(lambda: bridge.messages.ack(identity(ctx), message_id, receipt, claim))
 
     @server.tool(annotations=read)
     def conversation_get(

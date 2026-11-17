@@ -94,6 +94,7 @@ class MessageManager:
         # Runtime-owned admission of NEW records only. Idempotent reads and
         # historical inbox entries never call this hook.
         self.delivery_hook = None
+        self.pinned_context_check = None
         from kirabridge.voice_channel import VoiceChannel
         from kirabridge.voice_message_policy import VoiceMessagePolicy
 
@@ -517,7 +518,9 @@ class MessageManager:
             except TimeoutError:
                 pass
 
-    def ack(self, principal, message_id, receipt):
+    CLAIM_FIELDS = ("body", "request_reply", "kind", "sender", "recipient", "conversation_id")
+
+    def ack(self, principal, message_id, receipt, claim=None):
         self._identity(principal, "message.ack")
         with self.store.transaction():
             row = self._row(principal, message_id)
@@ -525,12 +528,59 @@ class MessageManager:
                 raise BridgeError("not_found", "Incoming message not found")
             if not row["receipt"] or receipt != row["receipt"]:
                 raise BridgeError("receipt_conflict", "A matching delivery receipt is required")
+            if claim is not None:
+                self._check_ack_claim(row, claim)
             if row["acknowledged"] is None:
                 self.store.db.execute(
                     "UPDATE messages SET acknowledged=? WHERE id=?", (time.time(), message_id)
                 )
                 self._event(message_id, "message.acknowledged", principal, {"receipt": receipt})
         return self.get(principal, message_id)
+
+    def _check_ack_claim(self, row, claim):
+        """Context contract checked inside the ACK write transaction."""
+        if not isinstance(claim, dict) or not {"run_id", "snapshot_sha256"} <= set(claim):
+            raise BridgeError("invalid_claim", "ACK claim needs run_id and snapshot_sha256")
+        job = self.store.db.execute(
+            "SELECT state,run_id,evidence FROM message_jobs WHERE message_id=?", (row["id"],)
+        ).fetchone()
+        try:
+            evidence = json.loads(job["evidence"]) if job is not None else {}
+        except (TypeError, ValueError):
+            evidence = None
+        binding = evidence.get("managed_guidance_context") if isinstance(evidence, dict) else None
+        held = self.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (row["id"],)
+        ).fetchone()
+        reason = None
+        if digest({k: row[k] for k in self.CLAIM_FIELDS}) != claim["snapshot_sha256"]:
+            reason = "message_changed"
+        elif job is None or job["state"] != "running":
+            reason = "job_state_changed"
+        elif job["run_id"] != claim["run_id"]:
+            reason = "run_owner_changed"
+        elif held is not None:
+            reason = "hold_placed"
+        elif not isinstance(evidence, dict):
+            reason = "claim_evidence_invalid"
+        elif (binding is None) != (claim.get("context_sha256") is None):
+            reason = "context_binding_changed"
+        elif binding is not None and digest(binding) != claim["context_sha256"]:
+            reason = "context_binding_changed"
+        elif binding is not None:
+            # Whole pinned binding incl. every guidance source (state, ACK, hold,
+            # body, scope, prompt hash), read inside this ACK write transaction.
+            if self.pinned_context_check is None:
+                reason = "context_unverifiable"
+            else:
+                try:
+                    self.pinned_context_check(
+                        row, binding, run_id=claim["run_id"], receipt=row["receipt"]
+                    )
+                except BridgeError:
+                    reason = "pinned_context_changed"
+        if reason is not None:
+            raise BridgeError("claim_changed", "Claimed message changed: " + reason)
 
     def conversation(self, principal, conversation_id, after=0, limit=50):
         self._identity(principal, "message.read")

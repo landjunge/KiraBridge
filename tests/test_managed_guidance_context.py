@@ -27,7 +27,7 @@ class Harness:
         if tool == "message_receive":
             result = m.receive("codex_channel", **args)
         elif tool == "message_ack":
-            result = m.ack("codex_channel", args["message_id"], args["receipt"])
+            result = m.ack("codex_channel", args["message_id"], args["receipt"], args.get("claim"))
         elif tool == "message_send":
             result = m.send("codex_channel", MessageSend.model_validate(args["message"]))
         else:

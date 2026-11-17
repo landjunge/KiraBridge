@@ -598,14 +598,17 @@ class MessageReceiver:
                 "reconciled_without_input": True,
             }
 
-    def _finish(self, message_id, state, evidence, error=None, reply_id=None):
-
+    def _finish(self, message_id, state, evidence, error=None, reply_id=None, *, run_id=None):
+        """run_id given: only the claiming run may write (atomic owner check)."""
         job = self.bridge.store.db.execute(
             "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
         if job["state"] not in {"queued", "running"}:
-            return  # same job must not create a second completion
+            return False  # same job must not create a second completion
+        if run_id is not None and (job["state"] != "running" or job["run_id"] != run_id):
+            return False  # owner handoff: foreign run keeps its own history
         self._record_finish(job, state, evidence, error=error, reply_id=reply_id)
+        return True
 
     def _record_finish(self, job, state, evidence, error=None, reply_id=None):
         """Caller has validated the exact prior state and owns the transaction."""
@@ -1094,6 +1097,65 @@ class MessageReceiver:
             except TimeoutError:
                 pass
 
+    CLAIM_FIELDS = ("body", "request_reply", "kind", "sender", "recipient", "conversation_id")
+
+    def _claim_contract(self, message, run_id, context=None):
+        claim = {
+            "run_id": run_id,
+            "snapshot_sha256": digest({k: message[k] for k in self.CLAIM_FIELDS}),
+        }
+        if context is not None:
+            # Server re-checks the stored pinned binding and all its sources at ACK write.
+            claim["context_sha256"] = digest(context)
+        return claim
+
+    def _revalidate_claim(self, message, run_id, *, receipt=None, acknowledged=False):
+        """Claim contract for work without managed context (same blocking set).
+
+        A change of body/request_reply/routing, job state (incl. UNKNOWN),
+        run_id owner, worktree, receipt/ACK state or a new hold blocks the next
+        core step. Never refreshes the claimed snapshot.
+        """
+        message_id = message["id"]
+        with self.bridge.store.transaction():
+            row = self.bridge.store.db.execute(
+                "SELECT m.*,j.state AS job_state,j.run_id AS job_run_id,"
+                "j.execution_cwd AS job_cwd FROM messages m "
+                "JOIN message_jobs j ON j.message_id=m.id WHERE m.id=?",
+                (message_id,),
+            ).fetchone()
+            held = self.bridge.store.db.execute(
+                "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?",
+                (message_id,),
+            ).fetchone()
+            receiver = self.bridge.config.messaging.receivers.get(message["recipient"])
+            reason = None
+            if row is None:
+                reason = "message_missing"
+            elif any(row[key] != message[key] for key in self.CLAIM_FIELDS):
+                reason = "message_changed"
+            elif row["job_state"] != "running":
+                reason = "job_state_changed"
+            elif row["job_run_id"] != run_id:
+                reason = "run_owner_changed"
+            elif receiver is None or row["job_cwd"] != receiver.cwd:
+                reason = "receiver_scope_changed"
+            elif held is not None:
+                reason = "hold_placed"
+            elif acknowledged is not None and (row["acknowledged"] is not None) != acknowledged:
+                reason = "acknowledged_elsewhere"
+            elif receipt is not None and row["receipt"] != receipt:
+                reason = "receipt_changed"
+            if reason is not None:
+                self.bridge.store.audit(
+                    "message.claim_revalidation_failed",
+                    "local",
+                    None,
+                    {"message_id": message_id, "run_id": run_id, "reason": reason},
+                )
+        if reason is not None:
+            raise BridgeError("claim_changed", "Claimed message changed: " + reason)
+
     async def _process(
         self, pool, message, run_id, *, delivery_event=None, delivery_binding=None, interim=None
     ):
@@ -1107,12 +1169,13 @@ class MessageReceiver:
         if context is None:
             context = json.loads(claimed["evidence"]).get("managed_guidance_context")
         adapter_attempted = False
+        visible = False
         reply_id = None
 
         def owns_claim():
+            # Every claim, managed context or not, is bound to its exact run_id.
             return (
-                context is None
-                or self.bridge.store.db.execute(
+                self.bridge.store.db.execute(
                     "SELECT 1 FROM message_jobs WHERE message_id=? "
                     "AND state='running' AND run_id=?",
                     (message_id, run_id),
@@ -1126,16 +1189,31 @@ class MessageReceiver:
 
         def validate_context(*, receipt=None, acknowledged=False):
             if context is not None:
+                # Pinned managed scope: guidance_context.validate_current owns
+                # body/request_reply/state/run_id/hold/receipt checks.
                 from kirabridge.message_manager.guidance_context import render_pinned
 
-                return render_pinned(
-                    self.bridge,
-                    message,
-                    context,
-                    run_id=run_id,
-                    receipt=receipt,
-                    acknowledged=acknowledged,
-                )
+                try:
+                    return render_pinned(
+                        self.bridge,
+                        message,
+                        context,
+                        run_id=run_id,
+                        receipt=receipt,
+                        acknowledged=acknowledged,
+                    )
+                except BridgeError as exc:
+                    with self.bridge.store.transaction():
+                        self.bridge.store.audit(
+                            "message.claim_revalidation_failed",
+                            "local",
+                            None,
+                            {"message_id": message_id, "run_id": run_id, "reason": exc.code},
+                        )
+                    raise
+            # Work without managed context: same blocking set, previously unchecked.
+            expect = None if adapter_attempted and visible else acknowledged
+            self._revalidate_claim(message, run_id, receipt=receipt, acknowledged=expect)
             return message["body"]
 
         def retain_context(evidence):
@@ -1153,6 +1231,10 @@ class MessageReceiver:
             result = await pool.call("daemon", tool, arguments)
             content = result.structuredContent
             if result.isError or not isinstance(content, dict) or content.get("error"):
+                error = content.get("error") if isinstance(content, dict) else None
+                if isinstance(error, dict) and error.get("code") == "claim_changed":
+                    # Atomic ACK contract rejected: same UNKNOWN/no-replay handling.
+                    raise BridgeError("claim_changed", "Claimed message changed at ACK")
                 raise BridgeError("receiver_protocol", "Recipient MCP call was rejected")
             return content
 
@@ -1260,7 +1342,7 @@ class MessageReceiver:
             if visible and result.get("scope") == "local_agent_turn":
                 evidence = self._local_reply_evidence(message_id, run_id, result)
                 with self.bridge.store.transaction():
-                    self._finish(message_id, "completed", evidence)
+                    self._finish(message_id, "completed", evidence, run_id=run_id)
                 return
             if visible and result.get("scope") == "visible_input_delivery":
                 # Native Paste+Return confirms delivery only. No protocol text
@@ -1276,7 +1358,7 @@ class MessageReceiver:
                     "automatic_retry": False,
                 }
                 with self.bridge.store.transaction():
-                    self._finish(message_id, "completed", evidence)
+                    self._finish(message_id, "completed", evidence, run_id=run_id)
                 return
             evidence = retain_context(
                 {
@@ -1320,11 +1402,19 @@ class MessageReceiver:
             # Reply delivery awaits a peer and may have lost the claim or gained
             # a hold. Revalidate after it, immediately before the final ACK.
             validate_context(receipt=receipt)
-            ack = await call("message_ack", {"message_id": message_id, "receipt": receipt})
+            ack = await call(
+                "message_ack",
+                {
+                    "message_id": message_id,
+                    "receipt": receipt,
+                    # Atomic at ACK write: unchanged snapshot, running, same run_id, no hold.
+                    "claim": self._claim_contract(message, run_id, context),
+                },
+            )
             assert ack["acknowledged"] is not None
             with self.bridge.store.transaction():
                 validate_context(receipt=receipt, acknowledged=True)
-                self._finish(message_id, "completed", evidence, reply_id=reply_id)
+                self._finish(message_id, "completed", evidence, reply_id=reply_id, run_id=run_id)
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
                 if not owns_claim():
@@ -1355,6 +1445,7 @@ class MessageReceiver:
                     ),
                     "receiver_interrupted",
                     reply_id=reply_id,
+                    run_id=run_id,
                 )
             raise
         except Exception as exc:
@@ -1373,7 +1464,7 @@ class MessageReceiver:
                 "unknown"
                 if isinstance(exc, UncertainExecution)
                 or (isinstance(exc, BridgeError) and exc.code == "peer_unknown")
-                or (context is not None and adapter_attempted)
+                or adapter_attempted
                 else "failed"
             )
             # Preserve the last observed adapter/session evidence, never raw exception texts.
@@ -1393,4 +1484,5 @@ class MessageReceiver:
                         ),
                         exc.code if isinstance(exc, BridgeError) else "receiver_failed",
                         reply_id=reply_id,
+                        run_id=run_id,
                     )
