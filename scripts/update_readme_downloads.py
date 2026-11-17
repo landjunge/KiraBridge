@@ -35,7 +35,7 @@ import urllib.request
 from html import escape
 from pathlib import Path
 
-TOOL_VERSION = "2.2.1"
+TOOL_VERSION = "2.2.2"
 START, END = "<!-- AUTO-DOWNLOADS:START -->", "<!-- AUTO-DOWNLOADS:END -->"
 BUTTON_DIR = Path("assets/readme")
 API = "https://api.github.com"
@@ -275,16 +275,39 @@ def verify(repo, private, chosen):
 # --- output ------------------------------------------------------------------
 
 
+def placeholder_svg(label):
+    """Non-clickable, bilingual placeholder for a platform without a verified installer."""
+    label = escape(label)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="190" height="52" '
+        'viewBox="0 0 190 52" role="img" '
+        f'aria-label="{label}: In Vorbereitung / Coming soon">'
+        f'<title>{label}: In Vorbereitung / Coming soon</title>'
+        '<rect x="1" y="1" width="188" height="50" rx="10" '
+        'fill="#555b64" stroke="#858b94"/>'
+        f'<text x="95" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
+        f'font-size="13" font-weight="700" fill="#ffffff">{label}</text>'
+        '<text x="95" y="39" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
+        'font-size="10" fill="#ffffff">In Vorbereitung / Coming soon</text></svg>\\n'
+    )
+
+
 def render(repo, chosen):
-    """Return ({button file: svg}, readme block) for the chosen downloads."""
+    """Five visible platform fields; only verified packages get clickable links."""
     color = BRAND[repo.split("/")[-1].lower()]
     buttons, links = {}, []
     for label in ORDER:
+        path = BUTTON_DIR / f"download-{slug(label)}.svg"
         if label not in chosen:
+            buttons[path] = placeholder_svg(label)
+            links.append(
+                f'<img src="{path.as_posix()}" '
+                f'alt="{escape(label)}: In Vorbereitung / Coming soon" '
+                'width="190" height="52">'
+            )
             continue
         tag, asset = chosen[label]
         version = version_of(tag)
-        path = BUTTON_DIR / f"download-{slug(label)}.svg"
         buttons[path] = button_svg(label, version, color)
         url = escape(asset["browser_download_url"], quote=True)
         title = escape(f"{asset['name']} herunterladen / download", quote=True)
@@ -293,14 +316,7 @@ def render(repo, chosen):
             f'<a href="{url}" title="{title}"><img src="{path.as_posix()}" '
             f'alt="{alt}" width="190" height="52"></a>'
         )
-    block = (
-        '<p align="center">\n  ' + "\n  &nbsp;\n  ".join(links) + "\n</p>"
-        if links
-        else (
-            '<p align="center"><a href="https://github.com/'
-            f'{escape(repo, quote=True)}/releases">GitHub Releases</a></p>'
-        )
-    )
+    block = '<p align="center">\\n  ' + "\\n  &nbsp;\\n  ".join(links) + "\\n</p>"
     return buttons, block
 
 
@@ -442,6 +458,12 @@ def self_test():
     }
     if choose([foreign, *dual]) != choose(dual):
         failed.append("foreign release tag replaced the supported download lanes")
+    # All five fields stay visible; unavailable platforms never get download links.
+    preview_buttons, preview_block = render("landjunge/KiraBridge", choose(dual))
+    if len(preview_buttons) != len(ORDER) or preview_block.count("<a href=") != 2:
+        failed.append("five-field preview did not retain exactly two real download links")
+    if preview_block.count("In Vorbereitung / Coming soon") != 3:
+        failed.append("missing installers not represented by three placeholders")
     # Exercise the actual write path after the last supported release is deleted.
     # A successful empty API result must clear stale links, but a dry run must not.
     original_api, original_releases = globals()["api"], globals()["all_releases"]
@@ -479,11 +501,13 @@ def self_test():
             if Path("README.md").read_text() != stale or not stale_button.exists():
                 failed.append("empty-release dry run modified files")
             main([])
-            if stale_button.exists():
-                failed.append("deleted release left its generated button behind")
+            if stale_button.read_text() == "old":
+                failed.append("deleted release left a stale button instead of a placeholder")
             for page in ("README.md", "README.de.md"):
                 if "example.invalid/deleted" in Path(page).read_text():
                     failed.append(f"deleted release left a dead link in {page}")
+                if Path(page).read_text().count("In Vorbereitung / Coming soon") != len(ORDER):
+                    failed.append(f"{page}: expected five non-clickable placeholders")
             if unrelated.read_text() != "preserve":
                 failed.append("unrelated download asset changed")
     finally:
