@@ -52,7 +52,7 @@ BRAND = {
     "blockdesign": "#ebc33f",
 }
 
-# Display order of the buttons. "Debian Remote" is filled only from linux-* tags.
+# Display order of the buttons. "Debian Server" is filled only from linux-* tags.
 ORDER = ["macOS Apple Silicon", "macOS Intel", "Windows", "Linux Desktop", "Debian Server"]
 
 PACKAGE = re.compile(r"\.(?:dmg|pkg|exe|msi|appimage|deb|rpm|zip|tar\.gz)$", re.IGNORECASE)
@@ -183,7 +183,7 @@ def choose(releases):
     Desktop (unprefixed v*) still offers only that one release: missing
     platforms stay empty. linux-* is a second track; its Linux installer
     becomes ``Debian Server``. windows-* tags never fill a button. A 4AllPass
-    AppImage on v* stays ``Linux``.
+    AppImage on v* stays ``Linux Desktop``.
     """
     chosen = {}
     desktop = newest_lane(releases, "desktop")
@@ -341,7 +341,7 @@ def self_test():
         "4AllPass_0.1.2-rc.2_aarch64.dmg": ["macOS Apple Silicon"],
         "4AllPass_0.1.2-rc.2_x64.dmg": ["macOS Intel"],
         "4AllPass_0.1.2-rc.2_x64-setup.exe": ["Windows"],
-        "4AllPass_0.1.2-rc.2_amd64.AppImage": ["Linux"],
+        "4AllPass_0.1.2-rc.2_amd64.AppImage": ["Linux Desktop"],
         "ThreadDesk-macOS-AppleSilicon.dmg": ["macOS Apple Silicon"],
         "ThreadDesk-macOS.dmg": ["macOS Intel"],
         "ThreadDesk-Windows.exe": ["Windows"],
