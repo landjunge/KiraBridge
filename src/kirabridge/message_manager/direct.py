@@ -463,7 +463,8 @@ class DirectDelivery:
                     ).fetchone()
                     or bridge.store.db.execute(
                         "SELECT 1 FROM message_events WHERE message_id=? "
-                        "AND kind='message.native_submitting'", (identifier,)
+                        "AND kind='message.native_submitting'",
+                        (identifier,),
                     ).fetchone()
                 )
                 if forbidden:

@@ -56,10 +56,10 @@ def _socket(binding):
     fd = os.open(registry, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as stream:
         opened = os.fstat(stream.fileno())
-        if (
-            (opened.st_dev, opened.st_ino) != (record.st_dev, record.st_ino)
-            or opened.st_size > 16384
-        ):
+        if (opened.st_dev, opened.st_ino) != (
+            record.st_dev,
+            record.st_ino,
+        ) or opened.st_size > 16384:
             raise refused("native_codex_host_unverified")
         saved = json.loads(stream.read(16385))
     pid = saved.get("pid")
@@ -128,7 +128,10 @@ def _host_socket_path(pid):
     """
     result = subprocess.run(
         ["/usr/sbin/lsof", "-nP", "-a", "-p", str(pid), "-U", "-Fpn"],
-        capture_output=True, text=True, timeout=2, check=True,
+        capture_output=True,
+        text=True,
+        timeout=2,
+        check=True,
     )
     if len(result.stdout.encode()) > 16384:
         raise refused("native_codex_host_unverified")
@@ -175,8 +178,12 @@ class CodexHost:
 
             connector = self.connector or connect
             async with connector(
-                "ws://localhost/", sock=raw, open_timeout=3, close_timeout=1,
-                max_size=MAX_RESPONSE, ping_interval=None,
+                "ws://localhost/",
+                sock=raw,
+                open_timeout=3,
+                close_timeout=1,
+                max_size=MAX_RESPONSE,
+                ping_interval=None,
             ) as ws:
                 rpc = _RPC(ws)
                 initialized = await rpc.call(
@@ -186,12 +193,9 @@ class CodexHost:
                         "capabilities": {"experimentalApi": True},
                     },
                 )
-                if (
-                    initialized.get("codexHome") != binding.codex_home
-                    or not initialized.get("userAgent", "").startswith(
-                        "codex-tui/" + binding.protocol_version + " "
-                    )
-                ):
+                if initialized.get("codexHome") != binding.codex_home or not initialized.get(
+                    "userAgent", ""
+                ).startswith("codex-tui/" + binding.protocol_version + " "):
                     raise refused("native_codex_host_unverified")
                 await ws.send(json.dumps({"method": "initialized", "params": {}}))
                 yield rpc, generation
@@ -227,8 +231,10 @@ class CodexHost:
         turns = await rpc.call(
             "thread/turns/list",
             {
-                "threadId": binding.thread_id, "limit": 1,
-                "sortDirection": "desc", "itemsView": "summary",
+                "threadId": binding.thread_id,
+                "limit": 1,
+                "sortDirection": "desc",
+                "itemsView": "summary",
             },
         )
         rows = turns.get("data")
@@ -237,9 +243,7 @@ class CodexHost:
         active = rows[0] if rows and rows[0].get("status") == "inProgress" else None
         if (status["type"] == "active") != bool(active):
             raise refused("native_codex_target_not_ready")
-        if active is not None and (
-            not isinstance(active.get("id"), str) or not active["id"]
-        ):
+        if active is not None and (not isinstance(active.get("id"), str) or not active["id"]):
             raise refused("native_codex_target_not_ready")
         return {
             "binding_sha256": digest(binding.model_dump()),
@@ -260,7 +264,11 @@ class CodexHost:
             # A host restart may refresh physical generation; a different turn
             # never changes a claimed steering attempt into another operation.
             for key in (
-                "binding_sha256", "thread_id", "session_id", "operation", "expected_turn_id"
+                "binding_sha256",
+                "thread_id",
+                "session_id",
+                "operation",
+                "expected_turn_id",
             ):
                 if current[key] != prepared[key]:
                     raise refused("native_codex_target_changed")

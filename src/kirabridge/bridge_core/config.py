@@ -493,8 +493,7 @@ class NativeCodexBinding(BaseModel):
     @model_validator(mode="after")
     def absolute_paths(self):
         if any(
-            not Path(getattr(self, key)).is_absolute()
-            for key in ("codex_home", "host_executable")
+            not Path(getattr(self, key)).is_absolute() for key in ("codex_home", "host_executable")
         ):
             raise ValueError("Native Codex host paths must be absolute")
         return self
