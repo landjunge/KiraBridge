@@ -288,7 +288,7 @@ def placeholder_svg(label):
         f'<text x="95" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
         f'font-size="13" font-weight="700" fill="#ffffff">{label}</text>'
         '<text x="95" y="39" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
-        'font-size="10" fill="#ffffff">In Vorbereitung / Coming soon</text></svg>\\n'
+        'font-size="10" fill="#ffffff">In Vorbereitung / Coming soon</text></svg>\n'
     )
 
 
@@ -316,7 +316,7 @@ def render(repo, chosen):
             f'<a href="{url}" title="{title}"><img src="{path.as_posix()}" '
             f'alt="{alt}" width="190" height="52"></a>'
         )
-    block = '<p align="center">\\n  ' + "\\n  &nbsp;\\n  ".join(links) + "\\n</p>"
+    block = '<p align="center">\n  ' + "\n  &nbsp;\n  ".join(links) + "\n</p>"
     return buttons, block
 
 
