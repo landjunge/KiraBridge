@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import re
+import sqlite3
 import time
 from typing import Annotated, Literal
 
@@ -163,6 +164,10 @@ class TeamDispatcher:
     async def _loop(self):
         while not self.stopping:
             self.teams.wake.clear()
+            try:
+                self.teams.resume_coordinators()
+            except (BridgeError, sqlite3.Error):
+                pass  # notices stay pending and are retried on the next pass
             selected = self._next()
             if selected is None:
                 try:

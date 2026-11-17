@@ -142,12 +142,16 @@ class TeamConfig(BaseModel):
     max_result_bytes: int = Field(default=65536, ge=256, le=262144)
     max_actions_per_turn: int = Field(default=4, ge=1, le=4)
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+    # Opt-in: a finished delegated work wakes its automated delegator exactly once.
+    coordinator_resume: bool = False
 
     @model_serializer(mode="wrap")
     def routing_opt_out(self, handler):
         value = handler(self)
         if self.routing is None:
             value.pop("routing", None)
+        if not self.coordinator_resume:
+            value.pop("coordinator_resume", None)
         return value
 
     @model_validator(mode="after")
