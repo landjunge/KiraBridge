@@ -34,6 +34,8 @@
 </p>
 <!-- AUTO-DOWNLOADS:END -->
 
+<sub>macOS-DMGs: nicht von Apple notarisiert. Beim ersten Start kann eine Freigabe unter Systemeinstellungen → Datenschutz & Sicherheit nötig sein. Das bisherige macOS-Archiv ist keine DMG.</sub>
+
 <p align="center"><strong>Du sprichst mit deiner KI. KiraBridge verbindet Sprache mit der Steuerung deines Computers.</strong></p>
 
 ## Eine Werkzeugfamilie, eine gemeinsame Sprachsteuerung
