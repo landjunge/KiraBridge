@@ -394,14 +394,19 @@ async def test_persisted_queue_is_resumed_by_new_receiver(
     assert (Path(config.principals["grok"].roots[0]) / "grok-invocations").read_text() == "1\n"
 
 
-def test_receiver_budget_blocks_extra_provider_turns(channel, bridge, config, tmp_path):
+def test_receiver_budget_notes_extra_provider_turns_and_still_claims(
+    channel, bridge, config, tmp_path
+):
     configure_receivers(bridge, config, tmp_path)
     config.messaging.max_runs_per_conversation = 1
     first = channel.send("codex", message(dispatch=True))
     assert bridge.message_receiver._claim(first["id"])
     second = channel.send("codex", message(dispatch=True, idempotency_key="second"))
-    assert bridge.message_receiver._claim(second["id"]) is None
-    assert channel.get("codex", second["id"])["processing"]["state"] == "blocked"
+    assert bridge.message_receiver._claim(second["id"])
+    processing = channel.get("codex", second["id"])["processing"]
+    assert processing["state"] == "running"
+    assert processing["evidence"]["limit_notes"] == ["conversation_run_limit"]
+    assert processing["evidence"]["conversation_runs"] >= 1
 
 
 async def test_long_poll_is_bounded_and_wakes_on_delivery(channel):

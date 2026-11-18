@@ -1,6 +1,7 @@
 """Delivery-only questions never consume later model-turn admission budgets."""
 # ruff: noqa: F811
 
+import json
 import time
 
 import pytest
@@ -64,12 +65,17 @@ async def test_interim_delivery_does_not_charge_future_model_budget(
 
     actual = work("actual-model-turn")
     assert receiver._claim(actual["id"], direct=True), bridge.messages.get("chatgpt", actual["id"])
+    assert (
+        "limit_notes" not in bridge.messages.get("chatgpt", actual["id"])["processing"]["evidence"]
+    )
     receiver._finish(actual["id"], "completed", {"new_agent_turn": True})
     over_budget = work("second-model-turn")
-    assert receiver._claim(over_budget["id"], direct=True) is None
+    assert receiver._claim(over_budget["id"], direct=True)
     job = bridge.messages.get("chatgpt", over_budget["id"])["processing"]
-    assert job["state"] == "blocked"
-    assert job["evidence"]["reason"] == budget + "_run_limit"
+    assert job["state"] == "running"
+    assert job["evidence"]["limit_notes"] == [budget + "_run_limit"]
+    count_key = "conversation_runs" if budget == "conversation" else "hourly_runs"
+    assert job["evidence"][count_key] >= 1
 
 
 @pytest.mark.parametrize("budget", ["conversation", "hourly"])
@@ -137,12 +143,20 @@ async def test_managed_dispatch_of_interim_target_counts_after_failure_and_reope
             idempotency_key="managed-followup",
             body="Next model work",
             kind="work",
+            request_reply=False,
         ),
     )
-    assert not await receiver._dispatch_next("codex", include_visible=False)
-    assert len(calls) == 1
+    assert await receiver._dispatch_next("codex", include_visible=False)
+    assert len(calls) == 2
     job = bridge.messages.get("chatgpt", later["id"])["processing"]
-    assert job["state"] == "blocked" and job["evidence"]["reason"] == budget + "_run_limit"
+    assert job["state"] == state
+    assert job["evidence"].get("reason") != budget + "_run_limit"
+    noted = bridge.store.db.execute(
+        "SELECT evidence FROM message_events WHERE message_id=? "
+        "AND kind='message.processing_claimed'",
+        (later["id"],),
+    ).fetchone()
+    assert budget + "_run_limit" in json.loads(noted[0])["limit_notes"]
 
 
 @pytest.mark.parametrize("budget", ["conversation", "hourly"])

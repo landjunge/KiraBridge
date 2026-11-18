@@ -294,8 +294,10 @@ und automatischer Empfänger. Rollen können keine zusätzliche Identität freis
   von selbst weiter.
 - Unklare oder unterbrochene Ausgänge werden nicht blind erneut ausgeführt.
   Bekannte Aufträge werden nach einem Neustart anhand ihrer dauerhaften
-  Referenz beobachtet. Grenzen für Tiefe, Unteraufträge, Stundenbudget, Queue,
+  Referenz beobachtet. Grenzen für Tiefe, Unteraufträge, Stundenbudget,
   Nachrichtengröße und Ergebnisgröße begrenzen automatische Arbeit.
+  Volle Ablage, volle Inbox und die Nachrichten-Laufzähler lehnen nichts ab;
+  die Überschreitung wird nur vermerkt.
 - Ein entzogenes Teamrecht wird erneut vor der Ausführung geprüft. Ein bereits
   begonnenes externes Programm lässt sich durch eine Rollenänderung nicht
   rückwirkend ungeschehen machen. Bestehende unabhängige Sitzungen bleiben erhalten.

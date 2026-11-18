@@ -82,8 +82,17 @@ async def settled(direct):
             await asyncio.sleep(0)
 
 
+def claimed_event(bridge, message_id):
+    row = bridge.store.db.execute(
+        "SELECT evidence FROM message_events WHERE message_id=? "
+        "AND kind='message.processing_claimed'",
+        (message_id,),
+    ).fetchone()
+    return json.loads(row[0])
+
+
 @pytest.mark.parametrize("limit", ["conversation", "hourly"])
-async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_later(delivery, limit):
+async def test_run_limit_is_noted_and_the_message_is_still_delivered(delivery, limit):
     bridge, transport, direct, _, _ = delivery
     prior = new_message(bridge, "limit-history")
     bridge.store.db.execute(
@@ -94,7 +103,7 @@ async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_lat
         recipient="grok",
         conversation_id=prior["conversation_id"],
         idempotency_key="new-over-limit",
-        body="This request is never admitted",
+        body="This request is still admitted",
         kind="work",
         dispatch=True,
     )
@@ -105,18 +114,20 @@ async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_lat
     sent = bridge.messages.send("chatgpt", request)
     direct.submit("chatgpt", sent["id"])
     await direct.wait_delivery(sent["id"])
+    await settled(direct)
     current = job(bridge, sent)
-    assert current["state"] == "blocked"
-    assert current["evidence"]["reason"] == limit + "_run_limit"
-    assert current["claimed"] is None and current["started"] is None
-    assert not transport["calls"]
-    assert bridge.store.db.execute(
-        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (sent["id"],)
-    ).fetchone()
-    inbox = bridge.messages.receive("grok", after=sent["seq"] - 1)["messages"]
-    assert inbox == []
-    assert bridge.messages.send("chatgpt", request)["id"] == sent["id"]
-    assert not direct.submit("chatgpt", sent["id"])
+    assert current["state"] == "completed"
+    assert current["evidence"].get("reason") != limit + "_run_limit"
+    assert transport["calls"] == ["insert", "return"]
+    assert (
+        bridge.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (sent["id"],)
+        ).fetchone()
+        is None
+    )
+    noted = claimed_event(bridge, sent["id"])
+    assert noted["limit_notes"] == [limit + "_run_limit"]
+    assert noted[limit + "_runs" if limit == "hourly" else "conversation_runs"] >= 1
 
 
 def message_in(bridge, conversation, key, *, recipient="grok"):
@@ -156,13 +167,16 @@ async def test_hourly_run_limit_is_scoped_to_the_recipient(delivery):
     busy = message_in(bridge, "busy-grok", "busy-grok", recipient="grok")
     assert bridge.message_receiver._claim(busy["id"])
     second = message_in(bridge, "busy-grok-2", "busy-grok-2", recipient="grok")
-    assert bridge.message_receiver._claim(second["id"]) is None
-    assert (
-        bridge.messages.get("chatgpt", second["id"])["processing"]["evidence"]["reason"]
-        == "hourly_run_limit"
-    )
+    assert bridge.message_receiver._claim(second["id"])
+    noted = bridge.messages.get("chatgpt", second["id"])["processing"]
+    assert noted["state"] == "running"
+    assert noted["evidence"]["limit_notes"] == ["hourly_run_limit"]
+    assert noted["evidence"]["hourly_runs"] >= 1
     other = message_in(bridge, "fresh-codex", "fresh-codex", recipient="codex")
     assert bridge.message_receiver._claim(other["id"])
+    assert (
+        "limit_notes" not in bridge.messages.get("chatgpt", other["id"])["processing"]["evidence"]
+    )
 
 
 async def test_default_limits_fit_an_eight_round_handover(delivery):
