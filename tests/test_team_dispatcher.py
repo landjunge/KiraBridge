@@ -85,6 +85,88 @@ def test_team_payload_limit_counts_utf8_bytes():
     assert error.value.code == "team_payload_limit"
 
 
+def _prompt_pool(snapshot):
+    class Pool:
+        async def call(self, peer_name, tool, arguments):
+            assert peer_name == "daemon"
+            if tool == "team_message_ack":
+                return SimpleNamespace(structuredContent={"ok": True}, isError=False)
+            assert tool == "team_context"
+            return SimpleNamespace(structuredContent=snapshot, isError=False)
+
+    return Pool()
+
+
+def _prompt_work(body):
+    return {
+        "id": "tw-current",
+        "team_id": "t",
+        "assigned_by": "local",
+        "assignee": "grok",
+        "title": "now",
+        "body": body,
+        "parent_id": None,
+        "root_id": "tw-current",
+        "depth": 0,
+    }
+
+
+def _shared_snapshot():
+    return {
+        "team": {"id": "t", "name": "n", "coordinator": "local", "members": {}},
+        "work": [
+            {
+                "id": f"old-{index}",
+                "assigned_by": "local",
+                "assignee": "grok",
+                "title": "old",
+                "state": "completed",
+                "parent_id": None,
+                "result": "R" * 400,
+                "result_truncated": False,
+            }
+            for index in range(40)
+        ],
+        "messages": [
+            {
+                "id": f"tm-{index}",
+                "sender": "local",
+                "recipient": "grok",
+                "kind": "note",
+                "reply_to": None,
+                "body": "M" * 400,
+                "body_truncated": False,
+                "acknowledged": None,
+            }
+            for index in range(40)
+        ],
+        "truncated": False,
+    }
+
+
+async def test_prompt_keeps_current_work_when_shared_context_exceeds_the_adapter(config):
+    dispatcher, _teams = isolated_dispatcher(config)
+    body = "B" * 240000
+    prompt = await dispatcher._prompt(_prompt_pool(_shared_snapshot()), _prompt_work(body))
+    assert body in prompt
+    assert '"context_truncated":true' in prompt
+    assert len(prompt.encode()) <= 262144
+    assert "tm-39" not in prompt
+
+
+async def test_current_work_over_the_adapter_maximum_still_stops(config):
+    dispatcher, _teams = isolated_dispatcher(config)
+    snapshot = {
+        "team": {"id": "t", "name": "n", "coordinator": "local", "members": {}},
+        "work": [],
+        "messages": [],
+        "truncated": False,
+    }
+    with pytest.raises(BridgeError) as error:
+        await dispatcher._prompt(_prompt_pool(snapshot), _prompt_work("B" * 262145))
+    assert error.value.code == "team_payload_limit"
+
+
 @pytest.mark.parametrize(
     "text",
     [

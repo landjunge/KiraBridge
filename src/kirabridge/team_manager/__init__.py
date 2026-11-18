@@ -864,11 +864,12 @@ class TeamManager:
                 parent = self._message(request.team_id, request.reply_to)
                 if parent["recipient"] != principal or parent["sender"] != request.recipient:
                     raise BridgeError("reply_conflict", "Reply must reverse the addressed message")
+            notes = []
             if (
                 self.store.db.execute("SELECT count(*) FROM team_messages").fetchone()[0]
                 >= self.config.team.max_messages
             ):
-                raise BridgeError("message_store_full", "Team message archive capacity reached")
+                notes.append("message_store_full")
             count = self.store.db.execute(
                 "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
@@ -876,7 +877,7 @@ class TeamManager:
                 (request.recipient,),
             ).fetchone()[0]
             if count >= self.config.team.max_pending_per_member:
-                raise BridgeError("message_queue_full", "Member message inbox is full")
+                notes.append("message_queue_full")
             message_id = message_id or "tm-" + uuid.uuid4().hex
             self.store.db.execute(
                 "INSERT INTO team_messages(id,team_id,sender,recipient,kind,body,reply_to,created) "
@@ -900,9 +901,13 @@ class TeamManager:
                 message_id,
                 recipient=request.recipient,
                 content_sha256=digest(request.body),
+                **({"limit_notes": notes} if notes else {}),
             )
         self.wake.set()
-        return self._message(request.team_id, message_id)
+        stored = self._message(request.team_id, message_id)
+        if notes:
+            stored["limit_notes"] = notes
+        return stored
 
     def messages(self, principal, team_id, after=0, limit=50):
         self._team(principal, team_id)
@@ -969,24 +974,25 @@ class TeamManager:
                 >= self.config.team.max_work_per_root
             ):
                 raise BridgeError("team_work_limit", "Root work delegation budget reached")
+            notes = []
             if (
                 self.store.db.execute("SELECT count(*) FROM team_work").fetchone()[0]
                 >= self.config.team.max_total_work
             ):
-                raise BridgeError("team_store_full", "Team work archive capacity reached")
+                notes.append("team_store_full")
             pending = self.store.db.execute(
                 "SELECT count(*) FROM team_work WHERE assignee=? AND state NOT IN "
                 "('completed','failed','unknown','cancelled','blocked')",
                 (request.assignee,),
             ).fetchone()[0]
             if pending >= self.config.team.max_pending_per_member:
-                raise BridgeError("team_queue_full", "Member work queue is full")
+                notes.append("team_queue_full")
             state = (
                 "queued" if self.config.team.workers[request.assignee].agent else "queued_manual"
             )
             self.store.db.execute(
                 "INSERT INTO team_work(id,team_id,assigned_by,assignee,title,body,parent_id,"
-                "root_id,depth,state,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "root_id,depth,state,evidence,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     work_id,
                     request.team_id,
@@ -998,6 +1004,7 @@ class TeamManager:
                     root_id,
                     depth,
                     state,
+                    canonical({"limit_notes": notes} if notes else {}),
                     time.time(),
                 ),
             )
@@ -1012,6 +1019,7 @@ class TeamManager:
                 root_id=root_id,
                 depth=depth,
                 content_sha256=digest(request.body),
+                **({"limit_notes": notes} if notes else {}),
             )
         self.wake.set()
         return self._work(work_id)
@@ -1069,7 +1077,7 @@ class TeamManager:
                 seen.add(row["id"])
                 messages.append(dict(row))
 
-        def snapshot(text_bytes):
+        def snapshot(text_bytes, work_rows, message_rows):
             def excerpt(value):
                 if not isinstance(value, str):
                     return value, False
@@ -1079,13 +1087,13 @@ class TeamManager:
             team_view = dict(team)
             team_view["name"], team_view["name_truncated"] = excerpt(team["name"])
             result_work = []
-            for source in work:
+            for source in work_rows:
                 item = dict(source)
                 item["title"], item["title_truncated"] = excerpt(source["title"])
                 item["result"], item["result_truncated"] = excerpt(source["result"])
                 result_work.append(item)
             result_messages = []
-            for source in messages:
+            for source in message_rows:
                 item = dict(source)
                 item["body"], item["body_truncated"] = excerpt(source["body"])
                 result_messages.append(item)
@@ -1107,22 +1115,39 @@ class TeamManager:
                 },
             }
 
-        result = snapshot(2048)
-        if len(canonical(result).encode("utf-8")) <= 32768:
+        def encoded_length(payload):
+            return len(canonical(payload).encode("utf-8"))
+
+        work_rows = list(work)
+        message_rows = list(messages)
+        dropped = False
+        result = snapshot(2048, work_rows, message_rows)
+        if encoded_length(result) <= 32768:
             return result
-        # Shrink text evenly instead of dropping recent work or pending message
-        # identities behind a large body. Include JSON escaping in the budget.
+        # Shrink text evenly, then omit older messages and extra work. A full
+        # context is returned with a note; it does not abort the caller.
         low, high = 0, 2048
-        result = snapshot(0)
-        if len(canonical(result).encode("utf-8")) > 32768:
-            raise BridgeError("team_context_limit", "Team metadata exceeds the context byte limit")
-        while low < high:
-            middle = (low + high + 1) // 2
-            candidate = snapshot(middle)
-            if len(canonical(candidate).encode("utf-8")) <= 32768:
-                low, result = middle, candidate
+        result = snapshot(0, work_rows, message_rows)
+        while encoded_length(result) > 32768 and (message_rows or work_rows):
+            if message_rows:
+                message_rows.pop()
             else:
-                high = middle - 1
+                work_rows.pop()
+            dropped = True
+            result = snapshot(0, work_rows, message_rows)
+        if encoded_length(result) <= 32768:
+            while low < high:
+                middle = (low + high + 1) // 2
+                candidate = snapshot(middle, work_rows, message_rows)
+                if encoded_length(candidate) <= 32768:
+                    low, result = middle, candidate
+                else:
+                    high = middle - 1
+        else:
+            result["truncated"] = True
+            result["limit_notes"] = ["team_context_limit"]
+        if dropped:
+            result["truncated"] = True
         return result
 
     def work_claim(self, principal, request: TeamWorkClaim):

@@ -1,5 +1,14 @@
 # BP-AUTO-01 · AutoNext-Abnahme 09.11.2026
 
+> **Stand 19.11.2026: AutoNext ist der alte Weg und nicht in Gebrauch.** Es ist die Kette
+> Codex-Hauptlauf, optional Grok-Review und Codex-Prüflauf über sichtbare Fenster, mit
+> Codex-Kontingentbeleg. Es hat nie einen Auftrag ausgeführt (alle `autonext_*`-Tabellen sind
+> leer) und steht absichtlich auf `disabled / not_started`. Die automatische Fortsetzung läuft
+> heute über die Team-Kette (`team.coordinator_resume`, siehe [TEAM-ORCHESTRATION](TEAM-ORCHESTRATION.md)).
+> Festgelegter Ablauf (Nutzerentscheidung 18.11.2026): erst als alter Weg kennzeichnen (dieser
+> Hinweis), nach dem TollGate-Adapter und dem Grok-Koordinator prüfen, ob die Team-Kette alles
+> kann, danach AutoNext entfernen.
+
 Paket BP-AUTO-01 aus dem Big Plan (ThreadDesk-Master `6b5b73b9de36`, Status im Board `188ce4729a62`).
 Nutzerfreigabe vom 09.11.2026: „Ja, mit 2 Testkarten“. RC43 ist installiert (`f9e6ec8`).
 
