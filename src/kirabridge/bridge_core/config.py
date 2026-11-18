@@ -172,6 +172,7 @@ class AgentConfig(BaseModel):
     qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
     qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
+    grok_reasoning_effort: str | None = Field(default=None, pattern=r"^[a-z]{1,16}$")
     qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
     qwen_max_tool_calls: int = Field(default=32, ge=1, le=4096)
     qwen_max_session_turns: int = Field(default=48, ge=1, le=2048)
@@ -205,6 +206,8 @@ class AgentConfig(BaseModel):
             for key in list(value):
                 if key.startswith("qwen_"):
                     value.pop(key)
+        if self.grok_reasoning_effort is None:
+            value.pop("grok_reasoning_effort", None)
         return value
 
     @model_validator(mode="after")
@@ -217,6 +220,8 @@ class AgentConfig(BaseModel):
             or self.qwen_reasoning_effort is not None
         ) and self.kind != "qwen_acp":
             raise ValueError("Qwen authentication selection requires kind qwen_acp")
+        if self.grok_reasoning_effort is not None and self.kind != "grok_acp":
+            raise ValueError("Grok reasoning effort requires kind grok_acp")
         if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
             raise ValueError("Full access requires the operator's explicit full bridge profile")
         return self

@@ -393,6 +393,8 @@ class GrokACPAdapter:
             command[1:1] = ["--allow", "Bash", "--allow", "Edit", "--allow", "Read"]
         else:
             command[1:1] = ["--deny", "Bash", "--deny", "Edit"]
+        if config.grok_reasoning_effort:
+            command[1:1] = ["--reasoning-effort", config.grok_reasoning_effort]
         if config.model:
             command[1:1] = ["--model", config.model]
         with PathScope(roots).directory(args.cwd) as fd:
