@@ -387,18 +387,108 @@ Provider-Ausgaben sind nicht Teil des Belegs.
 
 ## Automatische Koordinator-Fortsetzung (17.11.2026)
 
-Jeder Abschluss eines delegierten Teamauftrags (`finish`, `fail`, manuelle
-`work_complete`) schreibt in derselben Transaktion eine Completion-Meldung der
-Quelle `team` an den Auftraggeber (Ziel `team:<team_id>`). Sie bindet Work-ID,
+`team.coordinator_resume` steht standardmäßig auf aus. Ist es an, schreibt jeder
+Abschluss eines delegierten Teamauftrags (`finish`, `fail`, manuelle
+`work_complete`) in derselben Transaktion eine Completion-Meldung der Quelle
+`team` an den Auftraggeber (Ziel `team:<team_id>`). Sie bindet Work-ID,
 Wurzel-ID, ursprünglichen Delegations-Schlüssel, ggf. AutoNext-Task-ID,
 Ergebnis-Hash und Zustand; Eindeutigkeit über `(source, event_seq)`. Ein Auftrag,
-den der Koordinator an sich selbst vergibt, meldet sich nicht zurück an sich.
+den jemand an sich selbst vergibt, erzeugt keine Meldung.
 
-Mit `team.coordinator_resume = true` (Standard aus) legt der Dispatcher je Meldung
-genau einen idempotenten Koordinationsauftrag für einen automatisierten Auftraggeber
-an (`team_coordinator_resumes`: Meldung → Wiederaufnahme-Auftrag). Ausführung,
-Sitzungsfortsetzung, Core-Belege und Neustart-Abgleich übernimmt der vorhandene
-TeamDispatcher; ein Neustart startet weder doppelt noch wiederholt er ein
-UNKNOWN. Die Meldung wird erst zusammen mit der Verknüpfung quittiert. Endlosketten
-begrenzt `max_runs_per_hour`. Nachweis: `tests/test_team_coordinator_resume.py`
-(Auftrag → Agent → Ergebnis → Koordinator → Folgeauftrag/Abschluss, Neustart).
+`TeamManager.resume_coordinators` legt je solcher Meldung genau einen
+idempotenten Koordinationsauftrag für einen Auftraggeber mit gesetztem `agent`
+an (`team_coordinator_resumes`: Meldung → Wiederaufnahme-Auftrag, Schlüssel
+`resume-` plus Hash der Meldungs-ID). Ein zweiter Lauf und ein erneuter
+Dispatcher-Start legen denselben Auftrag nicht noch einmal an. Die Meldung wird
+erst zusammen mit der Verknüpfung quittiert. Beim Claim gilt
+`max_runs_per_hour` für Team-Arbeit mit Core-Auftrag in der letzten Stunde.
+Nachweis: `tests/test_team_coordinator_resume.py`.
+
+## Quellstand: Umfang und Fehlerfelder
+
+- `execution_scope = "existing_native_codex_root"` ist ein eigener Worker-Umfang.
+  Der `agent.execute`-Zweig startet dann `NativeCodexTurns` auf dem einen
+  geladenen, elternlosen Codex-Root, dessen aufgelöstes cwd dem aufgelösten
+  Worker-cwd entspricht, per `turn/start`. Unter höchstens 16 geladenen Ids
+  ergibt eine andere Anzahl `native_codex_root_not_unique`; eine fehlende oder
+  längere Id-Liste ergibt `native_codex_target_not_ready`. Ein laufender Turn
+  ergibt ebenfalls `native_codex_target_not_ready`. Keine
+  Terminaleingabe, kein Pane-, PID- oder Rollout-Pin. Hostprüfung und
+  Patch derselben Minor-Linie: siehe
+  [Teamturns ohne feste Bindung](NATIVE-CODEX-BINDING.md). Nötig ist
+  `[visible_handoffs.native_codex]` (`codex_home`, `host_executable`,
+  `protocol_version`). Agent und Art müssen `codex` sein.
+- `agents.<name>.model` ist optional. `grok_reasoning_effort` nur bei
+  `kind = "grok_acp"`, Muster `^[a-z]{1,16}$`. Der Grok-ACP-Adapter übergibt
+  gesetzte Werte als `--model` und `--reasoning-effort`.
+- Ein zurückgegebener Ausführungsmisserfolg wird zu `error`
+  `{code, kind, retry_safe}` und bei ganzzahligem Exitcode `exit_code`.
+  Codes: `command_exit_nonzero`, `command_timeout`, `command_killed`,
+  `agent_exit_nonzero`, `operation_failed`. Ein Peer-Code aus
+  `value.error.code` bleibt, wenn er `^[a-z][a-z0-9_]{0,79}$` entspricht,
+  sonst `tool_rejected`. `retry_safe` nur dann, wenn bei dieser Peer-Form
+  `evidence.request_sent` falsch ist. `dispatcher_restart` und
+  `dispatcher_shutdown` sind eigene `error.code`-Werte ohne dieses Objekt.
+  Die Completion-Nutzlast enthält `error_kind` aus `error.kind`.
+- `session_catalog_incomplete` hat `provider_error.reason = "catalog_truncated"`.
+  `session_selection_changed` hat `provider_error.reason`
+  `expected_pid_changed`, `window_changed` oder `pane_missing`.
+- Gemini und Copilot hängen `provider_error.diagnostic` nur an nicht-leeres,
+  bereinigtes stderr, höchstens 200 Zeichen. `opencode_http` und
+  `opencode_http_v2` setzen bei Statusfehlern nur `provider_error.http_status`.
+  Eine unerwartete ACP-Antwort-ID meldet `agent_identity` nur als Form:
+  `response_id`, `message_keys`, `pending_requests`, `adapter`, `reason`,
+  `already_answered`.
+
+## Source: scope and error fields
+
+- `execution_scope = "existing_native_codex_root"` is a separate worker scope.
+  The `agent.execute` branch then starts `NativeCodexTurns` on the one loaded,
+  parentless Codex root whose resolved cwd equals the resolved worker cwd, via
+  `turn/start`. Among at most 16 loaded ids, any other count raises
+  `native_codex_root_not_unique`; a missing or longer id list raises
+  `native_codex_target_not_ready`. A running turn also raises
+  `native_codex_target_not_ready`. There is no terminal input and
+  no pane, PID or rollout pin. Host checks and a patch of the same minor line:
+  see [Team turns without a fixed binding](NATIVE-CODEX-BINDING.md). The route
+  needs `[visible_handoffs.native_codex]` (`codex_home`, `host_executable`,
+  `protocol_version`). Agent and kind must be `codex`.
+- `agents.<name>.model` is optional. `grok_reasoning_effort` is accepted only
+  for `kind = "grok_acp"` and must match `^[a-z]{1,16}$`. The Grok ACP adapter
+  passes set values as `--model` and `--reasoning-effort`.
+- A returned execution failure becomes `error` `{code, kind, retry_safe}`, plus
+  `exit_code` when the exit code is an integer. Codes: `command_exit_nonzero`,
+  `command_timeout`, `command_killed`, `agent_exit_nonzero`,
+  `operation_failed`. A peer code from `value.error.code` is kept when it
+  matches `^[a-z][a-z0-9_]{0,79}$`; otherwise the code is `tool_rejected`.
+  `retry_safe` is true only for that peer form when `evidence.request_sent`
+  is false. `dispatcher_restart` and `dispatcher_shutdown` are separate
+  `error.code` values and do not use that object. The completion payload
+  copies `error.kind` to `error_kind`.
+- `session_catalog_incomplete` sets `provider_error.reason` to
+  `catalog_truncated`. `session_selection_changed` sets `provider_error.reason`
+  to `expected_pid_changed`, `window_changed` or `pane_missing`.
+- Gemini and Copilot attach `provider_error.diagnostic` only from non-empty
+  sanitized stderr, at most 200 characters. `opencode_http` and
+  `opencode_http_v2` set only `provider_error.http_status` on status failures.
+  An unexpected ACP response id reports `agent_identity` as shape only:
+  `response_id`, `message_keys`, `pending_requests`, `adapter`, `reason`,
+  `already_answered`.
+
+## Automatic coordinator resume
+
+`team.coordinator_resume` defaults to off. When it is on, each finish of
+delegated work (`finish`, `fail`, or manual `work_complete`) writes one
+completion notice in the same transaction, source `team`, target
+`team:<team_id>`. The notice binds work id, root id, the original delegation
+key, an AutoNext task id when present, the result hash and the state. Uniqueness
+is `(source, event_seq)`. Work that someone assigns to themselves records no
+notice.
+
+`TeamManager.resume_coordinators` creates exactly one idempotent coordination
+task per such notice for an assigner that has `agent` set
+(`team_coordinator_resumes` links notice to resume work; the key is `resume-`
+plus a hash of the notice id). A second pass and a later dispatcher start do
+not create that task again. The notice is acknowledged only together with the
+link. On claim, `max_runs_per_hour` applies to team work with a core task in
+the last hour. Evidence: `tests/test_team_coordinator_resume.py`.

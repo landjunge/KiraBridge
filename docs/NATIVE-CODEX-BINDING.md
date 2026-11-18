@@ -125,3 +125,50 @@ classification; an idle start consumes the ordinary model-run budget.
 No UI/website or download change follows from this internal optional development
 route; both READMEs link this contract. Windows/Linux, published packages and live
 message acceptance remain separate outcomes.
+
+## Teamturns ohne feste Bindung
+
+`execution_scope = "existing_native_codex_root"` auf `TeamWorkerConfig` wählt im
+`agent.execute`-Zweig `NativeCodexTurns`. Der Dispatcher übergibt `worker.cwd`.
+`authorize_execution` verlangt, dass das Auftrag-cwd nach `expanduser().absolute()`
+dem Worker-cwd entspricht. `discover` liest `thread/loaded/list`. Ist diese
+Id-Liste keine Liste oder länger als 16, ergibt das
+`native_codex_target_not_ready`. Sonst bleibt ein geladener, elternloser Root:
+`parentThreadId` und `attachedToThreadId` sind null, die Quelle ist `cli`,
+`vscode` oder `appServer`, und das aufgelöste Thread-cwd entspricht dem
+aufgelösten Auftrags-cwd. Eine andere Anzahl ergibt
+`native_codex_root_not_unique`. Ist der beobachtete Vorgang `turn/steer`, lehnt
+der Teampfad ab (`native_codex_target_not_ready`) und ruft nur `turn/start` auf.
+Der Lauf setzt `terminal_input_attempted` auf false. Die Threadauswahl verwendet
+kein Pane, keine Terminal-PID und keinen Rollout-Pfad. `CodexHost` prüft die
+Hostidentität (`native_codex_host_unverified`, dazu `codexHome` und
+`codex-tui/<major>.<minor>` gegen `protocol_version`). Ein Patch derselben
+Major-/Minor-Linie und Plattform unter
+`codex_home/packages/app-server-daemon/releases/<version>/bin/codex` bleibt
+gültig. `protocol_version` entspricht `^0\.169\.[0-9]{1,3}$`. Der Worker braucht
+`[visible_handoffs.native_codex]` mit `codex_home`, `host_executable` und
+`protocol_version`; Agent und Art müssen `codex` sein. Fehlt die Bindung, ist
+der Code `native_codex_unconfigured`.
+
+## Team turns without a fixed binding
+
+`execution_scope = "existing_native_codex_root"` on `TeamWorkerConfig` selects
+`NativeCodexTurns` from the `agent.execute` branch. The dispatcher passes
+`worker.cwd`. `authorize_execution` requires the task cwd, after
+`expanduser().absolute()`, to equal the worker cwd. `discover` reads
+`thread/loaded/list`. A missing id list or more than 16 ids raises
+`native_codex_target_not_ready`. Otherwise it keeps a loaded, parentless root:
+`parentThreadId` and `attachedToThreadId` are null, the source is `cli`,
+`vscode` or `appServer`, and the resolved thread cwd equals the resolved task
+cwd. Any other count raises `native_codex_root_not_unique`. When the observed
+operation is `turn/steer`, the team path refuses
+(`native_codex_target_not_ready`) and calls only `turn/start`. The run sets `terminal_input_attempted` to false.
+Thread selection uses no pane, terminal PID or rollout path. `CodexHost` checks
+host identity (`native_codex_host_unverified`, plus `codexHome` and
+`codex-tui/<major>.<minor>` against `protocol_version`). A patch of the same
+major/minor line and platform under
+`codex_home/packages/app-server-daemon/releases/<version>/bin/codex` stays valid.
+`protocol_version` matches `^0\.169\.[0-9]{1,3}$`. The worker needs
+`[visible_handoffs.native_codex]` with `codex_home`, `host_executable` and
+`protocol_version`; agent and kind must be `codex`. A missing binding raises
+`native_codex_unconfigured`.
