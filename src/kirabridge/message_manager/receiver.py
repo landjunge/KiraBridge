@@ -36,12 +36,23 @@ def separate_managed_eligible(config, created: float) -> bool:
 
 class MessageReceiver:
     WAIT_REASONS = {
+        "session_busy",
         "visible_target_busy",
         "visible_target_not_ready",
         "desktop_locked",
         "desktop_session_inactive",
         "visible_target_working",
         "visible_input_not_empty",
+        "visible_target_scrolled",
+        "visible_target_unknown",
+    }
+    # Busy or not ready, and no input was attempted. Wrong window, a draft,
+    # a locked Mac, and permission failures stay permanent refusals.
+    DEFER_UNSENT = {
+        "session_busy",
+        "visible_target_busy",
+        "visible_target_not_ready",
+        "visible_target_working",
         "visible_target_scrolled",
         "visible_target_unknown",
     }
@@ -166,6 +177,8 @@ class MessageReceiver:
             await self.direct.wait_delivery(identifier)
         result = self.messages.get(principal, identifier)
         job = result["processing"]
+        if job["state"] == "queued" and job["evidence"].get("waiting_for_visible_target") is True:
+            return result
         if job["state"] == "queued":
             # No active runtime attempt means a historical/unadmitted record.
             # Its ID remains readable, but reading it never starts delivery.
@@ -808,6 +821,31 @@ class MessageReceiver:
             )
             return dict(row), run_id
 
+    def _deferred_unsent(self, row):
+        """True only for a queued message that never attempted input."""
+        try:
+            evidence = json.loads(row["evidence"] or "{}")
+        except (ValueError, TypeError):
+            return False
+        return (
+            isinstance(evidence, dict)
+            and evidence.get("waiting_for_visible_target") is True
+            and evidence.get("terminal_input_attempted") is False
+            and evidence.get("reason") in self.DEFER_UNSENT
+        )
+
+    def _recipient_turn_open(self, recipient):
+        """A second execute must wait until the bound recipient's turn ends."""
+        if ("recipient", recipient) in self.direct.targets:
+            return True
+        return bool(
+            self.bridge.store.db.execute(
+                "SELECT 1 FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                "WHERE m.recipient=? AND j.state='running' LIMIT 1",
+                (recipient,),
+            ).fetchone()
+        )
+
     def _waiting(self, message_id, reason, observation=None):
         """A pre-dispatch observation is not a failed turn or an input attempt."""
         evidence = {
@@ -816,6 +854,7 @@ class MessageReceiver:
             "reason": reason,
             "terminal_input_attempted": False,
             "waiting_message": {
+                "session_busy": "Die Sitzung ist belegt; die Nachricht wartet ohne Eingabe.",
                 "visible_target_busy": "Eine frühere Übergabe muss noch abgeglichen werden.",
                 "visible_target_not_ready": "Das Agentenfenster ist noch nicht eingabebereit.",
                 "desktop_locked": "Mac gesperrt; die Nachricht wartet ohne Eingabe.",
@@ -824,6 +863,8 @@ class MessageReceiver:
                 "visible_input_not_empty": "Vorhandener Eingabetext wird nicht überschrieben.",
                 "visible_target_scrolled": "Zur aktuellen Eingabeansicht zurückkehren.",
                 "visible_target_unknown": "Bereitschaft nicht eindeutig; Diagnose ansehen.",
+                "execution_busy": "Ein früherer Lauf ist noch offen; die Nachricht wartet.",
+                "delivery_timeout": "Die Zustellung wartete ohne Eingabe und wird erneut geprüft.",
             }[reason],
         }
         if observation is not None:
@@ -987,8 +1028,22 @@ class MessageReceiver:
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=older.id) "
             "AND (? IS NULL OR older.created>=?) "
-            "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
-            (cutoff, cutoff, recipient, recipient, cutoff, cutoff),
+            "AND older.recipient=m.recipient AND older.seq<m.seq "
+            "AND (? = 1 OR (? IS NOT NULL AND older.created>=?) OR ("
+            "json_extract(q.evidence, '$.waiting_for_visible_target') = 1 "
+            "AND json_extract(q.evidence, '$.terminal_input_attempted') = 0))) "
+            "ORDER BY m.seq LIMIT 17",
+            (
+                cutoff,
+                cutoff,
+                recipient,
+                recipient,
+                cutoff,
+                cutoff,
+                1 if include_visible else 0,
+                cutoff,
+                cutoff,
+            ),
         ).fetchall()
         for row in rows:
             if row["acknowledged"] is not None:
@@ -1000,9 +1055,12 @@ class MessageReceiver:
                 not include_visible
                 and self.bridge.config.visible_handoffs.enabled
                 and not separate_managed_eligible(self.bridge.config, row["created"])
+                and not self._deferred_unsent(row)
             ):
                 # Old visible backlog is inventory, never fresh authorization.
-                # New visible work has one runtime-owned direct admission.
+                # A deferred unsent message is delivered once the bound composer is ready.
+                continue
+            if self._deferred_unsent(row) and self._recipient_turn_open(row["recipient"]):
                 continue
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue

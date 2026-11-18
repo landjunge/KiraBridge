@@ -486,6 +486,10 @@ class MessageManager:
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                 "h.queue_id='messages' AND h.item_id=messages.id) "
+                "AND NOT EXISTS (SELECT 1 FROM message_jobs j WHERE j.message_id=messages.id "
+                "AND j.state='queued' "
+                "AND json_extract(j.evidence, '$.waiting_for_visible_target') = 1 "
+                "AND json_extract(j.evidence, '$.terminal_input_attempted') = 0) "
                 "ORDER BY seq LIMIT ?",
                 (principal, after, conversation_id, conversation_id, limit),
             ).fetchall()
