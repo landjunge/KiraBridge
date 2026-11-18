@@ -10,7 +10,6 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
-from kirabridge.autonext.models import AutoNextConfig
 from kirabridge.bridge_core.models import AgentToolGrant, BridgeError
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
 
@@ -536,6 +535,15 @@ class LiveLogsConfig(BaseModel):
 
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ignore_retired_sections(cls, data):
+        # AutoNext was removed; an old config file may still carry its section.
+        if isinstance(data, dict) and "autonext" in data:
+            data = {key: value for key, value in data.items() if key != "autonext"}
+        return data
+
     _source_path: str | None = PrivateAttr(default=None)
     _source_sha256: str | None = PrivateAttr(default=None)
     _effective_sha256: str | None = PrivateAttr(default=None)
@@ -573,7 +581,6 @@ class Config(BaseModel):
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     team: TeamConfig = Field(default_factory=TeamConfig)
-    autonext: AutoNextConfig = Field(default_factory=AutoNextConfig)
     grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     file_transfer: FileTransferConfig = Field(default_factory=FileTransferConfig)

@@ -74,15 +74,13 @@ Host-/Grok-UNKNOWNs, VM-/Policy-/Profilzustände bleiben davon unberührt.
 
 ## Einstieg
 
-[Nativer Core/MCP-Vertrag](COORDINATOR-NATIVE-20261106.md) ·
 [versiegeltes Routing](COORDINATOR-NATIVE-ROUTING-20261106.md) ·
 [Remoteintegration](NATIVE-REMOTE-INTEGRATION-20261106.md) ·
 [R3-Prozessneustarts](plans/REMOTE-OS-RESTART-20261106.md) ·
 [R4-InFlight-Recovery](plans/REMOTE-INFLIGHT-RECOVERY-20261106.md) ·
 [CI-Kostengates](CI-COST-GATES-20261106.md) ·
 [Remote-CI-Quellenbindung](REMOTE-CI-PIN-GATE-20261106.md) ·
-[jobeigener CI-Speicher](CI-TEMP-SCOPE-20261106.md) ·
-[Fortsetzung und lokale Betriebsbelege](COORDINATOR-CONTINUATION-20261106.md).
+[jobeigener CI-Speicher](CI-TEMP-SCOPE-20261106.md).
 
 ## English
 

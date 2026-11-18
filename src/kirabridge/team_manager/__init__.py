@@ -7,7 +7,6 @@ import hashlib
 import json
 import math
 import re
-import sqlite3
 import time
 import uuid
 from pathlib import Path
@@ -441,11 +440,6 @@ class TeamManager:
 
     def resume_session(self, work):
         """Return a proven idle provider session only, reserving it exclusively."""
-        continuation = getattr(self.bridge, "autonext", None)
-        if continuation is not None and continuation.owns(work["id"]):
-            # AutoNext owns its coordinator/verifier lifecycle and supplies its
-            # own turn contract; ordinary team follow-ups use the session store.
-            return None
         worker = self.config.team.workers.get(work["assignee"])
         if (
             worker is None
@@ -1388,16 +1382,7 @@ class TeamManager:
                 return None
             if work["state"] != "queued" or work["core_task_id"] is not None:
                 return None
-            continuation = getattr(self.bridge, "autonext", None)
-            if continuation is not None and not continuation.work_ready(work_id):
-                return None
-            if work["created"] <= time.time() - self.config.queue_stale_seconds and not (
-                continuation is not None
-                and self.store.db.execute(
-                    "SELECT 1 FROM autonext_items WHERE work_id=?", (work_id,)
-                ).fetchone()
-            ):
-                # AutoNext items are bound to their own grant and lease instead.
+            if work["created"] <= time.time() - self.config.queue_stale_seconds:
                 self._fail(
                     work, "blocked", "stale_queue_expired", {"reason": "stale_queue_expired"}
                 )
@@ -1791,12 +1776,6 @@ class TeamManager:
             "SELECT idem FROM team_operations WHERE team_id=? AND operation='work' AND object_id=?",
             (work["team_id"], work_id),
         ).fetchone()
-        try:
-            order = self.store.db.execute(
-                "SELECT task_id FROM autonext_items WHERE work_id=?", (work_id,)
-            ).fetchone()
-        except sqlite3.OperationalError:
-            order = None
         failed = work["state"] != "completed"
         from kirabridge.completion_manager import record_notice
 
@@ -1814,7 +1793,6 @@ class TeamManager:
                 "root_id": work["root_id"],
                 "parent_id": work["parent_id"],
                 "delegation_key": operation["idem"] if operation else None,
-                "autonext_task_id": order["task_id"] if order else None,
                 "assignee": work["assignee"],
                 "state": work["state"],
                 "outcome": "failure" if failed else "success",

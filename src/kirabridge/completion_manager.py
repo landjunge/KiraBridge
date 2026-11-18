@@ -14,7 +14,6 @@ TERMINAL = {"completed", "failed", "cancelled", "unknown", "blocked"}
 SOURCE_CAPABILITIES = {
     "task": "task.read",
     "message": "message.read",
-    "autonext": "team.read",
     "team": "team.read",
 }
 SCHEMA = (
@@ -234,12 +233,8 @@ class CompletionManager:
         if not 1 <= limit <= 50:
             raise BridgeError("invalid_limit", "Use limit 1..50")
         if source_id is not None:
-            from kirabridge.autonext.models import ID
-
-            if not isinstance(source_id, str) or not (
-                re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id)
-                or re.fullmatch(ID, source_id)
-                or (source_id.startswith("grant-") and re.fullmatch(ID, source_id[6:]))
+            if not isinstance(source_id, str) or not re.fullmatch(
+                r"[A-Za-z0-9_.-]{1,128}", source_id
             ):
                 raise BridgeError("invalid_arguments", "Completion source id is invalid")
         policy = self.security.principal(principal)
@@ -251,11 +246,12 @@ class CompletionManager:
                 "capability_denied", "Own task.read, message.read or team.read required"
             )
         allowed = tuple(source if source in sources else "-" for source in SOURCE_CAPABILITIES)
+        marks = ",".join("?" for _ in allowed)
         with self.store.transaction():
             if source_id is None:
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND acknowledged IS NULL AND source IN (?,?,?,?) "
+                    "AND acknowledged IS NULL AND source IN (" + marks + ") "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
                     "ORDER BY seq DESC LIMIT ?",
@@ -265,7 +261,7 @@ class CompletionManager:
                 # A known source is readable even when older unacked notices fill the inbox.
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?,?,?) "
+                    "AND source_id=? AND acknowledged IS NULL AND source IN (" + marks + ") "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
                     "ORDER BY seq DESC LIMIT ?",
