@@ -1334,3 +1334,121 @@ async def test_guard_refusal_after_the_hook_but_before_paste_is_a_definite_failu
         await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
     else:
         assert isinstance(exc.value, UncertainExecution) and status["state"] == "unknown"
+
+
+async def test_wait_for_reply_handoff_catalog_call_count(bridge, config, monkeypatch):
+    """Count Terminal.app catalog fetches on one successful reply-waiting handoff."""
+    import os
+    import traceback
+    from copy import deepcopy
+
+    names = ["chatgpt", "grok_app", "codex", "grok"]
+    for name in names:
+        policy = config.principals["local"].model_copy(deep=True)
+        policy.capabilities += [
+            "session.inspect",
+            "session.input",
+            "terminal.execute",
+            "message.send",
+            "message.read",
+            "message.ack",
+        ]
+        policy.approval_mode = "automatic"
+        policy.message_peers = [other for other in names if other != name]
+        config.principals[name] = policy
+    config.visible_handoffs.enabled = True
+    config.visible_handoffs.bindings = {
+        "grok": VisibleTerminalBinding(
+            pane_id="terminal:100:ttys001",
+            expected_pid=123,
+            agent_pid=456,
+            ready_pattern=r"│\s*❯\s*│",
+        )
+    }
+    config.agents = {"grok": AgentConfig(kind="grok_acp")}
+    row = {
+        "pane_id": "terminal:100:ttys001",
+        "expected_pid": 123,
+        "window_id": 100,
+        "tty": "/dev/ttys001",
+        "transport": "terminal_app",
+        "busy": True,
+        "processes": [
+            {"pid": 123, "ppid": 100, "name": "zsh", "image": "/bin/zsh"},
+            {"pid": 456, "ppid": 123, "name": "grok", "image": "/bin/grok"},
+        ],
+    }
+    screen = {"text": "╭\n│ ❯ │\n╰"}
+    catalog_sites = []
+
+    def site():
+        frames = []
+        for frame in traceback.extract_stack()[:-1]:
+            if "/src/kirabridge/" not in frame.filename:
+                continue
+            frames.append(f"{frame.filename.rsplit('/src/', 1)[-1]}:{frame.lineno}:{frame.name}")
+        return tuple(frames)
+
+    async def catalog():
+        catalog_sites.append(site())
+        return [deepcopy(row)]
+
+    async def identity(pid, **kwargs):
+        process = next(item for item in row["processes"] if item["pid"] == pid)
+        return (
+            f"{os.getuid()} ttys001 Sat Oct 24 12:00:00 2026 "
+            f"{process['ppid']} {process['image']}"
+        )
+
+    async def read(pane_id):
+        return screen["text"]
+
+    async def insert(pane_id, text, **guards):
+        screen["text"] = "╭\n│ ❯ " + text + "\n╰"
+
+    async def press_return(pane_id, **guards):
+        screen["text"] = "╭\n│ ❯ │\n╰"
+        addressed = bridge.store.db.execute(
+            "SELECT message_id FROM visible_handoffs WHERE target='grok' AND state='submitting'"
+        ).fetchone()
+        message = next(
+            item
+            for item in bridge.messages.receive("grok")["messages"]
+            if item["id"] == addressed[0]
+        )
+        bridge.messages.ack("grok", message["id"], message["receipt"])
+        bridge.messages.send(
+            "grok",
+            MessageSend(
+                recipient="chatgpt",
+                conversation_id=message["conversation_id"],
+                idempotency_key="reply-catalog-count",
+                reply_to=message["id"],
+                body="independent review",
+                kind="result",
+                request_reply=False,
+                dispatch=False,
+            ),
+        )
+
+    monkeypatch.setattr(type(bridge.sessions.terminal_app), "available", property(lambda _: True))
+    monkeypatch.setattr(bridge.sessions.terminal_app, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "process_identity", identity)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "read", read)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "insert", insert)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "press_return", press_return)
+    result = await bridge.visible_handoffs.execute(
+        {"id": "catalog-count-reply", "principal": "chatgpt"},
+        AgentInput(agent="grok", prompt="Only this exact body", cwd="/tmp"),
+        callback,
+        callback,
+    )
+    rendered = "\n---\n".join(" > ".join(frames) for frames in catalog_sites)
+    assert result["success"] is True and result["text"] == "independent review", rendered
+    # Fresh catalogues stay at binding refresh, selection, both pre-paste
+    # target checks, the locked insert selection, post-paste verification,
+    # the pre-Return check, the locked Return selection, the cleared-input
+    # check, and the final reply-window check. The widget check inside insert
+    # reuses that insert's row and must not add an eleventh catalogue.
+    assert len(catalog_sites) == 10, f"{len(catalog_sites)} catalogs\n{rendered}"
+    assert all("observe_readiness" not in " ".join(frames) for frames in catalog_sites)

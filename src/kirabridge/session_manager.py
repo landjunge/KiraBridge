@@ -534,19 +534,23 @@ class SessionManager:
                     "Native agent input requires a task-owned selection",
                 )
             if identities is not None:
-                text = await self.terminal_app.read(args.pane_id)
-                if self.readiness is None:
-                    raise BridgeError(
-                        "visible_target_unknown", "No readiness assessor for agent input"
+                # The selection above is this insert's fresh read. The widget
+                # check reuses that row; it must not start a second catalogue
+                # before the paste, and it must not authorize the paste itself.
+                with self.observation_scope(principal, selected):
+                    text = await self.terminal_app.read(args.pane_id)
+                    if self.readiness is None:
+                        raise BridgeError(
+                            "visible_target_unknown", "No readiness assessor for agent input"
+                        )
+                    observation = await self.readiness(
+                        principal,
+                        {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
                     )
-                observation = await self.readiness(
-                    principal,
-                    {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
-                )
-                if not observation or not observation.get("ready"):
-                    raise BridgeError(
-                        "visible_target_not_ready", "Current agent widget is not ready"
-                    )
+                    if not observation or not observation.get("ready"):
+                        raise BridgeError(
+                            "visible_target_not_ready", "Current agent widget is not ready"
+                        )
                 if before_transport is not None:
                     await before_transport()
                 await self.terminal_app.insert(
