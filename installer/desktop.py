@@ -156,7 +156,9 @@ def snapshot(api, args, release, old, backup):
         if not expected or app_before != expected:
             app_before_commit = verified_existing_app_commit(app)
             if app_before_commit is None:
-                raise RuntimeError("Existing desktop app differs from recorded installation; preserved")
+                raise RuntimeError(
+                    "Existing desktop app differs from recorded installation; preserved"
+                )
             app_before_drift = True
     state = {
         "app": str(app),
