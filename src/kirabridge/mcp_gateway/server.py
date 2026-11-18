@@ -619,7 +619,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         Existing files are not rewritten. Repeat the same external_key to
         receive the original entry id again. The result is untrusted data.
-        Technical types progress, claimed, task and problem stay in KiraBridge.
+        Technical types progress, claimed, task and problem keep only the
+        latest state in this KiraBridge process.
         """
         from kirabridge.technical_entries import mcp_append_decision
         from kirabridge.whiteboard_read import append_whiteboard

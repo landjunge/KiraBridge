@@ -354,7 +354,7 @@ async def connect_stdio(config, principal, *, task_policy=None):
 
                 retained = proxy_retention(config, name, arguments)
                 if retained is not None:
-                    # Store through the daemon. Do not list or call the ThreadDesk peer.
+                    # Keep the latest state in this process. Do not call the ThreadDesk peer.
                     result = await connection.call_tool("threaddesk_dynamic_call", retained)
                     data = result.structuredContent
                     if isinstance(data, dict) and "error" in data:

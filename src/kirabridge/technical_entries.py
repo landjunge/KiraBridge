@@ -1,13 +1,15 @@
-"""Keep technical whiteboard writes in the existing audit trail.
+"""Keep only the latest technical whiteboard state in this process.
 
 ThreadDesk remains the place for plans, decisions, important findings and
-current status. Progress, claims, tasks and problems are stored here instead.
-A failure to store still answers success: this path never rejects a call.
+current status. Progress, claims, tasks and problems replace one in-memory
+state per principal, thread, actor and entry type. Nothing is written to the
+audit chain or the database. This path never rejects a call.
 """
 
 from __future__ import annotations
 
 import hashlib
+import threading
 import time
 from typing import Any
 
@@ -18,6 +20,8 @@ EXPLANATION = (
     "ThreadDesk speichert nur Pläne, Entscheidungen, wichtige Erkenntnisse "
     "und aktuelle Stände. Dieser technische Eintrag liegt in KiraBridge."
 )
+_LOCK = threading.Lock()
+_STATES: dict[tuple[str, str, str, str], dict] = {}
 
 
 def routing_enabled(config: Any) -> bool:
@@ -113,16 +117,38 @@ def _thread_id(chosen: dict, root: Any) -> str:
     return ""
 
 
-def _who(principal: Any, actor: str) -> str:
-    for value in (principal, actor, "unknown"):
-        text = _clip(value, _NAME_LIMIT).strip()
-        if text:
-            return text
-    return "unknown"
+def latest_technical_states() -> list[dict]:
+    """Copy of the process-local latest states. Diagnostic only, not durable."""
+    with _LOCK:
+        return [dict(value) for value in _STATES.values()]
 
 
-def retained_record(store: Any, principal: Any, tool: Any, arguments: Any) -> dict:
-    """Audit one technical entry. Truncation and a missing store do not raise."""
+def _principal_key(principal: Any) -> str:
+    text = _clip(principal, _NAME_LIMIT).strip()
+    return text or "unknown"
+
+
+def _answer(entry_type: str, thread_id: str, actor: str, digest: str, truncated: bool) -> dict:
+    return {
+        "routed": "kirabridge",
+        "kept": "latest_state_only",
+        "explanation": EXPLANATION,
+        "entry_type": entry_type,
+        "thread_id": thread_id,
+        "actor": actor,
+        "content_sha256": digest,
+        "content_truncated": truncated,
+    }
+
+
+def _remember(state: dict) -> None:
+    key = (state["principal"], state["thread_id"], state["actor"], state["entry_type"])
+    with _LOCK:
+        _STATES[key] = dict(state)
+
+
+def retained_record(_store: Any, principal: Any, tool: Any, arguments: Any) -> dict:
+    """Remember the latest state. The store is ignored and nothing is written."""
     try:
         chosen = _domain(arguments) or {}
         entry_type = technical_entry_type(arguments) or "progress"
@@ -130,7 +156,9 @@ def retained_record(store: Any, principal: Any, tool: Any, arguments: Any) -> di
         actor = _clip(chosen.get("actor"), _NAME_LIMIT)
         thread_id = _thread_id(chosen, arguments)
         digest = hashlib.sha256(raw.encode("utf-8", errors="replace")).hexdigest()
-        metadata = {
+        truncated = len(raw) > _TEXT_LIMIT
+        state = {
+            "principal": _principal_key(principal),
             "tool": _clip(tool, 80) or "whiteboard_append",
             "thread_id": thread_id,
             "entry_type": entry_type,
@@ -138,58 +166,15 @@ def retained_record(store: Any, principal: Any, tool: Any, arguments: Any) -> di
             "at": time.time(),
             "content_sha256": digest,
             "content": raw[:_TEXT_LIMIT],
-            "content_truncated": len(raw) > _TEXT_LIMIT,
+            "content_truncated": truncated,
         }
-        key = chosen.get("external_key")
-        if isinstance(key, str) and key:
-            metadata["external_key"] = _clip(key, 128)
-        stored = _audit(store, _who(principal, actor), metadata)
-        return {
-            "routed": "kirabridge",
-            "stored": stored,
-            "explanation": EXPLANATION,
-            "entry_type": entry_type,
-            "thread_id": thread_id,
-            "actor": actor,
-            "content_sha256": digest,
-            "content_truncated": len(raw) > _TEXT_LIMIT,
-        }
+        external_key = chosen.get("external_key")
+        if isinstance(external_key, str) and external_key:
+            state["external_key"] = _clip(external_key, 128)
+        _remember(state)
+        return _answer(entry_type, thread_id, actor, digest, truncated)
     except Exception:
-        return {
-            "routed": "kirabridge",
-            "stored": False,
-            "explanation": EXPLANATION,
-            "entry_type": "progress",
-            "thread_id": "",
-            "actor": "",
-            "content_sha256": hashlib.sha256(b"").hexdigest(),
-            "content_truncated": False,
-        }
-
-
-def _audit(store: Any, principal: str, metadata: dict) -> bool:
-    if store is None:
-        return False
-    try:
-        with store.transaction():
-            store.audit("whiteboard.technical", principal, None, metadata)
-        return True
-    except Exception:
-        smaller = {
-            "thread_id": metadata.get("thread_id") or "",
-            "entry_type": metadata.get("entry_type") or "progress",
-            "actor": metadata.get("actor") or "",
-            "at": time.time(),
-            "content_sha256": metadata.get("content_sha256") or "",
-            "content": "",
-            "content_truncated": True,
-        }
-        try:
-            with store.transaction():
-                store.audit("whiteboard.technical", principal, None, smaller)
-            return True
-        except Exception:
-            return False
+        return _answer("progress", "", "", hashlib.sha256(b"").hexdigest(), False)
 
 
 def dynamic_success(bridge: Any, principal: Any, name: str, arguments: Any) -> dict:
@@ -197,7 +182,7 @@ def dynamic_success(bridge: Any, principal: Any, name: str, arguments: Any) -> d
     return {
         "success": True,
         "routed": "kirabridge",
-        "stored": body["stored"],
+        "kept": "latest_state_only",
         "explanation": body["explanation"],
         "value": body,
         "scope": "kirabridge_technical_entry",
@@ -226,7 +211,7 @@ def manager_success(store: Any, principal: Any, arguments: Any) -> dict:
 
 
 def proxy_retention(config: Any, name: Any, arguments: Any) -> dict | None:
-    """Daemon call that stores the entry, or None when ThreadDesk still receives it."""
+    """Daemon call that keeps the latest state, or None when ThreadDesk still receives it."""
     if not should_retain(config, name, arguments):
         return None
     payload = arguments if isinstance(arguments, dict) else {}
