@@ -173,6 +173,7 @@ class Bridge:
             self.diagnostics,
             lambda principal: AuditObserver(config, principal, self.runtime, self.store),
         )
+        self.threaddesk.store = self.store
         from kirabridge.handoff_manager import HandoffManager
 
         self.handoffs = HandoffManager(self, peer=handoff_peer)

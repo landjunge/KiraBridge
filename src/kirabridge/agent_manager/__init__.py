@@ -531,7 +531,7 @@ class GrokACPAdapter:
             ) from exc
         finally:
             await client.aclose()
-            await reap_process(process)
+            await reap_process(process, census_timeout=2)
 
 
 class AgentManager:

@@ -363,6 +363,8 @@ class ThreadDeskConfig(BaseModel):
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
     dynamic_read_proxy: bool = False  # Legacy read-only opt-in remains supported.
     dynamic_tool_proxy: bool = False  # Explicit all-tools opt-in; mutations use durable tasks.
+    # progress/claimed/task/problem stay in the local audit. False restores board writes.
+    route_technical_entries: bool = True
 
 
 class WorkflowControlConfig(BaseModel):

@@ -24,7 +24,7 @@
 <p align="center">
   <img src="assets/readme/download-macos-apple-silicon.svg" alt="macOS Apple Silicon: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc51/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc51" width="190" height="52"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc53/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc53" width="190" height="52"></a>
   &nbsp;
   <img src="assets/readme/download-windows.svg" alt="Windows: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
@@ -151,6 +151,8 @@ bleiben als datierte Nachweise erhalten, nicht als aktueller Installationsstand.
 - **Keine späten Überraschungen:** Höchstens drei Aufträge warten gleichzeitig; ein vierter
   storniert den ältesten wartenden. Was länger als eine Stunde wartet, wird gestoppt und
   gemeldet, nie später ausgeführt. Große Ausgaben bleiben in der Datenbank kurz, das Protokoll vollständig.
+- **Neuester Boardtext (Entwicklungsstand):** `order="newest"` liest die neueste Whiteboard-Seite, `whiteboard_search` findet Text in einem Board. Keine neue Installation.
+- **Technische Boardeinträge:** `progress`, `claimed`, `task` und `problem` bleiben in KiraBridge, nur als letzter Stand im laufenden Prozess, ohne Audit und ohne Datenbank. Abschalten: `[threaddesk]` `route_technical_entries = false`.
 
 ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funktioniert eigenständig.
 Ist ThreadDesk eingerichtet, bringt das Paket die gepinnte ThreadDesk-Bibliothek mit. Der
