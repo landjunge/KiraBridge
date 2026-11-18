@@ -505,10 +505,28 @@ class ThreadDeskManager:
         }
 
     async def _whiteboard_append(self, task, args, running):
+        from kirabridge.technical_entries import manager_success, should_retain
         from kirabridge.whiteboard_read import append_whiteboard
 
         data = dict(args.data)
         thread_id = args.id or data.get("thread_id")
+        payload = dict(data)
+        if isinstance(thread_id, str):
+            payload["thread_id"] = thread_id
+        if should_retain(self.config, "whiteboard_append", payload):
+            try:
+                await running(
+                    {
+                        "adapter": "kirabridge",
+                        "tool": "whiteboard_append",
+                        "peer_called": False,
+                        "routed": "kirabridge",
+                    }
+                )
+            except Exception:
+                pass
+            principal = task.get("principal") if isinstance(task, dict) else None
+            return manager_success(getattr(self, "store", None), principal, payload)
         if not isinstance(thread_id, str):
             raise BridgeError("invalid_arguments", "An exact whiteboard thread id is required")
         await running({"adapter": "threaddesk", "tool": "whiteboard_append", "local_files": True})

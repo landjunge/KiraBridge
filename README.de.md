@@ -152,6 +152,7 @@ bleiben als datierte Nachweise erhalten, nicht als aktueller Installationsstand.
   storniert den ältesten wartenden. Was länger als eine Stunde wartet, wird gestoppt und
   gemeldet, nie später ausgeführt. Große Ausgaben bleiben in der Datenbank kurz, das Protokoll vollständig.
 - **Neuester Boardtext (Entwicklungsstand):** `order="newest"` liest die neueste Whiteboard-Seite, `whiteboard_search` findet Text in einem Board. Keine neue Installation.
+- **Technische Boardeinträge:** `progress`, `claimed`, `task` und `problem` bleiben in KiraBridge, nur als letzter Stand im laufenden Prozess, ohne Audit und ohne Datenbank. Abschalten: `[threaddesk]` `route_technical_entries = false`.
 
 ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funktioniert eigenständig.
 Ist ThreadDesk eingerichtet, bringt das Paket die gepinnte ThreadDesk-Bibliothek mit. Der
