@@ -744,10 +744,10 @@ class MessageReceiver:
                 # Late delivery could duplicate work already done in the visible terminal.
                 blocked("stale_queue_expired")
                 return None
-            # Both run ceilings are rolling one-hour windows that bound provider
-            # cost and queue growth. They are not identity, authentication or
-            # dedupe guards: those are enforced before this point and must never
-            # depend on these counters.
+            # Both run ceilings are rolling one-hour counters. They are displayed
+            # when crossed and never reject, block, or hold the message.
+            # They are not identity, authentication or dedupe guards: those are
+            # enforced before this point and must never depend on these counters.
             # Exempt only the exact run claimed by DirectDelivery for steering.
             # A queued interim target can instead reach agents.execute through
             # the managed cutoff route, so the original message is not proof.
@@ -758,22 +758,28 @@ class MessageReceiver:
                 "AND json_type(e.evidence,'$.interim_delivery')='true')"
             )
             since = time.time() - 3600
-            count = self.bridge.store.db.execute(
+            conversation_runs = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.conversation_id=? AND j.claimed>? " + delivery_only_claim,
                 (row["conversation_id"], since),
             ).fetchone()[0]
-            if not interim and count >= config.max_runs_per_conversation:
-                blocked("conversation_run_limit")
-                return None
-            count = self.bridge.store.db.execute(
+            hourly_runs = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.recipient=? AND j.claimed>? " + delivery_only_claim,
                 (row["recipient"], since),
             ).fetchone()[0]
-            if not interim and count >= config.max_runs_per_hour:
-                blocked("hourly_run_limit")
-                return None
+            limit_notes = []
+            if not interim and conversation_runs >= config.max_runs_per_conversation:
+                limit_notes.append("conversation_run_limit")
+            if not interim and hourly_runs >= config.max_runs_per_hour:
+                limit_notes.append("hourly_run_limit")
+            noted = {}
+            if limit_notes:
+                noted = {
+                    "limit_notes": limit_notes,
+                    "conversation_runs": conversation_runs,
+                    "hourly_runs": hourly_runs,
+                }
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
                 "existing_native_codex_root"
@@ -791,7 +797,7 @@ class MessageReceiver:
                 (
                     run_id,
                     time.time(),
-                    canonical({"session_scope": scope}),
+                    canonical({"session_scope": scope, **noted}),
                     config.receivers[row["recipient"]].cwd,
                     message_id,
                 ),
@@ -803,6 +809,7 @@ class MessageReceiver:
                 {
                     "run_id": run_id,
                     "session_scope": scope,
+                    **noted,
                     **({"interim_delivery": True} if direct and interim else {}),
                 },
             )

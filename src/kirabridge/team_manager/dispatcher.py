@@ -383,6 +383,7 @@ class TeamDispatcher:
         snapshot = await self._call(pool, "team_context", {"team_id": work["team_id"]})
         team = snapshot["team"]
         context = []
+        omitted = False
         for item in snapshot.get("work", []):
             if item["id"] == work["id"]:
                 continue
@@ -396,6 +397,7 @@ class TeamDispatcher:
                     bool(item.get("result_truncated")) or len(item["result"].encode()) > 2048
                 )
             if len(canonical([*context, summary]).encode()) > 16384:
+                omitted = True
                 break
             context.append(summary)
         messages = []
@@ -410,6 +412,7 @@ class TeamDispatcher:
                     bool(item.get("body_truncated")) or len(item["body"].encode()) > 2048
                 )
             if len(canonical([*messages, summary]).encode()) > 16384:
+                omitted = True
                 break
             messages.append(summary)
             if item.get("recipient") == work["assignee"] and item.get("acknowledged") is None:
@@ -433,7 +436,7 @@ class TeamDispatcher:
             },
             "shared_work": context,
             "shared_messages": messages,
-            "context_truncated": bool(snapshot.get("truncated")),
+            "context_truncated": bool(snapshot.get("truncated") or omitted),
         }
         worker = self.bridge.config.team.workers.get(work["assignee"])
 
@@ -468,21 +471,34 @@ class TeamDispatcher:
             return prompt
 
         prompt = assemble()
+
+        def drop_shared():
+            # Older shared messages go first. The current work text stays whole.
+            if messages:
+                messages.pop()
+            elif context:
+                context.pop()
+            else:
+                return False
+            metadata["context_truncated"] = True
+            return True
+
         visible = self.bridge.config.visible_handoffs.enabled and (
             not worker or worker.execution_scope == "existing_visible_terminal"
         )
         if visible:
             # The visible terminal lane accepts at most 16384 characters of input.
-            # Drop the oldest shared context first; the current work always stays.
-            while len(prompt) > VISIBLE_PROMPT_CHARS and (context or messages):
-                trimmed = context if context else messages
-                trimmed.pop()
-                metadata["context_truncated"] = True
+            while len(prompt) > VISIBLE_PROMPT_CHARS and drop_shared():
                 prompt = assemble()
-            keep = {item["id"] for item in messages}
-            receipts = [item for item in receipts if item in keep]
-        if len(prompt.encode()) > 262144:
+        while len(prompt.encode()) > 262144 and drop_shared():
+            prompt = assemble()
+        body = metadata["current_work"].get("body")
+        if len(prompt.encode()) > 262144 and isinstance(body, str) and len(body.encode()) > 262144:
+            # The work text itself exceeds the adapter maximum. Shared context
+            # is already gone, so this is the existing hard transport stop.
             raise BridgeError("team_payload_limit", "Team context exceeds the adapter limit")
+        keep = {item["id"] for item in messages}
+        receipts = [item for item in receipts if item in keep]
         for message_id in receipts:
             # The fixed authenticated recipient confirms that its managed
             # receiver accepted context. This is not a native execution proof.
