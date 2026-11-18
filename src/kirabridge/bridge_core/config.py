@@ -100,9 +100,9 @@ class TeamWorkerConfig(BaseModel):
     timeout: float = Field(default=120, gt=0, le=3600)
     response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
     # Explicit per-worker route; never a fallback from a busy visible session.
-    execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
-        "existing_visible_terminal"
-    )
+    execution_scope: Literal[
+        "existing_visible_terminal", "separate_managed_session", "existing_native_codex_root"
+    ] = "existing_visible_terminal"
     local_tools: bool = False
     mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=256)
     mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
@@ -488,7 +488,8 @@ class NativeCodexBinding(BaseModel):
     codex_home: str = Field(min_length=1, max_length=4096)
     host_executable: str = Field(min_length=1, max_length=4096)
     source: Literal["cli", "vscode", "appServer"]
-    protocol_version: Literal["0.169.0"] = "0.169.0"
+    # Same minor line only: a patch update of the installed host keeps the assignment.
+    protocol_version: str = Field(default="0.169.0", pattern=r"^0\.169\.[0-9]{1,3}$")
 
     @model_validator(mode="after")
     def absolute_paths(self):

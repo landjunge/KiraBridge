@@ -550,7 +550,9 @@ class TeamDispatcher:
             if isinstance(work, dict)
             else False,
             "model_turn_completed": True,
-            "session_scope": "existing_visible_terminal"
+            "session_scope": "existing_native_codex_root"
+            if worker and worker.execution_scope == "existing_native_codex_root"
+            else "existing_visible_terminal"
             if self.bridge.config.visible_handoffs.enabled
             and (not worker or worker.execution_scope == "existing_visible_terminal")
             else "separate_managed_session",

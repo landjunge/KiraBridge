@@ -1404,7 +1404,10 @@ class TeamManager:
                 work_id,
                 core_task_id=core_id,
                 session_resumed=bool(resume_session),
-                session_scope="existing_visible_terminal"
+                session_scope=self.config.team.workers[work["assignee"]].execution_scope
+                if self.config.team.workers[work["assignee"]].execution_scope
+                == "existing_native_codex_root"
+                else "existing_visible_terminal"
                 if self.config.visible_handoffs.enabled
                 and self.config.team.workers[work["assignee"]].execution_scope
                 == "existing_visible_terminal"

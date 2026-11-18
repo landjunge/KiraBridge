@@ -36,11 +36,16 @@ def local_host(monkeypatch):
         registry.chmod(0o644)
         binding = NativeCodexBinding(
             thread_id="11111111-1111-7111-8111-111111111111",
-            session_id="11111111-1111-7111-8111-111111111111", source="vscode",
-            codex_home=str(root), host_executable="/fixture/codex",
+            session_id="11111111-1111-7111-8111-111111111111",
+            source="vscode",
+            codex_home=str(root),
+            host_executable="/fixture/codex",
         )
         state = SimpleNamespace(
-            peer_pid=1234, uid=os.getuid(), process_path=binding.host_executable, raw=None,
+            peer_pid=1234,
+            uid=os.getuid(),
+            process_path=binding.host_executable,
+            raw=None,
         )
 
         class Raw:
@@ -87,10 +92,19 @@ def test_owned_daemon_registry_0644_inside_private_directory_is_supported(local_
     raw.close()
 
 
-@pytest.mark.parametrize("change", [
-    "peer_pid", "uid", "process_path", "reused_pid", "socket_permissions",
-    "directory_permissions", "registry_symlink", "socket_symlink",
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "peer_pid",
+        "uid",
+        "process_path",
+        "reused_pid",
+        "socket_permissions",
+        "directory_permissions",
+        "registry_symlink",
+        "socket_symlink",
+    ],
+)
 def test_stale_forged_and_reused_physical_host_identities_are_refused(local_host, change):
     binding, state, registry, saved, path = local_host
     if change == "peer_pid":
@@ -135,7 +149,8 @@ def test_socket_census_refreshes_only_one_endpoint_owned_by_registered_host(
             names = [path, other]
         pid = 5678 if mode == "wrong_pid" else 1234
         monkeypatch.setattr(
-            codex_host.subprocess, "run",
+            codex_host.subprocess,
+            "run",
             lambda *_args, **_kwargs: SimpleNamespace(
                 stdout=f"p{pid}\n" + "".join(f"n{candidate}\n" for candidate in names)
             ),
@@ -147,3 +162,39 @@ def test_socket_census_refreshes_only_one_endpoint_owned_by_registered_host(
             assert census(1234) == (path if mode == "unique" else other)
     finally:
         endpoint.close()
+
+
+def _release(home, version, arch="x86_64-apple-darwin"):
+    binary = home / "packages" / "app-server-daemon" / "releases" / f"{version}-{arch}" / "bin"
+    binary.mkdir(parents=True)
+    (binary / "codex").write_text("")
+    return str(binary / "codex")
+
+
+def _binding(home, pinned):
+    from kirabridge.bridge_core.config import NativeCodexBinding
+
+    return NativeCodexBinding(
+        thread_id="11111111-1111-7111-8111-111111111111",
+        session_id="11111111-1111-7111-8111-111111111111",
+        codex_home=str(home),
+        host_executable=pinned,
+        source="vscode",
+    )
+
+
+def test_host_patch_update_keeps_the_assignment_but_nothing_else_does(tmp_path):
+    from kirabridge.platform_adapters.codex_host import _same_host_line
+
+    home = tmp_path.resolve() / ".codex"
+    pinned = _release(home, "0.169.0")
+    binding = _binding(home, pinned)
+    assert _same_host_line(binding, pinned)
+    assert _same_host_line(binding, _release(home, "0.169.1"))  # patch update
+    assert not _same_host_line(binding, _release(home, "0.170.0"))  # other minor line
+    assert not _same_host_line(binding, _release(home, "0.169.2", "aarch64-apple-darwin"))
+    outside = tmp_path.resolve() / "elsewhere" / "bin"
+    outside.mkdir(parents=True)
+    (outside / "codex").write_text("")
+    assert not _same_host_line(binding, str(outside / "codex"))
+    assert not _same_host_line(binding, str(home / "packages" / "missing" / "bin" / "codex"))

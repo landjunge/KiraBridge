@@ -10,6 +10,7 @@ import asyncio
 import ctypes
 import json
 import os
+import re
 import socket
 import stat
 import struct
@@ -91,8 +92,8 @@ def _socket(binding):
         if (
             int(fields[0]) != os.getuid()
             or started != identity["startSeconds"]
-            or _process_path(pid) != binding.host_executable
-            or not fields[6].startswith(binding.host_executable + " app-server ")
+            or not _same_host_line(binding, _process_path(pid))
+            or not fields[6].startswith(_process_path(pid) + " app-server ")
             or "--managed-daemon" not in fields[6].split()
             or "--listen unix://" not in fields[6]
         ):
@@ -108,6 +109,34 @@ def _socket(binding):
     except BaseException:
         raw.close()
         raise
+
+
+_RELEASE = re.compile(r"^(\d+)\.(\d+)\.(\d+)-([a-z0-9_]+-apple-darwin)$")
+
+
+def _same_host_line(binding, actual):
+    """The running host is the pinned one or a patch release of the same managed install.
+
+    Never trusts a path outside CODEX_HOME/packages/app-server-daemon/releases/<v>/bin/codex.
+    """
+    if actual == binding.host_executable:
+        return True
+    releases = Path(binding.codex_home) / "packages" / "app-server-daemon" / "releases"
+    found, pinned = Path(actual), Path(binding.host_executable)
+    try:
+        if (
+            found != found.resolve(strict=True)
+            or found.name != "codex"
+            or found.parent.name != "bin"
+        ):
+            return False
+        a, b = found.parent.parent, pinned.parent.parent
+        if a.parent != releases or b.parent != releases:
+            return False
+        left, right = _RELEASE.match(a.name), _RELEASE.match(b.name)
+    except OSError:
+        return False
+    return bool(left and right and left.group(1, 2, 4) == right.group(1, 2, 4))
 
 
 def _process_path(pid):
@@ -193,9 +222,13 @@ class CodexHost:
                         "capabilities": {"experimentalApi": True},
                     },
                 )
-                if initialized.get("codexHome") != binding.codex_home or not initialized.get(
-                    "userAgent", ""
-                ).startswith("codex-tui/" + binding.protocol_version + " "):
+                agent = re.match(r"^codex-tui/(\d+)\.(\d+)\.\d+ ", initialized.get("userAgent", ""))
+                wanted = binding.protocol_version.split(".")[:2]
+                if (
+                    initialized.get("codexHome") != binding.codex_home
+                    or agent is None
+                    or list(agent.groups()) != wanted
+                ):
                     raise refused("native_codex_host_unverified")
                 await ws.send(json.dumps({"method": "initialized", "params": {}}))
                 yield rpc, generation
