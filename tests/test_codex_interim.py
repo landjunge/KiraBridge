@@ -4,6 +4,7 @@
 
 import copy
 import json
+import os
 import subprocess
 
 import pytest
@@ -265,7 +266,16 @@ def test_busy_composer_native_echo_and_verifier(literal_visible):
         + json.dumps(after)
         + ",100));"
     )
-    result = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True)
+    # console.log(true) is yellow when Node honors FORCE_COLOR, including over NO_COLOR.
+    node_env = os.environ.copy()
+    node_env.update(FORCE_COLOR="0", NO_COLOR="1", CLICOLOR_FORCE="0", TERM="dumb")
+    result = subprocess.run(
+        ["node", "-e", script],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=node_env,
+    )
     assert result.stdout.strip() == "true"
     from kirabridge.interim_message import normalized_composer
 
