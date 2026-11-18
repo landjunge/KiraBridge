@@ -48,7 +48,7 @@ class PathScope:
                 fd = next_fd
         except OSError as error:
             os.close(fd)
-            if error.errno in (errno.ENOENT, errno.ENOTDIR):
+            if error.errno == errno.ENOENT:
                 raise BridgeError("not_found", "Directory does not exist") from None
             raise BridgeError(
                 "path_denied", "Cannot open a directory without following symlinks"
