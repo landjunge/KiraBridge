@@ -152,6 +152,7 @@ remains available as dated evidence, not as the current installed version.
 - **No late surprises:** at most three tasks wait at a time; a fourth cancels the
   oldest waiting one. Work that waited longer than an hour is stopped and reported,
   never run later. Large outputs are kept short in the database, the audit trail stays complete.
+- **Newest board text (development source):** `order="newest"` reads the latest whiteboard page, and `whiteboard_search` finds text in one board. Not a new installed release.
 
 ThreadDesk and other integrations are optional. KiraBridge's core works independently.
 If ThreadDesk is configured, the package brings the pinned ThreadDesk library and the

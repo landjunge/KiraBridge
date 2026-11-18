@@ -151,6 +151,7 @@ bleiben als datierte Nachweise erhalten, nicht als aktueller Installationsstand.
 - **Keine späten Überraschungen:** Höchstens drei Aufträge warten gleichzeitig; ein vierter
   storniert den ältesten wartenden. Was länger als eine Stunde wartet, wird gestoppt und
   gemeldet, nie später ausgeführt. Große Ausgaben bleiben in der Datenbank kurz, das Protokoll vollständig.
+- **Neuester Boardtext (Entwicklungsstand):** `order="newest"` liest die neueste Whiteboard-Seite, `whiteboard_search` findet Text in einem Board. Keine neue Installation.
 
 ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funktioniert eigenständig.
 Ist ThreadDesk eingerichtet, bringt das Paket die gepinnte ThreadDesk-Bibliothek mit. Der

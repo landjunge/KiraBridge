@@ -151,6 +151,66 @@ def test_catalog_schema_names_the_whiteboard_tools():
     read = str(ThreadDeskReadInput.model_json_schema())
     manage = str(ThreadDeskManageInput.model_json_schema())
     assert "whiteboard_list" in read and "whiteboard_get" in read
+    assert "whiteboard_search" in read
+    assert 'Für die neuesten Einträge order="newest" verwenden.' in read
     assert "whiteboard_append" in manage
     with pytest.raises(ValidationError):
         ThreadDeskReadInput(tool="not_a_tool", arguments={})
+
+
+async def test_newest_order_and_search_stay_on_local_files(tmp_path):
+    from kirabridge.bridge_core.models import BridgeError
+
+    config = _config(tmp_path)
+    board = tmp_path / "desk" / "whiteboard" / "board-1"
+    for ordinal, text in ((1, "nur-alt geheim"), (2, "mitte"), (3, "nur-neu geheim")):
+        (board / f"e{ordinal}.json").write_text(
+            json.dumps(
+                {
+                    "id": f"e{ordinal}",
+                    "ordinal": ordinal,
+                    "entry_type": "note",
+                    "actor": "Grok",
+                    "created_at": "2026-11-18T00:00:00Z",
+                    "content": text,
+                }
+            )
+        )
+    manager = ThreadDeskManager(config)
+    page, seen = await _run(
+        manager,
+        ThreadDeskReadInput(
+            tool="whiteboard_list",
+            arguments={"id": "board-1", "include_content": True, "order": "newest", "limit": 1},
+        ),
+    )
+    assert seen[0]["tool"] == "whiteboard_list"
+    assert page["evidence"]["peer_called"] is False
+    assert [item["id"] for item in page["value"]["entries"]] == ["e3"]
+    assert page["value"]["order"] == "newest"
+    assert page["value"]["next_offset"] == 1 and page["value"]["complete"] is False
+    found, seen = await _run(
+        manager,
+        ThreadDeskReadInput(
+            tool="whiteboard_search",
+            arguments={"id": "board-1", "query": "GEHEIM", "limit": 10},
+        ),
+    )
+    assert seen[0]["tool"] == "whiteboard_search"
+    assert found["evidence"]["peer_called"] is False
+    assert [item["ordinal"] for item in found["value"]["matches"]] == [3, 1]
+    with pytest.raises(BridgeError, match="query"):
+        await _run(
+            manager,
+            ThreadDeskReadInput(
+                tool="whiteboard_search",
+                arguments={"id": "board-1", "query": "x" * 201},
+            ),
+        )
+    with pytest.raises(BridgeError, match="invalid"):
+        await _run(
+            manager,
+            ThreadDeskReadInput(
+                tool="whiteboard_search", arguments={"id": "../secrets", "query": "geheim"}
+            ),
+        )

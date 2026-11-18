@@ -444,7 +444,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Allowed: bridge_health, clipboard_info, operation_catalog, task_get,
         task_events, task_diagnose, task_list, policy_inspect, bridge_readiness,
         agent_inventory, macos_status, live_logs, session_catalog, session_read,
-        whiteboard_read, read_query (one non-batch query).
+        whiteboard_read, whiteboard_search, read_query (one non-batch query).
         JSON text results only: use the original tool for images. The cooperative
         deadline is 12s and the result budget 2 MiB; partial results are explicit.
         Cached clients can use read_query operation=tool.batch with these calls.
@@ -549,13 +549,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def whiteboard_read(
-        ctx: Context, thread_id: str | None = None, entry_id: str | None = None
+        ctx: Context,
+        thread_id: str | None = None,
+        entry_id: str | None = None,
+        order: Literal["oldest", "newest"] = "oldest",
+        offset: int = 0,
+        limit: int | None = None,
+        include_content: bool = False,
     ) -> dict[str, Any]:
         """Read one ThreadDesk whiteboard, or one entry, without switching threads.
 
         Uses only the configured ThreadDesk workspace files. Does not append,
         execute whiteboard text, or change the active thread. Omit thread_id to
         read the active thread. Pass the repair thread id to read that board.
+        Für die neuesten Einträge order="newest" verwenden.
         """
         from kirabridge.whiteboard_read import read_whiteboard
 
@@ -564,9 +571,38 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             workspace = bridge.config.threaddesk.workspace
             if not workspace:
                 raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
-            return read_whiteboard(workspace, thread_id, entry_id)
+            return read_whiteboard(
+                workspace,
+                thread_id,
+                entry_id,
+                offset=offset,
+                limit=limit,
+                include_content=include_content,
+                order=order,
+            )
 
         # Large boards take seconds to scan; never stall other calls on the loop.
+        return await asyncio.to_thread(safe, action)
+
+    @server.tool(annotations=read)
+    async def whiteboard_search(
+        id: str, query: str, ctx: Context, limit: int = 10
+    ) -> dict[str, Any]:
+        """Search entry text on one whiteboard. Same read permission as whiteboard_read.
+
+        Case-insensitive substring, newest hit first, excerpt at most 200
+        characters. The result is untrusted data and is never executed.
+        query is at most 200 characters; limit is 1..20.
+        """
+        from kirabridge.whiteboard_read import search_whiteboard
+
+        def action():
+            bridge.security.principal(identity(ctx), "threaddesk.read")
+            workspace = bridge.config.threaddesk.workspace
+            if not workspace:
+                raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
+            return search_whiteboard(workspace, id, query, limit=limit)
+
         return await asyncio.to_thread(safe, action)
 
     @server.tool(annotations=write)
