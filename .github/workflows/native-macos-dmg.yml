@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build and validate native drag-and-drop DMG
         run: |
           set -euo pipefail
@@ -37,7 +37,7 @@ jobs:
           hdiutil create -volname KiraBridge -srcfolder dist/dmg -format UDZO -ov "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg"
           hdiutil verify "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg"
           shasum -a 256 "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg" > "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg.sha256"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: KiraBridge-macOS-${{ matrix.suffix }}-DMG
           path: |
