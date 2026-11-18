@@ -117,7 +117,9 @@ def build(destination: Path, app: Path) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--app", type=Path, required=True, help="Installer .app from build_installer_app.py")
+    parser.add_argument(
+        "--app", type=Path, required=True, help="Installer .app from build_installer_app.py"
+    )
     parser.add_argument("--out", type=Path, required=True, help="New .dmg destination")
     args = parser.parse_args()
     print(json.dumps(build(args.out.absolute(), args.app.absolute()), indent=2))
