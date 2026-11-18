@@ -21,6 +21,10 @@ jobs:
           - runner: macos-15
             arch: arm64
             suffix: AppleSilicon
+    # Apple Silicon runners are billed; they only run when the repository variable
+    # BUILD_APPLE_SILICON is 'true'. Otherwise that leg is skipped and the Intel
+    # installer is still attached to the release.
+    if: ${{ matrix.arch != 'arm64' || vars.BUILD_APPLE_SILICON == 'true' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
