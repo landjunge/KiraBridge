@@ -22,9 +22,9 @@
 
 <!-- AUTO-DOWNLOADS:START -->
 <p align="center">
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc51/KiraBridge-macOS-AppleSilicon.dmg" title="KiraBridge-macOS-AppleSilicon.dmg herunterladen / download"><img src="assets/readme/download-macos-apple-silicon.svg" alt="Download macOS Apple Silicon 0.8.0rc51" width="190" height="52"></a>
+  <img src="assets/readme/download-macos-apple-silicon.svg" alt="macOS Apple Silicon: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc51/KiraBridge-macOS-Intel.dmg" title="KiraBridge-macOS-Intel.dmg herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc51" width="190" height="52"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc52/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc52" width="190" height="52"></a>
   &nbsp;
   <img src="assets/readme/download-windows.svg" alt="Windows: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
