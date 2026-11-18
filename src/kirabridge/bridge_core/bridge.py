@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -319,9 +320,16 @@ class Bridge:
         self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
 
+        next_prune = 0.0
+
         def maintain():
+            nonlocal next_prune
             self.messages.voice_policy.expire()
-            self.outputs.prune()
+            # Tidying runs often enough to stay current, not on every idle worker wake-up:
+            # capture() still prunes before every write, so nothing is ever left expired.
+            if time.monotonic() >= next_prune:
+                next_prune = time.monotonic() + 30.0
+                self.outputs.prune()
 
         self.tasks.maintenance = maintain
         self.message_receiver = MessageReceiver(self)
