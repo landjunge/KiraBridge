@@ -404,6 +404,42 @@ async def test_watchdog_requeues_an_unsent_timeout_and_delivers_once(delivery, m
     assert transport["calls"] == ["insert", "return"]
 
 
+async def test_old_unsent_message_is_delivered_once_but_evidenced_input_stays_blocked(
+    delivery, monkeypatch
+):
+    bridge, transport, direct, _, pool = delivery
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr(
+        "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+    )
+    stale = time.time() - bridge.config.queue_stale_seconds - 5
+    sent = new_message(bridge, "aged-unsent")
+    bridge.store.db.execute("UPDATE messages SET created=? WHERE id=?", (stale, sent["id"]))
+    assert direct.submit("chatgpt", sent["id"])
+    await direct.wait_delivery(sent["id"])
+    await settled(direct)
+    assert job(bridge, sent)["state"] == "completed"
+    assert transport["calls"] == ["insert", "return"]
+    assert not direct.submit("chatgpt", sent["id"])
+    from kirabridge.message_manager.receiver import MessageReceiver
+
+    assert not await MessageReceiver(bridge)._dispatch_next("grok", include_visible=False)
+    assert transport["calls"] == ["insert", "return"]
+
+    evidenced = new_message(bridge, "aged-uncertain")
+    bridge.store.db.execute("UPDATE messages SET created=? WHERE id=?", (stale, evidenced["id"]))
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=? WHERE message_id=?",
+        (json.dumps({"terminal_input_attempted": "unconfirmed"}), evidenced["id"]),
+    )
+    assert bridge.message_receiver._claim(evidenced["id"]) is None
+    blocked = job(bridge, evidenced)
+    assert blocked["state"] == "blocked"
+    assert blocked["evidence"]["reason"] == "stale_queue_expired"
+    assert bridge.message_receiver._claim(evidenced["id"]) is None
+    assert transport["calls"] == ["insert", "return"]
+
+
 async def test_watchdog_keeps_a_claimed_ambiguous_attempt_unknown(delivery, monkeypatch):
     bridge, transport, direct, _, _ = delivery
     direct.delivery_timeout = 0.02
@@ -483,9 +519,7 @@ async def test_competing_admission_waits_instead_of_a_second_execute(
         assert current["state"] == "queued"
         assert current["evidence"]["reason"] == "execution_busy"
         assert current["evidence"]["terminal_input_attempted"] is False
-        assert not await bridge.message_receiver._dispatch_next(
-            "grok", include_visible=False
-        )
+        assert not await bridge.message_receiver._dispatch_next("grok", include_visible=False)
         assert job(bridge, second)["state"] == "queued"
         assert connected == ["grok"]
     release.set()

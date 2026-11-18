@@ -755,8 +755,12 @@ class MessageReceiver:
                         },
                     )
 
-            if row["created"] <= time.time() - self.bridge.config.queue_stale_seconds:
-                # Late delivery could duplicate work already done in the visible terminal.
+            if row[
+                "created"
+            ] <= time.time() - self.bridge.config.queue_stale_seconds and self._delivery_evidenced(
+                message_id, row
+            ):
+                # Age alone does not block a message that was never sent.
                 blocked("stale_queue_expired")
                 return None
             # Both run ceilings are rolling one-hour windows that bound provider
@@ -822,6 +826,43 @@ class MessageReceiver:
                 },
             )
             return dict(row), run_id
+
+    def _delivery_evidenced(self, message_id, row):
+        """True when a paste, receipt, or uncertain attempt is already recorded."""
+        if any(row[key] is not None for key in ("delivered", "receipt", "acknowledged")):
+            return True
+        job = self.bridge.store.db.execute(
+            "SELECT started, evidence FROM message_jobs WHERE message_id=?",
+            (message_id,),
+        ).fetchone()
+        if job is None or job["started"] is not None:
+            return True
+        try:
+            evidence = json.loads(job["evidence"] or "{}")
+        except (ValueError, TypeError):
+            return True
+        if not isinstance(evidence, dict):
+            return True
+        if evidence.get("terminal_input_attempted", False) is not False:
+            return True
+        handoffs = self.bridge.store.db.execute(
+            "SELECT state, evidence FROM visible_handoffs WHERE message_id=?",
+            (message_id,),
+        ).fetchall()
+        for handoff in handoffs:
+            try:
+                saved = json.loads(handoff["evidence"] or "{}")
+            except (ValueError, TypeError):
+                return True
+            safe_abort = (
+                handoff["state"] == "interrupted"
+                and isinstance(saved, dict)
+                and saved.get("preinput_abort") is True
+                and saved.get("terminal_input_attempted") is False
+            )
+            if not safe_abort:
+                return True
+        return False
 
     def _deferred_unsent(self, row):
         """True only for a queued message that never attempted input."""
