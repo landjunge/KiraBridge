@@ -55,6 +55,8 @@ class MessageReceiver:
         "visible_target_working",
         "visible_target_scrolled",
         "visible_target_unknown",
+        "execution_busy",
+        "delivery_timeout",
     }
 
     def __init__(self, bridge):
