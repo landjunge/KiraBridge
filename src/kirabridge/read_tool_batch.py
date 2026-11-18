@@ -40,6 +40,7 @@ READ_TOOLS = frozenset(
         "session_catalog",
         "session_read",
         "whiteboard_read",
+        "whiteboard_search",
         "read_query",
     }
 )
