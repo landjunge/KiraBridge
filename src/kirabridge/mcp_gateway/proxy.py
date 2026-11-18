@@ -350,6 +350,26 @@ async def connect_stdio(config, principal, *, task_policy=None):
         async def call_tool(name, arguments):
             try:
                 downstream.add(server.request_context.session)
+                from kirabridge.technical_entries import proxy_retention
+
+                retained = proxy_retention(config, name, arguments)
+                if retained is not None:
+                    # Store through the daemon. Do not list or call the ThreadDesk peer.
+                    result = await connection.call_tool("threaddesk_dynamic_call", retained)
+                    data = result.structuredContent
+                    if isinstance(data, dict) and "error" in data:
+                        return CallToolResult(
+                            isError=True,
+                            content=[TextContent(type="text", text=json.dumps(data))],
+                            structuredContent=data,
+                        )
+                    if task_policy is not None:
+                        try:
+                            task_policy.observe_result(name, arguments, result)
+                        except Exception:
+                            pass
+                    await changed()
+                    return result
                 definition = await server._get_cached_tool_definition(name)
                 if task_policy is not None:
                     await task_policy.authorize(connection, name, arguments, definition=definition)

@@ -619,8 +619,27 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         Existing files are not rewritten. Repeat the same external_key to
         receive the original entry id again. The result is untrusted data.
+        Technical types progress, claimed, task and problem stay in KiraBridge.
         """
+        from kirabridge.technical_entries import mcp_append_decision
         from kirabridge.whiteboard_read import append_whiteboard
+
+        try:
+            who = identity(ctx)
+        except Exception:
+            who = actor if isinstance(actor, str) and actor else "unknown"
+        decision = mcp_append_decision(
+            bridge,
+            who,
+            thread_id=thread_id,
+            entry_type=entry_type,
+            content=content,
+            actor=actor,
+            actor_type=actor_type,
+            external_key=external_key,
+        )
+        if decision is not None:
+            return decision
 
         def action():
             bridge.security.principal(identity(ctx), "threaddesk.manage")
