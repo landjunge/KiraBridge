@@ -20,14 +20,14 @@ Neu gegenüber RC51:
   1 bis 20 Treffer, neueste zuerst, Ausschnitte bis 200 Zeichen). Gleiche
   Workspace- und ID-Prüfung wie `whiteboard_list`; Ergebnisse sind Daten, keine
   Anweisung. `order` wirkt auf Inhaltsseiten (`include_content`).
-- Teamaufträge in der CLI. `kirabridge team work` kennt `--after`, `--limit`
-  (1 bis 100) und `--latest N`; bei vollen Seiten steht `next_after` im Ergebnis.
 - Installer. Der Workflow `native-macos-dmg.yml` nutzt SHA-gepinnte Actions
   (vorher `startup_failure`) und läuft bei jedem veröffentlichten Release. Ein
   zweiter Job prüft die Prüfsummen und hängt beide DMGs samt `.sha256` an.
 - opencode. `opencode_http_v2` ist in der Bereitschaftsprüfung wie
   `opencode_http` von der Ausführbare-Datei-Prüfung ausgenommen.
 - Tests unabhängig von Terminalfarbe und `umask` (Codex-Interim, Qwen-Recovery).
+
+Berichtigung (18.11.2026): Das Durchblättern von Teamaufträgen in der CLI (`--after`, `--limit`, `--latest`) war in der ursprünglichen Notiz zu RC52 genannt, war aber nicht Teil dieses Releases. Es kommt mit dem nächsten Release.
 
 Offen und nicht Teil dieses Releases:
 
