@@ -1258,3 +1258,43 @@ async def test_grok_placeholder_handoff_pastes_returns_once_and_releases_the_fie
     assert transport["calls"] == ["insert", "return"]
     status = bridge.visible_handoffs.status("chatgpt", "grok-placeholder-once")
     assert status["state"] == "sent"
+
+
+async def test_finished_wait_for_reply_handoff_with_unconfirmed_reply_releases_after_fresh_ready(
+    visible,
+):
+    """A Codex turn whose answer could not be observed must not lock the terminal forever."""
+    bridge, transport = visible
+    transport.update(ack=False, reply=False)
+    args = AgentInput(agent="grok", prompt="Awaited work", cwd="/tmp", timeout=0.35)
+    task = {"id": "unconfirmed-reply", "principal": "chatgpt"}
+    waiter = asyncio.create_task(bridge.visible_handoffs.execute(task, args, callback, callback))
+    async with asyncio.timeout(1):
+        while "return" not in transport["calls"]:
+            await asyncio.sleep(0)
+    with pytest.raises(UncertainExecution):
+        await waiter
+    before = bridge.visible_handoffs.status("chatgpt", task["id"])
+    evidence = {
+        key: value
+        for key, value in before["evidence"].items()
+        if key not in {"input_reservation_released", "target_readiness"}
+    }
+    # The shape written by the local Codex observer path: answer unknown, no release.
+    bridge.visible_handoffs.transition(
+        task["id"], "unknown", {**evidence, "reason": "reply_unconfirmed"}
+    )
+    binding = bridge.config.visible_handoffs.bindings["grok"]
+    await bridge.visible_handoffs.reconcile_target_reservations("chatgpt", "grok", binding)
+    after = bridge.visible_handoffs.status("chatgpt", task["id"])
+    assert after["state"] == "unknown"
+    assert after["evidence"]["reason"] == "reply_unconfirmed_target_ready"
+    assert after["evidence"]["input_reservation_released"] is True
+    assert after["evidence"]["automatic_retry"] is False
+    result = await bridge.visible_handoffs.execute(
+        {"id": "next-after-unconfirmed", "principal": "chatgpt"},
+        args.model_copy(update={"wait_for_reply": False}),
+        callback,
+        callback,
+    )
+    assert result["scope"] == "visible_input_delivery"

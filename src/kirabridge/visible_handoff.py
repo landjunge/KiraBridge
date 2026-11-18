@@ -666,6 +666,32 @@ class VisibleHandoffs:
                         },
                     )
                 continue
+            if (
+                status["state"] == "unknown"
+                and status["binding"] == binding.model_dump()
+                and self.body_only_delivery(status)
+                and status["evidence"].get("reason")
+                in {"reply_unconfirmed", "reply_unconfirmed_target_ready"}
+            ):
+                # The input was delivered and returned; only its ANSWER is unknown and its
+                # waiter has ended. The lock exists to protect pending input, so a fresh
+                # positive ready check of this same target releases it. Never replayed.
+                if status["evidence"].get("reason") == "reply_unconfirmed_target_ready":
+                    continue
+                await self.check_target(principal, target, binding, ready=True)
+                self.transition(
+                    row["id"],
+                    "unknown",
+                    {
+                        **status["evidence"],
+                        "reason": "reply_unconfirmed_target_ready",
+                        "previous_reason": status["evidence"].get("reason"),
+                        "input_reservation_released": True,
+                        "automatic_retry": False,
+                        "target_readiness": "verified_ready_before_new_input",
+                    },
+                )
+                continue
             message = self.messages.get(row["principal"], status["message_id"])
             reply = self.store.db.execute(
                 "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
