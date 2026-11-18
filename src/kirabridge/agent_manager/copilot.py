@@ -6,7 +6,12 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from kirabridge.agent_manager.cli_support import BoundedText, bind_session, cli_environment
+from kirabridge.agent_manager.cli_support import (
+    BoundedText,
+    bind_session,
+    cli_environment,
+    note_cli_failure,
+)
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
 
@@ -157,15 +162,24 @@ class CopilotCLIAdapter:
                 line_callback=event,
             )
         if result["timed_out"] or result.get("terminated"):
-            raise UncertainExecution(
-                "agent_timeout", "Copilot CLI was interrupted; outcome is unknown"
+            raise note_cli_failure(
+                UncertainExecution(
+                    "agent_timeout", "Copilot CLI was interrupted; outcome is unknown"
+                ),
+                result,
             )
         if terminal_result is None:
-            raise UncertainExecution("agent_unconfirmed", "No native Copilot CLI result received")
+            raise note_cli_failure(
+                UncertainExecution("agent_unconfirmed", "No native Copilot CLI result received"),
+                result,
+            )
         success = terminal_result == 0 and result["exit_code"] == 0 and not failed
         if success and not (started and completed_turn):
-            raise UncertainExecution(
-                "agent_unconfirmed", "No completed Copilot model turn observed"
+            raise note_cli_failure(
+                UncertainExecution(
+                    "agent_unconfirmed", "No completed Copilot model turn observed"
+                ),
+                result,
             )
         return {
             "success": success,

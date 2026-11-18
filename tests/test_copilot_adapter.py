@@ -180,6 +180,29 @@ async def test_copilot_file_mentions_and_commands_remain_literal_text():
     assert json.loads(wire_text.split("\n", 1)[1]) == prompt
 
 
+async def test_copilot_unconfirmed_keeps_sanitized_auth_cause():
+    secret = "gho_" + ("a" * 28)
+    terminal = Terminal([], exit_code=1)
+    terminal.result["stderr"] = f"No authentication information found\ntoken={secret}\x00\n"
+    terminal.result["stdout"] = "PROMPT_SHOULD_NOT_APPEAR"
+    with pytest.raises(UncertainExecution) as error:
+        await execute(terminal)
+    assert error.value.code == "agent_unconfirmed"
+    diagnostic = error.value.provider_error["diagnostic"]
+    assert diagnostic.startswith("No authentication information found")
+    assert "token=[redacted]" in diagnostic
+    assert secret not in diagnostic
+    assert "PROMPT_SHOULD_NOT_APPEAR" not in diagnostic
+    assert "\n" not in diagnostic and "\x00" not in diagnostic
+    assert len(diagnostic) <= 200
+    fallback = Terminal([], exit_code=1)
+    fallback.result["stderr"] = " \n"
+    fallback.result["stdout"] = "No authentication information found"
+    with pytest.raises(UncertainExecution) as error:
+        await execute(fallback)
+    assert error.value.provider_error == {"diagnostic": "No authentication information found"}
+
+
 async def test_copilot_validates_original_directory_before_isolation(tmp_path):
     terminal = Terminal(events())
     with pytest.raises(BridgeError) as error:

@@ -217,6 +217,7 @@ async def test_create_prompt_and_correlate_reply(tmp_path):
     server = Server(location=str(tmp_path))
     result, running, _ = await execute(tmp_path, server)
     assert result["success"] and result["text"] == "Harmless answer"
+    assert result["evidence"]["provider_error"] is None
     assert result["evidence"]["adapter"] == "opencode_http_v2"
     assert result["evidence"]["session_id"].startswith("ses_")
     assert result["evidence"]["session_id"] == server.session_id
@@ -360,6 +361,26 @@ async def test_cwd_outside_roots_is_denied(tmp_path):
             record,
         )
     assert caught.value.code == "path_denied"
+
+
+async def test_rejected_request_keeps_http_status_without_the_body(tmp_path):
+    def handler(request):
+        return httpx.Response(422, json={"error": "secret-provider-body", "token": "T" * 40})
+
+    adapter = OpenCodeHTTPV2Adapter(transport=httpx.MockTransport(handler), poll_interval=0.01)
+    with pytest.raises(BridgeError) as caught:
+        await adapter.execute(
+            {"id": "task-1", "principal": "owner"},
+            AgentInput(agent="opencode_http_v2", prompt="hello", cwd=str(tmp_path), timeout=3),
+            config(),
+            [str(tmp_path)],
+            record,
+            record,
+        )
+    assert caught.value.code == "agent_rejected"
+    assert caught.value.provider_error == {"http_status": 422}
+    dumped = json.dumps(caught.value.provider_error)
+    assert "secret-provider-body" not in dumped and "T" * 40 not in dumped
 
 
 async def record(value):

@@ -55,6 +55,12 @@ def _error_category(error: Any) -> str | None:
     return _ERROR_CATEGORIES.get(name, "provider") if isinstance(name, str) else "provider"
 
 
+def _with_http_status(exc, status: int):
+    """Record only the status code. Response bodies can hold credentials or prompts."""
+    exc.provider_error = {"http_status": status}
+    return exc
+
+
 def _completed(message: dict[str, Any]) -> bool:
     time = message.get("time")
     if not isinstance(time, dict):
@@ -98,17 +104,29 @@ class OpenCodeHTTPAdapter:
             ) from None
         status = response.status_code
         if status in {401, 403}:
-            raise BridgeError("agent_auth", "OpenCode server rejected the configured credentials")
+            raise _with_http_status(
+                BridgeError("agent_auth", "OpenCode server rejected the configured credentials"),
+                status,
+            )
         if status == 404:
-            raise UncertainExecution("session_unknown", "OpenCode session is no longer available")
+            raise _with_http_status(
+                UncertainExecution("session_unknown", "OpenCode session is no longer available"),
+                status,
+            )
         if status in _FAILED_STATUS or status >= 500:
             # Status only: response bodies can contain provider or authorization details.
-            raise UncertainExecution(
-                "server_unknown", f"OpenCode server outcome is unknown (HTTP {status})"
+            raise _with_http_status(
+                UncertainExecution(
+                    "server_unknown", f"OpenCode server outcome is unknown (HTTP {status})"
+                ),
+                status,
             )
         if status >= 400:
-            raise BridgeError(
-                "agent_rejected", f"OpenCode server rejected the request (HTTP {status})"
+            raise _with_http_status(
+                BridgeError(
+                    "agent_rejected", f"OpenCode server rejected the request (HTTP {status})"
+                ),
+                status,
             )
         return response
 

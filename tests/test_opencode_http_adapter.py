@@ -139,6 +139,7 @@ async def test_task_handoff_binds_one_session_and_reports_live_status(tmp_path):
     result, running, progress = await execute(tmp_path, server)
 
     assert result["success"] and result["text"] == "Harmless answer"
+    assert result["evidence"]["provider_error"] is None
     assert result["evidence"]["adapter"] == "opencode_http"
     assert result["evidence"]["session_id"] == "ses_test"
     assert result["evidence"]["status_events"] == ["busy", "idle"]
@@ -244,6 +245,26 @@ async def test_cwd_outside_allowed_roots_is_denied_before_any_request(tmp_path):
         )
     assert caught.value.code == "path_denied"
     assert server.requests == []
+
+
+async def test_rejected_request_keeps_http_status_without_the_body(tmp_path):
+    def handler(request):
+        return httpx.Response(400, json={"error": "secret-provider-body", "token": "T" * 40})
+
+    adapter = OpenCodeHTTPAdapter(transport=httpx.MockTransport(handler), poll_interval=0.01)
+    with pytest.raises(BridgeError) as caught:
+        await adapter.execute(
+            {"id": "task-1", "principal": "owner"},
+            AgentInput(agent="opencode_http", prompt="hello", cwd=str(tmp_path), timeout=3),
+            config(),
+            [str(tmp_path)],
+            record,
+            record,
+        )
+    assert caught.value.code == "agent_rejected"
+    assert caught.value.provider_error == {"http_status": 400}
+    dumped = json.dumps(caught.value.provider_error)
+    assert "secret-provider-body" not in dumped and "T" * 40 not in dumped
 
 
 async def record(value):
