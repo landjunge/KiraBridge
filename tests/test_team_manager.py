@@ -428,7 +428,7 @@ def test_claim_persists_once_before_execution_and_restart_does_not_queue_again(d
         reopened.store.close()
 
 
-def test_claim_revalidates_roles_permissions_and_hourly_budget(domain):
+def test_claim_revalidates_roles_and_permissions_and_notes_the_hourly_count(domain):
     item = domain.delegate("grok", work())
     role(domain, "codex", "observer")
     assert domain.claim(item["id"]) is None
@@ -438,8 +438,8 @@ def test_claim_revalidates_roles_permissions_and_hourly_budget(domain):
     first = domain.delegate("grok", work(idempotency_key="first"))
     second = domain.delegate("grok", work(idempotency_key="second"))
     assert domain.claim(first["id"])
-    assert domain.claim(second["id"]) is None
-    assert domain.work_get("local", "test-team", second["id"])["error"] == "team_rate_limit"
+    # Crossing the hourly count is only noted: work is never blocked by KiraBridge's own limit.
+    assert domain.claim(second["id"])
 
 
 def test_running_task_scope_revalidation_blocks_role_and_roster_escalation(domain):

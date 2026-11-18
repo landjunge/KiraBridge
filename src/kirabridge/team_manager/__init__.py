@@ -1412,8 +1412,10 @@ class TeamManager:
                 (time.time() - 3600,),
             ).fetchone()[0]
             if count >= self.config.team.max_runs_per_hour:
-                self._fail(work, "blocked", "team_rate_limit", {"reason": "hourly_turn_limit"})
-                return None
+                # Budgets belong to TollGate: note the crossing, never block the work.
+                self.store.audit(
+                    "team.limit_noted", work["assignee"], None, {"limit": "hourly_turn_limit"}
+                )
             core_id = "team-" + work["id"]
             resume_session = self.resume_session(work)
             generation = self._generation(work["team_id"], work["assignee"])
