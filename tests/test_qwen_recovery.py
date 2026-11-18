@@ -22,6 +22,10 @@ def recovery(tmp_path, monkeypatch):
     cwd = str(tmp_path / "cwd")
     project = tmp_path / ".qwen/projects" / cwd.replace("/", "-") / "chats"
     project.mkdir(parents=True)
+    # mkdir keeps the process umask. Under 077 the children are already private;
+    # under 000 they are group-writable. Only .qwen may be the private ancestor.
+    for directory in (tmp_path / ".qwen" / "projects", project.parent, project):
+        directory.chmod(0o755)
     (tmp_path / ".qwen").chmod(0o700)
     history = project / "session.jsonl"
     history.write_text(
