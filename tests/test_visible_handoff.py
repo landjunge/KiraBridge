@@ -1298,3 +1298,39 @@ async def test_finished_wait_for_reply_handoff_with_unconfirmed_reply_releases_a
         callback,
     )
     assert result["scope"] == "visible_input_delivery"
+
+
+@pytest.mark.parametrize(
+    "code,definite",
+    [
+        ("visible_input_changed", True),
+        ("visible_input_not_empty", True),
+        ("clipboard_changed", True),
+        ("visible_target_changed", True),
+        ("visible_focus_changed", False),  # can be thrown after the paste action
+        ("visible_paste_unconfirmed", False),
+    ],
+)
+async def test_guard_refusal_after_the_hook_but_before_paste_is_a_definite_failure(
+    visible, monkeypatch, code, definite
+):
+    bridge, transport = visible
+
+    async def refused_after_hook(principal, args, *, before_transport=None):
+        await before_transport()  # the real manager calls it right before the native script
+        raise BridgeError(code, "Native guard refused")
+
+    monkeypatch.setattr(bridge.sessions, "insert", refused_after_hook)
+    task = {"id": "guard-after-hook-" + code, "principal": "chatgpt"}
+    args = AgentInput(agent="grok", prompt="Only this authorized task", cwd="/tmp")
+    with pytest.raises((BridgeError, UncertainExecution)) as exc:
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    status = bridge.visible_handoffs.status("chatgpt", task["id"])
+    if definite:
+        assert exc.value.code == code and not isinstance(exc.value, UncertainExecution)
+        assert status["state"] == "interrupted"
+        assert status["evidence"]["terminal_input_attempted"] is False
+        # No lock is left behind: an independent request can take the terminal.
+        await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+    else:
+        assert isinstance(exc.value, UncertainExecution) and status["state"] == "unknown"

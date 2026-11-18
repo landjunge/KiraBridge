@@ -26,6 +26,18 @@ def _text_sha256(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+# Raised by the native insert script's guards before the Paste menu action is performed.
+PRE_PASTE_REFUSALS = frozenset(
+    {
+        "clipboard_changed",
+        "visible_input_not_empty",
+        "visible_input_changed",
+        "visible_target_changed",
+        "session_busy",
+    }
+)
+
+
 class VisibleReadinessError(BridgeError):
     def __init__(self, observation):
         self.observation = observation
@@ -1427,16 +1439,26 @@ class VisibleHandoffs:
                     and _needs_cwd_proof(before["text"])
                     else None
                 )
-                await self.sessions.insert(
-                    principal,
-                    SessionInput(
-                        pane_id=binding.pane_id,
-                        expected_pid=binding.expected_pid,
-                        text=prompt,
-                        submit=False,
-                    ),
-                    before_transport=before_paste,
-                )
+                try:
+                    await self.sessions.insert(
+                        principal,
+                        SessionInput(
+                            pane_id=binding.pane_id,
+                            expected_pid=binding.expected_pid,
+                            text=prompt,
+                            submit=False,
+                        ),
+                        before_transport=before_paste,
+                    )
+                except BridgeError as refusal:
+                    # These guards run in the native script strictly BEFORE the paste
+                    # action, so such a refusal proves nothing was sent: a definite,
+                    # retry-safe failure rather than a lock-holding unknown.
+                    if not isinstance(refusal, UncertainExecution) and (
+                        refusal.code in PRE_PASTE_REFUSALS
+                    ):
+                        input_attempted = False
+                    raise
                 inserted = await self.check_target(principal, target, binding)
                 observed = await self.verify_inserted_body(
                     principal, target, binding, prompt, before, inserted, before_cwd
