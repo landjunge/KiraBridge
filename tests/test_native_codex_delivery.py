@@ -28,7 +28,10 @@ OTHER = "22222222-2222-7222-8222-222222222222"
 @pytest.fixture
 def binding(tmp_path):
     return NativeCodexBinding(
-        thread_id=ROOT, session_id=ROOT, source="vscode", codex_home=str(tmp_path),
+        thread_id=ROOT,
+        session_id=ROOT,
+        source="vscode",
+        codex_home=str(tmp_path),
         host_executable="/opt/codex/bin/codex",
     )
 
@@ -39,9 +42,13 @@ class Protocol:
     def __init__(self, binding):
         self.binding = binding
         self.thread = {
-            "id": ROOT, "sessionId": ROOT, "source": "vscode",
-            "parentThreadId": None, "attachedToThreadId": None,
-            "canAcceptDirectInput": True, "status": {"type": "active", "activeFlags": []},
+            "id": ROOT,
+            "sessionId": ROOT,
+            "source": "vscode",
+            "parentThreadId": None,
+            "attachedToThreadId": None,
+            "canAcceptDirectInput": True,
+            "status": {"type": "active", "activeFlags": []},
         }
         self.turn = "root-turn-1"
         self.generation = "host-generation-1"
@@ -130,13 +137,18 @@ async def test_two_concurrent_threads_route_only_assigned_root_without_any_tty(b
         attempts.append(observation)
 
     result = await host.deliver(binding, prepared, "original-id", "/literal body", before_send)
-    assert p.inputs() == [{
-        "id": 4, "method": "turn/steer", "params": {
-            "threadId": ROOT, "expectedTurnId": "root-turn-1",
-            "clientUserMessageId": "original-id",
-            "input": [{"type": "text", "text": "/literal body", "text_elements": []}],
-        },
-    }]
+    assert p.inputs() == [
+        {
+            "id": 4,
+            "method": "turn/steer",
+            "params": {
+                "threadId": ROOT,
+                "expectedTurnId": "root-turn-1",
+                "clientUserMessageId": "original-id",
+                "input": [{"type": "text", "text": "/literal body", "text_elements": []}],
+            },
+        }
+    ]
     assert len(attempts) == 1
     assert result["completion_scope"] == "native_input_delivery"
     assert result["native_input_attempted"] and not result["terminal_input_attempted"]
@@ -144,12 +156,19 @@ async def test_two_concurrent_threads_route_only_assigned_root_without_any_tty(b
     assert all(sock.fileno() == -1 for sock in p.sockets)
 
 
-@pytest.mark.parametrize("patch", [
-    {"id": OTHER}, {"sessionId": OTHER}, {"parentThreadId": ROOT},
-    {"attachedToThreadId": ROOT}, {"source": {"subAgent": {"threadId": ROOT}}},
-    {"canAcceptDirectInput": False}, {"status": {"type": "notLoaded"}},
-    {"status": {"type": "active", "activeFlags": ["waitingOnApproval"]}},
-])
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"id": OTHER},
+        {"sessionId": OTHER},
+        {"parentThreadId": ROOT},
+        {"attachedToThreadId": ROOT},
+        {"source": {"subAgent": {"threadId": ROOT}}},
+        {"canAcceptDirectInput": False},
+        {"status": {"type": "notLoaded"}},
+        {"status": {"type": "active", "activeFlags": ["waitingOnApproval"]}},
+    ],
+)
 async def test_sibling_child_unloaded_and_ambiguous_targets_never_receive_input(binding, patch):
     p = Protocol(binding)
     p.thread.update(patch)
@@ -277,9 +296,17 @@ async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(d
     assert len(p.inputs()) == 1
 
 
-@pytest.mark.parametrize("change", [
-    "binding", "receiver", "grant", "hold", "withdrawal", "interim_disabled",
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "binding",
+        "receiver",
+        "grant",
+        "hold",
+        "withdrawal",
+        "interim_disabled",
+    ],
+)
 async def test_late_scope_changes_prevent_native_io(delivery, binding, change):
     bridge, transport, direct, _, _ = delivery
     p = Protocol(binding)
@@ -305,7 +332,8 @@ async def test_late_scope_changes_prevent_native_io(delivery, binding, change):
         else:
             bridge.store.db.execute(
                 "INSERT INTO queue_withdrawals(queue_id,item_id,actor,created,reason_sha256) "
-                "VALUES('messages',?,'chatgpt',1,'test-owner')", (sent["id"],)
+                "VALUES('messages',?,'chatgpt',1,'test-owner')",
+                (sent["id"],),
             )
 
     p.read_hook = late
@@ -345,9 +373,12 @@ async def test_restart_preserves_original_native_attempt_and_never_replays(deliv
     sent = new_message(bridge, key="native-crash-after-ledger", recipient="codex")
     claimed = bridge.message_receiver._claim(sent["id"], direct=True, interim=True, native=True)
     evidence = {
-        "session_scope": "existing_native_codex_root", "run_id": claimed[1],
-        "native_input_attempted": True, "terminal_input_attempted": False,
-        "thread_id": ROOT, "automatic_retry": False,
+        "session_scope": "existing_native_codex_root",
+        "run_id": claimed[1],
+        "native_input_attempted": True,
+        "terminal_input_attempted": False,
+        "thread_id": ROOT,
+        "automatic_retry": False,
     }
     bridge.store.db.execute(
         "UPDATE message_jobs SET started=1,evidence=? WHERE message_id=?",
@@ -377,9 +408,11 @@ async def test_explicit_interim_handle_keeps_its_own_target_when_native_root_is_
     direct.codex_host = p.host()
     named = bridge.config.visible_handoffs.bindings["codex"]
     monkeypatch.setattr(
-        bridge.messages, "interim_target",
+        bridge.messages,
+        "interim_target",
         lambda _: SimpleNamespace(
-            pane_id=named.pane_id, expected_pid=named.expected_pid,
+            pane_id=named.pane_id,
+            expected_pid=named.expected_pid,
             expected_agent_pid=named.agent_pid,
         ),
     )
