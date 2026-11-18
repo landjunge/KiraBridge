@@ -102,6 +102,7 @@ class DirectDelivery:
             if not result.cancelled():
                 result.exception()  # Consume a persistence fault; never retry it.
             self._forget_recorded(message_id)
+            self.receiver.messages.wake.set()
 
         task.add_done_callback(finished)
         return True
@@ -296,6 +297,16 @@ class DirectDelivery:
                 }
             if observation:
                 evidence["observation"] = observation
+            if (
+                not possible
+                and code in self.receiver.DEFER_UNSENT
+                and row["state"] == "queued"
+                and owned_run is None
+            ):
+                # Nothing was inserted. Keep the body queued for the existing
+                # receiver loop; do not hold it and do not paste while busy.
+                self.receiver._waiting(message_id, code, observation)
+                return
             if (
                 not possible
                 and not bridge.store.db.execute(
