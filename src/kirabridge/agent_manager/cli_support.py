@@ -91,7 +91,7 @@ _BEARER = re.compile(r"(?i)\bBearer\s+\S+")
 _ASSIGNMENT = re.compile(
     r"(?i)(?<![A-Za-z0-9])(api_key|token|password|secret|authorization)(\s*[=:]\s*)\S+"
 )
-_LONG_TOKEN = re.compile(r"[A-Za-z0-9_-]{24,}")
+_LONG_TOKEN = re.compile(r"[A-Za-z0-9_./+=-]{24,}")
 
 
 def _redact_assignment(match: re.Match) -> str:

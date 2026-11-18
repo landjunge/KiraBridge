@@ -134,6 +134,33 @@ def test_a_resume_turn_never_wakes_itself(domain):
     assert domain.resume_coordinators() == 0
 
 
+def test_broken_payload_is_skipped_and_the_later_valid_notice_is_resumed(domain):
+    domain.config.team.coordinator_resume = True
+    domain.store.db.execute(
+        "INSERT INTO completion_notices"
+        "(id,principal,target,source,source_id,event_seq,payload,created) "
+        "VALUES(?,?,?,?,?,?,?,?)",
+        (
+            "completion-team-broken",
+            "codex",
+            "team:test-team",
+            "team",
+            "broken-payload",
+            900001,
+            "{",
+            1.0,
+        ),
+    )
+    work_id = finish_grok_work(domain)
+    assert domain.resume_coordinators() == 1
+    (link,) = domain.store.db.execute("SELECT * FROM team_coordinator_resumes").fetchall()
+    assert link["work_id"] == work_id
+    broken = domain.store.db.execute(
+        "SELECT acknowledged FROM completion_notices WHERE id='completion-team-broken'"
+    ).fetchone()
+    assert broken["acknowledged"] is None
+
+
 def test_manual_delegator_is_not_resumed(domain):
     domain.config.team.coordinator_resume = True
     item = domain.delegate("chatgpt", work(assignee="grok", idempotency_key="by-chatgpt"))

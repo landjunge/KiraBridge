@@ -65,3 +65,23 @@ def test_completion_payload_reads_the_normalized_error():
     payload = completion_payload(task, 1)
     assert payload["error_code"] == "command_timeout" and payload["outcome"] == "timeout"
     assert payload["error_kind"] == "timeout"
+
+
+def test_killed_kind_without_termination_evidence_stays_an_error():
+    task = {
+        "id": "t",
+        "operation": "terminal.execute",
+        "state": "failed",
+        "error": {"code": "command_killed", "kind": "killed", "retry_safe": False},
+        "result": {"exit_code": -9},
+        "evidence": {},
+        "created": 1.0,
+        "updated": 2.0,
+        "started": 1.0,
+        "finished": 2.0,
+    }
+    payload = completion_payload(task, 1)
+    assert payload["outcome"] == "error"
+    assert payload["error_code"] == "command_killed" and payload["exit_code"] == -9
+    evidenced = {**task, "evidence": {"terminated": True}}
+    assert completion_payload(evidenced, 1)["outcome"] == "cancelled"

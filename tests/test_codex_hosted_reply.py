@@ -132,6 +132,16 @@ async def test_writer_outside_the_codex_daemon_directory_is_refused(hosted):
     assert result["state"] == "unavailable"
 
 
+async def test_writer_must_be_the_versioned_release_codex_binary(hosted):
+    hosted.rollout()
+    host_root = hosted.root.parent / "packages" / "app-server-daemon"
+    hosted.host_exe = str(host_root / "helper" / "x")
+    assert (await prepare(hosted))["state"] == "unavailable"
+    hosted.host_exe = str(host_root / "releases" / "0.169.1-x86_64-apple-darwin" / "bin" / "codex")
+    result = await prepare(hosted)
+    assert result["state"] == "ready"
+
+
 async def test_two_hosted_candidates_are_ambiguous(hosted):
     hosted.rollout("rollout-a.jsonl")
     hosted.rollout("rollout-b.jsonl", thread="01a192b9-64f2-7d22-8429-cabd5faf1999")

@@ -1830,8 +1830,11 @@ class TeamManager:
             if started >= limit:
                 break
             principal = notice["principal"]
-            payload = json.loads(notice["payload"])
-            done = self._work(payload["work_id"])
+            try:
+                payload = json.loads(notice["payload"])
+                done = self._work(payload["work_id"])
+            except (json.JSONDecodeError, KeyError, TypeError, BridgeError):
+                continue
             # Only immutable notice fields: a retry after a crash must hash identically.
             body = (
                 f"KiraBridge meldet: Auftrag {payload['work_id']} ({done['title']}) von "

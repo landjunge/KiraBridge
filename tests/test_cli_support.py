@@ -101,6 +101,18 @@ def test_safe_diagnostic_masks_secrets_controls_and_length():
     assert "\x07" not in bounded
 
 
+def test_safe_diagnostic_masks_dotted_slash_tokens_and_long_paths():
+    # Bare `key` is not an assignment name. The 18-character sample stays visible.
+    # A real assignment of the same short value is still masked before the length rule.
+    assert safe_diagnostic("key=sk-abc.def/ghi") == "key=sk-abc.def/ghi"
+    assert safe_diagnostic("token=sk-abc.def/ghi") == "token=[redacted]"
+    dotted = "sk-abc.def/ghijklmnopqrstuvwxyz0123"
+    assert safe_diagnostic(dotted) == "[redacted]"
+    path = "/tmp/path/with/secret-token"
+    assert len(path) >= 24 and safe_diagnostic(path) == "[redacted]"
+    assert safe_diagnostic("abc+def=ghijklmnopqrstuvwx") == "[redacted]"
+
+
 def test_bounded_utf8_text_and_stable_session_identity():
     output = BoundedText(5)
     output.append("😀😀")

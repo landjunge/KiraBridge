@@ -73,7 +73,7 @@ def completion_payload(task, event_seq, *, source="task"):
         or code in {"agent_timeout", "command_timeout"}
         or kind == "timeout"
     )
-    terminated = find_evidence(evidence, "terminated") is True or kind == "killed"
+    terminated = find_evidence(evidence, "terminated") is True
     provider = find_evidence(evidence, "provider_error")
     # Only the adapter's explicit structured code is evidence. Never inspect text
     # for words such as quota, credit, 429, billing, limit or payment.

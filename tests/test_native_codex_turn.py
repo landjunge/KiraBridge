@@ -132,6 +132,36 @@ async def test_other_cwd_is_not_a_candidate(app, tmp_path):
     assert app.sent == []
 
 
+async def test_relative_thread_cwd_is_never_chosen(app, tmp_path):
+    app.cwd = Path(".")
+    with pytest.raises(BridgeError) as error:
+        await NativeCodexTurns().execute(
+            template(tmp_path),
+            str(Path.cwd()),
+            "11111111-1111-4111-8111-111111111111",
+            "BODY",
+            5,
+            noop,
+        )
+    assert error.value.code == "native_codex_root_not_unique" and app.sent == []
+
+
+async def test_final_answer_before_the_user_message_is_not_verified(app, tmp_path):
+    original = app.turn
+
+    def reversed_items(status="completed"):
+        row = original(status)
+        row["items"] = [row["items"][1], row["items"][0]]
+        return row
+
+    app.turn = reversed_items
+    with pytest.raises(UncertainExecution) as error:
+        await execute(app, tmp_path)
+    assert error.value.code == "native_codex_turn_unverified" and app.sent == ["turn/start"]
+    app.turn = original
+    assert (await execute(app, tmp_path))["final_message"] == "ANSWER"
+
+
 async def test_a_running_turn_is_never_steered(app, tmp_path):
     app.active = True
     with pytest.raises(BridgeError) as error:

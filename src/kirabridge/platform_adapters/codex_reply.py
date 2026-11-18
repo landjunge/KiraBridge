@@ -5,7 +5,8 @@ exact process's open writers may supply one unambiguous task-local candidate.
 The task-bound Codex process must hold the same device/inode open for writing. Codex >= 0.169
 keeps no log open in its terminal process: the shared app-server daemon writes it. Then one
 unique candidate may be hosted: same user and cwd, born after the terminal process, written
-only by one process whose executable lives under CODEX_HOME/packages/app-server-daemon. A pre-paste
+only by one process whose executable is releases/<version>/bin/codex
+under that daemon directory. A pre-paste
 cursor, exact new UserMessage, matching turn, final AgentMessage and completion
 are all required. Nothing here authenticates a mailbox principal or sends input.
 """
@@ -404,7 +405,13 @@ class CodexReplyObserver:
         executable = Path(" ".join(parts[8:])) if len(parts) > 8 else None
         if executable is None or not executable.is_absolute():
             raise ValueError("hosted_rollout_writer_not_codex_host")
-        if not executable.resolve().is_relative_to(self.host_root):
+        releases = executable.parent.parent.parent
+        if (
+            executable.name != "codex"
+            or executable.parent.name != "bin"
+            or releases.name != "releases"
+            or not executable.resolve().is_relative_to(self.host_root)
+        ):
             raise ValueError("hosted_rollout_writer_not_codex_host")
         return writers[0], identity
 

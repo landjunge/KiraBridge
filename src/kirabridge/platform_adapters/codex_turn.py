@@ -38,6 +38,7 @@ class NativeCodexTurns(CodexHost):
                 and thread["parentThreadId"] is None
                 and thread["attachedToThreadId"] is None
                 and isinstance(thread.get("cwd"), str)
+                and Path(thread["cwd"]).is_absolute()
                 and Path(thread["cwd"]).resolve() == Path(cwd).resolve()
             ):
                 found.append(thread)
@@ -75,18 +76,20 @@ class NativeCodexTurns(CodexHost):
 
         sent = await self.deliver(binding, prepared, message_id, body, before_send)
         turn = await self._await_turn(binding, sent["turn_id"], timeout)
-        user = [
-            item
-            for item in turn.get("items", [])
-            if item.get("type") == "userMessage"
-            and any(part.get("text") == body for part in item.get("content") or [])
-        ]
+        items = turn.get("items", [])
+        user_index = None
+        for index, item in enumerate(items):
+            if item.get("type") == "userMessage" and any(
+                part.get("text") == body for part in item.get("content") or []
+            ):
+                user_index = index
+        following = items[user_index + 1 :] if user_index is not None else []
         finals = [
             item
-            for item in turn.get("items", [])
+            for item in following
             if item.get("type") == "agentMessage" and item.get("phase") == "final_answer"
         ]
-        if turn.get("status") != "completed" or not user or not finals:
+        if turn.get("status") != "completed" or user_index is None or not finals:
             raise UncertainExecution(
                 "native_codex_turn_unverified", "The native turn has no exact verified answer"
             )
