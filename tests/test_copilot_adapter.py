@@ -200,7 +200,9 @@ async def test_copilot_unconfirmed_keeps_sanitized_auth_cause():
     fallback.result["stdout"] = "No authentication information found"
     with pytest.raises(UncertainExecution) as error:
         await execute(fallback)
-    assert error.value.provider_error == {"diagnostic": "No authentication information found"}
+    provider_error = getattr(error.value, "provider_error", None) or {}
+    assert "diagnostic" not in provider_error
+    assert "No authentication information found" not in json.dumps(provider_error)
 
 
 async def test_copilot_validates_original_directory_before_isolation(tmp_path):

@@ -124,11 +124,9 @@ def safe_diagnostic(text: str, limit: int = 200) -> str:
 
 
 def note_cli_failure(exc, result):
-    """Attach provider_error['diagnostic'] when the process result already captured output."""
+    """Attach provider_error['diagnostic'] from stderr only, never from stdout."""
     if isinstance(result, dict):
         text = result.get("stderr")
-        if not isinstance(text, str) or not text.strip():
-            text = result.get("stdout")
         if isinstance(text, str) and text.strip():
             diagnostic = safe_diagnostic(text)
             if diagnostic:
