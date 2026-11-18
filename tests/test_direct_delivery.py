@@ -569,14 +569,12 @@ async def test_an_existing_running_job_queues_the_next_message(delivery, monkeyp
     assert waiting["evidence"]["reason"] == "execution_busy"
     assert waiting["evidence"]["terminal_input_attempted"] is False
     assert job(bridge, previous) == original
-    assert not await bridge.message_receiver._dispatch_next("grok", include_visible=False)
-    assert job(bridge, sent)["state"] == "queued"
     assert not transport["calls"] and not connected
-    bridge.store.db.execute(
-        "UPDATE message_jobs SET state='completed' WHERE message_id=?", (previous["id"],)
-    )
+    # No in-flight pane hold remains after the admission returns. A ready
+    # terminal can take the queued message once; the old row stays untouched.
     assert await bridge.message_receiver._dispatch_next("grok", include_visible=False)
     assert job(bridge, sent)["state"] == "completed"
+    assert job(bridge, previous) == original
     assert transport["calls"] == ["insert", "return"]
     assert not await bridge.message_receiver._dispatch_next("grok", include_visible=False)
     assert transport["calls"] == ["insert", "return"]

@@ -885,14 +885,34 @@ class MessageReceiver:
         )
 
     def _recipient_turn_open(self, recipient):
-        """A second execute must wait until the bound recipient's turn ends."""
+        """Do not paste into a pane that an in-flight turn still holds.
+
+        A finished dispatcher call may leave its own job running. That row does
+        not by itself block a later delivery. The shared pane does: another
+        recipient's running turn, or this admission's pane key, must end first.
+        """
         if ("recipient", recipient) in self.direct.targets:
             return True
+        if not self.bridge.config.visible_handoffs.enabled:
+            return False
+        binding = self.bridge.config.visible_handoffs.bindings.get(recipient)
+        if binding is None:
+            return False
+        if ("pane", binding.pane_id) in self.direct.targets:
+            return True
+        others = [
+            name
+            for name, other in self.bridge.config.visible_handoffs.bindings.items()
+            if name != recipient and other.pane_id == binding.pane_id
+        ]
+        if not others:
+            return False
+        marks = ",".join("?" for _ in others)
         return bool(
             self.bridge.store.db.execute(
                 "SELECT 1 FROM message_jobs j JOIN messages m ON m.id=j.message_id "
-                "WHERE m.recipient=? AND j.state='running' LIMIT 1",
-                (recipient,),
+                f"WHERE j.state='running' AND m.recipient IN ({marks}) LIMIT 1",
+                tuple(others),
             ).fetchone()
         )
 
