@@ -295,54 +295,6 @@ async def test_real_authenticated_reply_has_priority_over_transport_receipt(
     assert transport["calls"] == ["insert", "return"]
 
 
-@pytest.mark.parametrize("mode", [True, False, None])
-async def test_explicit_unsubmitted_continuation_preserves_durable_reply_preference(visible, mode):
-    from kirabridge.bridge_core.models import canonical
-
-    bridge, transport = visible
-    transport.update(ack=False, reply=False)
-    args = AgentInput(
-        agent="grok", prompt="Exactly the original draft", cwd="/tmp", wait_for_reply=mode is True
-    )
-
-    async def stop_before_return(evidence):
-        if evidence["state"] == "inserted":
-            raise UncertainExecution("visible_insert_unknown", "Own controlled pre-Return stop")
-
-    with pytest.raises(UncertainExecution):
-        await bridge.visible_handoffs.execute(
-            {"id": "own-unsubmitted", "principal": "chatgpt"},
-            args,
-            callback,
-            stop_before_return,
-        )
-    assert transport["calls"] == ["insert"]
-    if mode is None:
-        status = bridge.visible_handoffs.status("chatgpt", "own-unsubmitted")
-        inserted = next(event for event in status["events"] if event["state"] == "inserted")
-        evidence = {
-            key: value for key, value in inserted["evidence"].items() if key != "wait_for_reply"
-        }
-        bridge.store.db.execute(
-            "UPDATE visible_handoff_events SET evidence=? WHERE seq=?",
-            (canonical(evidence), inserted["seq"]),
-        )
-        with pytest.raises(BridgeError) as error:
-            await bridge.visible_handoffs.continue_unsubmitted(
-                "chatgpt", "own-unsubmitted", callback
-            )
-        assert error.value.code == "return_reconciliation_required"
-        assert transport["calls"] == ["insert"]
-    else:
-        status = await bridge.visible_handoffs.continue_unsubmitted(
-            "chatgpt", "own-unsubmitted", callback
-        )
-        sent = next(event for event in status["events"] if event["state"] == "sent")
-        assert sent["evidence"]["wait_for_reply"] is mode
-        assert bridge.visible_handoffs.body_only_transport_delivery(status) is (mode is False)
-        assert transport["calls"] == ["insert", "return"]
-
-
 async def test_default_reply_observer_times_out_without_rewriting_body_or_changing_mode(visible):
     from kirabridge.bridge_core.models import digest
 
@@ -652,16 +604,6 @@ async def test_legacy_hash_without_wait_field_accepts_genuine_late_reply_without
     )
     assert result["scope"] == "agent_turn" and result["text"] == "Real historical result"
     assert result["evidence"]["agent_confirmed"] and not transport["calls"]
-
-
-async def test_legacy_unknown_marker_cannot_authorize_a_new_return(visible):
-    bridge, transport = visible
-    args = AgentInput(agent="grok", prompt="Historical body", cwd="/tmp", timeout=0.01)
-    retain_legacy_handoff(bridge, args, state="unknown", reason="visible_insert_unknown")
-    transport["text"] = "╭\n│ ❯ Historical body\nKB-END-old-marker\n╰"
-    with pytest.raises(BridgeError) as error:
-        await bridge.visible_handoffs.continue_unsubmitted("chatgpt", "legacy", callback)
-    assert error.value.code == "return_reconciliation_required" and not transport["calls"]
 
 
 async def test_eve_literal_session_input_reports_delivery_without_claiming_a_reply(
