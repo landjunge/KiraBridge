@@ -258,7 +258,7 @@ class CompletionManager:
                     "AND acknowledged IS NULL AND source IN (?,?,?,?) "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                    "ORDER BY seq LIMIT ?",
+                    "ORDER BY seq DESC LIMIT ?",
                     (principal, target, *allowed, limit),
                 ).fetchall()
             else:
@@ -268,7 +268,7 @@ class CompletionManager:
                     "AND source_id=? AND acknowledged IS NULL AND source IN (?,?,?,?) "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                    "ORDER BY seq LIMIT ?",
+                    "ORDER BY seq DESC LIMIT ?",
                     (principal, target, source_id, *allowed, limit),
                 ).fetchall()
             notices = []
