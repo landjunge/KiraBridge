@@ -396,3 +396,22 @@ async def test_action_aliases_without_events_preserve_execution_and_idempotency(
             assert (await bridge.tasks.wait("local", value.task_id))["state"] == "completed"
             duplicate = await clients.call("local", name, {"request": value.model_dump()})
             assert duplicate.structuredContent["id"] == value.task_id
+
+
+def test_published_tool_schemas_carry_no_generated_titles():
+    from kirabridge.mcp_gateway.server import strip_schema_titles
+
+    schema = {
+        "title": "XArguments",
+        "type": "object",
+        "properties": {
+            "title": {"title": "Title", "type": "string"},
+            "other": {"anyOf": [{"title": "Inner", "type": "null"}], "title": "Other"},
+        },
+        "$defs": {"title": {"title": "Def", "type": "object"}},
+    }
+    assert strip_schema_titles(schema) == {
+        "type": "object",
+        "properties": {"title": {"type": "string"}, "other": {"anyOf": [{"type": "null"}]}},
+        "$defs": {"title": {"type": "object"}},
+    }
