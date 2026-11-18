@@ -234,7 +234,17 @@ class ACPClient:
     async def _handle_response(self, identifier, message: dict) -> None:
         entry = self._response_events.pop(identifier, None)
         if entry is None or entry[0].done():
-            raise UncertainExecution("agent_identity", "Unexpected ACP response id")
+            error = UncertainExecution("agent_identity", "Unexpected ACP response id")
+            # Shape only (never content): what arrived and what we were still waiting for.
+            error.provider_error = {
+                "adapter": "acp",
+                "reason": "Unexpected ACP response id",
+                "response_id": str(identifier)[:64],
+                "already_answered": entry is not None,
+                "pending_requests": sorted(str(key)[:32] for key in self._response_events)[:8],
+                "message_keys": sorted(str(key)[:32] for key in message)[:8],
+            }
+            raise error
         future, method = entry
         if "error" in message:
             error = UncertainExecution("agent_rpc", "ACP server returned an error")
