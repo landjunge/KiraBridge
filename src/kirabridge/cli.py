@@ -27,6 +27,60 @@ def emit(value, *, stream=None):
     print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout, flush=True)
 
 
+def _integer_between(low, high):
+    def parse(value):
+        try:
+            number = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError("must be an integer") from None
+        if not low <= number <= high:
+            raise argparse.ArgumentTypeError(f"must be from {low} to {high}")
+        return number
+
+    return parse
+
+
+def _next_after(result, limit):
+    work = result.get("work")
+    if not isinstance(work, list) or len(work) != limit:
+        return result
+    sequences = [
+        item["seq"] for item in work if isinstance(item, dict) and isinstance(item.get("seq"), int)
+    ]
+    if work and len(sequences) == len(work):
+        result["next_after"] = max(sequences)
+    return result
+
+
+async def _latest_team_work(pool, team_id, count):
+    """Page forward to the end and keep the newest assignments in ascending order."""
+    after = 0
+    kept = []
+    while True:
+        response = await pool.call(
+            "daemon",
+            "team_work_list",
+            {"team_id": team_id, "after": after, "limit": 100},
+        )
+        page = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+        if page.get("error"):
+            return page
+        batch = page.get("work")
+        if not isinstance(batch, list) or not batch:
+            break
+        kept.extend(batch)
+        if len(kept) > count:
+            del kept[:-count]
+        if len(batch) < 100:
+            break
+        sequence = batch[-1].get("seq") if isinstance(batch[-1], dict) else None
+        if not isinstance(sequence, int) or sequence <= after:
+            break
+        after = sequence
+    cursor = kept[-1]["seq"] if kept and isinstance(kept[-1], dict) else after
+    return {"work": kept, "next_cursor": cursor}
+
+
 class _BridgeSignalHandling:
     """Keep Uvicorn's graceful stop inside Bridge's async context."""
 
@@ -357,6 +411,9 @@ async def execute(args) -> None:
                 arguments["member"] = args.member
         elif action == "work" and args.work_id:
             arguments["work_id"] = args.work_id
+        elif action == "work" and args.latest is None:
+            arguments["after"] = args.after
+            arguments["limit"] = args.limit
         writes = action in {
             "create",
             "role",
@@ -372,8 +429,13 @@ async def execute(args) -> None:
             arguments = {"request": arguments}
         async with MCPClientPool(call_timeout=20) as pool:
             await pool.connect(peer(config, args.principal))
-            response = await pool.call("daemon", tool, arguments)
-        result = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+            if action == "work" and args.latest is not None and not args.work_id:
+                result = await _latest_team_work(pool, args.team_id, args.latest)
+            else:
+                response = await pool.call("daemon", tool, arguments)
+                result = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+                if action == "work" and not args.work_id and not result.get("error"):
+                    _next_after(result, args.limit)
         emit(result)
         if result.get("error"):
             raise SystemExit(2)
@@ -889,6 +951,9 @@ def main() -> None:
     work = actions.add_parser("work")
     work.add_argument("team_id")
     work.add_argument("--work-id")
+    work.add_argument("--after", type=_integer_between(0, 2**63 - 1), default=0)
+    work.add_argument("--limit", type=_integer_between(1, 100), default=50)
+    work.add_argument("--latest", type=_integer_between(1, 100))
     create = actions.add_parser("create")
     create.add_argument("team_id")
     create.add_argument("--name")
