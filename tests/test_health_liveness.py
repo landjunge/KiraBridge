@@ -23,7 +23,6 @@ def test_liveness_does_not_access_unavailable_storage(bridge, monkeypatch):
         patch.setattr(bridge.store, "db", UnavailableDatabase())
         patch.setattr(bridge.outputs, "status", forbidden_detail)
         patch.setattr(bridge.diagnostics, "status", forbidden_detail)
-        patch.setattr(bridge.autonext, "inspect", forbidden_detail)
         result = bridge.health("local", include_diagnostics=False)
         assert result["name"] == "KiraBridge" and result["runtime"]["instance_id"]
         assert result["dispatcher_active"] is False  # This fixture has no running workers.
@@ -36,7 +35,6 @@ def test_liveness_does_not_access_unavailable_storage(bridge, monkeypatch):
         }
         assert result["output_history"]["status"] == "not_probed"
         assert result["diagnostics_storage"]["recording"] == "not_probed"
-        assert result["autonext"]["state"] == "not_probed"
         assert result["health_detail"]["readiness"] == "not_checked"
         assert result["discovery"]["terminal_observation"]["freshness"] == "not_probed"
         with pytest.raises(sqlite3.OperationalError, match="test database unavailable"):
@@ -67,7 +65,6 @@ def test_direct_health_keeps_explicit_storage_and_maintenance_details(bridge, mo
     assert result["health_detail"]["included"] is True
     assert result["diagnostics_storage"]["recording"] == "available"
     assert result["output_history"].get("status") != "not_probed"
-    assert result["autonext"].get("state") != "not_probed"
 
 
 async def test_http_routine_health_skips_details_and_explicit_details_check_grant(
@@ -83,7 +80,6 @@ async def test_http_routine_health_skips_details_and_explicit_details_check_gran
         "maintenance": Mock(return_value={"id": "test-maintenance", "state": "draining"}),
         "output": Mock(return_value={"status": "test_output_detail"}),
         "diagnostics": Mock(return_value={"recording": "test_diagnostic_detail"}),
-        "autonext": Mock(return_value={"state": "test_autonext_detail"}),
     }
     async with MCPClientPool() as clients:
         await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
@@ -93,7 +89,6 @@ async def test_http_routine_health_skips_details_and_explicit_details_check_gran
             patch.setattr(bridge.store, "maintenance_state", probes["maintenance"])
             patch.setattr(bridge.outputs, "status", probes["output"])
             patch.setattr(bridge.diagnostics, "status", probes["diagnostics"])
-            patch.setattr(bridge.autonext, "inspect", probes["autonext"])
             health = (await clients.call("local", "bridge_health", {})).structuredContent
             assert health["dispatcher_active"] is True
             assert health["operations"]["accepting_new_work"] is None
@@ -107,7 +102,6 @@ async def test_http_routine_health_skips_details_and_explicit_details_check_gran
             assert details["operations"]["accepting_new_work"] is False
             assert details["output_history"]["status"] == "test_output_detail"
             assert details["diagnostics_storage"]["recording"] == "test_diagnostic_detail"
-            assert details["autonext"]["state"] == "test_autonext_detail"
             for probe in probes.values():
                 probe.assert_called_once_with()
                 probe.reset_mock()

@@ -70,7 +70,9 @@ class GrokStructuredAdapter:
             raise BridgeError(
                 "agent_billing_unknown", "Structured Grok requires subscription login"
             )
-        schema = files("kirabridge.autonext").joinpath("review_verdict.schema.json").read_text()
+        schema = (
+            files("kirabridge.agent_manager").joinpath("review_verdict.schema.json").read_text()
+        )
         with TemporaryDirectory(prefix="kirabridge-grok-review-") as temporary:
             prompt_path = Path(temporary).resolve() / "prompt.txt"
             fd = os.open(prompt_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)

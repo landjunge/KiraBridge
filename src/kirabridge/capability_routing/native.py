@@ -92,7 +92,6 @@ class NativeRouting:
         if initial and (stored.get("evidence") or {}).get("routing_decision"):
             raise BridgeError("routing_replay_denied", "Original routing decision already exists")
         self.bridge.teams.authorize_execution(stored)
-        self.bridge.agents.worktree_guard(stored, args)
         policy = self.bridge.security.principal(task["principal"], "agent.execute")
         agent = cfg.agents.get(worker.agent)
         if not agent or agent.kind not in KINDS or args.agent not in policy.agents:

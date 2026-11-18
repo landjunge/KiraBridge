@@ -11,7 +11,6 @@ from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
 from kirabridge.agent_manager import AgentManager
-from kirabridge.autonext.models import AutoNextControl
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -89,7 +88,6 @@ from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboard
 from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
 INPUTS = {
-    "autonext.control": AutoNextControl,
     **WINDOWS_KEYBOARD_INPUTS,
     **WINDOWS_WINDOW_INPUTS,
     **WINDOWS_APP_INPUTS,
@@ -340,17 +338,6 @@ class Bridge:
         self.agents.qwen_session_guard = self.teams.qwen_session_proof
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
-        from kirabridge.autonext.manager import AutoNextManager
-
-        if config.autonext.coordinator_mode:
-            from kirabridge.autonext.coordinator import CoordinatedAutoNext
-
-            self.autonext = CoordinatedAutoNext(self)
-        else:
-            self.autonext = AutoNextManager(self)
-        self.agents.worktree_guard = lambda task, args: self.autonext.authorize_execution(
-            {**task, "args": args.model_dump()}
-        )
         from kirabridge.queue_management import QueueManager
 
         self.queues = QueueManager(
@@ -493,7 +480,6 @@ class Bridge:
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
-            "autonext": {"state": "not_probed"},
             "health_detail": {
                 "included": include_diagnostics,
                 "request": "bridge_health(include_diagnostics=true)",
@@ -511,7 +497,6 @@ class Bridge:
                 },
                 output_history=self.outputs.status(),
                 diagnostics_storage=self.diagnostics.status(),
-                autonext=self.autonext.inspect(),
             )
         if sys.platform.startswith("linux"):
             from kirabridge.platform_adapters import LinuxAdapter
@@ -966,10 +951,6 @@ class Bridge:
             return await self.agents.execute(
                 task, args, policy, running, progress, separate_managed=managed
             )
-        if operation == "autonext.control":
-            self.autonext.validate_control(principal, args)
-            await running({"evidence_type": "autonext_control", "action": args.action})
-            return self.autonext.control(principal, args)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation == "workflow.stop":
@@ -1131,10 +1112,8 @@ class Bridge:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
-            await self.autonext.start()
         except BaseException:
             for stop in (
-                self.autonext.stop,
                 self.team_dispatcher.stop,
                 self.message_receiver.stop,
                 self.tasks.stop,
@@ -1146,12 +1125,9 @@ class Bridge:
     async def __aexit__(self, *exc):
         try:
             try:
-                await self.autonext.stop()
+                await self.team_dispatcher.stop()
             finally:
-                try:
-                    await self.team_dispatcher.stop()
-                finally:
-                    await self.message_receiver.stop()
+                await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.system_modules.close()
