@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -310,11 +311,15 @@ class TaskManager:
     async def _heartbeat(self, task_id: str) -> None:
         while True:
             await asyncio.sleep(self.config.lease_seconds / 3)
-            self.store.db.execute(
-                "UPDATE tasks SET lease_until=? WHERE id=? AND lease_owner=? "
-                "AND state IN ('accepted','running')",
-                (time.time() + self.config.lease_seconds, task_id, self.owner),
-            )
+            try:
+                self.store.db.execute(
+                    "UPDATE tasks SET lease_until=? WHERE id=? AND lease_owner=? "
+                    "AND state IN ('accepted','running')",
+                    (time.time() + self.config.lease_seconds, task_id, self.owner),
+                )
+            except Exception:  # noqa: BLE001 - one failed renewal must not end the heartbeat
+                # The next beat retries; the lease only lapses if every renewal fails.
+                logging.getLogger(__name__).warning("lease renewal failed for %s", task_id)
 
     def managed_workers(self):
         """Only fixed operator-configured team workers may use the managed lane."""
