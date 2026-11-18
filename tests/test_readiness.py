@@ -164,6 +164,58 @@ async def test_opencode_http_preflight_does_not_require_an_executable(bridge):
     assert result["ready"] is True
 
 
+async def test_opencode_http_v2_preflight_does_not_require_an_executable(bridge):
+    from kirabridge.bridge_core.config import AgentConfig
+    from kirabridge.readiness import task_preflight
+
+    bridge.config.agents["httpv2"] = AgentConfig(
+        kind="opencode_http_v2",
+        model="deepseek/deepseek-flash",
+        server_url="http://127.0.0.1:58836",
+    )
+    bridge.config.principals["local"].agents.append("httpv2")
+    task = {
+        "id": "httpv2-preflight",
+        "principal": "local",
+        "operation": "agent.execute",
+        "args": {
+            "agent": "httpv2",
+            "prompt": "hello",
+            "cwd": bridge.config.principals["local"].roots[0],
+            "timeout": 5,
+        },
+    }
+    result = task_preflight(bridge, task)
+    agent_check = next(item for item in result["checks"] if item["kind"] == "agent")
+    assert agent_check["ok"] is True
+    assert agent_check["code"] == "available"
+    assert result["ready"] is True
+
+
+async def test_gemini_cli_preflight_still_requires_an_executable(bridge):
+    from kirabridge.bridge_core.config import AgentConfig
+    from kirabridge.readiness import task_preflight
+
+    bridge.config.agents["gemini"] = AgentConfig(kind="gemini_cli")
+    bridge.config.principals["local"].agents.append("gemini")
+    task = {
+        "id": "gemini-preflight",
+        "principal": "local",
+        "operation": "agent.execute",
+        "args": {
+            "agent": "gemini",
+            "prompt": "hello",
+            "cwd": bridge.config.principals["local"].roots[0],
+            "timeout": 5,
+        },
+    }
+    result = task_preflight(bridge, task)
+    agent_check = next(item for item in result["checks"] if item["kind"] == "agent")
+    assert agent_check["ok"] is False
+    assert agent_check["code"] == "agent_config"
+    assert result["ready"] is False
+
+
 def test_readiness_reports_pending_approval_without_changing_tasks_or_policy(bridge):
     policy = bridge.config.principals["local"]
     policy.capabilities.append("session.inspect")
