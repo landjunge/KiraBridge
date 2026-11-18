@@ -10,17 +10,29 @@ on:
 permissions:
   contents: read
 jobs:
+  plan:
+    # Apple Silicon runners are billed; that leg is only planned when the
+    # repository variable BUILD_APPLE_SILICON is 'true'. The Intel installer is
+    # always built and attached.
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    env:
+      BUILD_APPLE_SILICON: ${{ vars.BUILD_APPLE_SILICON }}
+    steps:
+      - id: matrix
+        run: |
+          set -euo pipefail
+          include='{"runner":"macos-15-intel","arch":"x86_64","suffix":"Intel"}'
+          if [ "$BUILD_APPLE_SILICON" = "true" ]; then
+            include="$include"',{"runner":"macos-15","arch":"arm64","suffix":"AppleSilicon"}'
+          fi
+          echo "matrix={\"include\":[$include]}" >> "$GITHUB_OUTPUT"
   dmg:
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15-intel
-            arch: x86_64
-            suffix: Intel
-          - runner: macos-15
-            arch: arm64
-            suffix: AppleSilicon
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
