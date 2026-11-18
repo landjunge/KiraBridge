@@ -657,3 +657,33 @@ for line in sys.stdin:
         assert "TOPSECRET" not in json.dumps(evidence)
     finally:
         await acp.aclose()
+
+
+async def test_grok_skills_reload_notice_is_ignored_but_other_stray_ids_are_not(tmp_path):
+    body = (
+        HANDSHAKE
+        + """
+import json, sys
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/prompt":
+        print(json.dumps({"jsonrpc": "2.0", "id": "skills-reload", "result": {}}), flush=True)
+        result = {"stopReason": "end_turn"}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        await acp.request("authenticate", {"methodId": "cached_token"}, 3)
+        new = await acp.request("session/new", {"cwd": str(tmp_path), "mcpServers": []}, 3)
+        acp.bind_session(new["sessionId"])
+        done = await acp.request(
+            "session/prompt", {"sessionId": "s1", "prompt": [{"type": "text", "text": "hi"}]}, 3
+        )
+        assert done["stopReason"] == "end_turn"
+    finally:
+        await acp.aclose()
