@@ -57,6 +57,23 @@ def inline_task_timeout(operation: str) -> float:
     return 2
 
 
+def strip_schema_titles(node, *, names=False):
+    """Drop generated ``title`` labels from a JSON schema; they only repeat the field name.
+
+    ``names`` marks a mapping whose keys are property or definition names, which are kept
+    even when one is called ``title``. Validation does not use the published schema.
+    """
+    if isinstance(node, list):
+        return [strip_schema_titles(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    return {
+        key: strip_schema_titles(value, names=key in ("properties", "$defs") and not names)
+        for key, value in node.items()
+        if names or key != "title" or not isinstance(value, str)
+    }
+
+
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
     config = bridge.config
     server = FastMCP(
@@ -1730,5 +1747,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     from kirabridge.mcp_gateway.timing import instrument_server
 
+    for registered in server._tool_manager.list_tools():
+        registered.parameters = strip_schema_titles(registered.parameters)
     instrument_server(server._mcp_server, "daemon")
     return server
