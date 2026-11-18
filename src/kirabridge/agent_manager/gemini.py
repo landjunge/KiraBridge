@@ -319,9 +319,7 @@ class GeminiAdapter:
                 }
             )
             raise note_cli_failure(
-                UncertainExecution(
-                    "agent_unconfirmed", "No native Gemini result event observed"
-                ),
+                UncertainExecution("agent_unconfirmed", "No native Gemini result event observed"),
                 result,
             )
         return {

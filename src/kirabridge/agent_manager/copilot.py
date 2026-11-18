@@ -176,9 +176,7 @@ class CopilotCLIAdapter:
         success = terminal_result == 0 and result["exit_code"] == 0 and not failed
         if success and not (started and completed_turn):
             raise note_cli_failure(
-                UncertainExecution(
-                    "agent_unconfirmed", "No completed Copilot model turn observed"
-                ),
+                UncertainExecution("agent_unconfirmed", "No completed Copilot model turn observed"),
                 result,
             )
         return {

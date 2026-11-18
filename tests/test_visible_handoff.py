@@ -1338,8 +1338,7 @@ async def test_wait_for_reply_handoff_catalog_call_count(bridge, config, monkeyp
     async def identity(pid, **kwargs):
         process = next(item for item in row["processes"] if item["pid"] == pid)
         return (
-            f"{os.getuid()} ttys001 Sat Oct 24 12:00:00 2026 "
-            f"{process['ppid']} {process['image']}"
+            f"{os.getuid()} ttys001 Sat Oct 24 12:00:00 2026 {process['ppid']} {process['image']}"
         )
 
     async def read(pane_id):
