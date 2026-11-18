@@ -1404,7 +1404,10 @@ class TeamManager:
                 work_id,
                 core_task_id=core_id,
                 session_resumed=bool(resume_session),
-                session_scope="existing_visible_terminal"
+                session_scope=self.config.team.workers[work["assignee"]].execution_scope
+                if self.config.team.workers[work["assignee"]].execution_scope
+                == "existing_native_codex_root"
+                else "existing_visible_terminal"
                 if self.config.visible_handoffs.enabled
                 and self.config.team.workers[work["assignee"]].execution_scope
                 == "existing_visible_terminal"
@@ -1827,8 +1830,11 @@ class TeamManager:
             if started >= limit:
                 break
             principal = notice["principal"]
-            payload = json.loads(notice["payload"])
-            done = self._work(payload["work_id"])
+            try:
+                payload = json.loads(notice["payload"])
+                done = self._work(payload["work_id"])
+            except (json.JSONDecodeError, KeyError, TypeError, BridgeError):
+                continue
             # Only immutable notice fields: a retry after a crash must hash identically.
             body = (
                 f"KiraBridge meldet: Auftrag {payload['work_id']} ({done['title']}) von "

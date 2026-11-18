@@ -2,7 +2,11 @@
 
 An explicitly configured path/thread is only a candidate. Otherwise only that
 exact process's open writers may supply one unambiguous task-local candidate.
-The task-bound Codex process must hold the same device/inode open for writing. A pre-paste
+The task-bound Codex process must hold the same device/inode open for writing. Codex >= 0.169
+keeps no log open in its terminal process: the shared app-server daemon writes it. Then one
+unique candidate may be hosted: same user and cwd, born after the terminal process, written
+only by one process whose executable is releases/<version>/bin/codex
+under that daemon directory. A pre-paste
 cursor, exact new UserMessage, matching turn, final AgentMessage and completion
 are all required. Nothing here authenticates a mailbox principal or sends input.
 """
@@ -16,6 +20,7 @@ import os
 import re
 import stat
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError
@@ -28,6 +33,7 @@ MAX_LINE_BYTES = 1024 * 1024
 MAX_LSOF_BYTES = 16384
 MAX_ANSWER_BYTES = 262144
 MAX_CANDIDATES = 8
+MAX_HOSTED_SCAN = 64
 
 
 def _sha(value):
@@ -223,20 +229,13 @@ class CodexReplyObserver:
             raise ValueError("session_line_limit")
         return [json.loads(line) for line in lines], _sha(appended)
 
-    async def _process_files(self, pid, expected_identity, process_identity, *, path=None):
-        if await process_identity(pid, detailed=True) != expected_identity:
-            raise ValueError("process_binding_changed")
+    async def _lsof(self, argv):
         child = None
         try:
             async with asyncio.timeout(3):
                 creation = asyncio.create_task(
                     self.process_factory(
-                        "/usr/sbin/lsof",
-                        "-a",
-                        "-p",
-                        str(pid),
-                        "-F0pfaDint",
-                        *([path] if path is not None else []),
+                        *argv,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.DEVNULL,
                         limit=MAX_LSOF_BYTES + 1,
@@ -265,7 +264,7 @@ class CodexReplyObserver:
                 await child.wait()
                 if child.returncode:
                     raise ValueError("process_file_observation_unavailable")
-                files = self._file_rows(bytes(raw), pid)
+                return bytes(raw)
         finally:
             cancelled = isinstance(sys.exc_info()[1], asyncio.CancelledError)
             if child is not None:
@@ -275,6 +274,14 @@ class CodexReplyObserver:
                     if cancelled:
                         raise asyncio.CancelledError from None
                     raise
+
+    async def _process_files(self, pid, expected_identity, process_identity, *, path=None):
+        if await process_identity(pid, detailed=True) != expected_identity:
+            raise ValueError("process_binding_changed")
+        raw = await self._lsof(
+            ["/usr/sbin/lsof", "-a", "-p", str(pid), "-F0pfaDint", *([path] if path else [])]
+        )
+        files = self._file_rows(raw, pid)
         if await process_identity(pid, detailed=True) != expected_identity:
             raise ValueError("process_binding_changed")
         return files
@@ -357,6 +364,109 @@ class CodexReplyObserver:
             raise ValueError("process_rollout_writer_unavailable")
         return matches[0]
 
+    @staticmethod
+    def _holder_rows(raw):
+        fields = [part.removeprefix(b"\n").decode("utf-8") for part in raw.split(b"\0")]
+        holders, pid, item = {}, None, None
+        for field in (part for part in fields if part):
+            if field.startswith("p"):
+                pid, item = int(field[1:]), None
+                holders[pid] = []
+            elif pid is None:
+                raise ValueError("invalid_holder_observation")
+            elif field.startswith("f"):
+                item = {"f": field[1:]}
+                holders[pid].append(item)
+            elif item is None or field[0] in item:
+                raise ValueError("invalid_holder_observation")
+            else:
+                item[field[0]] = field[1:]
+        return holders
+
+    @property
+    def host_root(self):
+        return (self.root.parent / "packages" / "app-server-daemon").resolve()
+
+    async def _host_writer(self, cursor, process_identity):
+        """The one same-user daemon process that writes exactly this device/inode."""
+        raw = await self._lsof(["/usr/sbin/lsof", "-F0pfaDint", "--", cursor["path"]])
+        writers = [
+            pid
+            for pid, rows in self._holder_rows(raw).items()
+            if any(self._matches(row, cursor) for row in rows)
+        ]
+        if len(writers) != 1:
+            raise ValueError("hosted_rollout_writer_not_unique")
+        try:
+            identity = await process_identity(writers[0], detailed=True)
+        except BridgeError:
+            raise ValueError("hosted_rollout_writer_not_owned") from None
+        parts = identity.split()
+        executable = Path(" ".join(parts[8:])) if len(parts) > 8 else None
+        if executable is None or not executable.is_absolute():
+            raise ValueError("hosted_rollout_writer_not_codex_host")
+        releases = executable.parent.parent.parent
+        if (
+            executable.name != "codex"
+            or executable.parent.name != "bin"
+            or releases.name != "releases"
+            or not executable.resolve().is_relative_to(self.host_root)
+        ):
+            raise ValueError("hosted_rollout_writer_not_codex_host")
+        return writers[0], identity
+
+    @staticmethod
+    def _started(identity):
+        parts = identity.split()
+        try:
+            return datetime.strptime(" ".join(parts[2:7]), "%a %b %d %H:%M:%S %Y").timestamp()
+        except ValueError:
+            raise ValueError("process_start_unavailable") from None
+
+    def _recent(self, started):
+        found, day = [], datetime.fromtimestamp(started).date()
+        while day <= datetime.now().date():
+            folder = self.root / f"{day:%Y}" / f"{day:%m}" / f"{day:%d}"
+            if folder.is_dir():
+                found += sorted(folder.glob("rollout-*.jsonl"))
+            day += timedelta(days=1)
+        if len(found) > MAX_HOSTED_SCAN:
+            found = found[-MAX_HOSTED_SCAN:]
+        fresh = []
+        for path in found:
+            info = path.stat()
+            born = getattr(info, "st_birthtime", info.st_ctime)
+            if info.st_uid == os.getuid() and born >= started - 2:
+                fresh.append(path)
+        return fresh
+
+    async def _discover_hosted(self, binding, expected_identity, process_identity, cwd):
+        if not isinstance(cwd, str) or not Path(cwd).is_absolute():
+            raise ValueError("independent_thread_binding_unavailable")
+        files = await self._process_files(binding.agent_pid, expected_identity, process_identity)
+        working = [item for item in files if item.get("f") == "cwd" and item.get("t") == "DIR"]
+        if (
+            len(working) != 1
+            or not Path(working[0].get("n", "")).is_absolute()
+            or Path(working[0]["n"]).resolve() != Path(cwd).resolve()
+        ):
+            raise ValueError("process_cwd_mismatch")
+        started = self._started(expected_identity)
+        matches = []
+        for path in await asyncio.to_thread(self._recent, started):
+            try:
+                cursor = await asyncio.to_thread(self._snapshot, str(path), None, cwd=cwd)
+                host = await self._host_writer(cursor, process_identity)
+            except (OSError, ValueError, TypeError, AttributeError):
+                continue  # Not this terminal's thread; never a reply source.
+            matches.append((cursor, host))
+        if len(matches) > 1:
+            raise ValueError("ambiguous_hosted_rollouts")
+        if not matches:
+            raise ValueError("process_rollout_writer_unavailable")
+        cursor, (pid, identity) = matches[0]
+        return {**cursor, "host_pid": pid, "host_identity": identity}
+
     async def prepare(self, binding, *, process_identity, expected_identity, body, cwd=None):
         if not expected_identity:
             return _unavailable("independent_thread_binding_unavailable")
@@ -371,12 +481,20 @@ class CodexReplyObserver:
                     return _unavailable("process_does_not_own_bound_rollout_writer")
                 origin = "explicit_verified_writer"
             elif not binding.codex_thread_id and not binding.codex_rollout_path:
-                cursor = await self._discover(binding, expected_identity, process_identity, cwd)
-                if not await self._writer(
-                    cursor, binding.agent_pid, expected_identity, process_identity
-                ):
-                    return _unavailable("process_binding_changed")
-                origin = "process_writer_discovery"
+                try:
+                    cursor = await self._discover(binding, expected_identity, process_identity, cwd)
+                    if not await self._writer(
+                        cursor, binding.agent_pid, expected_identity, process_identity
+                    ):
+                        return _unavailable("process_binding_changed")
+                    origin = "process_writer_discovery"
+                except ValueError as exc:
+                    if str(exc) != "process_rollout_writer_unavailable":
+                        raise
+                    cursor = await self._discover_hosted(
+                        binding, expected_identity, process_identity, cwd
+                    )
+                    origin = "hosted_writer_discovery"
             else:
                 return _unavailable("independent_thread_binding_unavailable")
             # The log must still be the exact pre-paste baseline after process observation.
@@ -429,7 +547,8 @@ class CodexReplyObserver:
             )
             or (
                 binding.codex_thread_id is None
-                and cursor.get("binding_origin") != "process_writer_discovery"
+                and cursor.get("binding_origin")
+                not in {"process_writer_discovery", "hosted_writer_discovery"}
             )
             or cursor.get("body_sha256") != _sha(body.encode("utf-8"))
         ):
@@ -441,7 +560,14 @@ class CodexReplyObserver:
             answer = _answer(records, cursor["thread_id"], body)
             if answer["state"] != "completed":
                 return answer
-            if not await self._writer(
+            if cursor.get("binding_origin") == "hosted_writer_discovery":
+                host = await self._host_writer(cursor, process_identity)
+                if host != (cursor.get("host_pid"), cursor.get("host_identity")):
+                    return _unavailable("process_binding_changed")
+                await self._process_files(
+                    binding.agent_pid, cursor["process_identity"], process_identity
+                )
+            elif not await self._writer(
                 cursor, binding.agent_pid, cursor["process_identity"], process_identity
             ):
                 return _unavailable("process_binding_changed")

@@ -8,7 +8,12 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from kirabridge.agent_manager.cli_support import BoundedText, bind_session, cli_environment
+from kirabridge.agent_manager.cli_support import (
+    BoundedText,
+    bind_session,
+    cli_environment,
+    note_cli_failure,
+)
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.terminal_manager import TerminalManager
@@ -264,13 +269,17 @@ class GeminiAdapter:
                 line_callback=event,
             )
         if result["timed_out"] or result.get("terminated"):
-            raise UncertainExecution(
-                "agent_unconfirmed", "Gemini process ended before confirmed exit"
+            raise note_cli_failure(
+                UncertainExecution(
+                    "agent_unconfirmed", "Gemini process ended before confirmed exit"
+                ),
+                result,
             )
         if outcome is None:
             # Native 0.37.2 emits these diagnostics from its authentication
             # startup path before entering runNonInteractive (and its init).
-            # Do not classify by exit code alone or retain provider text/URLs.
+            # Do not classify by exit code alone. provider_error keeps only a
+            # sanitized prefix of the already captured stream, never the raw line.
             auth_lines = [
                 line
                 for line in result["stderr"].splitlines()
@@ -292,11 +301,14 @@ class GeminiAdapter:
                         "exit_code": result["exit_code"],
                     }
                 )
-                raise BridgeError(
-                    code,
-                    "Google no longer serves this individual-account Gemini CLI login"
-                    if unsupported
-                    else "Gemini authentication failed before a native session",
+                raise note_cli_failure(
+                    BridgeError(
+                        code,
+                        "Google no longer serves this individual-account Gemini CLI login"
+                        if unsupported
+                        else "Gemini authentication failed before a native session",
+                    ),
+                    result,
                 )
             await progress(
                 {
@@ -306,7 +318,10 @@ class GeminiAdapter:
                     "session_observed": session is not None,
                 }
             )
-            raise UncertainExecution("agent_unconfirmed", "No native Gemini result event observed")
+            raise note_cli_failure(
+                UncertainExecution("agent_unconfirmed", "No native Gemini result event observed"),
+                result,
+            )
         return {
             "success": outcome == "success" and not fatal and result["exit_code"] == 0,
             "text": messages.text,

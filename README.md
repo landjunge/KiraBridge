@@ -66,6 +66,8 @@ Alongside direct control, KiraBridge can pass work to **Codex and Grok** through
 
 The development source supports interim questions to an explicitly selected, working Codex session without stopping its work or submitting another agent job. Proven delivery-only steering does not consume the conversation/hourly model-run budgets; claimed managed attempts still count, including failed or unknown outcomes. The current native route uses the existing macOS terminal; uncertain delivery is retained without automatic repetition, and users can disable interim messages. Live macOS acceptance and native Windows/Linux/server transport acceptance are recorded separately and remain open.
 
+The development source also offers an optional [native Codex root binding](docs/NATIVE-CODEX-BINDING.md) for new direct messages on macOS with Codex 0.169. It verifies the assigned logical root on the existing host for every attempt, refreshing host process and socket observations automatically instead of retaining an old terminal handle. Parallel sessions keep their own identities; acceptance, recipient acknowledgement and reply remain separate. This route is not activated or live accepted by the source tests.
+
 The source also includes [Qwen Code 0.27.2 via ACP and task-scoped MCP](docs/providers/QWEN.md): explicit existing authentication, native model/effort selection, configurable operator budgets and policy-filtered KiraBridge tools for read or explicitly granted coding tasks. Same-session recovery requires a proven owned binding; native turn completion remains separate from project acceptance. Production activation and full task acceptance remain gated.
 
 The development source now includes a shared ACP client and an `opencode_acp` adapter for isolated text-only tasks, with session validation, bounded output and explicit timeout or disconnect results. This adapter creates its own process; observing that same session in the OpenCode app and the full macOS workflow still require acceptance. These changes have not been installed in the published runtime.
@@ -73,6 +75,15 @@ The development source now includes a shared ACP client and an `opencode_acp` ad
 A separate development adapter `opencode_http_v2` targets the installed shared OpenCode 2.2.7 app's `/api` surface (session create/get, prompt with a stable message id, paged message list). It correlates its own admitted prompt causally because V2 assistant messages carry no `parentID`/`sessionID`, and it fails closed on foreign or ambiguous inputs. The legacy V1 HTTP path stays unchanged and there is no protocol or POST fallback after an unclear start. This adapter is not installed and its live acceptance remains a separate gate. An observed idle outcome of `failed` or `interrupted` remains unconfirmed even if an assistant message has text and `finish=stop`.
 
 Team assignments also keep the proven provider session for each worker. A later assignment to the same worker resumes that session only while it is idle and for the unchanged agent, adapter and working directory; a still-running or unconfirmed (unknown) session is never reused. `team_session_get` exposes the binding and `team_session_clear` tombstones it, so a turn still in flight cannot resurrect a cleared session. Resume currently covers Codex, Grok ACP, sealed idle Qwen ACP sessions and the separate native OpenCode HTTP path; the OpenCode CLI and `opencode_acp` adapters are rejected for resume because their isolated profile has no persisted session store. Resumption is restricted to sealed team work, survives a bridge restart and never replays a claimed core task. The live acceptance with Codex, Grok and OpenCode/DeepSeek across a bridge restart is recorded in `docs/evidence/team-coordination-live-20261112.json`.
+
+### Source: team scope, resume and error fields
+
+- `execution_scope = "existing_native_codex_root"` runs one team turn on the single loaded, parentless Codex root whose resolved cwd equals the resolved worker cwd, through app-server `turn/start`. Among at most 16 loaded ids, any other count raises `native_codex_root_not_unique`. A missing or longer id list, and a running turn, raise `native_codex_target_not_ready`. The path records `terminal_input_attempted = false` and does not select a pane, terminal PID or rollout path. Host identity is checked; a patch release of the same minor line stays valid. `protocol_version` accepts only `0.169.<patch>`. The route needs `[visible_handoffs.native_codex]` with `codex_home`, `host_executable` and `protocol_version`. The worker's agent and kind must be `codex`. See [Native Codex root binding](docs/NATIVE-CODEX-BINDING.md).
+- `team.coordinator_resume` defaults to off. When it is on, finished delegated work (`finish`, `fail` or manual `work_complete`) records one completion notice, source `team`, target `team:<team_id>`, and `TeamManager.resume_coordinators` creates one idempotent coordination task for an assigner that has `agent` set. The link is stored in `team_coordinator_resumes`. Work assigned to its own assignee records no notice.
+- `agents.<name>.model` is optional. `grok_reasoning_effort` is accepted only for `kind = "grok_acp"` and must match `^[a-z]{1,16}$`. The Grok ACP adapter passes a set model as `--model` and a set effort as `--reasoning-effort`.
+- When an execution returns a failure, the task stores `error` as `{code, kind, retry_safe}`, plus `exit_code` when the result has an integer exit code. Codes from that normalization are `command_exit_nonzero`, `command_timeout`, `command_killed`, `agent_exit_nonzero` and `operation_failed`. A nested peer `value.error.code` is kept when it matches `^[a-z][a-z0-9_]{0,79}$`; otherwise the code is `tool_rejected`. `retry_safe` is true only for that peer form when `evidence.request_sent` is false. Dispatcher restart and shutdown store `error.code` `dispatcher_restart` or `dispatcher_shutdown` without that normalized object. The completion payload copies `error.kind` to `error_kind`.
+- A short terminal catalog raises `session_catalog_incomplete` with `provider_error.reason = "catalog_truncated"`. A complete catalog that no longer matches the selected pane raises `session_selection_changed` with `provider_error.reason` `expected_pid_changed`, `window_changed` or `pane_missing`.
+- Gemini and Copilot CLI failures can set `provider_error.diagnostic` from non-empty stderr only, sanitized and at most 200 characters. `opencode_http` and `opencode_http_v2` record `provider_error.http_status` on status failures. An unexpected ACP response id raises `agent_identity` with shape fields only: `response_id`, `message_keys`, `pending_requests`, `adapter`, `reason` and `already_answered`.
 
 ThreadDesk adds projects and work history to this workflow, while the other family tools are intended to work together through the shared voice interface. Each tool remains independent; integration plans are not presented as shipped functionality.
 
@@ -149,10 +160,12 @@ Python; rollback restores both values. Other settings stay unchanged.
 
 ## Get started
 
-1. **Install or update.** Download and fully extract `KiraBridge-macos.tar.gz`.
-   Run `sh ./install.sh --desktop --require-visible-terminal` from the extracted
-   `KiraBridge` directory in a separate Terminal window and follow its confirmation.
-   Preserve running agent sessions.
+1. **Install or update.** If your download is a DMG, open it, drag `KiraBridge.app`
+   to `Applications` and launch it. Otherwise download and fully extract
+   `KiraBridge-macos.tar.gz`, then run `sh ./install.sh --desktop
+   --require-visible-terminal` from the extracted `KiraBridge` directory in a
+   separate Terminal window. Follow its confirmation. Preserve running agent
+   sessions.
 2. **Open the app.** The installer updates the service and desktop app together.
    Open `KiraBridge.app` in `~/Applications`. Existing settings and credentials
    remain; the installer creates a rollback backup.

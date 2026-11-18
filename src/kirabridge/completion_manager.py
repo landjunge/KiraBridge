@@ -65,8 +65,14 @@ def find_evidence(value, key, depth=0):
 def completion_payload(task, event_seq, *, source="task"):
     evidence = {"result": task.get("result"), "evidence": task.get("evidence", {})}
     state = task["state"]
-    code = (task.get("error") or {}).get("code")
-    timed_out = find_evidence(evidence, "timed_out") is True or code == "agent_timeout"
+    error = task.get("error") or {}
+    code = error.get("code")
+    kind = error.get("kind")  # normalized at the task; older rows fall back to the evidence scan
+    timed_out = (
+        find_evidence(evidence, "timed_out") is True
+        or code in {"agent_timeout", "command_timeout"}
+        or kind == "timeout"
+    )
     terminated = find_evidence(evidence, "terminated") is True
     provider = find_evidence(evidence, "provider_error")
     # Only the adapter's explicit structured code is evidence. Never inspect text
@@ -103,6 +109,7 @@ def completion_payload(task, event_seq, *, source="task"):
         "outcome": outcome,
         "execution_outcome_unknown": state == "unknown",
         "error_code": code,
+        "error_kind": kind,
         "provider_error": provider,
         "quota_diagnosis": "evidenced"
         if provider_category == "quota_exhausted"

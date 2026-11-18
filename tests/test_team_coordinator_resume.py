@@ -14,7 +14,7 @@ from test_team_manager import core, create, domain, work  # noqa: F401,F811
 from kirabridge.bridge_core.config import AgentConfig
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
-from kirabridge.team_manager.models import TeamWorkComplete, TeamWorkCreate
+from kirabridge.team_manager.models import TeamMessageSend, TeamWorkComplete, TeamWorkCreate
 
 
 def finish_grok_work(domain, key="order-1", result="Grok result"):
@@ -132,6 +132,33 @@ def test_a_resume_turn_never_wakes_itself(domain):
     domain.finish(claimed["id"], "Next decision: done", {"actions": []})
     assert len(notices(domain)) == 1  # only the original worker completion
     assert domain.resume_coordinators() == 0
+
+
+def test_broken_payload_is_skipped_and_the_later_valid_notice_is_resumed(domain):
+    domain.config.team.coordinator_resume = True
+    domain.store.db.execute(
+        "INSERT INTO completion_notices"
+        "(id,principal,target,source,source_id,event_seq,payload,created) "
+        "VALUES(?,?,?,?,?,?,?,?)",
+        (
+            "completion-team-broken",
+            "codex",
+            "team:test-team",
+            "team",
+            "broken-payload",
+            900001,
+            "{",
+            1.0,
+        ),
+    )
+    work_id = finish_grok_work(domain)
+    assert domain.resume_coordinators() == 1
+    (link,) = domain.store.db.execute("SELECT * FROM team_coordinator_resumes").fetchall()
+    assert link["work_id"] == work_id
+    broken = domain.store.db.execute(
+        "SELECT acknowledged FROM completion_notices WHERE id='completion-team-broken'"
+    ).fetchone()
+    assert broken["acknowledged"] is None
 
 
 def test_manual_delegator_is_not_resumed(domain):
@@ -314,3 +341,67 @@ def test_blocked_delegator_does_not_starve_other_coordinators(domain):
             )
     finish_grok_work(domain)
     assert domain.resume_coordinators() == 1
+
+
+async def test_visible_lane_prompt_is_trimmed_to_the_terminal_input_limit(
+    http_bridge,  # noqa: F811
+    config,
+    tmp_path,
+    monkeypatch,
+):
+    from kirabridge.team_manager.dispatcher import VISIBLE_PROMPT_CHARS
+
+    bridge, endpoint = http_bridge
+    configure_team(bridge, config, tmp_path, monkeypatch)
+    config.visible_handoffs.enabled = True
+    config.team.max_pending_per_member = 200
+    config.team.max_work_per_root = 256
+    config.team.workers["codex"].execution_scope = "existing_visible_terminal"
+    teams = bridge.teams
+    teams.create(
+        "local",
+        create(
+            team_id="big",
+            members={"local": "coordinator", "codex": "worker", "grok": "reviewer"},
+            coordinator="local",
+            idempotency_key="big-create",
+        ),
+    )
+    for index in range(40):  # long shared history that used to blow the 16384 limit
+        teams.delegate(
+            "local",
+            TeamWorkCreate(
+                team_id="big",
+                assignee="grok",
+                title=f"history {index}",
+                body="x" * 3000,
+                idempotency_key=f"h{index}",
+            ),
+        )
+    for index in range(20):
+        teams.send(
+            "local",
+            TeamMessageSend(
+                team_id="big",
+                recipient="codex",
+                body="m" * 2000,
+                kind="question",
+                idempotency_key=f"m{index}",
+            ),
+        )
+    current = teams.delegate(
+        "local",
+        TeamWorkCreate(
+            team_id="big",
+            assignee="codex",
+            title="now",
+            body="Decide the next step.",
+            idempotency_key="now",
+        ),
+    )
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("daemon", url=endpoint, token="codex-team-test-" + "x" * 40))
+        prompt = await bridge.team_dispatcher._prompt(clients, teams._work(current["id"]))
+    assert len(prompt) <= VISIBLE_PROMPT_CHARS
+    assert current["id"] in prompt and "Decide the next step." in prompt
+    assert '"context_truncated":true' in prompt

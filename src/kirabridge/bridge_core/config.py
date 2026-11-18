@@ -100,9 +100,9 @@ class TeamWorkerConfig(BaseModel):
     timeout: float = Field(default=120, gt=0, le=3600)
     response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
     # Explicit per-worker route; never a fallback from a busy visible session.
-    execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
-        "existing_visible_terminal"
-    )
+    execution_scope: Literal[
+        "existing_visible_terminal", "separate_managed_session", "existing_native_codex_root"
+    ] = "existing_visible_terminal"
     local_tools: bool = False
     mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=256)
     mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
@@ -172,6 +172,7 @@ class AgentConfig(BaseModel):
     qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
     qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
+    grok_reasoning_effort: str | None = Field(default=None, pattern=r"^[a-z]{1,16}$")
     qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
     qwen_max_tool_calls: int = Field(default=32, ge=1, le=4096)
     qwen_max_session_turns: int = Field(default=48, ge=1, le=2048)
@@ -205,6 +206,8 @@ class AgentConfig(BaseModel):
             for key in list(value):
                 if key.startswith("qwen_"):
                     value.pop(key)
+        if self.grok_reasoning_effort is None:
+            value.pop("grok_reasoning_effort", None)
         return value
 
     @model_validator(mode="after")
@@ -217,6 +220,8 @@ class AgentConfig(BaseModel):
             or self.qwen_reasoning_effort is not None
         ) and self.kind != "qwen_acp":
             raise ValueError("Qwen authentication selection requires kind qwen_acp")
+        if self.grok_reasoning_effort is not None and self.kind != "grok_acp":
+            raise ValueError("Grok reasoning effort requires kind grok_acp")
         if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
             raise ValueError("Full access requires the operator's explicit full bridge profile")
         return self
@@ -474,11 +479,38 @@ class VisibleTerminalBinding(BaseModel):
         return self
 
 
+class NativeCodexBinding(BaseModel):
+    """An administratively assigned ordinary root thread on an existing local host.
+
+    Thread IDs from request bodies, environment variables and child tool calls
+    never populate this assignment. Physical process/socket identities are fresh
+    observations, so a host restart does not change this logical destination.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    thread_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    session_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    codex_home: str = Field(min_length=1, max_length=4096)
+    host_executable: str = Field(min_length=1, max_length=4096)
+    source: Literal["cli", "vscode", "appServer"]
+    # Same minor line only: a patch update of the installed host keeps the assignment.
+    protocol_version: str = Field(default="0.169.0", pattern=r"^0\.169\.[0-9]{1,3}$")
+
+    @model_validator(mode="after")
+    def absolute_paths(self):
+        if any(
+            not Path(getattr(self, key)).is_absolute() for key in ("codex_home", "host_executable")
+        ):
+            raise ValueError("Native Codex host paths must be absolute")
+        return self
+
+
 class VisibleHandoffConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: Literal[True] = True
     allow_interim_messages: bool = True
     bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
+    native_codex: NativeCodexBinding | None = None
 
 
 class OutputHistoryConfig(BaseModel):

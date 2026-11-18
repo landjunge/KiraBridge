@@ -3,7 +3,12 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from kirabridge.agent_manager.cli_support import BoundedText, bind_session, cli_environment
+from kirabridge.agent_manager.cli_support import (
+    BoundedText,
+    bind_session,
+    cli_environment,
+    safe_diagnostic,
+)
 from kirabridge.bridge_core.config import AgentConfig, TerminalConfig
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.terminal_manager import TerminalManager
@@ -66,6 +71,46 @@ def test_agent_cli_gets_account_name_from_uid_not_environment(monkeypatch):
 def test_runtime_injection_is_not_a_credential_name(key):
     with pytest.raises(BridgeError, match="dedicated credential"):
         cli_environment(AgentConfig(kind="opencode", api_key_env=key))
+
+
+def test_safe_diagnostic_masks_secrets_controls_and_length():
+    bearer = "B" * 30
+    long_token = "Ab12_" + ("x" * 24)
+    text = (
+        "Please set an Auth method\x1b[31m now\n\n"
+        f"Bearer {bearer}\n"
+        "api_key=supersecret\n"
+        f"token: {long_token}\n"
+        "password=hunter2\n"
+        "authorization: letmein\n"
+    )
+    result = safe_diagnostic(text)
+    assert result.startswith("Please set an Auth method")
+    assert "Bearer [redacted]" in result
+    assert "api_key=[redacted]" in result
+    assert "token: [redacted]" in result
+    assert "password=[redacted]" in result
+    assert "authorization: [redacted]" in result
+    assert bearer not in result and long_token not in result
+    assert "supersecret" not in result and "hunter2" not in result and "letmein" not in result
+    assert "\x1b" not in result and "\n" not in result and "  " not in result
+    assert len(result) <= 200
+    bounded = safe_diagnostic(("auth missing " * 40) + "\x07")
+    assert len(bounded) == 200
+    assert bounded.startswith("auth missing")
+    assert "\x07" not in bounded
+
+
+def test_safe_diagnostic_masks_dotted_slash_tokens_and_long_paths():
+    # Bare `key` is not an assignment name. The 18-character sample stays visible.
+    # A real assignment of the same short value is still masked before the length rule.
+    assert safe_diagnostic("key=sk-abc.def/ghi") == "key=sk-abc.def/ghi"
+    assert safe_diagnostic("token=sk-abc.def/ghi") == "token=[redacted]"
+    dotted = "sk-abc.def/ghijklmnopqrstuvwxyz0123"
+    assert safe_diagnostic(dotted) == "[redacted]"
+    path = "/tmp/path/with/secret-token"
+    assert len(path) >= 24 and safe_diagnostic(path) == "[redacted]"
+    assert safe_diagnostic("abc+def=ghijklmnopqrstuvwx") == "[redacted]"
 
 
 def test_bounded_utf8_text_and_stable_session_identity():
