@@ -239,6 +239,10 @@ async def test_gemini_known_startup_auth_rejection_is_sanitized_and_scoped(tmp_p
         assert any(e.get("failure_code") == "agent_auth_unsupported_client" for e in calls)
     assert "SECRET" not in json.dumps(calls)
     assert "SECRET" not in str(error.value)
+    saved = error.value.provider_error["diagnostic"]
+    assert "Error authenticating:" in saved
+    assert "SECRET" not in saved
+    assert len(saved) <= 200
 
 
 async def test_gemini_bounded_text_and_malformed_result(tmp_path):
@@ -401,3 +405,61 @@ def test_gemini_rejects_symlinked_authentication_cache(tmp_path, monkeypatch):
     ):
         pytest.fail("Symlinked authentication must fail before native dispatch")
     assert error.value.code == "agent_auth"
+
+
+async def test_gemini_unconfirmed_keeps_sanitized_cli_diagnostic(tmp_path):
+    secret = "A" * 28
+    diagnostic = f"Please set an Auth method before continuing Bearer {secret}\n"
+    executable = fake_cli(
+        tmp_path,
+        [],
+        body=f"import sys\nprint({diagnostic!r}, file=sys.stderr, flush=True)",
+        ending="sys.exit(1)",
+    )
+    config, args = options(tmp_path, executable)
+    with pytest.raises(UncertainExecution) as error:
+        await execute(tmp_path, config, args)
+    assert error.value.code == "agent_unconfirmed"
+    saved = error.value.provider_error["diagnostic"]
+    assert saved.startswith("Please set an Auth method before continuing")
+    assert "Bearer [redacted]" in saved
+    assert secret not in saved
+    assert "\n" not in saved
+    assert len(saved) <= 200
+
+
+async def test_gemini_stdout_model_text_never_enters_provider_error(tmp_path):
+    secret = "SECRET-MODEL-REPLY sk-ABCDEFGHIJKLMNOPQRSTUVWX"
+    executable = fake_cli(
+        tmp_path,
+        [],
+        body=f"print({secret!r}, flush=True)",
+        ending="sys.exit(1)",
+    )
+    config, args = options(tmp_path, executable)
+    with pytest.raises(UncertainExecution) as error:
+        await execute(tmp_path, config, args)
+    provider_error = getattr(error.value, "provider_error", None) or {}
+    assert "diagnostic" not in provider_error
+    assert secret not in json.dumps(provider_error)
+
+
+async def test_gemini_success_does_not_keep_stderr(tmp_path):
+    noise = "Please set an Auth method " + ("B" * 30)
+    executable = fake_cli(
+        tmp_path,
+        [
+            {"type": "init", "session_id": "gemini-session-1"},
+            {"type": "message", "role": "assistant", "content": "ok"},
+            {"type": "result", "status": "success"},
+        ],
+        body=f"import sys\nprint({noise!r}, file=sys.stderr, flush=True)",
+        ending="sys.exit(0)",
+    )
+    config, args = options(tmp_path, executable)
+    result, observed = await execute(tmp_path, config, args)
+    assert result["success"]
+    assert result["text"] == "ok"
+    dumped = json.dumps((result, observed))
+    assert "Please set an Auth method" not in dumped
+    assert "provider_error" not in result["evidence"]

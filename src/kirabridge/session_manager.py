@@ -534,19 +534,23 @@ class SessionManager:
                     "Native agent input requires a task-owned selection",
                 )
             if identities is not None:
-                text = await self.terminal_app.read(args.pane_id)
-                if self.readiness is None:
-                    raise BridgeError(
-                        "visible_target_unknown", "No readiness assessor for agent input"
+                # The selection above is this insert's fresh read. The widget
+                # check reuses that row; it must not start a second catalogue
+                # before the paste, and it must not authorize the paste itself.
+                with self.observation_scope(principal, selected):
+                    text = await self.terminal_app.read(args.pane_id)
+                    if self.readiness is None:
+                        raise BridgeError(
+                            "visible_target_unknown", "No readiness assessor for agent input"
+                        )
+                    observation = await self.readiness(
+                        principal,
+                        {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
                     )
-                observation = await self.readiness(
-                    principal,
-                    {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
-                )
-                if not observation or not observation.get("ready"):
-                    raise BridgeError(
-                        "visible_target_not_ready", "Current agent widget is not ready"
-                    )
+                    if not observation or not observation.get("ready"):
+                        raise BridgeError(
+                            "visible_target_not_ready", "Current agent widget is not ready"
+                        )
                 if before_transport is not None:
                     await before_transport()
                 await self.terminal_app.insert(
@@ -747,10 +751,37 @@ class SessionManager:
                     "Several live tabs report this tty; no input until the view is unique",
                 )
             return selected
-        raise BridgeError(
+        # A catalog that was cut short or could not see every tab proves nothing about
+        # this pane; report that instead of claiming the selection changed.
+        if catalog.get("truncated"):
+            failure = BridgeError(
+                "session_catalog_incomplete",
+                "The terminal catalog is incomplete; the selected pane cannot be judged",
+            )
+            failure.provider_error = {
+                "reason": "catalog_truncated",
+                "sessions": len(catalog["sessions"]),
+            }
+            raise failure
+        same_pane = [row for row in catalog["sessions"] if row["pane_id"] == pane_id]
+        same_tty = [
+            row
+            for row in catalog["sessions"]
+            if pane_id.rsplit(":", 1)[-1] == str(row.get("tty", "")).rsplit("/", 1)[-1]
+        ]
+        reason = (
+            "expected_pid_changed"
+            if same_pane
+            else "window_changed"
+            if same_tty
+            else "pane_missing"
+        )
+        failure = BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
         )
+        failure.provider_error = {"reason": reason, "sessions": len(catalog["sessions"])}
+        raise failure
 
     async def focus(self, principal, pane_id, expected_pid):
         self.authorization.principal(principal, "session.input")

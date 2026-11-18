@@ -26,6 +26,18 @@ def _text_sha256(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+# Raised by the native insert script's guards before the Paste menu action is performed.
+PRE_PASTE_REFUSALS = frozenset(
+    {
+        "clipboard_changed",
+        "visible_input_not_empty",
+        "visible_input_changed",
+        "visible_target_changed",
+        "session_busy",
+    }
+)
+
+
 class VisibleReadinessError(BridgeError):
     def __init__(self, observation):
         self.observation = observation
@@ -666,6 +678,32 @@ class VisibleHandoffs:
                         },
                     )
                 continue
+            if (
+                status["state"] == "unknown"
+                and status["binding"] == binding.model_dump()
+                and self.body_only_delivery(status)
+                and status["evidence"].get("reason")
+                in {"reply_unconfirmed", "reply_unconfirmed_target_ready"}
+            ):
+                # The input was delivered and returned; only its ANSWER is unknown and its
+                # waiter has ended. The lock exists to protect pending input, so a fresh
+                # positive ready check of this same target releases it. Never replayed.
+                if status["evidence"].get("reason") == "reply_unconfirmed_target_ready":
+                    continue
+                await self.check_target(principal, target, binding, ready=True)
+                self.transition(
+                    row["id"],
+                    "unknown",
+                    {
+                        **status["evidence"],
+                        "reason": "reply_unconfirmed_target_ready",
+                        "previous_reason": status["evidence"].get("reason"),
+                        "input_reservation_released": True,
+                        "automatic_retry": False,
+                        "target_readiness": "verified_ready_before_new_input",
+                    },
+                )
+                continue
             message = self.messages.get(row["principal"], status["message_id"])
             reply = self.store.db.execute(
                 "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
@@ -1005,99 +1043,6 @@ class VisibleHandoffs:
         )
         await running({"handoff_id": identifier, "state": "sent", "agent_confirmed": False})
 
-    async def continue_unsubmitted(self, principal, identifier, running):
-        from kirabridge.bridge_core.config import VisibleTerminalBinding
-
-        status = self.status(principal, identifier)
-        binding = VisibleTerminalBinding.model_validate(status["binding"])
-        async with self.sessions.agent_selection(principal, status["target"], binding):
-            return await self._continue_unsubmitted(principal, identifier, running)
-
-    async def _continue_unsubmitted(self, principal, identifier, running):
-        """Explicit local reconciliation, no new paste and no repeat of a prior Return."""
-        from kirabridge.bridge_core.config import VisibleTerminalBinding
-
-        status = self.status(principal, identifier)
-        message = self.messages.get(principal, status["message_id"])
-        if message["acknowledged"]:
-            return self.reconcile(principal, identifier)
-        attempted_return = any(
-            e["state"] in {"submitting", "return_sent", "sent", "confirmed"}
-            for e in status["events"]
-        )
-        if (
-            status["state"] != "unknown"
-            or status["evidence"].get("reason") != "visible_insert_unknown"
-            or attempted_return
-        ):
-            raise BridgeError(
-                "return_reconciliation_required", "A Return may already have been sent"
-            )
-        binding = VisibleTerminalBinding.model_validate(status["binding"])
-        if self.config.visible_handoffs.bindings.get(status["target"]) != binding:
-            raise BridgeError("handoff_conflict", "Original binding changed")
-        view = await self.check_target(principal, status["target"], binding)
-        verified = next(
-            (
-                event["evidence"]
-                for event in reversed(status["events"])
-                if event["state"] == "inserted"
-                and event["evidence"].get("prompt_format") == "body_only_v1"
-                and event["evidence"].get("prompt_observed") is True
-            ),
-            None,
-        )
-        current_view = self.input_view(status["target"], view["text"])
-        if (
-            verified is None
-            or verified.get("expected_payload_sha256") != _text_sha256(message["body"])
-            or verified.get("verified_input_view_sha256") != _text_sha256(current_view)
-        ):
-            raise BridgeError(
-                "return_reconciliation_required",
-                "Original literal input was not verified; inspect it and use an explicit Return",
-            )
-        wait_for_reply = verified.get("wait_for_reply", True)
-        if type(wait_for_reply) is not bool or wait_for_reply != bool(message["request_reply"]):
-            raise BridgeError(
-                "return_reconciliation_required", "Original reply preference is not consistent"
-            )
-        observed = "same_previously_verified_literal_widget"
-        local_reply = verified.get("local_reply_observer")
-        if isinstance(local_reply, dict) and local_reply.get("state") == "ready":
-            local_reply = await self.codex_reply.before_submit(
-                local_reply["cursor"], binding, body=message["body"]
-            )
-        self.transition(
-            identifier,
-            "inserted",
-            {
-                "insertion_representation": observed,
-                "reconciled_without_paste": True,
-                "return_sent": False,
-                "agent_confirmed": False,
-                **({"local_reply_observer": local_reply} if isinstance(local_reply, dict) else {}),
-            },
-        )
-        try:
-            await self.submit_inserted(
-                identifier,
-                principal,
-                status["target"],
-                binding,
-                running,
-                expected_input_view=current_view,
-                wait_for_reply=wait_for_reply,
-            )
-        except BaseException as exc:
-            self.transition(
-                identifier,
-                "unknown",
-                {"reason": getattr(exc, "code", "interrupted"), "automatic_retry": False},
-            )
-            raise
-        return self.status(principal, identifier)
-
     async def execute(self, task, args, running, progress, *, binding_override=None):
         started = time.monotonic()
         error = None
@@ -1401,16 +1346,26 @@ class VisibleHandoffs:
                     and _needs_cwd_proof(before["text"])
                     else None
                 )
-                await self.sessions.insert(
-                    principal,
-                    SessionInput(
-                        pane_id=binding.pane_id,
-                        expected_pid=binding.expected_pid,
-                        text=prompt,
-                        submit=False,
-                    ),
-                    before_transport=before_paste,
-                )
+                try:
+                    await self.sessions.insert(
+                        principal,
+                        SessionInput(
+                            pane_id=binding.pane_id,
+                            expected_pid=binding.expected_pid,
+                            text=prompt,
+                            submit=False,
+                        ),
+                        before_transport=before_paste,
+                    )
+                except BridgeError as refusal:
+                    # These guards run in the native script strictly BEFORE the paste
+                    # action, so such a refusal proves nothing was sent: a definite,
+                    # retry-safe failure rather than a lock-holding unknown.
+                    if not isinstance(refusal, UncertainExecution) and (
+                        refusal.code in PRE_PASTE_REFUSALS
+                    ):
+                        input_attempted = False
+                    raise
                 inserted = await self.check_target(principal, target, binding)
                 observed = await self.verify_inserted_body(
                     principal, target, binding, prompt, before, inserted, before_cwd

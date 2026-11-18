@@ -186,7 +186,7 @@ async def test_spawn_admission_cannot_hide_later_unknown_or_shutdown(bridge, out
         current = bridge.store.get(task["id"])
         assert current["evidence"]["automatic_retry"] is False
         assert current["evidence"]["last_observation"]["evidence_type"] == "local_process_spawned"
-        assert current["error"] is None or current["error"]["code"] == "owned_process_unknown"
+        assert current["error"]["code"] in {"owned_process_unknown", "dispatcher_shutdown"}
         assert cleaned.is_set()
         await bridge.tasks.stop()
         await bridge.tasks.start()

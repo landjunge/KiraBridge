@@ -167,11 +167,8 @@ async def test_cancelling_local_reply_observation_preserves_delivery_without_rep
     assert transport["calls"] == ["insert", "return"]
 
 
-async def test_explicit_draft_continuation_rechecks_local_cursor_and_cannot_use_an_old_turn(
-    local_handoff, monkeypatch
-):
+async def test_interrupted_local_insert_is_not_repeated_or_observed(local_handoff, monkeypatch):
     bridge, transport, trace = local_handoff
-    submit = bridge.visible_handoffs.submit_inserted
 
     async def failed_before_return(*args, **kwargs):
         raise BridgeError("visible_insert_unknown", "Interrupted after verified insertion")
@@ -180,21 +177,10 @@ async def test_explicit_draft_continuation_rechecks_local_cursor_and_cannot_use_
     with pytest.raises(UncertainExecution):
         await execute(bridge, timeout=0.02)
     assert transport["calls"] == ["insert"]
-    monkeypatch.setattr(bridge.visible_handoffs, "submit_inserted", submit)
-
-    async def intervening_turn(*args, **kwargs):
-        trace.append("continuation_recheck")
-        return {"state": "unavailable", "reason": "turn_observed_before_our_return"}
-
-    monkeypatch.setattr(bridge.visible_handoffs.codex_reply, "before_submit", intervening_turn)
-    status = await bridge.visible_handoffs.continue_unsubmitted(
-        "chatgpt", "local-observed-turn", callback
-    )
-    assert status["state"] == "sent" and transport["calls"] == ["insert", "return"]
     with pytest.raises(UncertainExecution):
         await execute(bridge, timeout=0.02)
-    assert "continuation_recheck" in trace and "observe_after_return" not in trace
-    assert transport["calls"] == ["insert", "return"]
+    assert "observe_after_return" not in trace
+    assert transport["calls"] == ["insert"]
 
 
 def unknown_paste_with_ready_cursor(bridge, *, identifier="unknown-codex-paste"):

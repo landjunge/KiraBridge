@@ -19,6 +19,7 @@ from kirabridge.bridge_core.models import (
 from kirabridge.operations import OPERATIONS
 from kirabridge.platform_adapters import RuntimeLock
 from kirabridge.security_manager import SecurityManager, request_hash
+from kirabridge.task_manager.failure import normalize_failure
 from kirabridge.task_manager.store import Store
 
 Executor = Callable[[dict, Callable, Callable], Awaitable[dict]]
@@ -465,12 +466,15 @@ class TaskManager:
             else:
                 state = State.COMPLETED if result.get("success", True) else State.FAILED
                 evidence = result.get("evidence", {"operation_returned": True})
+            failure = normalize_failure(result) if state == State.FAILED and not pending else None
+            if failure is not None and failure["retry_safe"]:
+                evidence = {**evidence, "safe_to_retry": True, "automatic_retry": False}
             self.store.transition(
                 task["id"],
                 state,
                 evidence,
                 result=result,
-                error={"code": "session_handle_pending"} if pending else None,
+                error={"code": "session_handle_pending"} if pending else failure,
                 owner=self.owner,
             )
         except asyncio.CancelledError:
@@ -485,7 +489,7 @@ class TaskManager:
                     **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },
-                error={"code": "native_admission_timeout"} if expired else None,
+                error={"code": "native_admission_timeout" if expired else "dispatcher_shutdown"},
                 owner=self.owner,
             )
             raise

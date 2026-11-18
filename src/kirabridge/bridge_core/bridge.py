@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -939,6 +940,20 @@ class Bridge:
             ).fetchone()
             worker = self.config.team.workers.get(work["assignee"]) if work else None
             managed = bool(worker and worker.execution_scope == "separate_managed_session")
+            if worker and worker.execution_scope == "existing_native_codex_root":
+                if worker.agent != "codex" or self.config.agents[worker.agent].kind != "codex":
+                    raise BridgeError("native_codex_unsupported", "Native route is Codex only")
+                from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
+
+                await running({"evidence_type": "native_codex_turn_dispatch"})
+                return await NativeCodexTurns().execute(
+                    self.config.visible_handoffs.native_codex,
+                    args.cwd,
+                    str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + task["id"])),
+                    args.prompt,
+                    min(args.timeout, worker.timeout),
+                    progress,
+                )
             return await self.agents.execute(
                 task, args, policy, running, progress, separate_managed=managed
             )
