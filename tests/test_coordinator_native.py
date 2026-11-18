@@ -267,7 +267,8 @@ async def test_native_followup_and_durable_completion_via_real_mcp(scenario, tmp
             n["payload"]["source"] == "autonext" and n["payload"]["outcome"] == "success"
             for n in notices
         )
-        first, second_notice = notices
+        # Newest first: order by seq to name the older and the newer notice.
+        first, second_notice = sorted(notices, key=lambda n: n["seq"])
         selected = (
             await pool.call(
                 "owner",
