@@ -385,6 +385,16 @@ class WorkflowControlConfig(BaseModel):
     consumer_id: str = Field(default="kirabridge-cli", pattern=r"^[A-Za-z0-9_.:-]{1,128}$")
     source_commit: str | None = Field(default=None, pattern=r"^[a-f0-9]{40}$")
     source_package_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    # Read-only TollGate daily-budget check before each agent run (false = no call).
+    budget: bool = Field(default=True, strict=True)
+
+    @model_serializer(mode="wrap")
+    def omit_default_budget(self, handler):
+        # The effective-config digest of existing configurations must not change.
+        value = handler(self)
+        if self.budget:
+            value.pop("budget", None)
+        return value
 
 
 class TerminalConfig(BaseModel):
