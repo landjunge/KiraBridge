@@ -97,6 +97,22 @@ class LicenseRegressionTests(unittest.TestCase):
                         recipe.write_text(text.replace(proof, "REMOVED_PRODUCT_INCLUSION"))
                         self.assertTrue(CHECK.check_packagers(root))
 
+    def test_commented_out_inclusion_commands_are_not_proof(self):
+        for relative, proofs in CHECK.PACKAGER_PROOFS.items():
+            original = ROOT / relative
+            if not original.exists():
+                continue
+            text = original.read_text()
+            for proof in proofs:
+                with self.subTest(recipe=relative, proof=proof), tempfile.TemporaryDirectory() as t:
+                    recipe = Path(t) / relative
+                    recipe.parent.mkdir(parents=True)
+                    commented = "\n".join(
+                        "# " + line if proof in line else line for line in text.splitlines()
+                    )
+                    recipe.write_text(commented)
+                    self.assertTrue(CHECK.check_packagers(Path(t)))
+
 
 if __name__ == "__main__":
     unittest.main()
