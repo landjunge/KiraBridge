@@ -551,6 +551,11 @@ class AgentManager:
             "claude_code": ClaudeCodeAdapter(terminal),
             "copilot_cli": CopilotCLIAdapter(terminal),
         }
+        host = getattr(config, "acp_pap_host", None)
+        if host is not None and host.enabled:
+            from kirabridge.agent_manager.acp_pap_host import ACPPAPHostAdapter
+
+            self.adapters["acp_pap"] = ACPPAPHostAdapter(terminal, config)
 
     def register(self, kind: str, adapter: AgentAdapter) -> None:
         if kind in self.adapters or adapter.interface_version != "1":
