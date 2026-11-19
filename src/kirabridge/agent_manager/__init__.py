@@ -644,12 +644,11 @@ class AgentManager:
 
     @staticmethod
     def with_budget_note(result, note):
-        if note is not None and isinstance(result, dict):
-            evidence = result.setdefault("evidence", {})
-            if isinstance(evidence, dict):
-                evidence["tollgate"] = note
-                if note["decision"] == "unavailable":
-                    evidence["tollgate_unavailable"] = True
+        evidence = result.get("evidence") if isinstance(result, dict) else None
+        if note is not None and isinstance(evidence, dict):
+            evidence["tollgate"] = note
+            if note["decision"] == "unavailable":
+                evidence["tollgate_unavailable"] = True
         return result
 
     async def execute(self, task, args, principal, running, progress, **options):
