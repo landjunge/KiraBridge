@@ -348,3 +348,35 @@ async def test_native_two_step_scripts_compile_without_executing_ui(
         subprocess.run, command, capture_output=True, text=True, timeout=10
     )
     assert compiled.returncode == 0, compiled.stderr
+
+
+async def test_ended_shell_windows_do_not_make_the_catalog_incomplete(bridge, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
+    manager = SessionManager(bridge.sessions.ports)
+
+    async def native(*args, **kwargs):
+        return [
+            {"window_id": 123, "tty": "/dev/ttys004", "busy": False, "miniaturized": False},
+            {"window_id": 124, "tty": "/dev/ttys005", "busy": False, "miniaturized": True},
+        ]
+
+    async def communicate():
+        uid = __import__("os").getuid()
+        # ttys005 has no process at all: its shell ended and the window only remains.
+        return (f"{uid} 400 1 ttys004 /bin/zsh\n".encode(), b"")
+
+    async def process(*args, **kwargs):
+        return SimpleNamespace(
+            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
+        )
+
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec", process
+    )
+    rows = await manager.terminal_app.catalog()
+    assert [row["pane_id"] for row in rows] == ["terminal:123:ttys004"]
+    assert manager.terminal_app.last_catalog_incomplete is False
+    assert rows[0]["miniaturized"] is False

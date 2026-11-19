@@ -89,3 +89,20 @@ def test_duplicate_tty_is_not_addressable():
         ]
     )
     assert all(row["identity_ambiguous"] for row in rows)
+
+
+def test_minimized_windows_are_not_open_windows_and_are_never_merged():
+    """Real state: one live window, one finished window, two minimized windows of equal size."""
+    small = {"x": 512, "y": 92, "width": 985, "height": 637}
+    rows = attach_visual_windows(
+        [
+            _tab(5964, "/dev/ttys003", frontmost=True, index=1),
+            {**_tab(7372, "/dev/ttys004", bounds=small, index=2), "miniaturized": True},
+            {**_tab(7374, "/dev/ttys005", bounds=small, index=3), "miniaturized": True},
+            _tab(9159, "/dev/ttys002", bounds={"x": 369, "y": 130, "width": 985, "height": 637}),
+        ]
+    )
+    assert {row["ui_window_count"] for row in rows} == {2}
+    minimized = [row for row in rows if row["window_id"] in (7372, 7374)]
+    assert {row["visual_window_id"] for row in minimized} == {7372, 7374}
+    assert all(row["tab_count"] == 1 and not row.get("selection_ambiguous") for row in minimized)

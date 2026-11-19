@@ -98,11 +98,13 @@ async def test_visible_command_keeps_final_selection_screens_and_no_replay(comma
         before_duplicate = copy.deepcopy(state)
         assert bridge.prepare("local", value)["state"] == "completed"
         assert state == before_duplicate
-    # Actual SessionManager.selected/read/catalog methods ran throughout.
-    assert state["catalogs"] == 3
+    # Actual SessionManager.selected/read/catalog methods ran throughout. The screen is read
+    # once before dispatch (the native dispatch confirms the empty prompt itself) and once
+    # after, reusing the row observed at dispatch: two catalogues, two reads.
+    assert state["catalogs"] == 2
     assert state["catalogs_at_dispatch"] == 2
-    assert state["reads_at_dispatch"] == 2
-    assert state["reads"] == [1, 2, 3]
+    assert state["reads_at_dispatch"] == 1
+    assert state["reads"] == [1, 2]
     assert state["identities"] == [345] and len(state["posts"]) == 1
 
 
@@ -270,3 +272,50 @@ async def test_dirty_git_prompt_is_confirmed_as_empty_without_posting_input(comm
     )
     assert await bridge.visible_terminal.suitable("local", state["row"])
     assert not state["posts"]
+
+
+async def test_checking_stops_at_the_first_suitable_window(command, monkeypatch):
+    bridge, state, args = command
+    transport = bridge.sessions.terminal_app
+    rows = []
+    for number in (9, 3, 7):
+        item = copy.deepcopy(state["row"])
+        item.update(pane_id=f"terminal:1{number}:ttys00{number}", tty=f"/dev/ttys00{number}")
+        rows.append(item)
+    reads, posts = [], []
+
+    async def catalog():
+        return copy.deepcopy(rows)
+
+    async def read(pane):
+        reads.append(pane)
+        return "host project% "
+
+    async def identity(pid):
+        return "501 ttys003 Wed Nov 4 12:00:00 2026"
+
+    async def send(selected, text, observed_identity):
+        posts.append(selected["pane_id"])
+        script = Path(shlex.split(text)[-1])
+        nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
+        write_private(script.parent / "result.json", json.dumps({"nonce": nonce, "exit_code": 0}))
+
+    for name, function in (
+        ("catalog", catalog),
+        ("read", read),
+        ("process_identity", identity),
+        ("send_confirmed", send),
+    ):
+        monkeypatch.setattr(transport, name, function)
+    value = request(
+        "terminal.visible",
+        {**args, "pane_id": None, "expected_pid": None},
+        task_id="first-suitable",
+    )
+    async with bridge:
+        bridge.prepare("local", value)
+        task = await bridge.tasks.wait("local", value.task_id, 5)
+    assert task["state"] == "completed", task
+    # The lowest pane id is used; the other two idle shells are never read before dispatch.
+    assert posts == ["terminal:13:ttys003"]
+    assert "terminal:19:ttys009" not in reads and "terminal:17:ttys007" not in reads

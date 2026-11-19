@@ -48,11 +48,13 @@ class VisibleTerminal:
             environment,
         )
 
-    async def suitable(self, principal, row):
+    async def suitable(self, principal, row, *, read_screen=True):
         if (
             row.get("transport") != "terminal_app"
             or row.get("busy", True)
             or not row.get("processes")
+            # A window minimized to the Dock cannot be brought front by the focus step.
+            or row.get("miniaturized")
         ):
             return False
         # Idle shell only: an interactive agent/editor is never an interchangeable shell.
@@ -64,6 +66,10 @@ class VisibleTerminal:
             raise BridgeError(
                 "visible_target_ambiguous", "Several live tabs report this tty; no input"
             )
+        if not read_screen:
+            # Row checks only. The native dispatch reads the screen and confirms the empty
+            # prompt itself in the same call (send_confirmed), so no second read is needed.
+            return True
         # The caller just observed this row. Scope only this fresh screen read;
         # final selection and native dispatch still verify input authority anew.
         with self.sessions.observation_scope(principal, row):
@@ -137,19 +143,18 @@ class VisibleTerminal:
                 error = catalog.get("transport_errors", {}).get("terminal_app")
                 if error:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
-                candidates, unconfirmed_input = [], None
-                for candidate in catalog["sessions"]:
+                row, unconfirmed_input = None, None
+                # The lowest pane id with fresh empty-shell evidence is used, so checking
+                # stops at the first suitable window instead of reading every idle shell.
+                for candidate in sorted(catalog["sessions"], key=lambda item: item["pane_id"]):
                     try:
                         if await self.suitable(principal, candidate):
-                            candidates.append(candidate)
+                            row = candidate
+                            break
                     except BridgeError as error:
                         if error.code != "visible_input_unknown":
                             raise
                         unconfirmed_input = error
-                # Every candidate has independent fresh empty-shell evidence.
-                row = (
-                    sorted(candidates, key=lambda item: item["pane_id"])[0] if candidates else None
-                )
                 if row is None:
                     if unconfirmed_input is not None:
                         # An ambiguous existing shell is not evidence that more
@@ -256,7 +261,7 @@ class VisibleTerminal:
             current = await bridge.sessions.selected(
                 principal, reference.pane_id, reference.expected_pid
             )
-            if current != row or not await self.suitable(principal, current):
+            if current != row or not await self.suitable(principal, current, read_screen=False):
                 raise BridgeError(
                     "visible_target_changed", "Visible shell changed before dispatch; no input"
                 )
@@ -275,9 +280,12 @@ class VisibleTerminal:
                     raise UncertainExecution(
                         "visible_result_unknown", "Unexpected visible command receipt"
                     )
-                output = await bridge.sessions.read(
-                    principal, reference.pane_id, reference.expected_pid
-                )
+                # Output is informational: reuse the row observed at dispatch instead of
+                # another full window catalogue just to return the screen.
+                with bridge.sessions.observation_scope(principal, current):
+                    output = await bridge.sessions.read(
+                        principal, reference.pane_id, reference.expected_pid
+                    )
                 return {
                     **reference.model_dump(),
                     "tty": row["tty"],
