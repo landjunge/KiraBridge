@@ -1108,12 +1108,60 @@ class Bridge:
             },
         )
 
+    BINDING_REFRESH_FIRST = 10.0
+    BINDING_REFRESH_INTERVAL = 90.0
+
+    async def refresh_agent_bindings_once(self, principal="local"):
+        """Re-check the configured agent windows against one fresh catalogue.
+
+        Read-only. Only a binding that is no longer in the catalogue goes through the
+        existing proven-absence and unique-live-agent replacement (refreshed_binding), so a
+        restart of KiraBridge, Terminal.app or an agent never leaves a dead binding behind.
+        Returns the targets that were replaced.
+        """
+        from kirabridge.visible_binding import binding_still_present
+
+        bindings = dict(self.config.visible_handoffs.bindings)
+        if not bindings:
+            return []
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except Exception:  # noqa: BLE001 - an unavailable Terminal is retried next round
+            return []
+        sessions = catalog.get("sessions") or []
+        replaced = []
+        for target, binding in bindings.items():
+            if binding_still_present(binding, sessions):
+                continue
+            try:
+                updated, _ = await self.visible_handoffs.refreshed_binding(
+                    principal, target, binding
+                )
+            except Exception:  # noqa: BLE001 - never stops the loop; the next round retries
+                continue
+            if updated is not binding and updated != binding:
+                replaced.append(target)
+        return replaced
+
+    async def _binding_refresher(self):
+        await asyncio.sleep(self.BINDING_REFRESH_FIRST)
+        while True:
+            try:
+                await self.refresh_agent_bindings_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                pass
+            await asyncio.sleep(self.BINDING_REFRESH_INTERVAL)
+
     async def __aenter__(self):
         await self.tasks.start()
         try:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
+            if self.config.visible_handoffs.bindings and sys.platform == "darwin":
+                self._binding_task = asyncio.create_task(self._binding_refresher())
         except BaseException:
             for stop in (
                 self.team_dispatcher.stop,
@@ -1125,6 +1173,10 @@ class Bridge:
         return self
 
     async def __aexit__(self, *exc):
+        task = getattr(self, "_binding_task", None)
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
         try:
             try:
                 await self.team_dispatcher.stop()
