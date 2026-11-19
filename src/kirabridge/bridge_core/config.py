@@ -188,6 +188,8 @@ class AgentConfig(BaseModel):
         | None
     ) = None
     output_schema: str | None = Field(default=None, max_length=4096)
+    # Launch arguments for the opt-in kind "acp_pap" (see agent_manager/acp_pap_host.py).
+    acp_pap_args: list[str] = Field(default_factory=list)
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
     bridge_tools: bool = False
@@ -207,6 +209,8 @@ class AgentConfig(BaseModel):
                     value.pop(key)
         if self.grok_reasoning_effort is None:
             value.pop("grok_reasoning_effort", None)
+        if not self.acp_pap_args:
+            value.pop("acp_pap_args", None)
         return value
 
     @model_validator(mode="after")
@@ -219,6 +223,8 @@ class AgentConfig(BaseModel):
             or self.qwen_reasoning_effort is not None
         ) and self.kind != "qwen_acp":
             raise ValueError("Qwen authentication selection requires kind qwen_acp")
+        if self.acp_pap_args and self.kind != "acp_pap":
+            raise ValueError("ACP-PAP launch arguments require kind acp_pap")
         if self.grok_reasoning_effort is not None and self.kind != "grok_acp":
             raise ValueError("Grok reasoning effort requires kind grok_acp")
         if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
@@ -240,6 +246,7 @@ class AgentConfig(BaseModel):
             }
         defaults = {
             "qwen_acp": "",
+            "acp_pap": "",
             "opencode": "OPENCODE_API_KEY",
             "gemini_cli": "GEMINI_API_KEY",
             "claude_code": "ANTHROPIC_API_KEY",
@@ -533,8 +540,23 @@ class LiveLogsConfig(BaseModel):
     max_line_chars: int = Field(default=4096, ge=64, le=65536)
 
 
+class AcpPapHostConfig(BaseModel):
+    """Opt-in ACP-PAP host adapter (kind "acp_pap"). Disabled unless explicitly enabled."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = Field(default=False, strict=True)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_serializer(mode="wrap")
+    def omit_default_acp_pap_host(self, handler):
+        # The effective-config digest of existing configurations must not change.
+        value = handler(self)
+        if not self.acp_pap_host.enabled:
+            value.pop("acp_pap_host", None)
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -590,6 +612,7 @@ class Config(BaseModel):
     voice_messaging: VoiceMessagingConfig = Field(default_factory=VoiceMessagingConfig)
     voice_channel: VoiceChannelConfig = Field(default_factory=VoiceChannelConfig)
     visible_handoffs: VisibleHandoffConfig = Field(default_factory=VisibleHandoffConfig)
+    acp_pap_host: AcpPapHostConfig = Field(default_factory=AcpPapHostConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 
