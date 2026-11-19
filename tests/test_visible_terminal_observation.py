@@ -319,3 +319,85 @@ async def test_checking_stops_at_the_first_suitable_window(command, monkeypatch)
     # The lowest pane id is used; the other two idle shells are never read before dispatch.
     assert posts == ["terminal:13:ttys003"]
     assert "terminal:19:ttys009" not in reads and "terminal:17:ttys007" not in reads
+
+
+async def test_layout_change_of_other_windows_does_not_abort_the_dispatch(command):
+    """ui_window_count changes when any other window opens; the target itself is unchanged."""
+    bridge, state, args = command
+    original = bridge.sessions.terminal_app.catalog
+    calls = {"n": 0}
+
+    async def catalog():
+        calls["n"] += 1
+        rows = await original()
+        if calls["n"] >= 2:
+            for row in rows:
+                row["ui_window_count"] = 5
+                row["tab_selected"] = True
+        return rows
+
+    bridge.sessions.terminal_app.catalog = catalog
+    value = request("terminal.visible", args, task_id="layout-change")
+    async with bridge:
+        bridge.prepare("local", value)
+        task = await bridge.tasks.wait("local", value.task_id, 5)
+    assert task["state"] == "completed", task
+
+
+async def test_unsuitable_window_reports_its_real_reason(command):
+    bridge, state, args = command
+    state["row"]["miniaturized"] = True
+    running = AsyncMock()
+    with pytest.raises(BridgeError) as failure:
+        await bridge.visible_terminal.execute(
+            {"id": "minimized", "principal": "local"},
+            VisibleTerminalInput.model_validate(args),
+            running,
+        )
+    assert failure.value.code == "visible_target_minimized"
+    assert not state["posts"]
+    running.assert_not_awaited()
+
+
+async def test_a_vanishing_candidate_does_not_stop_the_choice_of_another(command, monkeypatch):
+    bridge, state, args = command
+    transport = bridge.sessions.terminal_app
+    rows = []
+    for number in (3, 5):
+        item = copy.deepcopy(state["row"])
+        item.update(pane_id=f"terminal:1{number}:ttys00{number}", tty=f"/dev/ttys00{number}")
+        rows.append(item)
+    posts = []
+
+    async def catalog():
+        return copy.deepcopy(rows)
+
+    async def read(pane):
+        if pane == "terminal:13:ttys003":
+            raise BridgeError("session_selection_changed", "window closed meanwhile")
+        return "host project% "
+
+    async def identity(pid):
+        return "501 ttys005 Wed Nov 4 12:00:00 2026"
+
+    async def send(selected, text, observed_identity):
+        posts.append(selected["pane_id"])
+        script = Path(shlex.split(text)[-1])
+        nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
+        write_private(script.parent / "result.json", json.dumps({"nonce": nonce, "exit_code": 0}))
+
+    for name, function in (
+        ("catalog", catalog),
+        ("read", read),
+        ("process_identity", identity),
+        ("send_confirmed", send),
+    ):
+        monkeypatch.setattr(transport, name, function)
+    value = request(
+        "terminal.visible", {**args, "pane_id": None, "expected_pid": None}, task_id="skip"
+    )
+    async with bridge:
+        bridge.prepare("local", value)
+        task = await bridge.tasks.wait("local", value.task_id, 5)
+    assert task["state"] == "completed", task
+    assert posts == ["terminal:15:ttys005"]

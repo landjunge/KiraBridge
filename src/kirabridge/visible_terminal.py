@@ -39,6 +39,31 @@ class VisibleTerminalInput(TerminalInput):
         return self
 
 
+# Fields that identify a window and its process state. Layout fields (ui_window_count,
+# tab_selected, visual_window_id, tab_index, tab_count) change when any other window opens,
+# closes or is clicked and must not abort a dispatch that send_confirmed verifies natively.
+_VOLATILE = {"ui_window_count", "tab_selected", "visual_window_id", "tab_index", "tab_count"}
+# A candidate that vanished or became ambiguous between catalog and read is skipped, not fatal.
+_SKIPPABLE = {"session_selection_changed", "visible_target_ambiguous", "visible_target_changed"}
+
+
+def _same_target(left, right):
+    return {k: v for k, v in left.items() if k not in _VOLATILE} == {
+        k: v for k, v in right.items() if k not in _VOLATILE
+    }
+
+
+def _unsuitable_code(row):
+    """The real reason a window is not a typing target, instead of a blanket session_busy."""
+    if row.get("miniaturized"):
+        return "visible_target_minimized", "Selected window is minimized to the Dock"
+    if not row.get("processes"):
+        return "visible_target_not_shell", "Selected window has no live shell"
+    if row.get("busy", True):
+        return "session_busy", "Selected window is busy"
+    return "session_busy", "Selected window is not a confirmed empty shell"
+
+
 class VisibleTerminal:
     def __init__(self, config, security, sessions, environment):
         self.config, self.security, self.sessions, self.environment = (
@@ -135,15 +160,14 @@ class VisibleTerminal:
             if args.pane_id:
                 row = await bridge.sessions.selected(principal, args.pane_id, args.expected_pid)
                 if not await self.suitable(principal, row):
-                    raise BridgeError(
-                        "session_busy", "Selected window is not a confirmed empty shell"
-                    )
+                    code, message = _unsuitable_code(row)
+                    raise BridgeError(code, message)
             else:
                 catalog = await bridge.sessions.catalog(principal)
                 error = catalog.get("transport_errors", {}).get("terminal_app")
                 if error:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
-                row, unconfirmed_input = None, None
+                row, unconfirmed_input, skipped = None, None, None
                 # The lowest pane id with fresh empty-shell evidence is used, so checking
                 # stops at the first suitable window instead of reading every idle shell.
                 for candidate in sorted(catalog["sessions"], key=lambda item: item["pane_id"]):
@@ -152,10 +176,16 @@ class VisibleTerminal:
                             row = candidate
                             break
                     except BridgeError as error:
+                        if error.code in _SKIPPABLE:
+                            skipped = skipped or error
+                            continue
                         if error.code != "visible_input_unknown":
                             raise
                         unconfirmed_input = error
                 if row is None:
+                    if unconfirmed_input is None and skipped is not None:
+                        # Nothing else was usable: name the real problem, never open a window.
+                        raise skipped
                     if unconfirmed_input is not None:
                         # An ambiguous existing shell is not evidence that more
                         # windows are needed. Preserve it and report input state.
@@ -261,7 +291,9 @@ class VisibleTerminal:
             current = await bridge.sessions.selected(
                 principal, reference.pane_id, reference.expected_pid
             )
-            if current != row or not await self.suitable(principal, current, read_screen=False):
+            if not _same_target(current, row) or not await self.suitable(
+                principal, current, read_screen=False
+            ):
                 raise BridgeError(
                     "visible_target_changed", "Visible shell changed before dispatch; no input"
                 )

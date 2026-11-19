@@ -380,3 +380,40 @@ async def test_ended_shell_windows_do_not_make_the_catalog_incomplete(bridge, mo
     assert [row["pane_id"] for row in rows] == ["terminal:123:ttys004"]
     assert manager.terminal_app.last_catalog_incomplete is False
     assert rows[0]["miniaturized"] is False
+
+
+async def test_orphaned_background_job_is_not_a_second_shell_root(bridge, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
+    manager = SessionManager(bridge.sessions.ports)
+
+    async def native(*args, **kwargs):
+        return [{"window_id": 123, "tty": "/dev/ttys004", "busy": False}]
+
+    async def communicate():
+        uid = __import__("os").getuid()
+        return (
+            (
+                f"{uid} 345 1 ttys004 /usr/bin/login\n"
+                f"{uid} 346 345 ttys004 /bin/zsh\n"
+                # nohup/ssh -f job handed over to launchd: parent 1, not a second shell
+                f"{uid} 777 1 ttys004 /usr/bin/ssh\n"
+            ).encode(),
+            b"",
+        )
+
+    async def process(*args, **kwargs):
+        return SimpleNamespace(
+            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
+        )
+
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec", process
+    )
+    rows = await manager.terminal_app.catalog()
+    assert [row["expected_pid"] for row in rows] == [345]
+    assert manager.terminal_app.last_catalog_incomplete is False
+    # The orphan is still reported as a process, so the window is not an idle shell.
+    assert 777 in {process["pid"] for process in rows[0]["processes"]}

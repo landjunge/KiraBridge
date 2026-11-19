@@ -87,7 +87,9 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
     groups: dict[tuple, list[dict]] = {}
     for row in rows:
         bounds = row.get("bounds") or {}
-        if row.get("miniaturized") is True:
+        if row.get("ended") is True:
+            key = ("minimized", row.get("window_id"))  # kept apart, never counted or merged
+        elif row.get("miniaturized") is True:
             # A window minimized to the Dock is not on screen: it must neither count as an
             # open window nor be merged with another window that has the same size.
             key = ("minimized", row.get("window_id"))
@@ -348,10 +350,22 @@ class TerminalAppTransport:
             ]
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
-            if not members and not all_members:
-                # The shell ended; Terminal.app keeps the window open. Nothing can be typed
-                # into it and it is not ambiguous, so it must not mark the catalog incomplete.
+            if not members:
+                # No user process on this tty: the shell ended (Terminal.app keeps the window
+                # open) or the login is still starting. Nothing can be typed into it yet, and
+                # it is not ambiguous, so it must not mark the whole catalog incomplete.
                 continue
+            if len(roots) > 1:
+                # A background job handed over to launchd (ppid 1: nohup, ssh -f, (cmd &)) is
+                # not a second shell. The shell root is the login process Terminal.app started,
+                # or else the one root whose parent is another process on this tty.
+                names = {p: Path(comm).name.lstrip("-") for _, p, _, comm in all_members}
+                logins = [p for p in roots if names.get(p) == "login"]
+                attached = [p for p, parent in members if p in roots and parent in all_pids]
+                for chosen in (logins, attached):
+                    if len(chosen) == 1:
+                        roots = chosen
+                        break
             if len(roots) != 1:
                 omitted = True
                 continue

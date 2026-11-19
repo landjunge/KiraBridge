@@ -106,3 +106,16 @@ def test_minimized_windows_are_not_open_windows_and_are_never_merged():
     minimized = [row for row in rows if row["window_id"] in (7372, 7374)]
     assert {row["visual_window_id"] for row in minimized} == {7372, 7374}
     assert all(row["tab_count"] == 1 and not row.get("selection_ambiguous") for row in minimized)
+
+
+def test_an_ended_window_is_not_counted_or_merged_with_a_live_window_of_equal_size():
+    bounds = {"x": 10, "y": 10, "width": 900, "height": 600}
+    rows = attach_visual_windows(
+        [
+            _tab(1, "/dev/ttys001", bounds=bounds, frontmost=True),
+            {**_tab(2, "/dev/ttys002", bounds=bounds, index=2), "ended": True},
+        ]
+    )
+    live = [row for row in rows if row["window_id"] == 1][0]
+    assert live["ui_window_count"] == 1 and live["tab_count"] == 1
+    assert live["tab_selected"] is True and not live.get("selection_ambiguous")
