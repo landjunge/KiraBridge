@@ -626,7 +626,45 @@ class AgentManager:
             ]
         }
 
-    async def execute(
+    def tollgate_loader(self):
+        from kirabridge.agent_manager.tollgate_gate import load_pinned_agent_gate
+
+        return load_pinned_agent_gate(self.config.workflow_control)
+
+    async def budget_note(self, agent):
+        """The single TollGate gate per run; None when switched off.
+
+        Raises BridgeError("tollgate_budget_reached") only for a user-set limit.
+        """
+        if not self.config.workflow_control.budget:
+            return None
+        from kirabridge.agent_manager.tollgate_gate import check_budget
+
+        return await check_budget(self.tollgate_loader, agent)
+
+    @staticmethod
+    def with_budget_note(result, note, *, create=False):
+        """Attach the note to an existing evidence dict; ``create`` adds one (native Codex)."""
+        if note is None or not isinstance(result, dict):
+            return result
+        evidence = result.get("evidence")
+        if not isinstance(evidence, dict):
+            if not create:
+                return result
+            evidence = result["evidence"] = {}
+        evidence["tollgate"] = note
+        if note["decision"] == "unavailable":
+            evidence["tollgate_unavailable"] = True
+        return result
+
+    async def execute(self, task, args, principal, running, progress, **options):
+        note = None
+        if args.agent in principal.agents and args.agent in self.config.agents:
+            note = await self.budget_note(args.agent)
+        result = await self.run_agent(task, args, principal, running, progress, **options)
+        return self.with_budget_note(result, note)
+
+    async def run_agent(
         self,
         task,
         args,
