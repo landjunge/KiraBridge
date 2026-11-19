@@ -81,7 +81,7 @@ Keine fremden Profile oder Shell-Pfade unbesehen überschreiben. Bestehende
 KiraBridge-Schlüssel bleiben bis zu einer gesondert freigegebenen und geprüften
 Migration erhalten. Die Betriebspfade stehen unten.
 
-Optionaler ACP-PAP-Host-Adapter (`[acp_pap_host] enabled = true`, Agent `kind = "acp_pap"`, Extra `kirabridge[acp-pap]`): standardmäßig aus, eine Verbindung und Sitzung je Core-Task, Zeitüberschreitung oder Trennung bleibt UNKNOWN und wird nie erneut gesendet.
+Optionaler ACP-PAP-Host-Adapter (`[acp_pap_host] enabled = true`, Agent `kind = "acp_pap"`, Paket `acp_pap` aus dem privaten Repository separat installieren, kein Extra und keine Pflichtabhängigkeit): standardmäßig aus, eine Verbindung und Sitzung je Core-Task, Zeitüberschreitung oder Trennung bleibt UNKNOWN und wird nie erneut gesendet.
 
 ## Sicherheit
 
