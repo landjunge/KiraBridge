@@ -22,10 +22,14 @@ def _placeholder(text):
 
 
 def verifiable_payload(text):
-    # Edge spaces remain ambiguous. Newlines and other visible characters can
-    # be proven from the composer cells alone.
+    # Edge spaces are invisible padding in the one-row exact comparison (single_line_payload
+    # still refuses them there), but the composer-cell comparison ignores all whitespace
+    # and proves every visible character. Indented code is therefore verifiable as long as
+    # it holds visible content.
     return bool(
-        text and text == text.strip(" ") and not re.search(r"[\x00-\x08\x0b-\x1f\x7f]", text)
+        text
+        and (text == text.strip(" ") or _compact(text))
+        and not re.search(r"[\x00-\x08\x0b-\x1f\x7f]", text)
     )
 
 
