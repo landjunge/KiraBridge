@@ -1,7 +1,8 @@
 """Claude Code's visible composer between two horizontal rules; literal text only.
 
 Claude wraps long input over continuation rows, so insertion is compared without
-whitespace. A collapsed paste ("[Pasted text #1 …]") never matches: no Return.
+whitespace. A collapsed paste ("[Pasted text #1 +k lines]") counts as the text only
+when the field was empty before and k matches the text's line count: no Return otherwise.
 No slash, menu, navigation or reply capability is claimed.
 """
 
@@ -18,6 +19,24 @@ _SPINNER = re.compile(r"[ \t]*[✻✽✶✳✢·*] ")
 
 def _compact(text):
     return re.sub(r"\s+", "", text)
+
+
+_FOLDED = re.compile(r"\[Pastedtext#\d+(?:\+(\d+)lines?)?\]")
+
+
+def _folded_counts(text):
+    """Line counts Claude Code may show in "[Pasted text #N +k lines]" for this text."""
+    counts = set()
+    for variant in (text, text.rstrip("\r\n")):
+        newlines = len(re.findall(r"\r\n|\r|\n", variant))
+        counts.update({newlines, newlines + 1} if newlines else {0})
+    return counts
+
+
+def folded_paste(field, text):
+    """The whole input field is exactly one folded-paste marker for this text."""
+    match = _FOLDED.fullmatch(_compact(field))
+    return bool(match) and int(match.group(1) or 0) in _folded_counts(text)
 
 
 def composer(text):
@@ -94,9 +113,10 @@ class ClaudeCodeAdapter:
         old = composer(legacy.display_text(before)[0])
         new_text, controls = legacy.display_text(raw)
         new = None if controls else composer(new_text)
-        if old is None or new is None or typed(old[1]) or "[Pasted text" in new_text:
+        if old is None or new is None or typed(old[1]) or not _compact(text):
             return False
-        return bool(_compact(text)) and _compact(typed(new[1])) == _compact(text)
+        field = typed(new[1])
+        return _compact(field) == _compact(text) or folded_paste(field, text)
 
     def navigation_preserves(self, before, after, observation, after_state):
         return False
@@ -108,11 +128,24 @@ class ClaudeCodeAdapter:
         return False
 
     def paste_source(self, text):
-        # Fresh-echo check for wrapped rows: compare without whitespace.
+        # Fresh-echo check: only the CURRENT input field, before and after. Empty before,
+        # exactly the text (whitespace-free, wrapped rows) or its folded marker after.
         return (
             "\nfunction observedPaste(before, after) {"
             "const c=s=>s.replace(/[\\s\\u00a0]+/g,''), p=c(" + json.dumps(text) + ");"
-            "return p.length>0 && c(after).includes(p) && !c(before).includes(p);}\n"
+            "const counts=" + json.dumps(sorted(_folded_counts(text))) + ";"
+            "const rule=/^[ \\t]*─{3,}(?: [^─\\n]{1,120} ─+)?[ \\t]*$/;"
+            "const field=s=>{const l=s.split('\\n');"
+            "for(let i=l.length-1;i>0;i--){"
+            "if(l[i].trimStart().startsWith('" + _PROMPT + "')&&rule.test(l[i-1])){"
+            "for(let e=i+1;e<l.length;e++){if(rule.test(l[e])){"
+            "return [l[i].trimStart().slice(1),...l.slice(i+1,e)].join('\\n');}}"
+            "return null;}}return null;};"
+            "const old=field(before), now=field(after);"
+            "if(!p.length||old===null||now===null||c(old).length) return false;"
+            "const cur=c(now); if(cur===p) return true;"
+            r"const m=/^\[Pastedtext#\d+(?:\+(\d+)lines?)?\]$/.exec(cur);"
+            "return !!m && counts.includes(m[1]===undefined?0:Number(m[1]));}\n"
         )
 
     def slash_insertion_observed(self, sessions, binding, raw, text, before, **options):
