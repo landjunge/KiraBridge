@@ -49,3 +49,13 @@ def test_nested_move_recovery_namespace_is_private_even_as_an_allowed_root(tmp_p
         scope.split(str(stage / "payload"))
     assert error.value.code == "path_denied"
     assert Path(stage).is_dir()
+
+
+def test_a_missing_directory_is_not_found_rather_than_denied(tmp_path):
+    from kirabridge.filesystem_manager import PathScope
+
+    scope = PathScope([str(tmp_path)])
+    with pytest.raises(BridgeError) as error:
+        with scope.directory(str(tmp_path / "missing")):
+            pass
+    assert error.value.code == "not_found"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import os
 import plistlib
@@ -89,6 +90,108 @@ def install_console_service(config_path: Path) -> None:
     )
     if subprocess.run(command, capture_output=True, timeout=15).returncode:
         raise BridgeError("console_start", "Could not start the local approval service")
+
+
+def _reload_console_service(path: Path, *, bootstrap_if_unloaded: bool = False) -> None:
+    """Restart the approvals job from `path`.
+
+    A job that is not loaded stays unloaded, unless `bootstrap_if_unloaded` is set
+    (rollback after a failed reload, where bootout may already have unloaded it).
+    """
+    target = f"gui/{os.getuid()}"
+    loaded = subprocess.run(
+        ["/bin/launchctl", "print", f"{target}/{LABEL}"], capture_output=True, timeout=10
+    )
+    if not loaded.returncode:
+        if subprocess.run(
+            ["/bin/launchctl", "bootout", f"{target}/{LABEL}"], capture_output=True, timeout=15
+        ).returncode:
+            raise BridgeError("console_start", "Could not stop the local approval service")
+    elif not bootstrap_if_unloaded:
+        return
+    if subprocess.run(
+        ["/bin/launchctl", "bootstrap", target, str(path)], capture_output=True, timeout=15
+    ).returncode:
+        raise BridgeError("console_start", "Could not start the local approval service")
+
+
+def reconcile_console_service(config_path: Path, interpreter: str) -> dict:
+    """Point an existing approvals LaunchAgent at the release interpreter.
+
+    Only our exact known definition (same label, module, config and command, differing
+    only in the interpreter) is changed. Other keys, the config and credentials are
+    untouched. The previous plist is kept byte-exact beside it and restored if the
+    reload fails. A missing service is not created here.
+    """
+    result = {"path": None, "changed": False, "backup": None}
+    if sys.platform != "darwin":
+        return result
+    path = Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
+    result["path"] = str(path)
+    if path.is_symlink() or path.parent.is_symlink():
+        raise BridgeError("service_conflict", "Symlinked approval service preserved")
+    if not path.exists():
+        return result
+    old = path.read_bytes()
+    try:
+        actual = plistlib.loads(old)
+    except (ValueError, plistlib.InvalidFileException) as exc:
+        raise BridgeError("service_conflict", "Invalid approval service file preserved") from exc
+    tail = ["-m", "kirabridge.cli", "--config", str(config_path), "approval-server"]
+    arguments = actual.get("ProgramArguments")
+    if (
+        actual.get("Label") != LABEL
+        or not isinstance(arguments, list)
+        or not arguments
+        or arguments[1:] != tail
+        or not isinstance(arguments[0], str)
+    ):
+        raise BridgeError("service_conflict", "Custom approval service definition preserved")
+    if arguments[0] == interpreter:
+        return result
+    digest = hashlib.sha256(old).hexdigest()
+    backup = path.with_name(path.name + ".backup-" + digest[:16])
+    if backup.exists() or backup.is_symlink():
+        if backup.is_symlink() or backup.read_bytes() != old:
+            raise BridgeError("service_conflict", "Approval service backup differs; preserved")
+    else:
+        write_private(backup, old)
+    updated = {**actual, "ProgramArguments": [interpreter, *tail]}
+    temporary = path.with_name(path.name + "." + uuid.uuid4().hex)
+    try:
+        write_private(temporary, plistlib.dumps(updated))
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    result.update(changed=True, backup=str(backup))
+    try:
+        _reload_console_service(path)
+    except BaseException as failure:
+        # Keep the original failure; a rollback failure is only noted on it.
+        try:
+            restore_console_service(result, bootstrap_if_unloaded=True)
+        except Exception as rollback:
+            failure.add_note(f"Approval service rollback failed: {type(rollback).__name__}")
+        raise
+    return result
+
+
+def restore_console_service(update: dict, *, bootstrap_if_unloaded: bool = False) -> None:
+    """Restore only the plist changed by `reconcile_console_service`, then reload it.
+
+    With `bootstrap_if_unloaded`, an unloaded job (e.g. after a failed reload) is
+    bootstrapped from the restored plist; a failure there raises BridgeError.
+    """
+    if not update.get("changed") or not update.get("backup"):
+        return
+    path = Path(update["path"])
+    temporary = path.with_name(path.name + "." + uuid.uuid4().hex)
+    try:
+        write_private(temporary, Path(update["backup"]).read_bytes())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    _reload_console_service(path, bootstrap_if_unloaded=bootstrap_if_unloaded)
 
 
 def probe(client: httpx.Client, key: str) -> str | None:

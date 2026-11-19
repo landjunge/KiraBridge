@@ -1,5 +1,9 @@
 # Geladener eigener Stopp · Betreiberstand 19.10.2026
 
+Historischer Installations- und Prüfbericht. Aktuelle Planung und Paketstatus
+stehen in ThreadDesk: maßgeblicher Master `6b5b73b9de36`, aktiver Arbeitsplan
+`7fb455b083f7` und Status im Arbeitsboard `188ce4729a62`.
+
 Installierte Version0.5.2 mit geprüftem Quellbackport `f3f1302`;
 zugehöriger Main-Quellpin `612a5c8f34a01d4280ce665dbf9d380a9e45a2c3`.
 Dies ist kein neuer öffentlicher Download. Version/CLI/Setup der bestehenden
@@ -12,7 +16,7 @@ SHA256 `f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b`.
 Die sieben festen Projektzuordnungen und `workflow.stop` nur für local/chatgpt
 ergänzen bestehende Rechte; engere Bot-/Codex-Principals wurden nicht erweitert.
 
-Vollständiger Bedienweg, Belege und maßgeblicher Paketstatus liegen im privaten
+Der damalige Bedienweg und seine technischen Belege lagen im privaten
 Projekt unter `/Users/landjunge/KiraBridge-project-control-20261018/docs/`:
 
 - `WORKFLOW-CONTROL-CONFIGURATION.md`: Configschema, Rechte, Stopwunsch,
@@ -21,7 +25,9 @@ Projekt unter `/Users/landjunge/KiraBridge-project-control-20261018/docs/`:
 - `evidence/workflow-stop-chatgpt-20261019.json`: zwölf ursprüngliche App-Tasks.
 - `evidence/workflow-stop-worktree-restart-20261019.json`: aktueller zusätzlicher
   Source-/Restartbeleg, kein wiederholter Agenten-/Stop-/Antwortauftrag.
-- `seven-tools-build-20261018-1833/status.json`: einzige maßgebliche Paketmatrix.
+- Die frühere Paketmatrix ist zusammen mit den alten Planquellen unverändert
+  in ThreadDesk archiviert: Datei `bb32567e949c` am Arbeitsboard
+  `188ce4729a62`; sie ist kein aktueller GitHub-Plan.
 
 Die tatsächlich ausgeführte lokale Vorprüfung:
 

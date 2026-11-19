@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from contextlib import AsyncExitStack
+from copy import deepcopy
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
@@ -121,6 +122,64 @@ class MCPClientPool:
         self.catalog_dirty = set()
         self.health_epochs = {}
         self._disconnects: dict[asyncio.Task, asyncio.Task] = {}
+        self._active_calls: dict[tuple, int] = {}
+        self._catalog_retirements: set[tuple] = set()
+        self._catalog_observations: dict[str, tuple] = {}
+
+    def _generation(self, peer_id):
+        return (
+            peer_id,
+            id(self.sessions.get(peer_id)),
+            id(self.owners.get(peer_id)),
+            self.connection_ids.get(peer_id),
+        )
+
+    def catalog_recovery_pending(self, peer_id):
+        return self._generation(peer_id) in self._catalog_retirements
+
+    def cached_catalog(self, peer_id, *, max_age):
+        """An internal short-lived view; explicit list_tools always contacts the peer."""
+        observation = self._catalog_observations.get(peer_id)
+        if (
+            observation is None
+            or peer_id not in self.sessions
+            or peer_id in self.catalog_dirty
+            or self.catalog_recovery_pending(peer_id)
+        ):
+            return None
+        generation, epoch, tools, observed_at, snapshot = observation
+        if (
+            generation != self._generation(peer_id)
+            or epoch != self.health_epochs.get(peer_id)
+            or tools is not self.catalogs.get(peer_id)
+            or time.monotonic() - observed_at >= max_age
+        ):
+            return None
+        return deepcopy(snapshot)
+
+    async def retire_catalog_connection(self, peer_id, *, generation=None):
+        """Retire an unresponsive catalogue without interrupting in-flight tools.
+
+        New dispatches are refused immediately. The last already dispatched call
+        closes this exact generation; its outcome is never replayed.
+        """
+        current = self._generation(peer_id)
+        if generation is not None and generation != current:
+            # The pool may already have closed the timed-out generation. Never
+            # retire a replacement installed while the manager backstop unwinds.
+            return peer_id not in self.sessions
+        generation = current
+        self.catalog_dirty.add(peer_id)
+        self._catalog_observations.pop(peer_id, None)
+        self._catalog_retirements.add(generation)
+        if self._active_calls.get(generation, 0):
+            self.notice(peer_id, "catalog.retirement_deferred")
+            return False
+        try:
+            await self.disconnect(peer_id)
+        finally:
+            self._catalog_retirements.discard(generation)
+        return True
 
     def notice(self, peer_id, phase, **metadata):
         connection_id = metadata.get("connection_id", self.connection_ids.get(peer_id))
@@ -273,6 +332,7 @@ class MCPClientPool:
                 self.catalog_locks.pop(peer.id, None)
                 self.catalog_dirty.discard(peer.id)
                 self.health_epochs.pop(peer.id, None)
+                self._catalog_observations.pop(peer.id, None)
                 self.notice(peer.id, "connection.closed")
 
         self.owners[peer.id] = asyncio.create_task(owner())
@@ -291,14 +351,18 @@ class MCPClientPool:
     async def list_tools(self, peer_id):
         """Fresh bounded pagination; catalogs never survive a connection generation.
 
-        A peer that accepts the request but never answers, or whose pipe is gone, is
-        replaced (connection and process) so the next read starts clean. Only the
+        A peer that accepts the request but never answers is retired after existing
+        tool calls finish; a closed pipe is disconnected immediately. Only the
         connection is rebuilt; no tool call is replayed.
         """
         session = self.sessions.get(peer_id)
         owner = self.owners.get(peer_id)
         if session is None:
             raise self.failure(peer_id, "peer_disconnected", "MCP peer is not connected")
+        if self.catalog_recovery_pending(peer_id):
+            raise self.failure(
+                peer_id, "peer_recovering", "MCP catalogue recovery awaits in-flight tools"
+            )
         progress = {"requested": False}
         try:
             return await self._read_catalog(peer_id, session, owner, progress)
@@ -309,7 +373,7 @@ class MCPClientPool:
                 and self.sessions.get(peer_id) is session
             ):
                 self.notice(peer_id, "peer.unresponsive", error_code="peer_unresponsive")
-                await self.disconnect(peer_id)
+                await self.retire_catalog_connection(peer_id)
             raise
         except TRANSPORT_CLOSED:
             if self.owners.get(peer_id) is owner:
@@ -323,6 +387,10 @@ class MCPClientPool:
         ):
             if self.sessions.get(peer_id) is not session:
                 raise self.failure(peer_id, "peer_disconnected", "MCP connection changed")
+            if self.catalog_recovery_pending(peer_id):
+                raise self.failure(
+                    peer_id, "peer_recovering", "MCP catalogue recovery awaits in-flight tools"
+                )
             # Consume only invalidations preceding this refresh. A notification
             # arriving while a page is in flight still requires another refresh.
             self.catalog_dirty.discard(peer_id)
@@ -362,7 +430,16 @@ class MCPClientPool:
                         raise BridgeError("tool_catalog_invalid", "Ambiguous tool catalog")
                     cursor = page.nextCursor
                     if not cursor:
+                        # Keep the internal observation isolated from callers mutating
+                        # returned Tool models or nested JSON schemas.
                         self.catalogs[peer_id] = tools
+                        self._catalog_observations[peer_id] = (
+                            self._generation(peer_id),
+                            self.health_epochs.get(peer_id),
+                            tools,
+                            time.monotonic(),
+                            deepcopy(tools),
+                        )
                         return tools
                     if cursor in seen:
                         raise BridgeError("tool_catalog_invalid", "Tool pagination cursor repeated")
@@ -490,6 +567,8 @@ class MCPClientPool:
                 notice_call("call.started", tool=tool, task_id=task_id)
                 started = True
 
+        if self.catalog_recovery_pending(peer_id):
+            raise not_dispatched("peer_recovering", "MCP catalogue recovery awaits in-flight tools")
         if peer_id in self.catalog_dirty:
             try:
                 async with asyncio.timeout_at(deadline):
@@ -505,6 +584,8 @@ class MCPClientPool:
                     ) from None
                 raise
             except BridgeError as exc:
+                if exc.code == "peer_recovering":
+                    raise not_dispatched(exc.code, str(exc)) from None
                 if exc.code == "peer_disconnected" and not current_generation():
                     raise not_dispatched() from None
                 raise
@@ -513,6 +594,7 @@ class MCPClientPool:
         # No automatic retries: a timed-out tool may have already executed remotely.
         predispatch_failure = None
         dispatched = False
+        generation = (peer_id, id(session), id(owner), connection_id)
         try:
             async with asyncio.timeout_at(deadline), self.gate:
                 if loop.time() >= deadline:
@@ -520,7 +602,13 @@ class MCPClientPool:
                 if not current_generation():
                     predispatch_failure = not_dispatched()
                     raise predispatch_failure
+                if self.catalog_recovery_pending(peer_id):
+                    predispatch_failure = not_dispatched(
+                        "peer_recovering", "MCP catalogue recovery awaits in-flight tools"
+                    )
+                    raise predispatch_failure
                 dispatched = True
+                self._active_calls[generation] = self._active_calls.get(generation, 0) + 1
                 result = await session.call_tool(tool, arguments)
                 epoch = self.health_epoch(peer_id, result) if health_tool else None
                 if current_generation() and health_tool and epoch is None:
@@ -534,6 +622,8 @@ class MCPClientPool:
                     else:
                         self.health_epochs[peer_id] = epoch
                     observe_start()
+                elif current_generation() and health_tool and epoch is not None:
+                    self.health_epochs[peer_id] = epoch
                 if quiet:
                     observe_start()
                 notice_call(
@@ -586,6 +676,19 @@ class MCPClientPool:
             observe_start()
             notice_call("call.interrupted", tool=tool, task_id=task_id, error_code="peer_unknown")
             raise
+        finally:
+            if dispatched:
+                remaining = self._active_calls[generation] - 1
+                if remaining:
+                    self._active_calls[generation] = remaining
+                else:
+                    self._active_calls.pop(generation, None)
+                    if generation in self._catalog_retirements:
+                        try:
+                            if current_generation():
+                                await self.disconnect(peer_id)
+                        finally:
+                            self._catalog_retirements.discard(generation)
 
     async def disconnect(self, peer_id: str) -> None:
         owner = self.owners.get(peer_id)

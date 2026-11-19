@@ -98,6 +98,17 @@ the local dispatcher, not a ChatGPT connection.
 
 ## Limits
 
+Direct `terminal_control` / `terminal.visible` commands and ChatGPT's default
+`terminal.execute` route execute exact argv in a fresh, short-lived Bridge-owned
+Linux PTY. Results identify the task, PID and TTY and include merged stdout/stderr,
+the observed exit status and cleanup evidence. Timeout terminates only this owned
+process session. The PTY is closed after execution and never attaches to an existing
+user shell. Read the original task with `terminal.output`; do not replay uncertain
+commands. Existing permission, executable and working-directory checks still apply.
+`create_if_needed` controls macOS windows only; either value uses a temporary PTY
+on Linux. Explicit pane targets and privileged direct execution are unsupported;
+use the separate session tools for existing owned interactive sessions.
+
 This server has no macOS GUI, no Terminal.app, no native keyboard control
 and no desktop session. The clipboard works only when `wl-clipboard` or
 `xclip` is installed, and the server does not require it. `platform.status`

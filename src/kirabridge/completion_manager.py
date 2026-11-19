@@ -11,7 +11,11 @@ import uuid
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 
 TERMINAL = {"completed", "failed", "cancelled", "unknown", "blocked"}
-SOURCE_CAPABILITIES = {"task": "task.read", "message": "message.read", "autonext": "team.read"}
+SOURCE_CAPABILITIES = {
+    "task": "task.read",
+    "message": "message.read",
+    "team": "team.read",
+}
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS message_completion_routes ("
     "message_id TEXT PRIMARY KEY REFERENCES messages(id), target TEXT NOT NULL)",
@@ -60,8 +64,14 @@ def find_evidence(value, key, depth=0):
 def completion_payload(task, event_seq, *, source="task"):
     evidence = {"result": task.get("result"), "evidence": task.get("evidence", {})}
     state = task["state"]
-    code = (task.get("error") or {}).get("code")
-    timed_out = find_evidence(evidence, "timed_out") is True or code == "agent_timeout"
+    error = task.get("error") or {}
+    code = error.get("code")
+    kind = error.get("kind")  # normalized at the task; older rows fall back to the evidence scan
+    timed_out = (
+        find_evidence(evidence, "timed_out") is True
+        or code in {"agent_timeout", "command_timeout"}
+        or kind == "timeout"
+    )
     terminated = find_evidence(evidence, "terminated") is True
     provider = find_evidence(evidence, "provider_error")
     # Only the adapter's explicit structured code is evidence. Never inspect text
@@ -98,6 +108,7 @@ def completion_payload(task, event_seq, *, source="task"):
         "outcome": outcome,
         "execution_outcome_unknown": state == "unknown",
         "error_code": code,
+        "error_kind": kind,
         "provider_error": provider,
         "quota_diagnosis": "evidenced"
         if provider_category == "quota_exhausted"
@@ -222,12 +233,8 @@ class CompletionManager:
         if not 1 <= limit <= 50:
             raise BridgeError("invalid_limit", "Use limit 1..50")
         if source_id is not None:
-            from kirabridge.autonext.models import ID
-
-            if not isinstance(source_id, str) or not (
-                re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id)
-                or re.fullmatch(ID, source_id)
-                or (source_id.startswith("grant-") and re.fullmatch(ID, source_id[6:]))
+            if not isinstance(source_id, str) or not re.fullmatch(
+                r"[A-Za-z0-9_.-]{1,128}", source_id
             ):
                 raise BridgeError("invalid_arguments", "Completion source id is invalid")
         policy = self.security.principal(principal)
@@ -238,40 +245,27 @@ class CompletionManager:
             raise BridgeError(
                 "capability_denied", "Own task.read, message.read or team.read required"
             )
+        allowed = tuple(source if source in sources else "-" for source in SOURCE_CAPABILITIES)
+        marks = ",".join("?" for _ in allowed)
         with self.store.transaction():
             if source_id is None:
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND acknowledged IS NULL AND source IN (?,?,?) "
+                    "AND acknowledged IS NULL AND source IN (" + marks + ") "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                    "ORDER BY seq LIMIT ?",
-                    (
-                        principal,
-                        target,
-                        "task" if "task" in sources else "-",
-                        "message" if "message" in sources else "-",
-                        "autonext" if "autonext" in sources else "-",
-                        limit,
-                    ),
+                    "ORDER BY seq DESC LIMIT ?",
+                    (principal, target, *allowed, limit),
                 ).fetchall()
             else:
                 # A known source is readable even when older unacked notices fill the inbox.
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?,?) "
+                    "AND source_id=? AND acknowledged IS NULL AND source IN (" + marks + ") "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                    "ORDER BY seq LIMIT ?",
-                    (
-                        principal,
-                        target,
-                        source_id,
-                        "task" if "task" in sources else "-",
-                        "message" if "message" in sources else "-",
-                        "autonext" if "autonext" in sources else "-",
-                        limit,
-                    ),
+                    "ORDER BY seq DESC LIMIT ?",
+                    (principal, target, source_id, *allowed, limit),
                 ).fetchall()
             notices = []
             for row in rows:

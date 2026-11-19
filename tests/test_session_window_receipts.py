@@ -1,6 +1,7 @@
 """Creation receipts survive a later uncertain physical-window result."""
 
 import sys
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,6 +15,11 @@ async def test_window_creation_receipt_is_durable_before_unknown_without_replay(
     bridge, config, monkeypatch, operation
 ):
     # Exercise the real dispatcher and durable event store, without any OS/UI.
+    monkeypatch.setattr(
+        "kirabridge.visible_terminal.current_platform", lambda: SimpleNamespace(name="macos")
+    )
+    linux_execute = AsyncMock(side_effect=AssertionError("Mac window fixture must not spawn a PTY"))
+    monkeypatch.setattr(bridge.sessions.linux, "execute_argv", linux_execute)
     monkeypatch.setattr(bridge, "platform_operation", lambda *args: None)
     bridge.tasks.preflight = None
     config.principals["local"].capabilities.append("session.inspect")
@@ -57,6 +63,7 @@ async def test_window_creation_receipt_is_durable_before_unknown_without_replay(
         ]
         assert bridge.submit("local", value, "already-consumed")["state"] == "unknown"
         assert calls == [value.task_id]
+        linux_execute.assert_not_awaited()
     finally:
         await bridge.tasks.stop()
 

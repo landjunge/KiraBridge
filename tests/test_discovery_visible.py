@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+from types import SimpleNamespace
 
 import pytest
 from conftest import request
@@ -202,6 +203,9 @@ def test_visible_reference_is_an_exact_pair():
 
 
 async def test_stale_explicit_window_cannot_receive_input(bridge, config, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.visible_terminal.current_platform", lambda: SimpleNamespace(name="macos")
+    )
     config.principals["local"].capabilities.append("session.inspect")
     config.principals["local"].executables.append("/bin/echo")
 

@@ -12,9 +12,9 @@ Reviewed main baseline: `2bbf6d9dc628cdf95e5591df7968f761f938883c`; the final do
 that Git pin without changing the packaged runtime.
 
 The local Intel runtime remains `0.8.0rc40` at
-`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. The newest published Intel installer
-remains [RC36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36),
-source `d4aebdd89a206045731f2692a3f363fddaa15ee0`. Both that installer and the separate
+`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. The newest published Intel archive
+is [RC49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49),
+source `edc44290831b5b79e5d1f64238bcf09e4fe8b85a`. Both that installer and the separate
 server archive were actually downloaded and hash-checked.
 [Verification, sources and remaining limits](evidence/readme-current-20261107.json).
 
@@ -149,7 +149,7 @@ in separate fresh legacy and remote processes, binding imports, pins and results
 
 | Lane | Sources and environment |
 | --- | --- |
-| Legacy | ThreadDesk `869a38970bace13c37d73654538b64efa1629da3`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
+| Legacy | ThreadDesk `22fda1da813e228b0969795f9565dcbcca3499d6`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
 | Remote R2/R3 | ThreadDesk M4 `a0dd4c39478b031e0e31d335c2a15435dfbc52eb`; both `KIRABRIDGE_TEST_THREADDESK_SOURCE` and `KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE` point to its `src/`; no legacy TD/TollGate imports |
 
 See the workflow's exact `PYTHONPATH`, temporary/report directories and helper

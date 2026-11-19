@@ -12,6 +12,7 @@ import httpx
 from kirabridge.agent_manager.acp import ACPClient
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.agent_manager.cli_support import login_identity
+from kirabridge.agent_manager.codex_package import inspect_codex_package
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
 from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
@@ -392,6 +393,8 @@ class GrokACPAdapter:
             command[1:1] = ["--allow", "Bash", "--allow", "Edit", "--allow", "Read"]
         else:
             command[1:1] = ["--deny", "Bash", "--deny", "Edit"]
+        if config.grok_reasoning_effort:
+            command[1:1] = ["--reasoning-effort", config.grok_reasoning_effort]
         if config.model:
             command[1:1] = ["--model", config.model]
         with PathScope(roots).directory(args.cwd) as fd:
@@ -528,7 +531,7 @@ class GrokACPAdapter:
             ) from exc
         finally:
             await client.aclose()
-            await reap_process(process)
+            await reap_process(process, census_timeout=2)
 
 
 class AgentManager:
@@ -548,6 +551,11 @@ class AgentManager:
             "claude_code": ClaudeCodeAdapter(terminal),
             "copilot_cli": CopilotCLIAdapter(terminal),
         }
+        host = getattr(config, "acp_pap_host", None)
+        if host is not None and host.enabled:
+            from kirabridge.agent_manager.acp_pap_host import ACPPAPHostAdapter
+
+            self.adapters["acp_pap"] = ACPPAPHostAdapter(terminal, config)
 
     def register(self, kind: str, adapter: AgentAdapter) -> None:
         if kind in self.adapters or adapter.interface_version != "1":
@@ -567,6 +575,7 @@ class AgentManager:
                             "sandbox_mode": config.sandbox_mode,
                             "project_rules_enabled": True,
                             "mcp_servers_enabled": config.bridge_tools,
+                            "runtime_package": inspect_codex_package(config.executable),
                         }
                         if config.kind == "codex"
                         else {}
@@ -635,8 +644,6 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
-        if guard := getattr(self, "worktree_guard", None):
-            guard(task, args)
         if (
             self.config.visible_handoffs.enabled
             and not separate_managed

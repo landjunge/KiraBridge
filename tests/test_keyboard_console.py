@@ -6,6 +6,7 @@ import uuid
 
 import httpx
 import pytest
+from macos_provider_fixture import bind_macos_provider
 
 from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
@@ -394,6 +395,7 @@ async def test_real_store_request_hash_decisions_focus_inspect_action_and_comple
     stored = store.put(profile())
     bridge.keyboard_profiles._store = store
     bridge.tasks.preflight = None
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.native_metadata = lambda: {
         "available": True,

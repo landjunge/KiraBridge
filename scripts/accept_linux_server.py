@@ -19,6 +19,17 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
+def acceptance_environment(environ=None):
+    """Copy the child environment without credentials for another installation."""
+    # Keep this script standalone: native acceptance hosts copy it on its own.
+    legacy = {"CHATGPT_TOKEN", "LOCAL_TOKEN", "CODEX_TOKEN", "GROK_TOKEN"}
+    return {
+        key: value
+        for key, value in (os.environ if environ is None else environ).items()
+        if key not in legacy and not (key.startswith("KIRABRIDGE_") and key.endswith("_TOKEN"))
+    }
+
+
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -164,7 +175,7 @@ def main():
             timeout=timeout,
             env={
                 k: v
-                for k, v in os.environ.items()
+                for k, v in acceptance_environment().items()
                 if k not in {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"}
             },
         )

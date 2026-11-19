@@ -399,12 +399,12 @@ async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_
                 },
             )
         ).structuredContent
-        assert sent["error"]["code"] == "visible_target_working"
-        assert sent["processing"]["state"] == "failed"
+        assert "error" not in sent
+        assert sent["processing"]["state"] == "queued"
+        assert sent["processing"]["evidence"]["reason"] == "visible_target_working"
+        assert sent["processing"]["evidence"]["terminal_input_attempted"] is False
         assert sent["processing"]["claimed"] is None
         assert transport["calls"] == []
-        transport["text"] = "╭\n│ ❯ │\n╰"
-        bridge.messages.wake.set()
         repeated = (
             await clients.call(
                 "caller",
@@ -422,27 +422,14 @@ async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_
                 },
             )
         ).structuredContent
-        assert repeated["id"] == sent["id"] and repeated["processing"]["state"] == "failed"
+        assert repeated["id"] == sent["id"] and repeated["processing"]["state"] == "queued"
         assert transport["calls"] == []
-        sent = (
-            await clients.call(
-                "caller",
-                "message_send",
-                {
-                    "message": {
-                        "recipient": "grok",
-                        "conversation_id": "fresh-http",
-                        "idempotency_key": "fresh-authorized-request",
-                        "kind": "work",
-                        "body": "A separate freshly authorized request",
-                        "dispatch": True,
-                    },
-                },
-            )
-        ).structuredContent
+        transport["text"] = "╭\n│ ❯ │\n╰"
+        bridge.messages.wake.set()
         async with asyncio.timeout(5):
             while bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] != "completed":
                 await asyncio.sleep(0.02)
+        assert transport["calls"] == ["insert", "return"]
         result = bridge.messages.get("chatgpt", sent["id"])
         assert result["acknowledged"] and result["processing"]["reply_id"]
         assert transport["calls"] == ["insert", "return"]

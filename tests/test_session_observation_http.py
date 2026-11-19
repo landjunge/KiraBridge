@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from conftest import request
+from macos_provider_fixture import bind_macos_provider
 from test_mcp import http_bridge  # noqa: F401 -- existing private HTTP Core fixture
 
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
@@ -23,6 +24,7 @@ async def test_http_native_timeout_is_durable_failed_without_input_or_replay(
     policy = bridge.config.principals["local"]
     policy.capabilities += ["session.inspect"]
     policy.permission_level = "full"
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.executable = lambda path: True
     bridge.macos.permission_probe.reader = lambda resource: {

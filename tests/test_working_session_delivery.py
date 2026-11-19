@@ -116,31 +116,28 @@ async def test_busy_work_is_held_without_input_or_automatic_inbox_delivery(
         await connect(clients, endpoint)
         sent = await call(clients, "chatgpt", "message_send", {"message": request})
         identifier = sent["id"]
-        assert sent["error"]["code"] == "visible_target_working"
-        assert sent["processing_route"] == "failed_visible_admission"
+        assert "error" not in sent
+        assert sent["processing_route"] == "existing_visible_terminal"
         job = sent["processing"]
-        assert job["state"] == "failed" and job["run_id"] is None
+        assert job["state"] == "queued" and job["run_id"] is None
         assert job["claimed"] is None and job["started"] is None
-        assert job["evidence"] == {
-            "automatic_retry": False,
-            "phase": "direct_admission",
-            "reason": "visible_target_working",
-            "terminal_input_attempted": False,
-            "observation": {
-                "state": "working",
-                "ready": False,
-                "reason": "current_progress_row",
-                "input_empty": True,
-                "target": "codex",
-            },
+        assert job["evidence"]["waiting_for_visible_target"] is True
+        assert job["evidence"]["reason"] == "visible_target_working"
+        assert job["evidence"]["terminal_input_attempted"] is False
+        assert job["evidence"]["observation"] == {
+            "state": "working",
+            "ready": False,
+            "reason": "current_progress_row",
+            "input_empty": True,
+            "target": "codex",
         }
         assert sent["delivered"] is sent["receipt"] is sent["acknowledged"] is None
         hold = bridge.store.db.execute(
             "SELECT actor,reason FROM queue_holds WHERE queue_id='messages' AND item_id=?",
             (identifier,),
         ).fetchone()
-        assert tuple(hold) == ("chatgpt", "direct_admission_rejected")
-        assert len(admissions) == 1 and transport["calls"] == []
+        assert hold is None
+        assert admissions and transport["calls"] == []
 
         # Repeating the same sender key reads the original outcome, never retries it.
         repeated = await call(clients, "chatgpt", "message_send", {"message": request})
@@ -148,7 +145,7 @@ async def test_busy_work_is_held_without_input_or_automatic_inbox_delivery(
         for reader in ("chatgpt", "codex"):
             stored = await call(clients, reader, "message_get", {"message_id": identifier})
             assert stored["body"] == request["body"] and stored["processing"] == job
-            assert stored["processing_route"] == "failed_visible_admission"
+            assert stored["processing_route"] == "existing_visible_terminal"
         inbox = await call(
             clients,
             "codex",
@@ -164,7 +161,7 @@ async def test_busy_work_is_held_without_input_or_automatic_inbox_delivery(
         )
         assert [entry["id"] for entry in history["messages"]] == [identifier]
         assert history["messages"][0]["processing"] == job
-        assert len(admissions) == 1 and transport["calls"] == []
+        assert admissions and transport["calls"] == []
         assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 0
 
 

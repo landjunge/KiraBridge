@@ -47,8 +47,11 @@ the installed KiraBridge or ThreadDesk apps.
   Resource identities are compared after resolving their URI scopes. Both the
   schema tree and expanded reference graph are
   limited to depth 48 and 2048 visited nodes; the existing 16-KiB schema limit
-  remains. Each invocation re-fetches annotations and validates its
-  arguments before calling ThreadDesk. Rejected or disconnected reads are
+  remains. Each invocation checks current permissions and validates its
+  arguments before calling ThreadDesk. Operation preflight may reuse an observed
+  catalogue for at most one second, scoped to its connection generation and
+  invalidated by catalogue notifications or an observed health-epoch change.
+  Explicit catalogue discovery always contacts the peer. Rejected or disconnected reads are
   never retried automatically.
 - When a mutation receives KiraBridge's separate operation envelope, a missing
   peer-root resource identity is supplied on a copy. Root-local references keep
@@ -78,3 +81,6 @@ the installed KiraBridge or ThreadDesk apps.
    A code merge is **not** proof that an installed app is updated.
 
 Status: source patch only until these checks and a real installation are recorded.
+
+The separately enabled mutation route, compact response mode and conservative
+recovery rules are described in [ThreadDesk operation reliability](THREADDESK-OPERATIONS-RELIABILITY.md).

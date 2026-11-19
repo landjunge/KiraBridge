@@ -336,3 +336,82 @@ async def test_opencode_cli_and_acp_resume_is_rejected_before_any_adapter_call(t
                 AsyncMock(),
             )
         assert caught.value.code == "agent_resume_unsupported"
+
+
+async def test_grok_acp_passes_the_configured_model_and_reasoning_effort(bridge, config, tmp_path):
+    record = tmp_path / "grok-argv.json"
+    body = f"""import json,sys
+open({str(record)!r},'w').write(json.dumps(sys.argv[1:]))
+for line in sys.stdin:
+    msg=json.loads(line)
+    method=msg.get('method')
+    if method=='initialize': result={{'protocolVersion':1,'authMethods':[{{'id':'cached_token'}}]}}
+    elif method=='authenticate': result={{}}
+    elif method=='session/new': result={{'sessionId':'grok-session-2'}}
+    elif method=='session/prompt':
+        content={{'type':'text','text':'ok'}}
+        update={{'sessionUpdate':'agent_message_chunk','content':content}}
+        params={{'sessionId':'grok-session-2','update':update}}
+        print(json.dumps({{'jsonrpc':'2.0','method':'session/update','params':params}}),flush=True)
+        result={{'stopReason':'end_turn'}}
+    else: continue
+    print(json.dumps({{'jsonrpc':'2.0','id':msg['id'],'result':result}}),flush=True)
+"""
+    config.agents["grok"] = AgentConfig(
+        kind="grok_acp",
+        executable=fake_cli(tmp_path, body),
+        model="grok-4.7",
+        grok_reasoning_effort="high",
+    )
+    value = agent_request(config, "grok")
+    submit(bridge, value)
+    async with bridge:
+        final = await bridge.tasks.wait("local", value.task_id)
+        assert final["state"] == "completed"
+    argv = json.loads(record.read_text())
+    assert argv[:4] == ["--model", "grok-4.7", "--reasoning-effort", "high"]
+
+
+async def test_grok_acp_cleanup_allows_a_slow_process_census(bridge, config, tmp_path, monkeypatch):
+    """Parallel runs end together; a 0.5 s census must not discard a finished result."""
+    from kirabridge import agent_manager
+
+    seen = {}
+    original = agent_manager.reap_process
+
+    async def recording(process, **kwargs):
+        seen.update(kwargs)
+        return await original(process, **kwargs)
+
+    monkeypatch.setattr(agent_manager, "reap_process", recording)
+    body = """import json,sys
+for line in sys.stdin:
+    msg=json.loads(line)
+    method=msg.get('method')
+    if method=='initialize': result={'protocolVersion':1,'authMethods':[{'id':'cached_token'}]}
+    elif method=='authenticate': result={}
+    elif method=='session/new': result={'sessionId':'grok-session-3'}
+    elif method=='session/prompt':
+        content={'type':'text','text':'ok'}
+        update={'sessionUpdate':'agent_message_chunk','content':content}
+        params={'sessionId':'grok-session-3','update':update}
+        print(json.dumps({'jsonrpc':'2.0','method':'session/update','params':params}),flush=True)
+        result={'stopReason':'end_turn'}
+    else: continue
+    print(json.dumps({'jsonrpc':'2.0','id':msg['id'],'result':result}),flush=True)
+"""
+    config.agents["grok"] = AgentConfig(kind="grok_acp", executable=fake_cli(tmp_path, body))
+    value = agent_request(config, "grok")
+    submit(bridge, value)
+    async with bridge:
+        final = await bridge.tasks.wait("local", value.task_id)
+        assert final["state"] == "completed"
+    assert seen.get("census_timeout") == 2
+
+
+def test_grok_reasoning_effort_is_only_valid_for_the_grok_adapter():
+    with pytest.raises(ValueError):
+        AgentConfig(kind="codex", grok_reasoning_effort="high")
+    with pytest.raises(ValueError):
+        AgentConfig(kind="grok_acp", grok_reasoning_effort="HIGH; rm")
+    assert "grok_reasoning_effort" not in AgentConfig(kind="grok_acp").model_dump()

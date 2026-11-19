@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from test_mcp import http_bridge  # noqa: F401 -- real authenticated HTTP fixture
 
 from kirabridge.bridge_core.bridge import Bridge
@@ -146,6 +147,7 @@ async def test_direct_keyboard_mcp_uses_old_full_grant_and_exactly_once_task_rou
     path = old_full_config(tmp_path, name="local", token_env="BRIDGE_TEST_TOKEN")
     original = path.read_bytes()
     config.principals["local"] = load_config(str(path)).principals["local"]
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.native_metadata = lambda: {
         "available": True,

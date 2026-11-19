@@ -51,6 +51,12 @@ _ERROR_CATEGORIES = {
 }
 
 
+def _with_http_status(exc, status: int):
+    """Record only the status code. Response bodies can hold credentials or prompts."""
+    exc.provider_error = {"http_status": status}
+    return exc
+
+
 def _model(config) -> dict[str, str]:
     provider, separator, model = (config.model or "").partition("/")
     if not separator or not provider or not model:
@@ -133,18 +139,33 @@ class OpenCodeHTTPV2Adapter:
             ) from None
         status = response.status_code
         if status in {401, 403}:
-            raise BridgeError("agent_auth", "OpenCode server rejected the configured credentials")
+            raise _with_http_status(
+                BridgeError("agent_auth", "OpenCode server rejected the configured credentials"),
+                status,
+            )
         if status == 404:
-            raise UncertainExecution("session_unknown", "OpenCode session is no longer available")
+            raise _with_http_status(
+                UncertainExecution("session_unknown", "OpenCode session is no longer available"),
+                status,
+            )
         if status == 409:
-            raise UncertainExecution("session_busy", "OpenCode session is already running a turn")
+            raise _with_http_status(
+                UncertainExecution("session_busy", "OpenCode session is already running a turn"),
+                status,
+            )
         if status >= 500:
-            raise UncertainExecution(
-                "server_unknown", f"OpenCode server outcome is unknown (HTTP {status})"
+            raise _with_http_status(
+                UncertainExecution(
+                    "server_unknown", f"OpenCode server outcome is unknown (HTTP {status})"
+                ),
+                status,
             )
         if status >= 400:
-            raise BridgeError(
-                "agent_rejected", f"OpenCode server rejected the request (HTTP {status})"
+            raise _with_http_status(
+                BridgeError(
+                    "agent_rejected", f"OpenCode server rejected the request (HTTP {status})"
+                ),
+                status,
             )
         return response
 

@@ -113,7 +113,8 @@ async def test_native_catalog_keeps_its_incomplete_observation(bridge, config):
     assert result["sessions"] == []
     with pytest.raises(BridgeError) as error:
         await manager.selected("local", "terminal:123:ttys004", 345)
-    assert error.value.code == "session_selection_changed"
+    # An incomplete observation proves nothing about the pane: say so, not "changed".
+    assert error.value.code == "session_catalog_incomplete"
     manager.tmux.catalog.assert_not_awaited()
 
 

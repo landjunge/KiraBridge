@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import subprocess
 import sys
 
 import pytest
@@ -10,6 +11,7 @@ from test_mcp import http_bridge as live_http_fixture
 
 from kirabridge.bridge_core.config import PrincipalConfig, TeamConfig, TeamWorkerConfig
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.team_manager.models import TeamWorkCreate
 
 http_bridge = live_http_fixture
 
@@ -259,3 +261,103 @@ async def test_all_seven_authenticated_agent_identities_can_address_each_other(
         assert bridge.store.db.execute("SELECT count(*) FROM team_messages").fetchone()[0] == 42
         assert bridge.store.db.execute("SELECT count(*) FROM team_work").fetchone()[0] == 42
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+
+
+def client_config(tmp_path, endpoint):
+    config_file = tmp_path / "client.toml"
+    port = endpoint.split(":")[2].split("/")[0]
+    config_file.write_text(
+        'host="127.0.0.1"\nport=' + port + '\n[principals.local]\ntoken_env="BRIDGE_TEST_TOKEN"\n'
+    )
+    return config_file
+
+
+async def team_command(config_file, *arguments):
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "kirabridge.cli",
+        "--config",
+        str(config_file),
+        "team",
+        *arguments,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=os.environ.copy(),
+    )
+    stdout, stderr = await process.communicate()
+    return process.returncode, stdout, stderr
+
+
+def fill_work(bridge, count=60):
+    bridge.config.team.max_pending_per_member = count
+    for index in range(count):
+        bridge.teams.delegate(
+            "local",
+            TeamWorkCreate(
+                team_id="gateway",
+                assignee="other",
+                title=f"item {index}",
+                body="paging",
+                idempotency_key=f"page-{index}",
+            ),
+        )
+
+
+async def test_team_work_cli_pages_past_the_default_fifty(http_bridge, tmp_path):
+    bridge, endpoint, pool = await setup_team(http_bridge)
+    config_file = client_config(tmp_path, endpoint)
+    try:
+        fill_work(bridge)
+        code, stdout, stderr = await team_command(config_file, "work", "gateway")
+        assert code == 0, stderr.decode()
+        board = json.loads(stdout)
+        assert [item["title"] for item in board["work"]] == [f"item {index}" for index in range(50)]
+        assert board["next_after"] == board["work"][-1]["seq"]
+        assert board["next_cursor"] == board["next_after"]
+        code, stdout, stderr = await team_command(
+            config_file, "work", "gateway", "--after", str(board["next_after"])
+        )
+        assert code == 0, stderr.decode()
+        rest = json.loads(stdout)
+        assert [item["title"] for item in rest["work"]] == [
+            f"item {index}" for index in range(50, 60)
+        ]
+        assert "next_after" not in rest
+        assert rest["next_cursor"] == rest["work"][-1]["seq"]
+    finally:
+        await pool.__aexit__(None, None, None)
+
+
+async def test_team_work_cli_latest_returns_the_newest_five_ascending(http_bridge, tmp_path):
+    bridge, endpoint, pool = await setup_team(http_bridge)
+    config_file = client_config(tmp_path, endpoint)
+    try:
+        fill_work(bridge)
+        code, stdout, stderr = await team_command(config_file, "work", "gateway", "--latest", "5")
+        assert code == 0, stderr.decode()
+        latest = json.loads(stdout)
+        assert [item["title"] for item in latest["work"]] == [
+            f"item {index}" for index in range(55, 60)
+        ]
+        sequences = [item["seq"] for item in latest["work"]]
+        assert sequences == sorted(sequences) and len(set(sequences)) == 5
+        assert "next_after" not in latest
+    finally:
+        await pool.__aexit__(None, None, None)
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [("--limit", "0"), ("--limit", "101"), ("--latest", "0"), ("--latest", "101")],
+)
+def test_team_work_cli_rejects_invalid_limit_and_latest(flag, value):
+    process = subprocess.run(
+        [sys.executable, "-m", "kirabridge.cli", "team", "work", "gateway", flag, value],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert process.returncode != 0
+    assert "unrecognized arguments" not in process.stderr
+    assert flag in process.stderr

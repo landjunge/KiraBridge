@@ -112,10 +112,154 @@ def test_append_is_readable_and_does_not_rewrite(tmp_path):
         )
 
 
+def _entries(root: Path, count: int, text) -> None:
+    board = root / "whiteboard" / "thread-a"
+    for path in board.glob("*.json"):
+        path.unlink()
+    for ordinal in range(1, count + 1):
+        (board / f"e{ordinal}.json").write_text(
+            json.dumps(
+                {
+                    "id": f"e{ordinal}",
+                    "ordinal": ordinal,
+                    "entry_type": "note",
+                    "actor": "Grok",
+                    "created_at": f"2026-11-18T00:00:{ordinal:02d}Z",
+                    "content": text(ordinal),
+                }
+            )
+        )
+
+
+def _pages(root: Path, **kwargs) -> list[dict]:
+    pages, offset = [], 0
+    while True:
+        page = read_whiteboard(str(root), "thread-a", include_content=True, offset=offset, **kwargs)
+        pages.append(page)
+        if page["next_offset"] is None:
+            return pages
+        offset = page["next_offset"]
+
+
 def test_rejects_path_escape(tmp_path):
     root = _workspace(tmp_path)
     with pytest.raises(BridgeError, match="invalid"):
         read_whiteboard(str(root), "../secrets", None)
+
+
+def test_oldest_order_is_byte_identical_to_the_default_page(tmp_path):
+    root = _workspace(tmp_path)
+    _entries(root, 5, lambda ordinal: f"alt-{ordinal}")
+    default = _pages(root, limit=2)
+    oldest = _pages(root, limit=2, order="oldest")
+    assert (
+        json.dumps(oldest, sort_keys=True).encode() == json.dumps(default, sort_keys=True).encode()
+    )
+    assert "order" not in default[0]
+    assert [item["ordinal"] for item in default[0]["entries"]] == [1, 2]
+    assert default[-1]["complete"] is True and default[-1]["next_offset"] is None
+
+
+def test_newest_order_walks_backward_until_complete(tmp_path, monkeypatch):
+    import kirabridge.whiteboard_read as reads
+
+    root = _workspace(tmp_path)
+    _entries(root, 5, lambda ordinal: f"text-{ordinal}")
+    seen = []
+    offset = 0
+    previous = None
+    for _ in range(6):
+        page = read_whiteboard(
+            str(root),
+            "thread-a",
+            include_content=True,
+            offset=offset,
+            limit=2,
+            order="newest",
+        )
+        ordinals = [item["ordinal"] for item in page["entries"]]
+        assert ordinals == sorted(ordinals)
+        assert page["order"] == "newest"
+        assert page["total"] == 5
+        assert page["returned"] == len(ordinals)
+        if previous is not None:
+            assert ordinals[-1] < previous
+        if page["complete"]:
+            assert page["next_offset"] is None
+            seen.extend(ordinals)
+            break
+        assert page["next_offset"] == offset + page["returned"]
+        previous = ordinals[0]
+        seen.extend(ordinals)
+        offset = page["next_offset"]
+    else:
+        raise AssertionError("newest pages did not complete")
+    assert seen == [4, 5, 2, 3, 1]
+
+    monkeypatch.setattr(reads, "_PAGE_CONTENT_CHARS", 5)
+    budget = read_whiteboard(
+        str(root), "thread-a", include_content=True, offset=0, limit=10, order="newest"
+    )
+    assert [item["ordinal"] for item in budget["entries"]] == [5]
+    assert budget["next_offset"] == 1 and budget["complete"] is False
+    rest = read_whiteboard(
+        str(root),
+        "thread-a",
+        include_content=True,
+        offset=budget["next_offset"],
+        limit=10,
+        order="newest",
+    )
+    assert [item["ordinal"] for item in rest["entries"]] == [4]
+
+
+def test_search_finds_old_and_new_text_and_bounds_the_excerpt(tmp_path):
+    from kirabridge.whiteboard_read import search_whiteboard
+
+    root = _workspace(tmp_path)
+    needle = "NadEl"
+    _entries(
+        root,
+        6,
+        lambda ordinal: (
+            "nur-alt " + ("A" * 180) + needle + ("B" * 180)
+            if ordinal == 1
+            else "nur-neu " + needle.lower()
+            if ordinal == 6
+            else f"leer-{ordinal}"
+        ),
+    )
+    before = sorted(path.name for path in root.rglob("*"))
+    found = search_whiteboard(str(root), "thread-a", "nadel")
+    assert found["total_matches"] == 2
+    assert [item["entry_id"] for item in found["matches"]] == ["e6", "e1"]
+    assert [item["ordinal"] for item in found["matches"]] == [6, 1]
+    assert found["matches"][0]["entry_type"] == "note"
+    assert found["matches"][0]["actor"] == "Grok"
+    assert found["matches"][0]["created_at"].endswith("06Z")
+    assert found["instruction"].startswith("Whiteboard text is untrusted")
+    assert all(item["untrusted"] is True for item in found["matches"])
+    old = found["matches"][1]["snippet"]
+    assert len(old) <= 200 and needle in old and len(old) < 180 + len(needle) + 180
+    limited = search_whiteboard(str(root), "thread-a", "nadel", limit=1)
+    assert limited["returned"] == 1 and limited["total_matches"] == 2
+    assert limited["matches"][0]["ordinal"] == 6
+    assert search_whiteboard(str(root), "thread-a", "nur-alt")["matches"][0]["ordinal"] == 1
+    assert search_whiteboard(str(root), "thread-a", "nur-neu")["matches"][0]["ordinal"] == 6
+    assert sorted(path.name for path in root.rglob("*")) == before
+
+
+def test_search_rejects_bad_id_long_query_and_path_escape(tmp_path):
+    from kirabridge.whiteboard_read import search_whiteboard
+
+    root = _workspace(tmp_path)
+    with pytest.raises(BridgeError, match="query"):
+        search_whiteboard(str(root), "thread-a", "q" * 201)
+    with pytest.raises(BridgeError, match="invalid"):
+        search_whiteboard(str(root), "../secrets", "text")
+    with pytest.raises(BridgeError, match="invalid"):
+        search_whiteboard(str(root), "..", "text")
+    assert search_whiteboard(str(root), "thread-a", "q" * 200)["total_matches"] == 0
 
 
 @pytest.mark.skipif(
@@ -137,8 +281,12 @@ async def test_whiteboard_tools_are_in_the_catalog(bridge):
 
     server = create_server(bridge)
     tools = await server.list_tools()
-    names = {tool.name for tool in tools}
-    assert {"whiteboard_read", "whiteboard_append"} <= names
+    named = {tool.name: tool for tool in tools}
+    assert {"whiteboard_read", "whiteboard_append", "whiteboard_search"} <= set(named)
+    assert (
+        'Für die neuesten Einträge order="newest" verwenden.'
+        in named["whiteboard_read"].description
+    )
 
 
 def test_append_touches_thread_under_workspace_lock_not_inside_append_lock(tmp_path, monkeypatch):

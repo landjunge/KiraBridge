@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +11,6 @@ from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
 from kirabridge.agent_manager import AgentManager
-from kirabridge.autonext.models import AutoNextControl
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -87,7 +88,6 @@ from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboard
 from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
 INPUTS = {
-    "autonext.control": AutoNextControl,
     **WINDOWS_KEYBOARD_INPUTS,
     **WINDOWS_WINDOW_INPUTS,
     **WINDOWS_APP_INPUTS,
@@ -172,6 +172,7 @@ class Bridge:
             self.diagnostics,
             lambda principal: AuditObserver(config, principal, self.runtime, self.store),
         )
+        self.threaddesk.store = self.store
         from kirabridge.handoff_manager import HandoffManager
 
         self.handoffs = HandoffManager(self, peer=handoff_peer)
@@ -294,13 +295,20 @@ class Bridge:
             authorize=self.security.authorize,
         )
         self.sessions.terminal_app.system_transport = self.system_modules.transport
-        self.macos = MacOSProvider(
+        provider_type, provider_options = MacOSProvider, {}
+        if sys.platform.startswith("linux"):
+            from kirabridge.platform_adapters.linux.provider import LinuxProvider
+
+            provider_type = LinuxProvider
+            provider_options["owned_terminal"] = self.sessions.linux
+        self.macos = provider_type(
             terminal_app=self.sessions.terminal_app,
             clipboard=self.clipboard,
             files=self.filesystem,
             processes=self.processes,
             system_modules=self.system_modules,
             system_reports=self.terminal,
+            **provider_options,
         )
         from kirabridge.native_queries import NativeQueries
 
@@ -310,9 +318,16 @@ class Bridge:
         self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
 
+        next_prune = 0.0
+
         def maintain():
+            nonlocal next_prune
             self.messages.voice_policy.expire()
-            self.outputs.prune()
+            # Tidying runs often enough to stay current, not on every idle worker wake-up:
+            # capture() still prunes before every write, so nothing is ever left expired.
+            if time.monotonic() >= next_prune:
+                next_prune = time.monotonic() + 30.0
+                self.outputs.prune()
 
         self.tasks.maintenance = maintain
         self.message_receiver = MessageReceiver(self)
@@ -323,17 +338,6 @@ class Bridge:
         self.agents.qwen_session_guard = self.teams.qwen_session_proof
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
-        from kirabridge.autonext.manager import AutoNextManager
-
-        if config.autonext.coordinator_mode:
-            from kirabridge.autonext.coordinator import CoordinatedAutoNext
-
-            self.autonext = CoordinatedAutoNext(self)
-        else:
-            self.autonext = AutoNextManager(self)
-        self.agents.worktree_guard = lambda task, args: self.autonext.authorize_execution(
-            {**task, "args": args.model_dump()}
-        )
         from kirabridge.queue_management import QueueManager
 
         self.queues = QueueManager(
@@ -409,7 +413,12 @@ class Bridge:
                 task_id=request.task_id,
             )
 
-    def health(self, principal: str) -> dict:
+    def health(self, principal: str, *, include_diagnostics: bool = True) -> dict:
+        """Report authenticated liveness, optionally with synchronous storage diagnostics.
+
+        Direct callers retain the detailed report. Routine MCP polling opts out of
+        storage reads; an alive dispatcher alone does not prove task admission.
+        """
         policy = self.security.principal(principal, "bridge.health")
         from kirabridge.discovery import snapshot
         from kirabridge.permissions import automatic_for, permission_summary
@@ -456,23 +465,39 @@ class Bridge:
             "voice_messaging": self.config.voice_messaging.model_dump(),
             "visible_handoffs": self.config.visible_handoffs.model_dump(),
             **self.messages.voice_channel.profile(principal),
-            "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+            "health_scope": "liveness and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
             "operations": {
                 "protocol": 1,
-                "maintenance": self.store.maintenance_state(),
-                "accepting_new_work": self.store.maintenance_state() is None,
+                "status": "not_probed",
+                "maintenance": None,
+                "accepting_new_work": None,
             },
             "desktop_last_observation": self.sessions.desktop.last,
-            "output_history": self.outputs.status(),
-            "diagnostics_storage": self.diagnostics.status(),
+            "output_history": {"status": "not_probed"},
+            "diagnostics_storage": {"recording": "not_probed"},
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
-            "autonext": self.autonext.inspect(),
+            "health_detail": {
+                "included": include_diagnostics,
+                "request": "bridge_health(include_diagnostics=true)",
+                "readiness": "not_checked",
+            },
             "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
+        if include_diagnostics:
+            maintenance = self.store.maintenance_state()
+            result.update(
+                operations={
+                    "protocol": 1,
+                    "maintenance": maintenance,
+                    "accepting_new_work": maintenance is None,
+                },
+                output_history=self.outputs.status(),
+                diagnostics_storage=self.diagnostics.status(),
+            )
         if sys.platform.startswith("linux"):
             from kirabridge.platform_adapters import LinuxAdapter
 
@@ -909,13 +934,23 @@ class Bridge:
             ).fetchone()
             worker = self.config.team.workers.get(work["assignee"]) if work else None
             managed = bool(worker and worker.execution_scope == "separate_managed_session")
+            if worker and worker.execution_scope == "existing_native_codex_root":
+                if worker.agent != "codex" or self.config.agents[worker.agent].kind != "codex":
+                    raise BridgeError("native_codex_unsupported", "Native route is Codex only")
+                from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
+
+                await running({"evidence_type": "native_codex_turn_dispatch"})
+                return await NativeCodexTurns().execute(
+                    self.config.visible_handoffs.native_codex,
+                    args.cwd,
+                    str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + task["id"])),
+                    args.prompt,
+                    min(args.timeout, worker.timeout),
+                    progress,
+                )
             return await self.agents.execute(
                 task, args, policy, running, progress, separate_managed=managed
             )
-        if operation == "autonext.control":
-            self.autonext.validate_control(principal, args)
-            await running({"evidence_type": "autonext_control", "action": args.action})
-            return self.autonext.control(principal, args)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation == "workflow.stop":
@@ -1077,10 +1112,8 @@ class Bridge:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
-            await self.autonext.start()
         except BaseException:
             for stop in (
-                self.autonext.stop,
                 self.team_dispatcher.stop,
                 self.message_receiver.stop,
                 self.tasks.stop,
@@ -1092,12 +1125,9 @@ class Bridge:
     async def __aexit__(self, *exc):
         try:
             try:
-                await self.autonext.stop()
+                await self.team_dispatcher.stop()
             finally:
-                try:
-                    await self.team_dispatcher.stop()
-                finally:
-                    await self.message_receiver.stop()
+                await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.system_modules.close()

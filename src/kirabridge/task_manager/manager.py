@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -19,6 +20,7 @@ from kirabridge.bridge_core.models import (
 from kirabridge.operations import OPERATIONS
 from kirabridge.platform_adapters import RuntimeLock
 from kirabridge.security_manager import SecurityManager, request_hash
+from kirabridge.task_manager.failure import normalize_failure
 from kirabridge.task_manager.store import Store
 
 Executor = Callable[[dict, Callable, Callable], Awaitable[dict]]
@@ -309,11 +311,15 @@ class TaskManager:
     async def _heartbeat(self, task_id: str) -> None:
         while True:
             await asyncio.sleep(self.config.lease_seconds / 3)
-            self.store.db.execute(
-                "UPDATE tasks SET lease_until=? WHERE id=? AND lease_owner=? "
-                "AND state IN ('accepted','running')",
-                (time.time() + self.config.lease_seconds, task_id, self.owner),
-            )
+            try:
+                self.store.db.execute(
+                    "UPDATE tasks SET lease_until=? WHERE id=? AND lease_owner=? "
+                    "AND state IN ('accepted','running')",
+                    (time.time() + self.config.lease_seconds, task_id, self.owner),
+                )
+            except Exception:  # noqa: BLE001 - one failed renewal must not end the heartbeat
+                # The next beat retries; the lease only lapses if every renewal fails.
+                logging.getLogger(__name__).warning("lease renewal failed for %s", task_id)
 
     def managed_workers(self):
         """Only fixed operator-configured team workers may use the managed lane."""
@@ -465,12 +471,15 @@ class TaskManager:
             else:
                 state = State.COMPLETED if result.get("success", True) else State.FAILED
                 evidence = result.get("evidence", {"operation_returned": True})
+            failure = normalize_failure(result) if state == State.FAILED and not pending else None
+            if failure is not None and failure["retry_safe"]:
+                evidence = {**evidence, "safe_to_retry": True, "automatic_retry": False}
             self.store.transition(
                 task["id"],
                 state,
                 evidence,
                 result=result,
-                error={"code": "session_handle_pending"} if pending else None,
+                error={"code": "session_handle_pending"} if pending else failure,
                 owner=self.owner,
             )
         except asyncio.CancelledError:
@@ -485,7 +494,7 @@ class TaskManager:
                     **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },
-                error={"code": "native_admission_timeout"} if expired else None,
+                error={"code": "native_admission_timeout" if expired else "dispatcher_shutdown"},
                 owner=self.owner,
             )
             raise

@@ -6,6 +6,7 @@ import re
 import shlex
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -18,6 +19,9 @@ from kirabridge.visible_terminal import VisibleTerminalInput
 
 @pytest.fixture
 def command(bridge, config, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.visible_terminal.current_platform", lambda: SimpleNamespace(name="macos")
+    )
     policy = config.principals["local"]
     policy.capabilities.append("session.inspect")
     policy.approval_mode = "automatic"

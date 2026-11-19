@@ -12,9 +12,9 @@ Geprüfte Mainbasis: `2bbf6d9dc628cdf95e5591df7968f761f938883c`; die abschließe
 diesen Gitpin ohne Änderung der paketierten Laufzeit fortschreiben.
 
 Die lokale Intel-Laufzeit bleibt `0.8.0rc40` bei
-`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. Jüngster veröffentlichter Intel-Installer
-bleibt [RC36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36),
-Quelle `d4aebdd89a206045731f2692a3f363fddaa15ee0`. Dieser Installer und das getrennte
+`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. Der jüngste veröffentlichte Intel-Stand
+ist [RC49](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49),
+Quelle `edc44290831b5b79e5d1f64238bcf09e4fe8b85a`. Dieser Installer und das getrennte
 Serverarchiv wurden tatsächlich geladen und auf Hashgleichheit geprüft.
 [Prüfung, Quellen und verbleibende Grenzen](evidence/readme-current-20261107.json).
 
@@ -80,6 +80,8 @@ freigegebene Aktion. [ChatGPT-Einrichtung](CHATGPT.md).
 Keine fremden Profile oder Shell-Pfade unbesehen überschreiben. Bestehende
 KiraBridge-Schlüssel bleiben bis zu einer gesondert freigegebenen und geprüften
 Migration erhalten. Die Betriebspfade stehen unten.
+
+Optionaler ACP-PAP-Host-Adapter (`[acp_pap_host] enabled = true`, Agent `kind = "acp_pap"`, Paket `acp_pap` aus dem privaten Repository separat installieren, kein Extra und keine Pflichtabhängigkeit): standardmäßig aus, eine Verbindung und Sitzung je Core-Task, Zeitüberschreitung oder Trennung bleibt UNKNOWN und wird nie erneut gesendet.
 
 ## Sicherheit
 
@@ -159,7 +161,7 @@ in getrennten frischen Legacy-/Remoteprozessen mit gebundenen Importen, Pins und
 
 | Prüfzweig | Quellen und Umgebung |
 | --- | --- |
-| Legacy | ThreadDesk `869a38970bace13c37d73654538b64efa1629da3`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
+| Legacy | ThreadDesk `22fda1da813e228b0969795f9565dcbcca3499d6`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
 | Remote R2/R3 | ThreadDesk M4 `a0dd4c39478b031e0e31d335c2a15435dfbc52eb`; `KIRABRIDGE_TEST_THREADDESK_SOURCE` und `KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE` zeigen auf dessen `src/`; keine Legacy-TD-/TollGateimporte |
 
 Exakte `PYTHONPATH`-, Temp-/Reportpfade und Helferargumente stehen im Workflow;

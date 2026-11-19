@@ -289,6 +289,34 @@ def agents_section(config, inventory):
                     f"Pfad unter [agents.{name}] prüfen",
                 )
             )
+        if getattr(configured, "kind", None) == "codex":
+            package = row.get("runtime_package") or {}
+            state = package.get("status", "unknown")
+            if state == "layout_incomplete":
+                missing = ", ".join(
+                    key
+                    for key, value in package.get("components", {}).items()
+                    if value.get("state") in {"missing", "not_executable"}
+                )
+                items.append(
+                    item(
+                        WARN,
+                        f"{AGENT_NAMES.get(name, name.capitalize())} · Paketdateien",
+                        f"Deklariertes 0.169-Paket: {missing}",
+                        "Versionspassendes vollständiges Herstellerpaket prüfen; "
+                        "keine automatische Änderung",
+                    )
+                )
+            else:
+                detail = (
+                    "0.169-Dateistruktur beobachtet; Versionen und Toolfähigkeit ungeprüft"
+                    if state == "layout_observed"
+                    else "Paketstatus unbekannt; Launcherziel oder unterstützte "
+                    "Paketmetadaten nicht belegt"
+                )
+                items.append(
+                    item(INFO, f"{AGENT_NAMES.get(name, name.capitalize())} · Paketdateien", detail)
+                )
     if items:
         items.append(
             item(INFO, "Anmeldungen werden nicht getestet", "Ein echter Test würde Tokens kosten")

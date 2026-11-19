@@ -65,17 +65,32 @@ class SessionSelect(SessionReference):
 
 
 class SessionInput(SessionReference):
-    """Literal text, or key='enter' bound to an observed cursor and current agent PID."""
+    """Literal text, a bound key, or intent='interim' to the exact working Codex PID.
+
+    Interim messages preserve the current turn and require expected_agent_pid.
+    """
 
     text: str = Field(default="", max_length=16384)
     submit: bool = True
     require_idle: bool = False
+    intent: Literal["literal", "interim"] = "literal"
     key: Literal["enter", "escape"] | None = None
     expected_cursor: str = Field(default="", pattern=r"^$|^[0-9a-f]{64}$")
     expected_agent_pid: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def explicit_input_mode(self):
+        if self.intent == "interim":
+            if (
+                self.key is not None
+                or not self.submit
+                or not self.text
+                or self.expected_agent_pid is None
+            ):
+                raise ValueError("Interim input requires text, submit=true and an exact agent PID")
+            if self.expected_cursor or self.require_idle:
+                raise ValueError("Interim input does not require an idle turn or a Return cursor")
+            return self
         if self.key is not None:
             if self.text or not self.submit or not self.expected_cursor:
                 raise ValueError(
@@ -175,6 +190,10 @@ class SessionManager:
         try:
             rows = await self.tmux.catalog()
         except BridgeError as exc:
+            if transport is None and sys.platform.startswith("linux") and not native_rows:
+                result = await self._linux_catalog()
+                result["transport_errors"]["tmux"] = {"code": exc.code}
+                return result
             return self._catalog_result(
                 native_rows,
                 transport="terminal_app" if native_rows else "tmux",
@@ -515,19 +534,23 @@ class SessionManager:
                     "Native agent input requires a task-owned selection",
                 )
             if identities is not None:
-                text = await self.terminal_app.read(args.pane_id)
-                if self.readiness is None:
-                    raise BridgeError(
-                        "visible_target_unknown", "No readiness assessor for agent input"
+                # The selection above is this insert's fresh read. The widget
+                # check reuses that row; it must not start a second catalogue
+                # before the paste, and it must not authorize the paste itself.
+                with self.observation_scope(principal, selected):
+                    text = await self.terminal_app.read(args.pane_id)
+                    if self.readiness is None:
+                        raise BridgeError(
+                            "visible_target_unknown", "No readiness assessor for agent input"
+                        )
+                    observation = await self.readiness(
+                        principal,
+                        {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
                     )
-                observation = await self.readiness(
-                    principal,
-                    {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
-                )
-                if not observation or not observation.get("ready"):
-                    raise BridgeError(
-                        "visible_target_not_ready", "Current agent widget is not ready"
-                    )
+                    if not observation or not observation.get("ready"):
+                        raise BridgeError(
+                            "visible_target_not_ready", "Current agent widget is not ready"
+                        )
                 if before_transport is not None:
                     await before_transport()
                 await self.terminal_app.insert(
@@ -623,6 +646,7 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            visible_direct = self.direct(principal) and not args.pane_id.startswith("linux:")
             # Recognition, exact assignment and central handoff are mandatory for
             # every CLI tab, including an unbound idle-looking tab. A raw shortcut
             # cannot establish readiness or the task's durable input intent.
@@ -630,9 +654,9 @@ class SessionManager:
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
                 )
-            if (args.require_idle or self.direct(principal)) and selected.get("busy", True):
+            if (args.require_idle or visible_direct) and selected.get("busy", True):
                 raise BridgeError("session_busy", "Selected terminal is not an idle shell")
-            if self.direct(principal) and not args.pane_id.startswith("terminal:"):
+            if visible_direct and not args.pane_id.startswith("terminal:"):
                 raise BridgeError(
                     "visible_terminal_required",
                     "ChatGPT direct input requires a visible Terminal.app window",
@@ -651,7 +675,7 @@ class SessionManager:
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
                 )
-            elif self.direct(principal):
+            elif visible_direct:
                 identity = await self.terminal_app.process_identity(selected["expected_pid"])
                 await self.terminal_app.send_confirmed(
                     selected, args.text, identity, before_transport=before_transport
@@ -727,10 +751,37 @@ class SessionManager:
                     "Several live tabs report this tty; no input until the view is unique",
                 )
             return selected
-        raise BridgeError(
+        # A catalog that was cut short or could not see every tab proves nothing about
+        # this pane; report that instead of claiming the selection changed.
+        if catalog.get("truncated"):
+            failure = BridgeError(
+                "session_catalog_incomplete",
+                "The terminal catalog is incomplete; the selected pane cannot be judged",
+            )
+            failure.provider_error = {
+                "reason": "catalog_truncated",
+                "sessions": len(catalog["sessions"]),
+            }
+            raise failure
+        same_pane = [row for row in catalog["sessions"] if row["pane_id"] == pane_id]
+        same_tty = [
+            row
+            for row in catalog["sessions"]
+            if pane_id.rsplit(":", 1)[-1] == str(row.get("tty", "")).rsplit("/", 1)[-1]
+        ]
+        reason = (
+            "expected_pid_changed"
+            if same_pane
+            else "window_changed"
+            if same_tty
+            else "pane_missing"
+        )
+        failure = BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
         )
+        failure.provider_error = {"reason": reason, "sessions": len(catalog["sessions"])}
+        raise failure
 
     async def focus(self, principal, pane_id, expected_pid):
         self.authorization.principal(principal, "session.input")
@@ -754,6 +805,9 @@ class SessionManager:
     async def close_tab(self, principal, pane_id, expected_pid):
         self.authorization.principal(principal, "session.input")
         selected = await self.selected(principal, pane_id, expected_pid)
+        if pane_id.startswith("linux:"):
+            await self.linux.close(pane_id)
+            return {"pane_id": pane_id, "expected_pid": expected_pid, "closed": True}
         if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
             raise BridgeError(
                 "terminal_window_required", "Refusing to close the only visible terminal"

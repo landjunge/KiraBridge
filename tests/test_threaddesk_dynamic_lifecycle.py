@@ -216,7 +216,7 @@ def manage_contract():
 
 
 @pytest.mark.parametrize("stored", [True, False])
-async def test_lost_thread_manage_reply_is_reconciled_by_operation_id_not_resent(config, stored):
+async def test_lost_thread_manage_reply_without_request_binding_is_not_resent(config, stored):
     configured(config)
     effects, reads = [], []
     arguments = {
@@ -230,8 +230,18 @@ async def test_lost_thread_manage_reply_is_reconciled_by_operation_id_not_resent
     async def peer(_, name, values, **kwargs):
         if name == "thread_operation_status":
             reads.append(values)
-            receipt = {"operation_id": "note-1", "thread_id": "t1", "revision": 4}
-            return result({"found": stored, "result": receipt if stored else None})
+            receipt = {
+                "operation_id": "note-1",
+                "action": "set_note",
+                "thread_id": "t1",
+                "revision": 4,
+                "duplicate": False,
+                "deleted": False,
+                "thread": {"id": "t1", "revision": 4},
+            }
+            return result(
+                {"operation_id": "note-1", "found": stored, "result": receipt if stored else None}
+            )
         effects.append(values)
         raise BridgeError("peer_unknown", "Synthetic late reply after the effect")
 
@@ -240,9 +250,7 @@ async def test_lost_thread_manage_reply_is_reconciled_by_operation_id_not_resent
         outcome = await call(bridge, "local", "thread_manage", arguments, "kb-note-1")
     assert effects == [arguments]
     assert reads == [{"operation_id": "note-1"}]
+    assert not outcome["success"] and outcome["task"]["state"] == "unknown"
     if stored:
-        assert outcome["success"] and outcome["task"]["state"] == "completed"
-        assert outcome["value"]["reconciled"] and outcome["value"]["receipt"]["revision"] == 4
-        assert outcome["effect_confirmed"] is True
-    else:
-        assert not outcome["success"] and outcome["task"]["state"] == "unknown"
+        assert outcome["evidence"]["provider_error"]["operation_receipt_found"]
+        assert outcome["evidence"]["provider_error"]["request_hash_verified"] is False

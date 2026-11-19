@@ -28,18 +28,19 @@ jobs:
           uv run python scripts/build_release.py --out dist/candidate
           uv run python scripts/build_release.py --out dist/rebuild
           diff dist/candidate/SHA256SUMS dist/rebuild/SHA256SUMS
-      - name: Download authenticated original RC14 upgrade fixture
+      - name: Download current shipping wheel as upgrade fixture
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist/previous
-          gh release download v0.8.0rc14 -R landjunge/KiraBridge -p '*.whl' -D dist/previous
-          echo 'c5d33839b70badf36371d1fef03ea3a4370e00165db4699647ccacfa3700fadd  dist/previous/kirabridge-0.8.0rc14-py3-none-any.whl' | shasum -a 256 -c -
+          gh release download v0.8.0rc49 -R landjunge/KiraBridge -p '*.whl' -D dist/previous
+          echo '4bb45a7cb61811df1878f48c18f5bf4dede84081a3b237bdf2c1ed5e5b504e27  dist/previous/kirabridge-0.8.0rc49-py3-none-any.whl' | shasum -a 256 -c -
       - name: Actual isolated launchd install, upgrade, restart and rollback
         run: >-
           uv run python scripts/accept_macos_release.py dist/candidate
           --root dist/accept-ci-rc15
-          --previous-wheel dist/previous/kirabridge-0.8.0rc14-py3-none-any.whl
+          --previous-wheel dist/previous/kirabridge-0.8.0rc49-py3-none-any.whl
+          --previous-commit edc44290831b5b79e5d1f64238bcf09e4fe8b85a
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: KiraBridge-macos-${{ matrix.os }}

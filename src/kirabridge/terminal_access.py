@@ -1,6 +1,7 @@
 """Explain granted terminal access separately from optional input confirmation."""
 
 from kirabridge.permissions import decision
+from kirabridge.platform_adapters import current_platform
 
 
 def terminal_access(config, principal):
@@ -12,7 +13,52 @@ def terminal_access(config, principal):
     read_decision = decision(config, principal, "session.read")
     send = effective["authorized"]
     buffered = effective["buffer_enabled"]
+    host = current_platform().name
+    requirements = [
+        "interactive macOS desktop",
+        "Terminal.app automation",
+        "fresh window/TTY/PID identity",
+        "confirmed empty shell input",
+    ]
+    description = (
+        "Terminalrechte sind erteilt. Vorhandene Fenster über den Katalog auswählen; "
+        "Lesen und Eingabe verwenden Fenster-ID, TTY und PID. "
+        "Ein ausgeschalteter Zusatzpuffer deaktiviert den Terminalzugriff nicht."
+        if inspect and send
+        else "Terminalrechte sind nicht vollständig erteilt."
+    )
+    alternative = None
+    if host == "linux":
+        requirements = [
+            "fresh short-lived bridge-owned PTY for direct argv",
+            "terminal.execute, session.inspect and session.input authorization",
+            "permitted working directory and executable",
+        ]
+        description = (
+            "Unter Linux führen terminal_control/terminal.visible und direkte "
+            "terminal.execute-Aufrufe argv in einer neuen kurzlebigen Bridge-eigenen PTY aus. "
+            "Ausgabe und beobachteter Exitstatus gehören nur zu diesem Auftrag; "
+            "die PTY wird danach geschlossen. Bestehende Benutzerterminals werden nicht "
+            "übernommen. create_if_needed betrifft nur macOS-Fenster. "
+            "Freigabe ist keine Laufzeitprüfung."
+        )
+        alternative = {"transport": "linux", "operation": "session.open"}
+    elif host == "windows":
+        requirements = [
+            "interactive Windows desktop for the separate windows.console.handoff route",
+            "explicit operation authorization",
+            "permitted working directory and executable",
+        ]
+        description = (
+            "Unter Windows ist terminal.visible nicht unterstützt. Der vorhandene separate "
+            "Weg windows.console.handoff verwendet eine neue sichtbare Windows-Konsole. "
+            "Freigabe und Laufzeitverfügbarkeit müssen getrennt geprüft werden."
+        )
+        alternative = {"transport": "windows.console.v1", "operation": "windows.console.handoff"}
+    if alternative is not None:
+        alternative.update(availability="not_probed", requires_separate_authorization=True)
     return {
+        "host_platform": host,
         "policy_authorized": inspect and send,
         "discovery_allowed": inspect,
         "read_allowed": inspect,
@@ -30,14 +76,13 @@ def terminal_access(config, principal):
         "input_operation": "session.input",
         "direct_command_tool": "terminal_control",
         "direct_command_operation": "terminal.visible",
+        "direct_command_availability": "not_probed"
+        if host in {"macos", "linux"}
+        else "unsupported_platform",
         "direct_command_decision": decision(config, principal, "terminal.visible"),
         "new_window_decision": decision(config, principal, "session.open"),
-        "runtime_requirements": [
-            "interactive macOS desktop",
-            "Terminal.app automation",
-            "fresh window/TTY/PID identity",
-            "confirmed empty shell input",
-        ],
+        "runtime_requirements": requirements,
+        "alternative_terminal_route": alternative,
         "grant_is_not_runtime_readiness": True,
         "cached_client_catalog_query": {"operation": "session.catalog"},
         "cached_client_task_operations": ["session.catalog", "session.read"],
@@ -47,11 +92,5 @@ def terminal_access(config, principal):
             "pane_id": "FROM_CATALOG",
             "expected_pid": "FROM_CATALOG",
         },
-        "description": (
-            "Terminalrechte sind erteilt. Vorhandene Fenster über den Katalog auswählen; "
-            "Lesen und Eingabe verwenden Fenster-ID, TTY und PID. "
-            "Ein ausgeschalteter Zusatzpuffer deaktiviert den Terminalzugriff nicht."
-            if inspect and send
-            else "Terminalrechte sind nicht vollständig erteilt."
-        ),
+        "description": description,
     }

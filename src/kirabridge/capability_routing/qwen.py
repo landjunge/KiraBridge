@@ -57,8 +57,6 @@ class ScopedQwenAdapter:
         ):
             raise RoutingError("Scoped Qwen Team claim is no longer executable")
         b.teams.authorize_execution(stored)
-        if authorize := getattr(b.agents, "worktree_guard", None):
-            authorize(stored, args)
         lease = b.store.db.execute(
             "SELECT lease_owner,lease_until,receipt,attempt,request_hash FROM tasks WHERE id=?",
             (task["id"],),

@@ -179,3 +179,29 @@ def test_audit_detects_tampering_and_does_not_log_payload(bridge, config):
     assert verify(bridge.store)["valid"]
     bridge.store.db.execute("UPDATE audit SET kind='tampered' WHERE seq=1")
     assert not verify(bridge.store)["valid"]
+
+
+async def test_heartbeat_survives_a_failed_lease_renewal():
+    import asyncio
+    from types import SimpleNamespace
+
+    from kirabridge.task_manager.manager import TaskManager
+
+    calls = []
+
+    class Db:
+        def execute(self, *args):
+            calls.append(args)
+            if len(calls) == 1:
+                raise RuntimeError("database is locked")
+
+    fake = SimpleNamespace(
+        config=SimpleNamespace(lease_seconds=0.03),
+        store=SimpleNamespace(db=Db()),
+        owner="test",
+    )
+    beat = asyncio.create_task(TaskManager._heartbeat(fake, "task"))
+    await asyncio.sleep(0.2)
+    assert not beat.done()
+    assert len(calls) >= 2
+    beat.cancel()
