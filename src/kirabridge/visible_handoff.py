@@ -386,7 +386,11 @@ class VisibleHandoffs:
                 current_evidence = json.loads(current["evidence"])
                 if (
                     current["state"] == "confirmed"
-                    or current_evidence.get("reason") == "visible_paste_unconfirmed"
+                    or "visible_paste_unconfirmed"
+                    in {
+                        current_evidence.get("reason"),
+                        current_evidence.get("previous_reason"),
+                    }
                 ):
                     message_row = self.store.db.execute(
                         "SELECT acknowledged,conversation_id FROM messages WHERE id=?",
@@ -753,6 +757,25 @@ class VisibleHandoffs:
                         },
                     )
                 continue  # The old message stays unknown and is not sent again.
+            if self._unconfirmed_input(status):
+                # The paste/insert outcome stayed unknown. The lock protects possibly
+                # pending input, so only a FRESH ready observation (empty, idle input of
+                # this same window) releases it. Text still in the field keeps the lock.
+                await self.check_target(principal, target, binding, ready=True)
+                if status["evidence"].get("reason") != "unconfirmed_input_lock_released":
+                    self.transition(
+                        row["id"],
+                        "unknown",
+                        {
+                            **status["evidence"],
+                            "reason": "unconfirmed_input_lock_released",
+                            "previous_reason": status["evidence"].get("reason"),
+                            "input_reservation_released": True,
+                            "automatic_retry": False,
+                            "target_readiness": "verified_ready_before_new_input",
+                        },
+                    )
+                continue  # The old message stays unknown and is never sent again.
             error = BridgeError("visible_target_busy", busy_message)
             last = status["events"][-1] if status["events"] else None
             error.observation = {
@@ -765,6 +788,15 @@ class VisibleHandoffs:
                 "next_step": "Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
             }
             raise error
+
+    @staticmethod
+    def _unconfirmed_input(status):
+        """Paste/insert outcome unknown; its lock ends only after a fresh ready check."""
+        return status["state"] == "unknown" and status["evidence"].get("reason") in {
+            "visible_paste_unconfirmed",
+            "visible_insert_unknown",
+            "unconfirmed_input_lock_released",
+        }
 
     @staticmethod
     def _pre_paste_refusal(status):
