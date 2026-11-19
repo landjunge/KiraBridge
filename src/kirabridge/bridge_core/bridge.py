@@ -939,8 +939,9 @@ class Bridge:
                     raise BridgeError("native_codex_unsupported", "Native route is Codex only")
                 from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
 
+                note = await self.agents.budget_note(worker.agent)
                 await running({"evidence_type": "native_codex_turn_dispatch"})
-                return await NativeCodexTurns().execute(
+                result = await NativeCodexTurns().execute(
                     self.config.visible_handoffs.native_codex,
                     args.cwd,
                     str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + task["id"])),
@@ -948,6 +949,7 @@ class Bridge:
                     min(args.timeout, worker.timeout),
                     progress,
                 )
+                return self.agents.with_budget_note(result, note)
             return await self.agents.execute(
                 task, args, policy, running, progress, separate_managed=managed
             )
