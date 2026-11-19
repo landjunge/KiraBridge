@@ -1257,6 +1257,137 @@ def restart_service(args):
         )
 
 
+AUX_PREFIX = "com.kirabridge."
+TUNNEL_LABEL = "com.kirabridge.chatgpt"
+
+
+def _launchctl(*argv, timeout=20):
+    return subprocess.run(
+        ["launchctl", *argv], capture_output=True, text=True, timeout=timeout, check=False
+    )
+
+
+def _aux_loaded_from(label):
+    """Plist path launchd loaded *label* from, or None when it is not loaded."""
+    result = _launchctl("print", f"gui/{os.getuid()}/{label}", timeout=10)
+    if result.returncode:
+        return None
+    match = re.search(r"^\s*path = (.+)$", result.stdout, re.MULTILINE)
+    return Path(match.group(1).strip('"')) if match else Path("<unknown>")
+
+
+def _aux_bootstrap(path):
+    deadline = time.monotonic() + 30
+    while True:
+        done = _launchctl("bootstrap", f"gui/{os.getuid()}", str(path))
+        if done.returncode == 0:
+            return
+        if done.returncode != 5 or time.monotonic() > deadline:
+            detail = (done.stderr or done.stdout or "").strip()
+            raise RuntimeError(f"bootstrap {done.returncode}: {detail[:200]}")
+        time.sleep(1)
+
+
+def _aux_strings(value, change):
+    if isinstance(value, str):
+        return change(value)
+    if isinstance(value, list):
+        return [_aux_strings(item, change) for item in value]
+    if isinstance(value, dict):
+        return {key: _aux_strings(item, change) for key, item in value.items()}
+    return value
+
+
+def _aux_texts(value):
+    if isinstance(value, str):
+        return [value]
+    items = value.values() if isinstance(value, dict) else value if isinstance(value, list) else []
+    return [text for item in items for text in _aux_texts(item)]
+
+
+def sync_aux_services(args, release, backup, *, restart_tunnel=True):
+    """Point auxiliary com.kirabridge.* launchd services at *release*; fail-soft.
+
+    Returns (records, problems). Records describe rewritten plists for rollback;
+    problems are short German notes. Never raises for a single service.
+    """
+    records, problems = [], []
+    if args.service != "launchd" or LABEL != "com.kirabridge.bridge":
+        return records, problems
+    root = str(args.prefix / "releases")
+    pattern = re.compile(re.escape(root) + r"/([^/\s\"']+)")
+    token = re.compile(re.escape(root) + r"/[^\s\"'=:]+")
+    agents = args.plist.parent
+    for path in sorted(agents.glob(AUX_PREFIX + "*.plist")):
+        label = path.name[: -len(".plist")]
+        if path == args.plist or label == LABEL:
+            continue
+        try:
+            original = path.read_bytes()
+            data = plistlib.loads(original)
+            texts = _aux_texts(data)
+            found = {name for text in texts for name in pattern.findall(text)}
+            if not found or found == {release.name}:
+                continue
+            updated = _aux_strings(data, lambda s: pattern.sub(root + "/" + release.name, s))
+            missing = {
+                p
+                for text in _aux_texts(updated)
+                for p in token.findall(text)
+                if not Path(p).exists()
+            }
+            if missing:
+                problems.append(
+                    (label, "unverändert, fehlt im neuen Release: " + short(Path(min(missing))))
+                )
+                continue
+            source = _aux_loaded_from(label)
+            if source is not None and source != path:
+                problems.append((label, "unverändert, läuft aus anderer plist"))
+                continue
+            name = "aux." + path.name
+            atomic(backup / name, original, path.stat().st_mode & 0o777)
+            atomic(path, plistlib.dumps(updated), path.stat().st_mode & 0o777, exact_mode=True)
+            try:
+                if source is not None:
+                    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+                    _aux_bootstrap(path)
+            except Exception as error:
+                atomic(path, original, path.stat().st_mode & 0o777, exact_mode=True)
+                with contextlib.suppress(Exception):
+                    _aux_bootstrap(path)
+                problems.append((label, f"Neustart fehlgeschlagen, alte plist bleibt: {error}"))
+                continue
+            records.append({"plist": str(path), "backup": name, "installed_sha256": sha(path)})
+        except Exception as error:
+            problems.append((label, f"nicht angepasst: {error}"))
+    if restart_tunnel and _aux_loaded_from(TUNNEL_LABEL) is not None:
+        done = _launchctl("kickstart", "-k", f"gui/{os.getuid()}/{TUNNEL_LABEL}")
+        if done.returncode:
+            problems.append((TUNNEL_LABEL, "Neustart fehlgeschlagen"))
+    return records, problems
+
+
+def restore_aux_services(active):
+    """Rollback: restore auxiliary plists recorded by sync_aux_services; fail-soft."""
+    backup = Path(active["backup"])
+    for record in active.get("aux_services", []):
+        path = Path(record["plist"])
+        label = path.name[: -len(".plist")]
+        try:
+            if (sha(path) if path.exists() else None) != record["installed_sha256"]:
+                report("warn", f"{label} seit Umschaltung geändert; nicht zurückgesetzt")
+                continue
+            saved = backup / record["backup"]
+            loaded_before = _aux_loaded_from(label) == path
+            atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777, exact_mode=True)
+            if loaded_before:
+                _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+                _aux_bootstrap(path)
+        except Exception as error:
+            report("warn", f"{label} nicht zurückgesetzt", detail=str(error)[:200])
+
+
 SOURCE_FIELDS = ("source_package_path", "source_tree_sha256", "source_file_count")
 
 
@@ -1665,6 +1796,14 @@ def activate(args, release):
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
     if args.service != "none":
         final_check(args, release)
+    # Only after the new release is active and verified; never fails the upgrade.
+    aux_records, aux_problems = sync_aux_services(args, release, backup)
+    if aux_records:
+        before["aux_services"] = aux_records
+        jwrite(backup / "transaction.json", before)
+        jwrite(current, before)
+    for label, problem in aux_problems:
+        report("warn", f"Zusatzdienst {label.removeprefix(AUX_PREFIX)}", detail=problem)
     report_summary(
         f"KiraBridge {manifest['version']} ist installiert",
         [
@@ -1673,6 +1812,12 @@ def activate(args, release):
             *(
                 [("ThreadDesk", Path(threaddesk_plan["installed"]["source_root"]).parent.name)]
                 if threaddesk_plan
+                else []
+            ),
+            *([("Zusatzdienste", f"{len(aux_records)} umgestellt")] if aux_records else []),
+            *(
+                [("Zusatzdienste offen", ", ".join(label for label, _ in aux_problems))]
+                if aux_problems
                 else []
             ),
             ("Rückweg", short(backup)),
@@ -1758,6 +1903,7 @@ def rollback(args, *, _compensating=False):
                 and _systemctl(args, "enable", "--runtime", "--", args.plist.name).returncode
             ):
                 raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
+    restore_aux_services(active)
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
