@@ -47,9 +47,13 @@ def _unavailable(reason):
     }
 
 
-def _plan_exhausted(plan):
-    return isinstance(plan, dict) and (
-        plan.get("exhausted") is True or plan.get("state") == "exhausted"
+def _plan_exhausted(decision):
+    """TollGate reports an exhausted, fresh plan as plan.limit_status/fresh and the reason."""
+    plan = decision.get("plan")
+    return decision.get("reason") == "plan_exhausted_observed" or (
+        isinstance(plan, dict)
+        and plan.get("limit_status") == "exhausted"
+        and plan.get("fresh") is True
     )
 
 
@@ -65,7 +69,7 @@ async def check_budget(loader, consumer):
             "decision": verdict,
             "reason": str(decision.get("reason", ""))[:300],
             "limit_source": decision.get("limit_source"),
-            "plan_exhausted": _plan_exhausted(decision.get("plan")),
+            "plan_exhausted": _plan_exhausted(decision),
         }
         day = decision.get("day") or {}
     except Exception:  # noqa: BLE001 - nothing blocks without a user-set limit

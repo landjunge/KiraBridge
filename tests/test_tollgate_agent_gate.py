@@ -102,7 +102,10 @@ async def test_deny_without_user_envelope_never_blocks(tmp_path):
 
 
 async def test_plan_exhausted_note(tmp_path):
-    h = Harness(tmp_path, verdict("allow", "none", plan={"exhausted": True}))
+    h = Harness(
+        tmp_path,
+        verdict("allow", "user_envelope", plan={"limit_status": "exhausted", "fresh": True}),
+    )
     result = await h.run()
     assert result["evidence"]["tollgate"]["plan_exhausted"] is True
 
@@ -183,3 +186,12 @@ def test_budget_switch_is_strict_and_keeps_the_config_digest():
     )
     with pytest.raises(ValidationError):
         Config(workflow_control={"budget": "no"})
+
+
+async def test_stale_exhausted_plan_is_not_noted(tmp_path):
+    h = Harness(
+        tmp_path,
+        verdict("allow", "user_envelope", plan={"limit_status": "exhausted", "fresh": False}),
+    )
+    result = await h.run()
+    assert result["evidence"]["tollgate"]["plan_exhausted"] is False
