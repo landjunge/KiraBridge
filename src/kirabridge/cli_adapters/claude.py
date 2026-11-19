@@ -15,6 +15,20 @@ from .contract import Capabilities
 _RULE = re.compile(r"[ \t]*─{3,}(?: [^─\n]{1,120} ─+)?[ \t]*")
 _PROMPT = "❯"
 _SPINNER = re.compile(r"[ \t]*[✻✽✶✳✢·*] ")
+_LIVE_SPINNER = re.compile(r"^[ \t]*[✻✽✶✳✢·*] \S+… \(", re.M)
+_OUTPUT = "⏺"
+
+
+def live_block(above):
+    """Rows between the last output block and the input separator.
+
+    A todo list (``⎿ ☐ …``), queued messages or hints may sit between the spinner and
+    the input, so the whole block counts, not only the two nearest rows.
+    """
+    for index in range(len(above) - 1, -1, -1):
+        if above[index].lstrip().startswith(_OUTPUT):
+            return above[index + 1 :]
+    return above[-30:]
 
 
 def _compact(text):
@@ -81,10 +95,12 @@ class ClaudeCodeAdapter:
             above, rows, footer = found
             first = rows[0].replace(" ", " ").rstrip()
             empty = len(rows) == 1 and bool(re.fullmatch(binding.ready_pattern, first.strip()))
-            # Only the live spinner row and the footer; quoted output never counts.
-            nearest = [line for line in above if line.strip()][-2:]
-            status = [line for line in nearest if _SPINNER.match(line)] + footer
-            busy = binding.busy_pattern and re.search(binding.busy_pattern, "\n".join(status), re.I)
+            # Only the block after the last output, and the footer; quoted output never counts.
+            block = live_block(above)
+            status = [line for line in block if _SPINNER.match(line)] + footer
+            busy = (
+                binding.busy_pattern and re.search(binding.busy_pattern, "\n".join(status), re.I)
+            ) or _LIVE_SPINNER.search("\n".join(block))
             state, reason = (
                 ("input_not_empty", "existing_input_must_not_be_overwritten")
                 if not empty

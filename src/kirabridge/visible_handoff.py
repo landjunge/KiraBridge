@@ -384,14 +384,10 @@ class VisibleHandoffs:
                 import json
 
                 current_evidence = json.loads(current["evidence"])
-                if (
-                    current["state"] == "confirmed"
-                    or "visible_paste_unconfirmed"
-                    in {
-                        current_evidence.get("reason"),
-                        current_evidence.get("previous_reason"),
-                    }
-                ):
+                if current["state"] == "confirmed" or "visible_paste_unconfirmed" in {
+                    current_evidence.get("reason"),
+                    current_evidence.get("previous_reason"),
+                }:
                     message_row = self.store.db.execute(
                         "SELECT acknowledged,conversation_id FROM messages WHERE id=?",
                         (status["message_id"],),

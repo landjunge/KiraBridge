@@ -149,9 +149,7 @@ def assess(target, raw, binding, protocol=None):
         # The final input row, not any previous user prompt in visible output.
         queue_composer = first.startswith("»")
         candidate = "›" + first[1:] if queue_composer else first
-        empty = bool(re.fullmatch(binding.ready_pattern, candidate)) or codex_placeholder(
-            candidate
-        )
+        empty = bool(re.fullmatch(binding.ready_pattern, candidate)) or codex_placeholder(candidate)
         base["input_empty"] = empty
         prelude = text[: text.rfind(view)].rstrip()
         current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""

@@ -119,3 +119,23 @@ def test_long_multiline_paste_shown_folded_is_confirmed_only_for_matching_lines(
     # Not empty before, or other text beside the marker: never evidence.
     assert run_echo(text, screen(["❯ draft"]), folded) is False
     assert run_echo(text, EMPTY, screen(["❯ x [Pasted text #1 +29 lines]"])) is False
+
+
+def test_spinner_with_todo_list_and_hints_before_the_input_is_still_working():
+    adapter = adapter_for("claude")
+    rows = [
+        "✻ Pondering… (34s · ↓ 1.2k tokens)",
+        "  ⎿ ☐ Erste Aufgabe",
+        "    ☐ Zweite Aufgabe",
+        "    ☒ Dritte Aufgabe",
+        "",
+        "❯ ",
+    ]
+    text = "\n".join(
+        ["⏺ Earlier answer", "", *rows[:-2], "", RULE + " Big Plan ─", rows[-1], RULE, "  ⏵⏵ auto"]
+    )
+    state = adapter.observe(text, BINDING)
+    assert state["state"] == "working" and not state["ready"]
+    # The same layout without a live spinner (finished todo list) is ready.
+    idle = text.replace("✻ Pondering… (34s · ↓ 1.2k tokens)", "  Klar")
+    assert adapter.observe(idle, BINDING)["ready"]
