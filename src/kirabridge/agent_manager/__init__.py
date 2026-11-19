@@ -643,12 +643,18 @@ class AgentManager:
         return await check_budget(self.tollgate_loader, agent)
 
     @staticmethod
-    def with_budget_note(result, note):
-        evidence = result.get("evidence") if isinstance(result, dict) else None
-        if note is not None and isinstance(evidence, dict):
-            evidence["tollgate"] = note
-            if note["decision"] == "unavailable":
-                evidence["tollgate_unavailable"] = True
+    def with_budget_note(result, note, *, create=False):
+        """Attach the note to an existing evidence dict; ``create`` adds one (native Codex)."""
+        if note is None or not isinstance(result, dict):
+            return result
+        evidence = result.get("evidence")
+        if not isinstance(evidence, dict):
+            if not create:
+                return result
+            evidence = result["evidence"] = {}
+        evidence["tollgate"] = note
+        if note["decision"] == "unavailable":
+            evidence["tollgate_unavailable"] = True
         return result
 
     async def execute(self, task, args, principal, running, progress, **options):

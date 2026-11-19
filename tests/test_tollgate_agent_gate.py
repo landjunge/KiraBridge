@@ -195,3 +195,42 @@ async def test_stale_exhausted_plan_is_not_noted(tmp_path):
     )
     result = await h.run()
     assert result["evidence"]["tollgate"]["plan_exhausted"] is False
+
+
+async def test_malformed_answers_fail_open(tmp_path):
+    for answer in (
+        {"decision": []},
+        {"decision": "allow", "day": 5},
+        "text",
+        None,
+        {"decision": "x"},
+    ):
+        h = Harness(tmp_path, answer)
+        result = await h.run()
+        assert h.runs == ["t1"], answer
+        assert result["evidence"]["tollgate_unavailable"] is True
+
+
+async def test_slow_loader_is_inside_the_timeout(tmp_path, monkeypatch):
+    import time
+
+    from kirabridge.agent_manager import tollgate_gate
+
+    monkeypatch.setattr(tollgate_gate, "GATE_TIMEOUT_SECONDS", 0.05)
+
+    def slow_loader():
+        time.sleep(0.3)
+        return lambda consumer: {"decision": "deny", "limit_source": "user_envelope"}
+
+    note = await tollgate_gate.check_budget(slow_loader, "codex")
+    assert note["decision"] == "unavailable"
+
+
+def test_native_codex_result_gets_an_evidence_dict():
+    from kirabridge.agent_manager import AgentManager
+
+    note = {"decision": "unavailable", "reason": "tollgate_unavailable"}
+    result = AgentManager.with_budget_note({"final_message": "x"}, note, create=True)
+    assert result["evidence"]["tollgate"] == note and result["evidence"]["tollgate_unavailable"]
+    plain = AgentManager.with_budget_note({"text": "x"}, note)
+    assert "evidence" not in plain

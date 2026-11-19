@@ -58,28 +58,41 @@ def _plan_exhausted(decision):
 
 
 async def check_budget(loader, consumer):
-    """Return the evidence note; raise BridgeError only for a user-set limit reached."""
+    """Return the evidence note; raise BridgeError only for a user-set limit reached.
+
+    Loading the pinned package and calling the gate both run in one worker thread under
+    one timeout, and every answer is validated inside the same protected section, so a
+    slow, broken or malformed TollGate can only fail open.
+    """
+
+    def call():
+        return loader()(consumer)
+
+    deny = None
     try:
-        gate = loader()
-        decision = await asyncio.wait_for(
-            asyncio.to_thread(gate, consumer), timeout=GATE_TIMEOUT_SECONDS
-        )
-        verdict = decision["decision"]
+        decision = await asyncio.wait_for(asyncio.to_thread(call), timeout=GATE_TIMEOUT_SECONDS)
+        if not isinstance(decision, dict):
+            raise TypeError("answer is not a mapping")
+        verdict = decision.get("decision")
+        if not isinstance(verdict, str) or verdict not in {"allow", "unknown", "deny"}:
+            raise ValueError("unknown decision")
+        day = decision.get("day")
+        if day is not None and not isinstance(day, dict):
+            raise TypeError("day is not a mapping")
+        day = day or {}
         note = {
             "decision": verdict,
             "reason": str(decision.get("reason", ""))[:300],
             "limit_source": decision.get("limit_source"),
             "plan_exhausted": _plan_exhausted(decision),
         }
-        day = decision.get("day") or {}
+        if verdict == "deny" and note["limit_source"] == "user_envelope":
+            deny = (
+                f"Daily budget for {consumer} reached: spent {day.get('spent_usd')} "
+                f"of {day.get('limit_usd')} USD (TollGate)"
+            )
     except Exception:  # noqa: BLE001 - nothing blocks without a user-set limit
         return _unavailable("tollgate_unavailable")
-    if verdict == "deny" and note["limit_source"] == "user_envelope":
-        raise BridgeError(
-            "tollgate_budget_reached",
-            f"Daily budget for {consumer} reached: spent {day.get('spent_usd')} "
-            f"of {day.get('limit_usd')} USD (TollGate)",
-        )
-    if verdict not in {"allow", "unknown", "deny"}:
-        return _unavailable("tollgate_unavailable")
+    if deny is not None:
+        raise BridgeError("tollgate_budget_reached", deny)
     return note

@@ -949,7 +949,7 @@ class Bridge:
                     min(args.timeout, worker.timeout),
                     progress,
                 )
-                return self.agents.with_budget_note(result, note)
+                return self.agents.with_budget_note(result, note, create=True)
             return await self.agents.execute(
                 task, args, policy, running, progress, separate_managed=managed
             )
