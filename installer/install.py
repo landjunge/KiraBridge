@@ -1361,7 +1361,9 @@ def sync_aux_services(args, release, backup, *, restart_tunnel=True):
             records.append({"plist": str(path), "backup": name, "installed_sha256": sha(path)})
         except Exception as error:
             problems.append((label, f"nicht angepasst: {error}"))
-    if restart_tunnel and _aux_loaded_from(TUNNEL_LABEL) is not None:
+    tunnel = agents / f"{TUNNEL_LABEL}.plist"
+    # Only the tunnel defined next to this bridge plist, loaded from that file.
+    if restart_tunnel and tunnel.exists() and _aux_loaded_from(TUNNEL_LABEL) == tunnel:
         done = _launchctl("kickstart", "-k", f"gui/{os.getuid()}/{TUNNEL_LABEL}")
         if done.returncode:
             problems.append((TUNNEL_LABEL, "Neustart fehlgeschlagen"))
