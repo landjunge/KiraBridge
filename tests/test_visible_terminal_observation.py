@@ -401,3 +401,124 @@ async def test_a_vanishing_candidate_does_not_stop_the_choice_of_another(command
         task = await bridge.tasks.wait("local", value.task_id, 5)
     assert task["state"] == "completed", task
     assert posts == ["terminal:15:ttys005"]
+
+
+def test_old_command_folders_are_pruned_and_nothing_else(tmp_path):
+    import os
+    import time
+
+    from kirabridge.visible_terminal import prune_command_folders
+
+    old, fresh = "a" * 32, "b" * 32
+    for name in (old, fresh, "not-a-token", "c" * 31):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "command.zsh").write_text("x")
+    age = time.time() - 5 * 86400
+    for name in (old, "not-a-token", "c" * 31):
+        os.utime(tmp_path / name, (age, age))
+    assert prune_command_folders(tmp_path) == 1
+    assert not (tmp_path / old).exists()
+    assert (tmp_path / fresh).exists()
+    assert (tmp_path / "not-a-token").exists() and (tmp_path / ("c" * 31)).exists()
+
+
+async def test_the_command_folder_is_removed_once_the_receipt_is_read(command):
+    bridge, state, args = command
+    value = request("terminal.visible", args, task_id="folder-cleanup")
+    async with bridge:
+        bridge.prepare("local", value)
+        task = await bridge.tasks.wait("local", value.task_id, 5)
+    assert task["state"] == "completed", task
+    root = bridge.config.state_path / "visible-commands"
+    assert not [child for child in root.iterdir() if child.is_dir()]
+
+
+def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_after=None):
+    """Run the generated script with the real /bin/zsh on a pseudo-terminal."""
+    import os
+    import pty
+    import signal
+    import subprocess
+    import time
+
+    from kirabridge.visible_terminal import build_command_script
+
+    master, slave = pty.openpty()
+    tty = os.ttyname(slave)
+    folder = tmp_path / "run"
+    folder.mkdir()
+    result = folder / "result.json"
+    script = build_command_script(
+        tty_override or tty,
+        cwd or str(tmp_path),
+        argv or ["/usr/bin/true"],
+        "n0nce",
+        folder,
+        result,
+    )
+    path = folder / "command.zsh"
+    path.write_text(script)
+    process = subprocess.Popen(
+        ["/bin/zsh", "-f", str(path)],
+        stdin=slave,
+        stdout=slave,
+        stderr=slave,
+        start_new_session=True,
+    )
+    if interrupt_after is not None:
+        time.sleep(interrupt_after)
+        # A terminal signals the whole foreground group (Ctrl-C, window closed).
+        os.killpg(process.pid, signal.SIGTERM)
+    process.wait(timeout=20)
+    os.close(master)
+    os.close(slave)
+    return process.returncode, (json.loads(result.read_text()) if result.exists() else None)
+
+
+def test_script_receipts_the_exit_code_atomically(tmp_path):
+    code, receipt = _run_script(tmp_path, argv=["/bin/sh", "-c", "exit 3"])
+    assert receipt == {"nonce": "n0nce", "exit_code": 3} and code == 0
+    assert not list((tmp_path / "run").glob("result.tmp"))
+
+
+def test_script_receipts_a_wrong_terminal_immediately(tmp_path):
+    code, receipt = _run_script(tmp_path, tty_override="/dev/ttys999")
+    assert code == 125
+    assert receipt == {"nonce": "n0nce", "exit_code": 125, "phase": "setup"}
+
+
+def test_script_receipts_an_unusable_directory_immediately(tmp_path):
+    code, receipt = _run_script(tmp_path, cwd=str(tmp_path / "missing"))
+    assert code == 125 and receipt["phase"] == "setup"
+
+
+def test_script_receipts_an_interrupt(tmp_path):
+    code, receipt = _run_script(tmp_path, argv=["/bin/sleep", "30"], interrupt_after=1.0)
+    assert code == 130
+    assert receipt == {"nonce": "n0nce", "exit_code": 130, "phase": "interrupted"}
+
+
+@pytest.mark.parametrize(
+    ("phase", "code"),
+    [("setup", "visible_target_changed"), ("interrupted", "visible_command_interrupted")],
+)
+async def test_setup_and_interrupt_receipts_fail_at_once(command, monkeypatch, phase, code):
+    bridge, state, args = command
+    transport = bridge.sessions.terminal_app
+
+    async def send(selected, text, observed_identity):
+        script = Path(shlex.split(text)[-1])
+        nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
+        receipt = {"nonce": nonce, "exit_code": 125 if phase == "setup" else 130, "phase": phase}
+        write_private(script.parent / "result.json", json.dumps(receipt))
+
+    monkeypatch.setattr(transport, "send_confirmed", send)
+    started = __import__("time").monotonic()
+    with pytest.raises(BridgeError) as failure:
+        await bridge.visible_terminal.execute(
+            {"id": f"receipt-{phase}", "principal": "local"},
+            VisibleTerminalInput.model_validate({**args, "timeout": 30}),
+            AsyncMock(),
+        )
+    assert failure.value.code == code
+    assert __import__("time").monotonic() - started < 5  # no waiting for the timeout

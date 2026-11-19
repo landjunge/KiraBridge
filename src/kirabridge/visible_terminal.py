@@ -6,6 +6,7 @@ import asyncio
 import json
 import secrets
 import shlex
+import shutil
 import time
 from pathlib import Path
 
@@ -62,6 +63,76 @@ def _unsuitable_code(row):
     if row.get("busy", True):
         return "session_busy", "Selected window is busy"
     return "session_busy", "Selected window is not a confirmed empty shell"
+
+
+def build_command_script(tty, cwd, argv, nonce, folder, result_path):
+    """The one-shot zsh script typed into the visible window (never run by KiraBridge itself)."""
+    ok = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
+    setup_failed = json.dumps({"nonce": nonce, "exit_code": 125, "phase": "setup"})
+    interrupted = json.dumps({"nonce": nonce, "exit_code": 130, "phase": "interrupted"})
+    tmp_path = shlex.quote(str(folder / "result.tmp"))
+    final = shlex.quote(str(result_path))
+    # Every way out writes a receipt atomically (temp file, then rename): a failed
+    # window/cwd check or an interrupt is reported at once instead of after the timeout.
+    script = (
+        "#!/bin/zsh -f\numask 077\n"
+        + "kb_done() { printf "
+        + shlex.quote("%s\n")
+        + ' "$1" > '
+        + tmp_path
+        + " && /bin/mv -f "
+        + tmp_path
+        + " "
+        + final
+        + "; }\n"
+        + "kb_int() { kb_done "
+        + shlex.quote(interrupted)
+        + "; exit 130; }\n"
+        + "trap kb_int INT TERM HUP\n"
+        + '[[ "$(/usr/bin/tty)" == '
+        + shlex.quote(tty)
+        + " ]] || { kb_done "
+        + shlex.quote(setup_failed)
+        + "; exit 125; }\n"
+        + "cd -- "
+        + shlex.quote(cwd)
+        + " || { kb_done "
+        + shlex.quote(setup_failed)
+        + "; exit 125; }\n"
+        + shlex.join(argv)
+        + "\nkb_status=$?\n"
+        + 'kb_done "$(printf '
+        + shlex.quote(ok)
+        + ' "$kb_status")"\n'
+    )
+    return script
+
+
+COMMAND_FOLDER_MAX_AGE = 3 * 86400
+
+
+def prune_command_folders(root, *, now=None, max_age=COMMAND_FOLDER_MAX_AGE):
+    """Remove one-shot command folders (script with argv, receipt) older than ``max_age``.
+
+    Only direct children named like a 32-character hex token are touched, so nothing else in
+    the state directory is ever removed. Recent folders stay for late-receipt reconciliation.
+    """
+    removed, now = 0, time.time() if now is None else now
+    try:
+        children = list(Path(root).iterdir())
+    except OSError:
+        return removed
+    for child in children:
+        name = child.name
+        if len(name) != 32 or any(c not in "0123456789abcdef" for c in name):
+            continue
+        try:
+            if child.is_dir() and not child.is_symlink() and now - child.stat().st_mtime > max_age:
+                shutil.rmtree(child, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 class VisibleTerminal:
@@ -259,6 +330,7 @@ class VisibleTerminal:
         from kirabridge.bridge_core.config import private_directory
 
         private_directory(root)
+        prune_command_folders(root)
         folder = root / secrets.token_hex(16)
         folder.mkdir(mode=0o700)
         result_path, script_path = folder / "result.json", folder / "command.zsh"
@@ -269,23 +341,7 @@ class VisibleTerminal:
         # same final revalidation, adding a native roundtrip without authority.
         # A one-shot script in this window inherits its real TTY. No subprocess
         # daemon, tmux pane, detached session or provider adapter executes the command.
-        result = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
-        script = (
-            "#!/bin/zsh -f\numask 077\n"
-            + '[[ "$(/usr/bin/tty)" == '
-            + shlex.quote(row["tty"])
-            + " ]] || exit 125\n"
-            + "cd -- "
-            + shlex.quote(cwd)
-            + " || exit 125\n"
-            + shlex.join(argv)
-            + "\nkb_status=$?\n"
-            + "printf "
-            + shlex.quote(result + "\n")
-            + ' "$kb_status" > '
-            + shlex.quote(str(result_path))
-            + "\n"
-        )
+        script = build_command_script(row["tty"], cwd, argv, nonce, folder, result_path)
         write_private(script_path, script)
         async with bridge.sessions.lock:
             current = await bridge.sessions.selected(
@@ -312,12 +368,26 @@ class VisibleTerminal:
                     raise UncertainExecution(
                         "visible_result_unknown", "Unexpected visible command receipt"
                     )
+                if result.get("phase") == "setup":
+                    # The script refused to run: wrong terminal or unusable cwd. Nothing ran.
+                    shutil.rmtree(folder, ignore_errors=True)
+                    raise BridgeError(
+                        "visible_target_changed",
+                        "The window or directory changed before the command ran; nothing ran",
+                    )
+                if result.get("phase") == "interrupted":
+                    shutil.rmtree(folder, ignore_errors=True)
+                    raise BridgeError(
+                        "visible_command_interrupted", "The command was interrupted in the window"
+                    )
                 # Output is informational: reuse the row observed at dispatch instead of
                 # another full window catalogue just to return the screen.
                 with bridge.sessions.observation_scope(principal, current):
                     output = await bridge.sessions.read(
                         principal, reference.pane_id, reference.expected_pid
                     )
+                # The receipt is read: the script (it holds the argv) is no longer needed.
+                shutil.rmtree(folder, ignore_errors=True)
                 return {
                     **reference.model_dump(),
                     "tty": row["tty"],
