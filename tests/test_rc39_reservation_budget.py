@@ -9,9 +9,8 @@ from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.diagnostics import AuditObserver, export_audit
 
 
-async def test_empty_grok_cannot_release_unconfirmed_paste(visible):  # noqa: F811
-    bridge, transport = visible
-    old = enqueue(bridge, sender="codex", key="rc39-old-paste")
+def unconfirmed_paste(bridge, key="rc39-old-paste"):
+    old = enqueue(bridge, sender="codex", key=key)
     binding = bridge.config.visible_handoffs.bindings["grok"]
     bridge.store.db.execute(
         "INSERT INTO visible_handoffs VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -36,12 +35,43 @@ async def test_empty_grok_cannot_release_unconfirmed_paste(visible):  # noqa: F8
             "automatic_retry": False,
         },
     )
+    return old
+
+
+async def test_text_in_the_input_keeps_unconfirmed_paste_locked(visible):  # noqa: F811
+    bridge, transport = visible
+    old = unconfirmed_paste(bridge)
+    transport["text"] = "╭\n│ ❯ half typed\n╰"
     before = bridge.visible_handoffs.status("codex", "rc39-unknown")
     with pytest.raises(BridgeError) as error:
         await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
-    assert error.value.code == "visible_target_busy"
-    assert error.value.observation["handoff_id"] == "rc39-unknown"
+    # A filled field is not a positive ready observation, so the lock stays.
+    assert error.value.code == "visible_target_unknown"
     assert bridge.visible_handoffs.status("codex", "rc39-unknown") == before
+    assert transport["calls"] == []
+    assert bridge.messages.get("codex", old["id"])["acknowledged"] is None
+
+
+async def test_fresh_empty_input_releases_the_lock_and_never_replays(visible):  # noqa: F811
+    bridge, transport = visible
+    old = unconfirmed_paste(bridge)
+    await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+    status = bridge.visible_handoffs.status("codex", "rc39-unknown")
+    assert status["state"] == "unknown"
+    assert status["evidence"]["reason"] == "unconfirmed_input_lock_released"
+    assert status["evidence"]["previous_reason"] == "visible_paste_unconfirmed"
+    assert status["evidence"]["input_reservation_released"] is True
+    assert status["evidence"]["automatic_retry"] is False
+    # The old message stays unacknowledged, was never typed and is not sent again.
+    assert transport["calls"] == []
+    assert bridge.messages.get("codex", old["id"])["acknowledged"] is None
+    rows = bridge.store.db.execute(
+        "SELECT count(*) FROM visible_handoffs WHERE message_id=?", (old["id"],)
+    ).fetchone()[0]
+    assert rows == 1
+    # A second observation is idempotent: no further transition, still no input.
+    await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+    assert bridge.visible_handoffs.status("codex", "rc39-unknown") == status
     assert transport["calls"] == []
 
 

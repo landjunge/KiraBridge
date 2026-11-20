@@ -2,7 +2,7 @@
 
 import json
 
-from .rendering import codex_payload_forms, codex_wrap_words
+from .rendering import MAX_FULL, codex_payload_forms, codex_wrap_words
 
 
 def paste_source(text):
@@ -21,13 +21,25 @@ def paste_source(text):
         "if(lines && Number.isInteger(columns) && columns>=20 && columns<=4096) {"
         "for(const width of [columns-3,columns-4]) {"
         "if(lines.some(words=>words.some(word=>word.length>=width))) continue;"
-        "let rows=[], wrapped=false;"
+        "let parts=[], wrapped=false;"
         "for(const words of lines) { let logical=words.length?[words[0]]:[''];"
         "for(const word of words.slice(1)) {"
         "if(logical[logical.length-1].length+1+word.length<=width)"
         "logical[logical.length-1]+=' '+word;"
-        "else {logical.push(word); wrapped=true;} } rows=rows.concat(logical); }"
-        "if(wrapped) { forms.push(rows.join('\\n  '));"
+        "else {logical.push(word); wrapped=true;} } parts.push(logical); }"
+        # A full logical-line end shows an extra blank row or one extra ASCII space:
+        # accept every combination (same enumeration as codex_wrapped_renderings).
+        "const full=[]; parts.forEach((l,i)=>{if(l[l.length-1].length===width) full.push(i);});"
+        "const few=full.length<=" + str(MAX_FULL) + ";"
+        "const combos=few?Math.pow(3,full.length):1;"
+        "for(let n=0;n<combos;n++) {"
+        "const codes=full.map((_,k)=>few?Math.floor(n/Math.pow(3,full.length-1-k))%3:0);"
+        "let rows=[];"
+        "parts.forEach((l,i)=>{l=l.slice(); const k=full.indexOf(i);"
+        "const code=k>=0?codes[k]:0; if(code===2) l[l.length-1]+=' ';"
+        "rows=rows.concat(l); if(code===1) rows.push('');});"
+        "if(!wrapped && !codes.some(c=>c)) continue;"
+        "forms.push(rows.join('\\n  '));"
         "if(rows.slice(1).includes('')) forms.push(rows[0]+rows.slice(1)"
         ".map(row=>row?'\\n  '+row:'\\n ').join('')); } } }"
         "return forms.some(form=>current.startsWith(form) && "

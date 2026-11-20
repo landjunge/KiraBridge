@@ -145,7 +145,8 @@ async def test_real_direct_geometry_refusal_is_failed_before_any_paste(delivery,
                 idempotency_key="geometry",
                 kind="work",
                 dispatch=True,
-                body="Reply with MARKER.\n" + "abc " * 95 + "abcd",
+                # Four full-width logical lines: too many renderings to enumerate.
+                body="\n".join(["abc " * 31 + "abcd"] * 4),
             ),
         )
         await settled(direct)

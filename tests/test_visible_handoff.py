@@ -1393,3 +1393,45 @@ async def test_wait_for_reply_handoff_catalog_call_count(bridge, config, monkeyp
     # reuses that insert's row and must not add an eleventh catalogue.
     assert len(catalog_sites) == 10, f"{len(catalog_sites)} catalogs\n{rendered}"
     assert all("observe_readiness" not in " ".join(frames) for frames in catalog_sites)
+
+
+@pytest.mark.parametrize("code", ["visible_paste_unconfirmed", "visible_insert_unknown"])
+async def test_unconfirmed_paste_lock_releases_on_fresh_empty_ready_input(
+    visible, monkeypatch, code
+):
+    """An unknown paste keeps its lock only while text may still sit in the input."""
+    bridge, transport = visible
+    real_insert = bridge.sessions.insert
+
+    async def unconfirmed(principal, args, *, before_transport=None):
+        await before_transport()
+        transport["calls"].append("native_attempt")
+        raise UncertainExecution(code, "Paste not confirmed")
+
+    monkeypatch.setattr(bridge.sessions, "insert", unconfirmed)
+    args = AgentInput(agent="grok", prompt="First work", cwd="/tmp", wait_for_reply=False)
+    task = {"id": "unconfirmed-first", "principal": "chatgpt"}
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert bridge.visible_handoffs.status("chatgpt", task["id"])["state"] == "unknown"
+    # Text is still in the field: the lock stays.
+    transport["text"] = "╭\n│ ❯ First work\n╰"
+    with pytest.raises(BridgeError):
+        await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+    # Fresh observation: empty ready input. The old message stays unknown, never re-sent.
+    transport["text"] = "╭\n│ ❯ │\n╰"
+    monkeypatch.setattr(bridge.sessions, "insert", real_insert)
+    transport["calls"].clear()
+    result = await bridge.visible_handoffs.execute(
+        {"id": "unconfirmed-second", "principal": "chatgpt"},
+        args.model_copy(update={"prompt": "Second work"}),
+        callback,
+        callback,
+    )
+    assert result
+    assert transport["inserted_body"] == "Second work"
+    old = bridge.visible_handoffs.status("chatgpt", task["id"])
+    assert old["state"] == "unknown"
+    assert old["evidence"]["reason"] == "unconfirmed_input_lock_released"
+    assert old["evidence"]["automatic_retry"] is False
+    assert transport["calls"].count("insert") == 1

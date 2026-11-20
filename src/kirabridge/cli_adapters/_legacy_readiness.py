@@ -53,6 +53,22 @@ def codex_input_footer_group(lines):
 
 GROK_PLACEHOLDERS = ("Build anything",)
 
+# Rotating hint texts Codex shows in an EMPTY input. Only these exact, known strings count
+# as empty; an unknown text is treated as typed input.
+CODEX_PLACEHOLDERS = (
+    "Explain this codebase",
+    "Find and fix a bug in @filename",
+    "Write tests for @filename",
+    "Summarize recent commits",
+    "Implement {feature}",
+)
+
+
+def codex_placeholder(row):
+    """Whether this composer row is the prompt marker plus exactly one known placeholder."""
+    match = re.fullmatch(r"\s*›[ \u00a0]+(.*?)\s*", row)
+    return bool(match) and match.group(1) in CODEX_PLACEHOLDERS
+
 
 def grok_input_state(view):
     """Whether the last complete Grok box holds an empty composer.
@@ -133,7 +149,7 @@ def assess(target, raw, binding, protocol=None):
         # The final input row, not any previous user prompt in visible output.
         queue_composer = first.startswith("»")
         candidate = "›" + first[1:] if queue_composer else first
-        empty = bool(re.fullmatch(binding.ready_pattern, candidate))
+        empty = bool(re.fullmatch(binding.ready_pattern, candidate)) or codex_placeholder(candidate)
         base["input_empty"] = empty
         prelude = text[: text.rfind(view)].rstrip()
         current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
@@ -185,9 +201,11 @@ def assess(target, raw, binding, protocol=None):
                 if protocol.get("state") == "idle"
                 else "bound_codex_state_unavailable",
             )
-        # Without a bound protocol, ambiguous work words are not an idle proof.
+        # Without a bound protocol, ambiguous work words directly above the input are
+        # not an idle proof. Older output further up (quotes, a past "esc to interrupt")
+        # is history, not current activity.
         activity_text = "\n".join(
-            line for line in text.splitlines() if not _codex_transcript_navigation(line)
+            line for line in current.splitlines() if not _codex_transcript_navigation(line)
         )
         if binding.busy_pattern and re.search(binding.busy_pattern, activity_text, re.I):
             return result("unknown", "unbound_ambiguous_activity_text")
