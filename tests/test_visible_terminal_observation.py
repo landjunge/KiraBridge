@@ -4,6 +4,7 @@ import copy
 import json
 import re
 import shlex
+import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,6 +16,10 @@ from conftest import request
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.private_files import write_private
 from kirabridge.visible_terminal import VisibleTerminalInput
+
+# The generated command script is a zsh script; without zsh the receipt tests
+# cannot run (Ubuntu CI images ship no zsh).
+ZSH = shutil.which("zsh")
 
 
 @pytest.fixture
@@ -459,7 +464,7 @@ def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_a
     path = folder / "command.zsh"
     path.write_text(script)
     process = subprocess.Popen(
-        ["/bin/zsh", "-f", str(path)],
+        [ZSH, "-f", str(path)],
         stdin=slave,
         stdout=slave,
         stderr=slave,
@@ -475,23 +480,30 @@ def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_a
     return process.returncode, (json.loads(result.read_text()) if result.exists() else None)
 
 
+needs_zsh = pytest.mark.skipif(ZSH is None, reason="the generated command script requires zsh")
+
+
+@needs_zsh
 def test_script_receipts_the_exit_code_atomically(tmp_path):
     code, receipt = _run_script(tmp_path, argv=["/bin/sh", "-c", "exit 3"])
     assert receipt == {"nonce": "n0nce", "exit_code": 3} and code == 0
     assert not list((tmp_path / "run").glob("result.tmp"))
 
 
+@needs_zsh
 def test_script_receipts_a_wrong_terminal_immediately(tmp_path):
     code, receipt = _run_script(tmp_path, tty_override="/dev/ttys999")
     assert code == 125
     assert receipt == {"nonce": "n0nce", "exit_code": 125, "phase": "setup"}
 
 
+@needs_zsh
 def test_script_receipts_an_unusable_directory_immediately(tmp_path):
     code, receipt = _run_script(tmp_path, cwd=str(tmp_path / "missing"))
     assert code == 125 and receipt["phase"] == "setup"
 
 
+@needs_zsh
 def test_script_receipts_an_interrupt(tmp_path):
     code, receipt = _run_script(tmp_path, argv=["/bin/sleep", "30"], interrupt_after=1.0)
     assert code == 130

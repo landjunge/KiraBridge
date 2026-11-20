@@ -354,6 +354,9 @@ class TerminalAppTransport:
                 # No user process on this tty: the shell ended (Terminal.app keeps the window
                 # open) or the login is still starting. Nothing can be typed into it yet, and
                 # it is not ambiguous, so it must not mark the whole catalog incomplete.
+                # Foreign processes on the same tty are different: the window exists but
+                # cannot be represented as one of ours, so the catalog stays incomplete.
+                omitted = omitted or bool(all_members)
                 continue
             if len(roots) > 1:
                 # A background job handed over to launchd (ppid 1: nohup, ssh -f, (cmd &)) is
