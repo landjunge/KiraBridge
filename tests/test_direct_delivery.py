@@ -13,6 +13,7 @@ from test_visible_handoff import visible  # noqa: F401
 from kirabridge.bridge_core.config import ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.message_manager import MessageSend
+from kirabridge.message_manager.receiver import MessageReceiver
 
 
 @pytest.fixture
@@ -172,6 +173,32 @@ async def test_blocked_target_fails_once_without_claim_or_private_error_text(
     assert "PRIVATE" not in json.dumps(current)
     assert not transport["calls"] and not connected
     assert not direct.submit("chatgpt", sent["id"])
+
+
+@pytest.mark.parametrize("code", sorted(MessageReceiver.WAIT_REASONS))
+async def test_visible_wait_reason_is_reported_without_receiver_backoff(
+    delivery, monkeypatch, code
+):
+    bridge, transport, direct, connected, _ = delivery
+
+    async def not_ready(*args):
+        raise BridgeError(code, "Visible target not ready")
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", not_ready)
+    sent = new_message(bridge, "wait-" + code)
+    direct.submit("chatgpt", sent["id"])
+    async with asyncio.timeout(1):
+        await direct.wait_delivery(sent["id"])
+    current = job(bridge, sent)
+    assert current["state"] == "failed" and current["error"] == code
+    assert current["claimed"] is None and current["started"] is None
+    assert current["evidence"]["phase"] == "direct_admission"
+    assert current["evidence"]["terminal_input_attempted"] is False
+    assert current["evidence"]["automatic_retry"] is False
+    assert "receiver_retry" not in current["evidence"]
+    assert "waiting_for_visible_target" not in current["evidence"]
+    assert "next_attempt_at" not in json.dumps(current)
+    assert not transport["calls"] and not connected
 
 
 async def test_selection_race_after_internal_receipt_is_failed_without_requeue(
