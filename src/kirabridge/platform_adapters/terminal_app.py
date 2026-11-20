@@ -87,7 +87,13 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
     groups: dict[tuple, list[dict]] = {}
     for row in rows:
         bounds = row.get("bounds") or {}
-        if row.get("script_tab_count", 1) > 1:
+        if row.get("ended") is True:
+            key = ("minimized", row.get("window_id"))  # kept apart, never counted or merged
+        elif row.get("miniaturized") is True:
+            # A window minimized to the Dock is not on screen: it must neither count as an
+            # open window nor be merged with another window that has the same size.
+            key = ("minimized", row.get("window_id"))
+        elif row.get("script_tab_count", 1) > 1:
             key = ("script", row.get("window_id"))
         else:
             key = (
@@ -100,7 +106,7 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
             if None in key:
                 key = ("script", row.get("window_id"))
         groups.setdefault(key, []).append(row)
-    ui_count = len(groups)
+    ui_count = len([key for key in groups if key[0] != "minimized"])
     tty_count: dict[str, int] = {}
     for row in rows:
         if row.get("ended"):
@@ -298,6 +304,7 @@ class TerminalAppTransport:
      const b = w.bounds();
      return w.tabs().map((t, i) => ({
       window_id:w.id(), index:w.index(), frontmost:w.frontmost(),
+      miniaturized:w.miniaturized(),
       bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
       script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
       tty:t.tty(), busy:t.busy(), selected:t.selected()
@@ -343,6 +350,25 @@ class TerminalAppTransport:
             ]
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
+            if not members:
+                # No user process on this tty: the shell ended (Terminal.app keeps the window
+                # open) or the login is still starting. Nothing can be typed into it yet, and
+                # it is not ambiguous, so it must not mark the whole catalog incomplete.
+                # Foreign processes on the same tty are different: the window exists but
+                # cannot be represented as one of ours, so the catalog stays incomplete.
+                omitted = omitted or bool(all_members)
+                continue
+            if len(roots) > 1:
+                # A background job handed over to launchd (ppid 1: nohup, ssh -f, (cmd &)) is
+                # not a second shell. The shell root is the login process Terminal.app started,
+                # or else the one root whose parent is another process on this tty.
+                names = {p: Path(comm).name.lstrip("-") for _, p, _, comm in all_members}
+                logins = [p for p in roots if names.get(p) == "login"]
+                attached = [p for p, parent in members if p in roots and parent in all_pids]
+                for chosen in (logins, attached):
+                    if len(chosen) == 1:
+                        roots = chosen
+                        break
             if len(roots) != 1:
                 omitted = True
                 continue
@@ -362,6 +388,7 @@ class TerminalAppTransport:
                     "tab_index": row.get("tab_index"),
                     "tab_count": row.get("tab_count"),
                     "tab_selected": row.get("tab_selected"),
+                    "miniaturized": bool(row.get("miniaturized")),
                     "ui_window_count": row.get("ui_window_count"),
                     "identity_ambiguous": bool(row.get("identity_ambiguous")),
                     "selection_ambiguous": bool(row.get("selection_ambiguous")),
