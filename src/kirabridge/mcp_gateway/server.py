@@ -21,6 +21,7 @@ from kirabridge.readiness import ReadinessInput, readiness
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
+    TeamOnboardRegister,
     TeamRoleSet,
     TeamSessionClear,
     TeamSessionGet,
@@ -1619,6 +1620,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def team_set_role(request: TeamRoleSet, ctx: Context) -> dict[str, Any]:
         """Owner/coordinator changes a role with revision CAS; coordinator switch is atomic."""
         return safe(lambda: bridge.teams.set_role(identity(ctx), request))
+
+    @server.tool(annotations=write)
+    def team_onboard_register(request: TeamOnboardRegister, ctx: Context) -> dict[str, Any]:
+        """Owner-only identity registration; candidate validated, backups kept, tokens hidden."""
+        return safe(lambda: bridge.teams.onboard_register(identity(ctx), request))
 
     @server.tool(annotations=write)
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
