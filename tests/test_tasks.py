@@ -205,3 +205,44 @@ async def test_heartbeat_survives_a_failed_lease_renewal():
     assert not beat.done()
     assert len(calls) >= 2
     beat.cancel()
+
+
+async def test_worker_lane_recovers_from_transient_maintenance_failure(bridge, monkeypatch):
+    manager = bridge.tasks
+    maintenance_calls, claimed, executed = 0, [], asyncio.Event()
+
+    def maintenance():
+        nonlocal maintenance_calls
+        maintenance_calls += 1
+        if maintenance_calls == 1:
+            raise OSError("sensitive storage detail")
+
+    def claim(*args, **kwargs):
+        if not claimed:
+            claimed.append({"id": "later-task"})
+            return claimed[0]
+        return None
+
+    async def execute(task):
+        assert task["id"] == "later-task"
+        executed.set()
+
+    manager.maintenance = maintenance
+    monkeypatch.setattr(manager.store, "claim", claim)
+    monkeypatch.setattr(manager, "_execute", execute)
+    worker = asyncio.create_task(manager._worker("normal"))
+    try:
+        await asyncio.wait_for(executed.wait(), 2)
+        assert maintenance_calls >= 2
+        assert not worker.done()
+        records = bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='task.worker_loop_failed'"
+        ).fetchall()
+        assert records and all(
+            json.loads(row[0]) == {"reason": "worker_loop_failed", "lane": "normal"}
+            for row in records
+        )
+        assert "sensitive" not in str([row[0] for row in records])
+    finally:
+        worker.cancel()
+        await asyncio.gather(worker, return_exceptions=True)
