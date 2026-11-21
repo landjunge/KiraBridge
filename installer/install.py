@@ -1296,7 +1296,53 @@ def release_source(release):
     }
 
 
-def wait_health(args, release, version, *, expected_source=None):
+READINESS_SECONDS = 60
+LOG_TAIL_LINES = 12
+LOG_TAIL_CHARS = 1200
+
+
+def service_log_tail(args):
+    """Last service log lines, so a failed readiness check names its cause."""
+    paths = []
+    plist = getattr(args, "plist", None)
+    if plist is not None and Path(plist).is_file():
+        try:
+            settings = plistlib.loads(Path(plist).read_bytes())
+        except Exception:  # noqa: BLE001 - unreadable plist is not a readiness cause
+            settings = {}
+        for key in ("StandardErrorPath", "StandardOutPath"):
+            if isinstance(settings.get(key), str):
+                paths.append(Path(settings[key]))
+    prefix = getattr(args, "prefix", None)
+    if prefix is not None:
+        paths.extend(
+            [
+                Path(prefix) / "logs/service.stderr.log",
+                Path(prefix) / "logs/service.stdout.log",
+            ]
+        )
+    seen = set()
+    parts = []
+    for path in paths:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved in seen or not resolved.is_file():
+            continue
+        seen.add(resolved)
+        try:
+            lines = resolved.read_text(errors="replace").splitlines()[-LOG_TAIL_LINES:]
+        except OSError:
+            continue
+        text = "\n".join(line.strip() for line in lines if line.strip())
+        if text:
+            parts.append(f"{resolved.name}: {text}")
+    detail = "\n".join(parts)
+    return detail[-LOG_TAIL_CHARS:] if detail else ""
+
+
+def wait_health(args, release, version, *, expected_source=None, seconds=None):
     expected = release_source(release) if expected_source is None else expected_source
     if (
         not isinstance(expected.get("source_package_path"), str)
@@ -1307,7 +1353,9 @@ def wait_health(args, release, version, *, expected_source=None):
         or expected["source_file_count"] <= 0
     ):
         raise RuntimeError("Expected daemon source identity is unavailable")
-    deadline = time.monotonic() + 30
+    window = READINESS_SECONDS if seconds is None else seconds
+    deadline = time.monotonic() + window
+    last = "no status response observed"
     while time.monotonic() < deadline:
         try:
             health = cli(release, args.config, "status", timeout=8)
@@ -1320,10 +1368,16 @@ def wait_health(args, release, version, *, expected_source=None):
                 )
             ):
                 return health
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
-            pass
+            last = (
+                f"status reported version={health.get('version')!r} "
+                f"dispatcher_active={health.get('dispatcher_active')!r}"
+            )
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
+            last = f"{type(exc).__name__}: {exc}"[:300]
         time.sleep(0.5)
-    raise RuntimeError("New daemon readiness not proven within 30 seconds")
+    logs = service_log_tail(args)
+    message = f"New daemon readiness not proven within {window:g} seconds ({last})"
+    raise RuntimeError(message + (f"\nService log:\n{logs}" if logs else ""))
 
 
 def validate_service_owner(args):
