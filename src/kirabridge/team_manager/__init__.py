@@ -1406,8 +1406,8 @@ class TeamManager:
             generation = self._generation(work["team_id"], work["assignee"])
             self.store.db.execute(
                 "UPDATE team_work SET state='dispatching',core_task_id=?,claimed=?,"
-                "resume_session=?,session_generation=? WHERE id=?",
-                (core_id, time.time(), resume_session, generation, work_id),
+                "started=COALESCE(started,?),resume_session=?,session_generation=? WHERE id=?",
+                (core_id, time.time(), time.time(), resume_session, generation, work_id),
             )
             self._event(
                 work["team_id"],
@@ -1679,9 +1679,9 @@ class TeamManager:
             )
             if values != previous:
                 self.store.db.execute(
-                    "UPDATE team_work SET state=?,result=?,evidence=?,error=?,started=?,finished=? "
-                    "WHERE id=?",
-                    (*values, work_id),
+                    "UPDATE team_work SET state=?,result=?,evidence=?,error=?,"
+                    "started=COALESCE(?,started),finished=? WHERE id=?",
+                    (*values[:4], values[4], values[5], work_id),
                 )
                 self._event(
                     work["team_id"],
