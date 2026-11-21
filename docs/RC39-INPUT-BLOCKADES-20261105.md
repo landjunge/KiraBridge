@@ -3,6 +3,12 @@
 Auftrag: Diagnose und minimale Reparatur, keine Installation, kein Big Plan,
 keine Auditlöschung. Native Terminals und alte UNKNOWN-Aufträge wurden nicht bedient.
 
+**Hinweis 20.11.2026:** Der hier beschriebene UNKNOWN-Paste-Lock wird seit
+`db2f7c5` (PR #239, `c3b3980`) durch eine frische, positive Ready-Beobachtung
+desselben Fensters (leeres, idle Eingabefeld) freigegeben. Der alte Auftrag
+bleibt `unknown` und wird nie erneut gesendet; Text im Feld hält den Lock
+weiter. Der übrige Bericht beschreibt unverändert den Stand vom 05.11.2026.
+
 ## Gesicherter Ausgangsstand
 
 Ausgangsworktree `/Users/landjunge/KiraBridge`, Branch

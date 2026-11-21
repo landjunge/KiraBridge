@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 import re
 import time
 import uuid
@@ -16,6 +17,7 @@ from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
+    TeamOnboardRegister,
     TeamRoleSet,
     TeamSessionClear,
     TeamSessionGet,
@@ -741,6 +743,131 @@ class TeamManager:
         self._team(principal, team_id)
         return self._view_team(team_id)
 
+    DEFAULT_ONBOARD_CAPABILITIES = [
+        "bridge.health",
+        "message.ack",
+        "message.read",
+        "message.send",
+        "observations.read",
+        "task.read",
+        "team.manage",
+        "team.read",
+        "team.write",
+        "threaddesk.read",
+    ]
+
+    def onboard_register(self, principal, request: TeamOnboardRegister):
+        """Owner-only, idempotent on-disk registration of one identity.
+
+        Writing happens only after the candidate config validates against the
+        strict model; failures restore both files. Token values are never returned.
+        """
+        self._principal(principal, "team.manage")
+        if principal != "local":
+            raise BridgeError("team_role_denied", "Only the owner identity may onboard")
+        if request.identity == "local":
+            raise BridgeError("invalid_request", "The owner identity is never onboarded")
+        identity = request.identity
+        config_path = Path(request.config_path)
+        credentials_path = Path(request.credentials_path)
+        try:
+            text = config_path.read_text()
+        except OSError:
+            raise BridgeError("invalid_request", "Config file is not readable") from None
+        principal_header = f"[principals.{identity}]"
+        worker_header = f"[team.workers.{identity}]"
+        has_principal = principal_header in text
+        has_worker = worker_header in text
+        if has_principal != has_worker:
+            raise BridgeError(
+                "inconsistent_config", "Half-registered identity; resolve it manually"
+            )
+        from kirabridge.bridge_core.config import load_config
+
+        def atomic_private(target: Path, payload: str):
+            tmp = target.with_name(f".{target.name}.onboard-tmp-{os.getpid()}")
+            tmp.write_text(payload)
+            tmp.chmod(0o600)
+            tmp.replace(target)
+
+        credentials = {}
+        if not credentials_path.exists():
+            raise BridgeError("invalid_request", "Credentials file must already exist")
+        try:
+            credentials = json.loads(credentials_path.read_text())
+        except (OSError, ValueError):
+            raise BridgeError("invalid_request", "Credentials file is not readable") from None
+        if not isinstance(credentials, dict):
+            raise BridgeError("invalid_request", "Credentials file is not a mapping")
+        token_present = (
+            isinstance(credentials.get(identity), str) and len(credentials[identity]) >= 32
+        )
+        if has_principal and token_present:
+            live = identity in self.config.principals and identity in self.config.team.workers
+            return {
+                "identity": identity,
+                "registered": "already",
+                "token": "present",
+                "live": live,
+                "needs_restart": False,
+            }
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        backups = {}
+        for source in (config_path, credentials_path):
+            if source.exists():
+                target = source.with_name(f"{source.name}.bak-{stamp}-onboard-{identity}")
+                target.write_bytes(source.read_bytes())
+                target.chmod(0o600)
+                backups[str(source)] = str(target)
+
+        def restore():
+            for source, backup in backups.items():
+                Path(backup).replace(Path(source))
+
+        try:
+            if not has_principal:
+                capabilities = request.capabilities or self.DEFAULT_ONBOARD_CAPABILITIES
+                peers = json.dumps([p for p in request.message_peers if NAME.fullmatch(p)])
+                env_name = "KIRABRIDGE_" + identity.upper().replace("-", "_") + "_TOKEN"
+                block = (
+                    f"\n[principals.{identity}]\n"
+                    f'approval_mode = "{request.approval_mode}"\n'
+                    f"capabilities = {json.dumps(sorted(set(capabilities)))}\n"
+                    f'token_env = "{env_name}"\n'
+                    f"message_peers = {peers}\n"
+                    f"\n{worker_header}\n"
+                )
+                candidate = config_path.with_name(f".onboard-{identity}.toml")
+                candidate.write_text(text + block)
+                candidate.chmod(0o600)
+                try:
+                    probe = load_config(str(candidate))
+                finally:
+                    candidate.unlink(missing_ok=True)
+                if identity not in probe.principals or identity not in probe.team.workers:
+                    raise BridgeError("invalid_config", "Candidate config dropped the identity")
+                atomic_private(config_path, text + block)
+            if not token_present:
+                import secrets
+
+                credentials[identity] = secrets.token_urlsafe(48)
+                atomic_private(credentials_path, json.dumps(credentials))
+        except BridgeError:
+            restore()
+            raise
+        except Exception as exc:
+            restore()
+            raise BridgeError("onboard_failed", "Registration aborted; files restored") from exc
+        live = identity in self.config.principals and identity in self.config.team.workers
+        return {
+            "identity": identity,
+            "registered": "written",
+            "token": "present" if token_present else "generated",
+            "live": live,
+            "needs_restart": not live,
+            "backups": sorted(backups.values()),
+        }
+
     def set_role(self, principal, request: TeamRoleSet):
         self._automatic(principal)
         with self.store.transaction():
@@ -1406,8 +1533,8 @@ class TeamManager:
             generation = self._generation(work["team_id"], work["assignee"])
             self.store.db.execute(
                 "UPDATE team_work SET state='dispatching',core_task_id=?,claimed=?,"
-                "resume_session=?,session_generation=? WHERE id=?",
-                (core_id, time.time(), resume_session, generation, work_id),
+                "started=COALESCE(started,?),resume_session=?,session_generation=? WHERE id=?",
+                (core_id, time.time(), time.time(), resume_session, generation, work_id),
             )
             self._event(
                 work["team_id"],
@@ -1679,9 +1806,9 @@ class TeamManager:
             )
             if values != previous:
                 self.store.db.execute(
-                    "UPDATE team_work SET state=?,result=?,evidence=?,error=?,started=?,finished=? "
-                    "WHERE id=?",
-                    (*values, work_id),
+                    "UPDATE team_work SET state=?,result=?,evidence=?,error=?,"
+                    "started=COALESCE(?,started),finished=? WHERE id=?",
+                    (*values[:4], values[4], values[5], work_id),
                 )
                 self._event(
                     work["team_id"],

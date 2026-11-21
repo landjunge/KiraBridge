@@ -356,9 +356,12 @@ async def test_pre_paste_screen_mismatch_releases_the_lock_without_resending(vis
     assert job["state"] == "unknown"
 
 
-async def test_paste_that_may_have_landed_stays_locked(visible):
+@pytest.mark.parametrize("screen,released", [(NONEMPTY, False), (IDLE, True)])
+async def test_paste_that_may_have_landed_stays_locked_until_the_input_is_empty(
+    visible, screen, released
+):
     bridge, transport = visible
-    transport["text"] = IDLE
+    transport["text"] = screen
     binding = bridge.config.visible_handoffs.bindings["grok"]
     sent = enqueue(bridge, key="maybe-pasted")
     bridge.store.db.execute(
@@ -370,9 +373,16 @@ async def test_paste_that_may_have_landed_stays_locked(visible):
             canonical({"reason": "visible_paste_unconfirmed", "automatic_retry": False}),
         ),
     )
+    if released:
+        await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+        status = bridge.visible_handoffs.status("chatgpt", "pasted-run")
+        assert status["state"] == "unknown" and not transport["calls"]
+        assert status["evidence"]["reason"] == "unconfirmed_input_lock_released"
+        return
     with pytest.raises(BridgeError) as exc:
         await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
-    assert exc.value.code == "visible_target_busy" and not transport["calls"]
+    assert exc.value.code in {"visible_target_busy", "visible_input_not_empty"}
+    assert not transport["calls"]
 
 
 async def test_same_live_reservation_stays_busy_and_is_not_sent_twice(visible):

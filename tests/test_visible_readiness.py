@@ -81,10 +81,15 @@ def test_bound_idle_ignores_work_words_in_history_or_quotations(binding, history
     assert result["state"] == "ready" and result["protocol_state"] == "idle"
 
 
-@pytest.mark.parametrize("protocol", [None, {"state": "unknown"}])
-def test_history_without_reliable_idle_evidence_does_not_prove_ready(binding, protocol):
+def test_unknown_protocol_does_not_prove_ready_from_history(binding):
     text = "• Working (2s • esc to interrupt)\n\n• Angeblich fertig.\n\n" + EMPTY + FOOTER
-    assert checked(text, binding, protocol)["state"] == "unknown"
+    assert checked(text, binding, {"state": "unknown"})["state"] == "unknown"
+
+
+def test_unbound_old_work_words_above_the_current_block_do_not_block(binding):
+    # Only the block directly above the input counts without a bound protocol.
+    text = "• Working (2s • esc to interrupt)\n\n• Angeblich fertig.\n\n" + EMPTY + FOOTER
+    assert checked(text, binding, None)["state"] == "ready"
 
 
 def test_real_working_turn_is_blocked_even_with_empty_visible_widget(binding):

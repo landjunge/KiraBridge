@@ -24,7 +24,7 @@
 <p align="center">
   <img src="assets/readme/download-macos-apple-silicon.svg" alt="macOS Apple Silicon: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc57/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc57" width="190" height="52"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc59/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc59" width="190" height="52"></a>
   &nbsp;
   <img src="assets/readme/download-windows.svg" alt="Windows: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
@@ -78,6 +78,7 @@ Team assignments also keep the proven provider session for each worker. A later 
 
 ### Source: team scope, resume and error fields
 
+- New in the development source: owner-only `kirabridge team onboard <team_id> <identity> [--coordinator]`. The daemon tool `team_onboard_register` accepts only the owner identity `local`, appends `[principals.<id>]` plus `[team.workers.<id>]` and a generated token only after the candidate config validates against the strict model, keeps timestamped backups, restores both files on any failure, is idempotent on re-run and never returns token values. The running daemon keeps a start-up config snapshot, so the CLI orchestrates the rest: idle-guarded service reload (active team work or `--no-restart` stops it), one role call with revision CAS and a single renewed attempt, then a mandatory readback of owner, coordinator, revision, membership and the pending inbox page. Not an installed release.
 - `execution_scope = "existing_native_codex_root"` runs one team turn on the single loaded, parentless Codex root whose resolved cwd equals the resolved worker cwd, through app-server `turn/start`. Among at most 16 loaded ids, any other count raises `native_codex_root_not_unique`. A missing or longer id list, and a running turn, raise `native_codex_target_not_ready`. The path records `terminal_input_attempted = false` and does not select a pane, terminal PID or rollout path. Host identity is checked; a patch release of the same minor line stays valid. `protocol_version` accepts only `0.169.<patch>`. The route needs `[visible_handoffs.native_codex]` with `codex_home`, `host_executable` and `protocol_version`. The worker's agent and kind must be `codex`. See [Native Codex root binding](docs/NATIVE-CODEX-BINDING.md).
 - `team.coordinator_resume` defaults to off. When it is on, finished delegated work (`finish`, `fail` or manual `work_complete`) records one completion notice, source `team`, target `team:<team_id>`, and `TeamManager.resume_coordinators` creates one idempotent coordination task for an assigner that has `agent` set. The link is stored in `team_coordinator_resumes`. Work assigned to its own assignee records no notice.
 - `agents.<name>.model` is optional. `grok_reasoning_effort` is accepted only for `kind = "grok_acp"` and must match `^[a-z]{1,16}$`. The Grok ACP adapter passes a set model as `--model` and a set effort as `--reasoning-effort`.
