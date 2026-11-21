@@ -415,6 +415,7 @@ def test_claim_persists_once_before_execution_and_restart_does_not_queue_again(d
     item = domain.delegate("grok", work())
     claimed = domain.claim(item["id"])
     assert claimed["state"] == "dispatching" and claimed["core_task_id"] == "team-" + item["id"]
+    assert claimed["started"] is not None
     assert domain.claim(item["id"]) is None and not domain.pending()
     reopened = Bridge(config)
     try:
@@ -426,6 +427,28 @@ def test_claim_persists_once_before_execution_and_restart_does_not_queue_again(d
         assert manager.claim(item["id"]) is None
     finally:
         reopened.store.close()
+
+
+def test_dispatched_start_stamp_survives_observation_and_refines_with_evidence(domain):
+    item = domain.delegate("grok", work())
+    claimed = domain.claim(item["id"])
+    blind = core(domain, claimed, state="accepted", started=None)
+    domain.bind_task(item["id"], blind)
+    row = domain.store.db.execute(
+        "SELECT started FROM team_work WHERE id=?", (item["id"],)
+    ).fetchone()
+    assert row["started"] == claimed["started"]
+    refined = core(domain, claimed, state="running", started=claimed["started"] + 5)
+    domain.bind_task(item["id"], refined)
+    row = domain.store.db.execute(
+        "SELECT started FROM team_work WHERE id=?", (item["id"],)
+    ).fetchone()
+    assert row["started"] == claimed["started"] + 5
+    domain.bind_task(item["id"], blind)
+    row = domain.store.db.execute(
+        "SELECT started FROM team_work WHERE id=?", (item["id"],)
+    ).fetchone()
+    assert row["started"] == claimed["started"] + 5
 
 
 def test_claim_revalidates_roles_and_permissions_and_notes_the_hourly_count(domain):
