@@ -257,8 +257,7 @@ def test_recovery_reloads_owned_service_that_became_loaded(installer, world):
     assert [
         call[0]
         for call in world.fake.calls
-        if call[0] in {"bootout", "bootstrap"}
-        and "com.kirabridge.approvals" in call[-1]
+        if call[0] in {"bootout", "bootstrap"} and "com.kirabridge.approvals" in call[-1]
     ] == ["bootout", "bootstrap"]
 
 
