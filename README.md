@@ -50,6 +50,8 @@ The development console has a compact product header: the original two-color wor
 
 For example, ask the AI to write down a note. It can open or select the notes app, bring the appropriate window forward and enter your words. Workflows can likewise combine shortcuts, text input and window changes. The goal is not merely to send a command, but to produce a visible action and verifiable result on your computer. Success depends on the application, the operating system's accessibility support, granted permissions and connection stability.
 
+In the development source, MCP clients can request only the schemas they need through `operation_catalog`. Setting `compact=true` returns the selected catalog, the required permission context and a lightweight discovery revision; the full catalog response remains the default. This addition is in source and is not confirmed in a new installed version.
+
 ## Voice control for everyone, with accessibility built in
 
 **KiraBridge's primary goal is to make computers, applications and AI tools operable through natural language.** Instead of memorizing complex sequences, describe the desired outcome: open an app, write a note, switch windows or task an AI agent. Voice-driven operation is designed for everyone, whether for everyday tasks, productive work, hands-free control or complex workflows.

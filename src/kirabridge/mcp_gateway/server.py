@@ -705,6 +705,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         ctx: Context,
         observe_terminals: bool = False,
         operations: list[str] | None = None,
+        compact: bool = False,
     ) -> dict[str, Any]:
         """Permitted version-1 operations and exact argument JSON schemas.
 
@@ -714,6 +715,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         observations never authorize input or replace fresh target validation.
         Set operations to 1–32 exact operation names to obtain only the argument
         schemas needed for this action; omit it for the complete permitted catalog.
+        With selected operations, compact=true returns only permission context, the
+        selected schemas and a lightweight discovery epoch. It cannot observe terminals.
         """
 
         def action():
@@ -732,21 +735,39 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 or any(name not in INPUTS and name not in setup_reads for name in operations)
             ):
                 raise BridgeError("invalid_arguments", "Select 1–32 distinct known operations")
-            platform_rows = {
-                row["operation"]: row
-                for row in bridge.macos.operation_catalog(
-                    lambda op: decision(bridge.config, identity(ctx), op)
+            if compact and (operations is None or observe_terminals):
+                raise BridgeError(
+                    "invalid_arguments",
+                    "Compact discovery requires selected operations and no terminal observation",
                 )
+            requested = set(operations) if operations is not None else set(INPUTS)
+            platform_rows = {}
+            macos_operations = requested & set(bridge.macos.descriptors)
+            if requested & macos_operations:
+                platform_rows.update(
+                    {
+                        row["operation"]: row
+                        for row in bridge.macos.operation_catalog(
+                            lambda op: decision(bridge.config, identity(ctx), op)
+                        )
+                    }
+                )
+            windows_keyboard_operations = {
+                "windows.keyboard.inspect",
+                "windows.keyboard.sequence",
+                "windows.keyboard.shortcut",
+                "windows.keyboard.text",
             }
-            platform_rows.update(
-                {
-                    row["operation"]: row
-                    for row in bridge.windows_keyboard.catalog(
-                        lambda op: decision(bridge.config, identity(ctx), op)
-                    )
-                }
-            )
-            if current_platform().name == "linux":
+            if requested & windows_keyboard_operations:
+                platform_rows.update(
+                    {
+                        row["operation"]: row
+                        for row in bridge.windows_keyboard.catalog(
+                            lambda op: decision(bridge.config, identity(ctx), op)
+                        )
+                    }
+                )
+            if current_platform().name == "linux" and "terminal.visible" in requested:
                 permission = decision(bridge.config, identity(ctx), "terminal.visible")
                 platform_rows["terminal.visible"] = {
                     "operation": "terminal.visible",
@@ -762,17 +783,65 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "os_permission_state": "current_user_process",
                     "runtime_availability": "not_probed",
                 }
-            platform_rows.update(
-                {
-                    row["operation"]: row
-                    for row in bridge.windows_windows.catalog(
-                        lambda op: decision(bridge.config, identity(ctx), op)
-                    )
-                }
-            )
+            windows_window_operations = {"windows.window.list", "windows.window.control"}
+            if requested & windows_window_operations:
+                platform_rows.update(
+                    {
+                        row["operation"]: row
+                        for row in bridge.windows_windows.catalog(
+                            lambda op: decision(bridge.config, identity(ctx), op)
+                        )
+                    }
+                )
             # Host platform is a process-lifetime fact. Do not reconstruct the
             # full native capability snapshot for every operation in this request.
             native_host = bridge.macos.host_platform == "darwin"
+            selected_rows = {
+                name: {
+                    **OPERATIONS[name].describe(),
+                    "execution_budget_seconds": TERMINAL_QUERY_SECONDS
+                    if name in {"session.catalog", "session.read"}
+                    else None,
+                    "arguments": model.model_json_schema(),
+                    "approval_required": decision(bridge.config, identity(ctx), name)[
+                        "approval_required"
+                    ],
+                    "permission_decision": decision(bridge.config, identity(ctx), name),
+                    **({"platform": platform_rows[name]} if name in platform_rows else {}),
+                }
+                for name, model in INPUTS.items()
+                if (operations is None or name in operations)
+                and decision(bridge.config, identity(ctx), name)["authorized"]
+                and (
+                    name not in platform_rows
+                    or name
+                    in {
+                        "session.catalog",
+                        "session.read",
+                        "session.input",
+                        "session.focus",
+                        "session.close",
+                        "clipboard.info",
+                    }
+                    or not native_host
+                    or platform_rows[name]["eligible_for_submission"]
+                )
+            }
+            selected_rows.update(
+                {
+                    name: entry
+                    for name, entry in setup_reads.items()
+                    if operations is None or name in operations
+                }
+            )
+            if compact:
+                return {
+                    "api_version": "1",
+                    "approval_mode": policy.approval_mode,
+                    "permission_level": level_for(policy),
+                    "permission_label": LEVELS[level_for(policy)],
+                    "operations": selected_rows,
+                }
             result = {
                 "api_version": "1",
                 "approval_mode": policy.approval_mode,
@@ -796,45 +865,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "automatic_prompt_additions": False,
                 },
                 **bridge.messages.voice_channel.profile(identity(ctx)),
-                "operations": {
-                    name: {
-                        **OPERATIONS[name].describe(),
-                        "execution_budget_seconds": TERMINAL_QUERY_SECONDS
-                        if name in {"session.catalog", "session.read"}
-                        else None,
-                        "arguments": model.model_json_schema(),
-                        "approval_required": decision(bridge.config, identity(ctx), name)[
-                            "approval_required"
-                        ],
-                        "permission_decision": decision(bridge.config, identity(ctx), name),
-                        **({"platform": platform_rows[name]} if name in platform_rows else {}),
-                    }
-                    for name, model in INPUTS.items()
-                    if (operations is None or name in operations)
-                    and decision(bridge.config, identity(ctx), name)["authorized"]
-                    and (
-                        name not in platform_rows
-                        or name
-                        in {
-                            "session.catalog",
-                            "session.read",
-                            "session.input",
-                            "session.focus",
-                            "session.close",
-                            "clipboard.info",
-                        }
-                        or not native_host
-                        or platform_rows[name]["eligible_for_submission"]
-                    )
-                },
+                "operations": selected_rows,
             }
-            result["operations"].update(
-                {
-                    name: entry
-                    for name, entry in setup_reads.items()
-                    if operations is None or name in operations
-                }
-            )
             return result
 
         from kirabridge.discovery import live, snapshot
@@ -850,11 +882,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                         "unauthorized or unavailable"
                     ),
                 }
-            result["discovery"] = (
-                await live(bridge, identity(ctx))
-                if observe_terminals
-                else snapshot(bridge, identity(ctx))
-            )
+            if compact:
+                from kirabridge.discovery import epoch
+
+                result["discovery"] = epoch(bridge, identity(ctx))
+            else:
+                result["discovery"] = (
+                    await live(bridge, identity(ctx))
+                    if observe_terminals
+                    else snapshot(bridge, identity(ctx))
+                )
         return result
 
     @server.tool(annotations=write)

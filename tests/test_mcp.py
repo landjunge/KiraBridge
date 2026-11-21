@@ -87,6 +87,7 @@ async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
             await clients.call("local", "read_query", {"query": {"operation": "session.catalog"}})
         ).structuredContent
         assert result["sessions"] == [target]
+
         result = (
             await clients.call(
                 "local",
@@ -129,6 +130,32 @@ async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
                 if operation == "session.catalog"
                 else completed["result"]["text"] == "READ_FROM_EXACT_WINDOW"
             )
+
+
+async def test_compact_selected_operation_catalog_is_small_and_scoped(http_bridge):
+    _, endpoint = http_bridge
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        full = (
+            await clients.call("local", "operation_catalog", {"operations": ["file.list"]})
+        ).structuredContent
+        compact = (
+            await clients.call(
+                "local",
+                "operation_catalog",
+                {"operations": ["file.list"], "compact": True},
+            )
+        ).structuredContent
+        assert compact["operations"] == full["operations"]
+        assert compact["discovery"]["revision"] == full["discovery"]["revision"]
+        assert "terminal_access" not in compact
+        assert "visible_handoffs" not in compact
+        assert "permission_detail" not in compact
+        assert len(json.dumps(compact)) < len(json.dumps(full)) * 0.5
+        invalid = (
+            await clients.call("local", "operation_catalog", {"compact": True})
+        ).structuredContent
+        assert invalid["error"]["code"] == "invalid_arguments"
 
 
 async def test_http_auth_origin_host_and_protocol_limits(http_bridge):
