@@ -319,6 +319,10 @@ def test_activate_and_rollback_release_sqlite_before_bootstrap(installer, monkey
         installer, "wait_health", lambda *a, **kw: {"version": "0.8.0rc15", "runtime": {"pid": 1}}
     )
     monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    tunnel_restarts = []
+    monkeypatch.setattr(
+        installer, "_restart_owned_tunnel", lambda agents: tunnel_restarts.append(agents)
+    )
     writes = []
 
     def bootstrap(args):
@@ -329,7 +333,9 @@ def test_activate_and_rollback_release_sqlite_before_bootstrap(installer, monkey
 
     monkeypatch.setattr(installer, "start_service", bootstrap)
     installer.activate(args, release)
+    assert tunnel_restarts == [args.plist.parent]
     installer.rollback(args)
+    assert tunnel_restarts == [args.plist.parent, args.plist.parent]
     assert writes == ["bootstrap", "bootstrap"]
     with sqlite3.connect(database) as db:
         assert db.execute("select count(*) from preserved").fetchone()[0] == 2

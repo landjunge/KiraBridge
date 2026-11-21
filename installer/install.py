@@ -1305,6 +1305,26 @@ def _aux_texts(value):
     return [text for item in items for text in _aux_texts(item)]
 
 
+def _restart_owned_tunnel(agents):
+    """kickstart the com.kirabridge.chatgpt tunnel so its live connect child uses
+    the current runtime; fail-soft and only for the owned, correctly loaded plist.
+
+    Returns a short German note on failure, else None. A probe/restart that raises
+    (e.g. subprocess.TimeoutExpired) is reported, never propagated, so callers keep
+    already collected data. Never touches a foreign or differently loaded tunnel.
+    """
+    tunnel = agents / f"{TUNNEL_LABEL}.plist"
+    try:
+        if not tunnel.exists() or _aux_loaded_from(TUNNEL_LABEL) != tunnel:
+            return None
+        done = _launchctl("kickstart", "-k", f"gui/{os.getuid()}/{TUNNEL_LABEL}")
+    except Exception as error:
+        return f"Neustart fehlgeschlagen: {error}"
+    if done.returncode:
+        return "Neustart fehlgeschlagen"
+    return None
+
+
 def sync_aux_services(args, release, backup, *, restart_tunnel=True):
     """Point auxiliary com.kirabridge.* launchd services at *release*; fail-soft.
 
@@ -1361,12 +1381,12 @@ def sync_aux_services(args, release, backup, *, restart_tunnel=True):
             records.append({"plist": str(path), "backup": name, "installed_sha256": sha(path)})
         except Exception as error:
             problems.append((label, f"nicht angepasst: {error}"))
-    tunnel = agents / f"{TUNNEL_LABEL}.plist"
-    # Only the tunnel defined next to this bridge plist, loaded from that file.
-    if restart_tunnel and tunnel.exists() and _aux_loaded_from(TUNNEL_LABEL) == tunnel:
-        done = _launchctl("kickstart", "-k", f"gui/{os.getuid()}/{TUNNEL_LABEL}")
-        if done.returncode:
-            problems.append((TUNNEL_LABEL, "Neustart fehlgeschlagen"))
+    # Restart the owned tunnel last; fail-soft so the already collected records
+    # are still returned and persisted by activate() for the rollback path.
+    if restart_tunnel:
+        note = _restart_owned_tunnel(agents)
+        if note:
+            problems.append((TUNNEL_LABEL, note))
     return records, problems
 
 
@@ -1960,6 +1980,13 @@ def rollback(args, *, _compensating=False):
             ):
                 raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
     restore_aux_services(active)
+    # The forward sync kickstarted the owned tunnel onto the new runtime; restart
+    # it now so its live connect child drops back to the rolled-back runtime. Same
+    # ownership guard as sync: only the plist next to the bridge, loaded from it.
+    if args.service == "launchd" and LABEL == "com.kirabridge.bridge":
+        note = _restart_owned_tunnel(args.plist.parent)
+        if note:
+            report("warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note)
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):

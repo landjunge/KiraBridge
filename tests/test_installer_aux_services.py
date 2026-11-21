@@ -22,10 +22,13 @@ class FakeLaunchctl:
         self.calls = []
         self.loaded = set()
         self.fail_bootstrap = set()
+        self.raise_for = set()
 
     def __call__(self, *argv, timeout=20):
         self.calls.append(argv)
         label = argv[-1].rsplit("/", 1)[-1].removesuffix(".plist")
+        if (argv[0], label) in self.raise_for:
+            raise subprocess.TimeoutExpired(argv, timeout)
         code, out = 0, ""
         if argv[0] == "print":
             if label in self.loaded:
@@ -129,6 +132,22 @@ def test_one_failure_does_not_stop_others(installer, world):
     assert world.files["approvals"].read_bytes() == original
     assert "com.kirabridge.approvals" in {label for label, _ in problems}
     assert [Path(r["plist"]).stem for r in records] == ["com.kirabridge.chat-events"]
+
+
+@pytest.mark.parametrize("raising_action", ["print", "kickstart"])
+def test_tunnel_raise_keeps_aux_records_and_returns_warning(installer, world, raising_action):
+    world.fake.raise_for = {(raising_action, installer.TUNNEL_LABEL)}
+
+    records, problems = installer.sync_aux_services(world.args, world.new, world.backup)
+
+    assert {Path(record["plist"]).stem for record in records} == {
+        "com.kirabridge.approvals",
+        "com.kirabridge.chat-events",
+    }
+    assert any(
+        label == installer.TUNNEL_LABEL and "Neustart fehlgeschlagen" in message
+        for label, message in problems
+    )
 
 
 def test_rollback_restores_aux_plists(installer, world):
