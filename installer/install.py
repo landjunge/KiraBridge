@@ -1315,7 +1315,12 @@ def service_log_tail(args):
                 paths.append(Path(settings[key]))
     prefix = getattr(args, "prefix", None)
     if prefix is not None:
-        paths.extend([Path(prefix) / "logs/service.stderr.log", Path(prefix) / "logs/service.stdout.log"])
+        paths.extend(
+            [
+                Path(prefix) / "logs/service.stderr.log",
+                Path(prefix) / "logs/service.stdout.log",
+            ]
+        )
     seen = set()
     parts = []
     for path in paths:
