@@ -151,9 +151,7 @@ def test_sync_persists_recovery_before_rewrite_and_recovers_interruption(
     current = world.args.prefix / "current.json"
     transaction = {"backup": str(world.backup), "aux_services": []}
     installer.jwrite(current, transaction)
-    original = {
-        key: world.files[key].read_bytes() for key in ("approvals", "chat")
-    }
+    original = {key: world.files[key].read_bytes() for key in ("approvals", "chat")}
     real_atomic = installer.atomic
     interrupted = False
 
@@ -199,9 +197,7 @@ def test_recovery_reloads_owned_service_interrupted_after_bootout(installer, wor
     assert "com.kirabridge.approvals" not in world.fake.loaded
     recovery = json.loads(current.read_text())
     record = next(
-        item
-        for item in recovery["aux_services"]
-        if item["plist"] == str(world.files["approvals"])
+        item for item in recovery["aux_services"] if item["plist"] == str(world.files["approvals"])
     )
     assert record["was_loaded"] is True
 
@@ -231,8 +227,7 @@ def test_recovery_preserves_foreign_loaded_binding(installer, world, monkeypatch
     assert world.files["approvals"].read_bytes() == original
     assert "com.kirabridge.approvals" in world.fake.loaded
     assert not any(
-        call[0] in {"bootout", "bootstrap"}
-        and "com.kirabridge.approvals" in " ".join(call)
+        call[0] in {"bootout", "bootstrap"} and "com.kirabridge.approvals" in " ".join(call)
         for call in world.fake.calls
     )
     assert any("fremder plist" in " ".join(map(str, warning)) for warning in warnings)
@@ -249,9 +244,7 @@ def test_recovery_reloads_owned_service_that_became_loaded(installer, world):
 
     recovery = json.loads(current.read_text())
     record = next(
-        item
-        for item in recovery["aux_services"]
-        if item["plist"] == str(world.files["approvals"])
+        item for item in recovery["aux_services"] if item["plist"] == str(world.files["approvals"])
     )
     assert record["was_loaded"] is False
     world.fake.loaded.add("com.kirabridge.approvals")
@@ -261,10 +254,10 @@ def test_recovery_reloads_owned_service_that_became_loaded(installer, world):
 
     assert world.files["approvals"].read_bytes() == original
     assert "com.kirabridge.approvals" in world.fake.loaded
-    assert (
-        [call[0] for call in world.fake.calls if call[0] in {"bootout", "bootstrap"}]
-        == ["bootout", "bootstrap"]
-    )
+    assert [call[0] for call in world.fake.calls if call[0] in {"bootout", "bootstrap"}] == [
+        "bootout",
+        "bootstrap",
+    ]
 
 
 def test_one_failure_does_not_stop_others(installer, world):
