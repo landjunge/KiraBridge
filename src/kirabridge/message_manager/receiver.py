@@ -79,7 +79,7 @@ class MessageReceiver:
             if not self.worker.cancelled():
                 self.worker.exception()  # Consume the finished task before replacing its handle.
             self.worker = None
-        if self.worker or not self.bridge.config.messaging.receivers:
+        if self.worker:
             return
         self.recovered_handoffs.clear()
         # The task dispatcher owns the exclusive runtime lock before this is called.
@@ -110,7 +110,9 @@ class MessageReceiver:
                 )
             queued = self.bridge.store.db.execute(
                 "SELECT m.id,m.recipient,m.created FROM messages m "
-                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued'"
+                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h "
+                "WHERE h.queue_id='messages' AND h.item_id=m.id)"
             ).fetchall()
             cutoff = self.bridge.config.messaging.separate_managed_after
             for row in queued:
@@ -121,6 +123,8 @@ class MessageReceiver:
                         continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
         self._reconcile_recovered_handoffs()
+        if not self.bridge.config.messaging.receivers:
+            return
         self.stopping = False
         self.direct.accepting = True
         self.messages.delivery_hook = self._submit_new

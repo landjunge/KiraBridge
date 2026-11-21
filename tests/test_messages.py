@@ -394,6 +394,49 @@ async def test_persisted_queue_is_resumed_by_new_receiver(
     assert (Path(config.principals["grok"].roots[0]) / "grok-invocations").read_text() == "1\n"
 
 
+async def test_receiver_recovers_persisted_jobs_without_configured_receivers(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    queued = channel.send("codex", message(dispatch=True))
+    held = channel.send("codex", message(idempotency_key="held", dispatch=True))
+    running = channel.send("codex", message(idempotency_key="interrupted", dispatch=True))
+    assert bridge.message_receiver._claim(running["id"])
+    with bridge.store.transaction():
+        bridge.queues._place_hold("codex", "messages", held["id"], "operator_hold")
+    config.messaging.receivers.clear()
+
+    await bridge.message_receiver.start()
+
+    queued_state = channel.get("codex", queued["id"])["processing"]
+    held_state = channel.get("codex", held["id"])["processing"]
+    running_state = channel.get("codex", running["id"])["processing"]
+    assert queued_state["state"] == "blocked"
+    assert queued_state["evidence"]["reason"] == "receiver_removed"
+    assert held_state["state"] == "queued"
+    assert bridge.store.db.execute(
+        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (held["id"],)
+    ).fetchone()
+    assert running_state["state"] == "unknown"
+    assert running_state["evidence"]["reason"] == "receiver_restart"
+    assert bridge.message_receiver.worker is None
+    assert bridge.messages.delivery_hook is None
+
+
+async def test_receiver_preserves_pre_cutoff_queue_without_configured_receivers(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    queued = channel.send("codex", message(dispatch=True))
+    config.messaging.receivers.clear()
+    config.messaging.separate_managed_after = queued["created"] + 1
+
+    await bridge.message_receiver.start()
+
+    assert channel.get("codex", queued["id"])["processing"]["state"] == "queued"
+    assert bridge.message_receiver.worker is None
+
+
 def test_receiver_budget_notes_extra_provider_turns_and_still_claims(
     channel, bridge, config, tmp_path
 ):
