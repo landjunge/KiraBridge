@@ -254,10 +254,12 @@ def test_recovery_reloads_owned_service_that_became_loaded(installer, world):
 
     assert world.files["approvals"].read_bytes() == original
     assert "com.kirabridge.approvals" in world.fake.loaded
-    assert [call[0] for call in world.fake.calls if call[0] in {"bootout", "bootstrap"}] == [
-        "bootout",
-        "bootstrap",
-    ]
+    assert [
+        call[0]
+        for call in world.fake.calls
+        if call[0] in {"bootout", "bootstrap"}
+        and "com.kirabridge.approvals" in call[-1]
+    ] == ["bootout", "bootstrap"]
 
 
 def test_one_failure_does_not_stop_others(installer, world):
