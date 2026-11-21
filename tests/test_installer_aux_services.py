@@ -261,6 +261,45 @@ def test_recovery_reloads_owned_service_that_became_loaded(installer, world):
     ] == ["bootout", "bootstrap"]
 
 
+def test_recovery_retries_reload_after_bootstrap_failure(installer, world):
+    current = world.args.prefix / "current.json"
+    transaction = {"backup": str(world.backup), "aux_services": []}
+    installer.jwrite(current, transaction)
+    world.fake.loaded.remove("com.kirabridge.approvals")
+
+    installer.sync_aux_services(world.args, world.new, world.backup, transaction=transaction)
+
+    recovery = json.loads(current.read_text())
+    record = next(
+        item for item in recovery["aux_services"] if item["plist"] == str(world.files["approvals"])
+    )
+    world.fake.loaded.add("com.kirabridge.approvals")
+    world.fake.fail_bootstrap = {"com.kirabridge.approvals"}
+
+    assert installer.restore_aux_services(recovery, current) is False
+
+    recovery = json.loads(current.read_text())
+    record = next(
+        item for item in recovery["aux_services"] if item["plist"] == str(world.files["approvals"])
+    )
+    assert record["restore_pending"] is True
+    assert record["restore_reload"] is True
+    assert "com.kirabridge.approvals" not in world.fake.loaded
+
+    world.fake.fail_bootstrap.clear()
+    assert installer.restore_aux_services(recovery, current) is True
+
+    assert "com.kirabridge.approvals" in world.fake.loaded
+    restored_record = next(
+        item
+        for item in json.loads(current.read_text())["aux_services"]
+        if item["plist"] == str(world.files["approvals"])
+    )
+    assert restored_record["restore_complete"] is True
+    assert "restore_pending" not in restored_record
+    assert "restore_reload" not in restored_record
+
+
 def test_one_failure_does_not_stop_others(installer, world):
     original = world.files["approvals"].read_bytes()
     world.fake.fail_bootstrap = {"com.kirabridge.approvals"}

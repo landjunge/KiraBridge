@@ -1449,25 +1449,21 @@ def restore_aux_services(active, transaction_path=None):
                 continue
 
             was_loaded = record.get("was_loaded")
-            # Persist an in-progress marker before launchctl changes. If rollback
-            # is interrupted after bootout, the next attempt knows to bootstrap.
+            # Persist both the target load state and an in-progress marker before
+            # launchctl changes. If bootstrap fails after bootout, a later rollback
+            # must still know to reload the service even though it is now unloaded.
+            if "restore_reload" not in record:
+                record["restore_reload"] = was_loaded is True or source == path
             record["restore_pending"] = True
             _persist_aux_recovery(active, transaction_path)
-            if was_loaded is True:
+            if record["restore_reload"]:
                 if source == path:
                     _launchctl("bootout", f"gui/{os.getuid()}/{label}")
                 # Also repairs a crash after bootout, when source is None.
                 _aux_bootstrap(path)
-            elif was_loaded is False:
-                if source == path:
-                    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
-                    _aux_bootstrap(path)
-            elif source == path:
-                # Compatibility with transaction records written before was_loaded.
-                _launchctl("bootout", f"gui/{os.getuid()}/{label}")
-                _aux_bootstrap(path)
             record["restore_complete"] = True
             record.pop("restore_pending", None)
+            record.pop("restore_reload", None)
             _persist_aux_recovery(active, transaction_path)
         except Exception as error:
             report("warn", f"{label} nicht zurückgesetzt", detail=str(error)[:200])
