@@ -27,8 +27,11 @@ def domain(bridge, config):
     manager.create(
         "local",
         TeamCreate(
-            team_id="test-team", name="t", members={"local": "worker", "codex": "worker"},
-            coordinator="local", idempotency_key="create",
+            team_id="test-team",
+            name="t",
+            members={"local": "worker", "codex": "worker"},
+            coordinator="local",
+            idempotency_key="create",
         ),
     )
     return manager
@@ -36,7 +39,7 @@ def domain(bridge, config):
 
 def files(tmp_path):
     cfg = tmp_path / "config.toml"
-    cfg.write_text('[daemon]\nport = 8765\n')
+    cfg.write_text("[daemon]\nport = 8765\n")
     creds = tmp_path / "credentials.json"
     creds.write_text(json.dumps({"local": "x" * 48, "codex": "y" * 48}))
     return cfg, creds
@@ -44,14 +47,21 @@ def files(tmp_path):
 
 def request(cfg, creds, **changes):
     return TeamOnboardRegister(
-        **{"identity": "worker9", "config_path": str(cfg), "credentials_path": str(creds),
-           "capabilities": [], "message_peers": ["local"], **changes}
+        **{
+            "identity": "worker9",
+            "config_path": str(cfg),
+            "credentials_path": str(creds),
+            "capabilities": [],
+            "message_peers": ["local"],
+            **changes,
+        }
     )
 
 
 def fake_probe(load_module_attr):
     def probe(_path):
         return load_module_attr
+
     return probe
 
 
@@ -82,8 +92,9 @@ def test_rerun_is_idempotent_without_new_backups(tmp_path, domain, monkeypatch):
     cfg, creds = files(tmp_path)
     monkeypatch.setattr(
         "kirabridge.bridge_core.config.load_config",
-        lambda _p: SimpleNamespace(principals={"worker9": object()},
-                                   team=SimpleNamespace(workers={"worker9": object()})),
+        lambda _p: SimpleNamespace(
+            principals={"worker9": object()}, team=SimpleNamespace(workers={"worker9": object()})
+        ),
     )
     domain.onboard_register("local", request(cfg, creds))
     backups = list(tmp_path.glob("*.bak-*"))

@@ -799,9 +799,9 @@ class TeamManager:
             raise BridgeError("invalid_request", "Credentials file is not readable") from None
         if not isinstance(credentials, dict):
             raise BridgeError("invalid_request", "Credentials file is not a mapping")
-        token_present = isinstance(credentials.get(identity), str) and len(
-            credentials[identity]
-        ) >= 32
+        token_present = (
+            isinstance(credentials.get(identity), str) and len(credentials[identity]) >= 32
+        )
         if has_principal and token_present:
             live = identity in self.config.principals and identity in self.config.team.workers
             return {
@@ -857,9 +857,7 @@ class TeamManager:
             raise
         except Exception as exc:
             restore()
-            raise BridgeError(
-                "onboard_failed", "Registration aborted; files restored"
-            ) from exc
+            raise BridgeError("onboard_failed", "Registration aborted; files restored") from exc
         live = identity in self.config.principals and identity in self.config.team.workers
         return {
             "identity": identity,

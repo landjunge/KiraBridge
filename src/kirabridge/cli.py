@@ -95,43 +95,71 @@ async def _run_team_onboard(args, config):
     """One command: register (server), restart in an idle window, optional role, readback."""
     out = {"identity": args.identity, "phases": []}
     if args.dry_run:
-        out["phases"].append({"phase": "dry-run", "plan": [
-            "team_onboard_register", "restart-if-needed", "team_set_role", "readback"]})
+        out["phases"].append(
+            {
+                "phase": "dry-run",
+                "plan": ["team_onboard_register", "restart-if-needed", "team_set_role", "readback"],
+            }
+        )
         return out
     live_paths = config.credentials_file or str(Path.home() / ".config/kirabridge/credentials.json")
     config_path = str(args.config or Path.home() / ".config/kirabridge/config.toml")
-    registered = await _onboard_call(config, args.principal, "team_onboard_register", {
-        "request": {
-            "identity": args.identity,
-            "config_path": config_path,
-            "credentials_path": live_paths,
-            "approval_mode": args.approval_mode,
-            "capabilities": args.capability or [],
-            "message_peers": args.peer or ["local"],
-        }
-    })
+    registered = await _onboard_call(
+        config,
+        args.principal,
+        "team_onboard_register",
+        {
+            "request": {
+                "identity": args.identity,
+                "config_path": config_path,
+                "credentials_path": live_paths,
+                "approval_mode": args.approval_mode,
+                "capabilities": args.capability or [],
+                "message_peers": args.peer or ["local"],
+            }
+        },
+    )
     if registered.get("error"):
         registered["phase"] = "register"
-        return {"identity": args.identity, "phases": [registered],
-                "error": registered["error"]}
-    out["phases"].append({"phase": "register", **{
-        k: registered.get(k) for k in ("registered", "token", "live", "needs_restart", "backups")}})
+        return {"identity": args.identity, "phases": [registered], "error": registered["error"]}
+    out["phases"].append(
+        {
+            "phase": "register",
+            **{
+                k: registered.get(k)
+                for k in ("registered", "token", "live", "needs_restart", "backups")
+            },
+        }
+    )
     if args.no_restart:
         out["phases"].append({"phase": "restart", "state": "skipped_by_flag"})
         return out
     if registered.get("needs_restart"):
-        busy = await _onboard_call(config, args.principal, "team_work_list", {
-            "team_id": args.team_id, "after": 0, "limit": 100})
-        active = [w for w in (busy.get("work") or [])
-                  if w.get("state") in {"queued", "dispatching", "created", "accepted",
-                                         "running", "processing_result"}]
+        busy = await _onboard_call(
+            config,
+            args.principal,
+            "team_work_list",
+            {"team_id": args.team_id, "after": 0, "limit": 100},
+        )
+        active = [
+            w
+            for w in (busy.get("work") or [])
+            if w.get("state")
+            in {"queued", "dispatching", "created", "accepted", "running", "processing_result"}
+        ]
         if active:
-            out["phases"].append({"phase": "restart", "state": "skipped_busy",
-                                  "active": len(active)})
+            out["phases"].append(
+                {"phase": "restart", "state": "skipped_busy", "active": len(active)}
+            )
             return out
         proc = await asyncio.create_subprocess_exec(
-            "launchctl", "kickstart", "-k", f"gui/{os.getuid()}/com.kirabridge.bridge",
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            "launchctl",
+            "kickstart",
+            "-k",
+            f"gui/{os.getuid()}/com.kirabridge.bridge",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
         await proc.wait()
         ready = False
         for _ in range(30):
@@ -140,8 +168,9 @@ async def _run_team_onboard(args, config):
             if not probe.get("error"):
                 ready = True
                 break
-        out["phases"].append({"phase": "restart",
-                              "state": "confirmed" if ready else "health_timeout"})
+        out["phases"].append(
+            {"phase": "restart", "state": "confirmed" if ready else "health_timeout"}
+        )
         if not ready:
             return out
     if args.coordinator or args.role:
@@ -151,30 +180,51 @@ async def _run_team_onboard(args, config):
             out["phases"].append({"phase": "role", **team})
             return out
         for attempt in (1, 2):
-            role_result = await _onboard_call(config, args.principal, "team_set_role", {
-                "request": {
-                    "team_id": args.team_id, "member": args.identity, "role": wanted,
-                    "active": True, "expected_revision": team["revision"],
-                    "idempotency_key": (args.key or "cli-onboard-" + uuid.uuid4().hex)
-                    + f"-role-{attempt}",
-                }
-            })
+            role_result = await _onboard_call(
+                config,
+                args.principal,
+                "team_set_role",
+                {
+                    "request": {
+                        "team_id": args.team_id,
+                        "member": args.identity,
+                        "role": wanted,
+                        "active": True,
+                        "expected_revision": team["revision"],
+                        "idempotency_key": (args.key or "cli-onboard-" + uuid.uuid4().hex)
+                        + f"-role-{attempt}",
+                    }
+                },
+            )
             if role_result.get("error", {}).get("code") == "team_revision_conflict":
                 if attempt == 1:
                     team = await _onboard_call(
                         config, args.principal, "team_get", {"team_id": args.team_id}
                     )
                     continue
-            out["phases"].append({"phase": "role", **{k: role_result.get(k) for k in
-                ("coordinator", "revision", "error") if k in role_result}})
+            out["phases"].append(
+                {
+                    "phase": "role",
+                    **{
+                        k: role_result.get(k)
+                        for k in ("coordinator", "revision", "error")
+                        if k in role_result
+                    },
+                }
+            )
             break
     final = await _onboard_call(config, args.principal, "team_get", {"team_id": args.team_id})
-    inbox = await _onboard_call(config, args.principal, "team_messages", {
-        "team_id": args.team_id, "after": 0, "limit": 50})
-    unacked = sum(1 for m in (inbox.get("messages") or [])
-                  if m.get("recipient") == args.identity and not m.get("acknowledged"))
+    inbox = await _onboard_call(
+        config, args.principal, "team_messages", {"team_id": args.team_id, "after": 0, "limit": 50}
+    )
+    unacked = sum(
+        1
+        for m in (inbox.get("messages") or [])
+        if m.get("recipient") == args.identity and not m.get("acknowledged")
+    )
     out["readback"] = {
-        "owner": final.get("owner"), "coordinator": final.get("coordinator"),
+        "owner": final.get("owner"),
+        "coordinator": final.get("coordinator"),
         "revision": final.get("revision"),
         "identity_in_team": args.identity in (final.get("members") or {}),
         "unbestaetigte_inbox_seite1": unacked,
