@@ -28,6 +28,20 @@ class TeamRoleSet(Input):
     idempotency_key: str = Field(min_length=1, max_length=128)
 
 
+class TeamOnboardRegister(Input):
+    """Owner-only registration of a new identity in config and credentials.
+
+    Re-running is safe: existing sections and tokens are kept untouched.
+    """
+
+    identity: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
+    config_path: str = Field(min_length=1, max_length=512)
+    credentials_path: str = Field(min_length=1, max_length=512)
+    approval_mode: Literal["automatic", "ask"] = "automatic"
+    capabilities: list[str] = Field(default_factory=list, max_length=16)
+    message_peers: list[str] = Field(default_factory=lambda: ["local"], max_length=16)
+
+
 class TeamMessageSend(Input):
     team_id: str = Field(min_length=1, max_length=128)
     recipient: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
