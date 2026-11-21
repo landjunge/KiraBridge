@@ -742,16 +742,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 )
             requested = set(operations) if operations is not None else set(INPUTS)
             platform_rows = {}
-            macos_operations = {
-                "terminal.visible",
-                "session.catalog",
-                "session.read",
-                "session.input",
-                "session.focus",
-                "session.close",
-                "clipboard.info",
-                "keyboard.control",
-            }
+            macos_operations = requested & set(bridge.macos.descriptors)
             if requested & macos_operations:
                 platform_rows.update(
                     {

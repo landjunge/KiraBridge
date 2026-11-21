@@ -50,6 +50,8 @@ Die Entwicklungskonsole hat einen kompakten Produktheader: originale zweifarbige
 
 Ein praktisches Beispiel: Du sagst, dass du eine Notiz festhalten möchtest. Die KI kann die entsprechende Anwendung öffnen oder auswählen, das richtige Fenster aktivieren und deinen Text eingeben. Ebenso lassen sich Arbeitsabläufe mit Tastenkombinationen und Fensterwechseln verbinden. Entscheidend ist nicht nur, dass ein Befehl verschickt wird, sondern dass du am Computer eine sichtbare Aktion und ein überprüfbares Ergebnis bekommst. Welche Schritte gelingen, hängt von der aktuellen Anwendung, den Bedienungshilfen des Betriebssystems, den erteilten Berechtigungen und der Stabilität der Verbindung ab.
 
+MCP-Clients können im Entwicklungsquellstand mit `operation_catalog` gezielt die Schemata benötigter Werkzeuge abrufen. `compact=true` liefert dazu nur den ausgewählten Katalog, den nötigen Berechtigungskontext und eine leichte Discovery-Revision; die vollständige Katalogantwort bleibt der Standard. Diese Erweiterung ist im Quellstand und noch nicht als neue installierte Version bestätigt.
+
 ## Sprachsteuerung für alle, Barrierefreiheit mitgedacht
 
 **Das Hauptziel von KiraBridge ist, Computer, Anwendungen und KI-Werkzeuge mit natürlicher Sprache bedienen zu können.** Statt komplizierte Bedienfolgen zu lernen, beschreibst du, was geschehen soll: ein Programm öffnen, eine Notiz schreiben, Fenster wechseln oder einen KI-Agenten beauftragen. Diese Form der Steuerung richtet sich grundsätzlich an alle Menschen, ob für alltägliche Aufgaben, produktives Arbeiten, freihändige Bedienung oder komplexe Abläufe.
