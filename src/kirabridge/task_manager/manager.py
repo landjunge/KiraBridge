@@ -374,27 +374,50 @@ class TaskManager:
         )
 
     async def _worker(self, lane: str) -> None:
+        fault_recorded = False
         while True:
-            self.wake.clear()
-            self.input_policy.expire()
-            if self.maintenance:
-                self.maintenance()
-            task = self.store.claim(
-                self.owner,
-                self.config.lease_seconds,
-                lane,
-                native_visible=self.config.visible_handoffs.enabled,
-                managed_workers=self.managed_workers(),
-                native_principals=self.native_principals(),
-                stale_seconds=self.config.queue_stale_seconds,
-            )
-            if task is None:
+            try:
+                self.wake.clear()
+                self.input_policy.expire()
+                if self.maintenance:
+                    self.maintenance()
+                task = self.store.claim(
+                    self.owner,
+                    self.config.lease_seconds,
+                    lane,
+                    native_visible=self.config.visible_handoffs.enabled,
+                    managed_workers=self.managed_workers(),
+                    native_principals=self.native_principals(),
+                    stale_seconds=self.config.queue_stale_seconds,
+                )
+                if task is not None:
+                    await self._execute(task)
+                    fault_recorded = False
+                    continue
                 try:
                     await asyncio.wait_for(self.wake.wait(), 2.0)
                 except TimeoutError:
                     pass
-                continue
-            await self._execute(task)
+                fault_recorded = False
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "task worker loop failed; retrying after recovery delay"
+                )
+                if not fault_recorded:
+                    try:
+                        with self.store.transaction():
+                            self.store.audit(
+                                "task.worker_loop_failed",
+                                "local",
+                                None,
+                                {"reason": "worker_loop_failed", "lane": lane},
+                            )
+                    except Exception:
+                        pass  # The store may be the failing component; retry regardless.
+                    fault_recorded = True
+                await asyncio.sleep(1)
 
     async def _execute(self, task: dict) -> None:
         heartbeat = asyncio.create_task(self._heartbeat(task["id"]))
