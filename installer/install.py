@@ -1325,7 +1325,7 @@ def _restart_owned_tunnel(agents):
     return None
 
 
-def sync_aux_services(args, release, backup, *, restart_tunnel=True):
+def sync_aux_services(args, release, backup, *, restart_tunnel=True, transaction=None):
     """Point auxiliary com.kirabridge.* launchd services at *release*; fail-soft.
 
     Returns (records, problems). Records describe rewritten plists for rollback;
@@ -1366,8 +1366,24 @@ def sync_aux_services(args, release, backup, *, restart_tunnel=True):
                 problems.append((label, "unverändert, läuft aus anderer plist"))
                 continue
             name = "aux." + path.name
-            atomic(backup / name, original, path.stat().st_mode & 0o777)
-            atomic(path, plistlib.dumps(updated), path.stat().st_mode & 0o777, exact_mode=True)
+            mode = path.stat().st_mode & 0o777
+            updated_bytes = plistlib.dumps(updated)
+            atomic(backup / name, original, mode, exact_mode=True)
+            record = {
+                "plist": str(path),
+                "backup": name,
+                "installed_sha256": hashlib.sha256(updated_bytes).hexdigest(),
+                "original_sha256": hashlib.sha256(original).hexdigest(),
+                "was_loaded": source == path,
+            }
+            if transaction is not None:
+                # Checkpoint rollback data before replacing the live definition.
+                # current.json is the authoritative active transaction used by
+                # rollback(); a crash between writes still leaves recovery data.
+                transaction.setdefault("aux_services", []).append(record)
+                jwrite(args.prefix / "current.json", transaction)
+                jwrite(backup / "transaction.json", transaction)
+            atomic(path, updated_bytes, mode, exact_mode=True)
             try:
                 if source is not None:
                     _launchctl("bootout", f"gui/{os.getuid()}/{label}")
@@ -1378,7 +1394,7 @@ def sync_aux_services(args, release, backup, *, restart_tunnel=True):
                     _aux_bootstrap(path)
                 problems.append((label, f"Neustart fehlgeschlagen, alte plist bleibt: {error}"))
                 continue
-            records.append({"plist": str(path), "backup": name, "installed_sha256": sha(path)})
+            records.append({**record, "installed_sha256": sha(path)})
         except Exception as error:
             problems.append((label, f"nicht angepasst: {error}"))
     # Restart the owned tunnel last; fail-soft so the already collected records
@@ -1390,24 +1406,73 @@ def sync_aux_services(args, release, backup, *, restart_tunnel=True):
     return records, problems
 
 
-def restore_aux_services(active):
+def _persist_aux_recovery(active, transaction_path):
+    if transaction_path is None:
+        return
+    jwrite(transaction_path, active)
+    backup = active.get("backup")
+    if backup:
+        jwrite(Path(backup) / "transaction.json", active)
+
+
+def restore_aux_services(active, transaction_path=None):
     """Rollback: restore auxiliary plists recorded by sync_aux_services; fail-soft."""
     backup = Path(active["backup"])
+    complete = True
     for record in active.get("aux_services", []):
         path = Path(record["plist"])
         label = path.name[: -len(".plist")]
         try:
-            if (sha(path) if path.exists() else None) != record["installed_sha256"]:
-                report("warn", f"{label} seit Umschaltung geändert; nicht zurückgesetzt")
+            if record.get("restore_complete"):
                 continue
-            saved = backup / record["backup"]
-            loaded_before = _aux_loaded_from(label) == path
-            atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777, exact_mode=True)
-            if loaded_before:
+            current_sha = sha(path) if path.exists() else None
+            original_sha = record.get("original_sha256")
+            if current_sha != record["installed_sha256"] and (
+                not original_sha or current_sha != original_sha
+            ):
+                report("warn", f"{label} seit Umschaltung geändert; nicht zurückgesetzt")
+                complete = False
+                continue
+
+            # The file may already be restored after an interrupted prior attempt.
+            # Probe ownership before launchctl changes so a foreign binding is
+            # never booted out or replaced by this recovery.
+            if current_sha != original_sha:
+                saved = backup / record["backup"]
+                atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777, exact_mode=True)
+            source = _aux_loaded_from(label)
+            if source is not None and source != path:
+                report(
+                    "warn", f"{label} läuft inzwischen aus fremder plist; Bindung nicht verändert"
+                )
+                complete = False
+                continue
+
+            was_loaded = record.get("was_loaded")
+            # Persist an in-progress marker before launchctl changes. If rollback
+            # is interrupted after bootout, the next attempt knows to bootstrap.
+            record["restore_pending"] = True
+            _persist_aux_recovery(active, transaction_path)
+            if was_loaded is True:
+                if source == path:
+                    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+                # Also repairs a crash after bootout, when source is None.
+                _aux_bootstrap(path)
+            elif was_loaded is False:
+                if source == path:
+                    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+                    _aux_bootstrap(path)
+            elif source == path:
+                # Compatibility with transaction records written before was_loaded.
                 _launchctl("bootout", f"gui/{os.getuid()}/{label}")
                 _aux_bootstrap(path)
+            record["restore_complete"] = True
+            record.pop("restore_pending", None)
+            _persist_aux_recovery(active, transaction_path)
         except Exception as error:
             report("warn", f"{label} nicht zurückgesetzt", detail=str(error)[:200])
+            complete = False
+    return complete
 
 
 SOURCE_FIELDS = ("source_package_path", "source_tree_sha256", "source_file_count")
@@ -1873,11 +1938,7 @@ def activate(args, release):
     if args.service != "none":
         final_check(args, release)
     # Only after the new release is active and verified; never fails the upgrade.
-    aux_records, aux_problems = sync_aux_services(args, release, backup)
-    if aux_records:
-        before["aux_services"] = aux_records
-        jwrite(backup / "transaction.json", before)
-        jwrite(current, before)
+    aux_records, aux_problems = sync_aux_services(args, release, backup, transaction=before)
     for label, problem in aux_problems:
         report("warn", f"Zusatzdienst {label.removeprefix(AUX_PREFIX)}", detail=problem)
     report_summary(
@@ -1954,16 +2015,15 @@ def rollback(args, *, _compensating=False):
                     path.unlink(missing_ok=True)
             if active.get("threaddesk_config"):
                 restore_threaddesk_config(args, active["threaddesk_config"])
-            if active.get("desktop"):
-                active["rollback_core_restored"] = True
-                active["restored_installed_wrapper_sha256"] = (
-                    sha(args.launcher) if args.launcher.exists() else None
-                )
-                active["restored_installed_plist_sha256"] = (
-                    sha(args.plist) if args.plist.exists() else None
-                )
-                jwrite(backup / "transaction.json", active)
-                jwrite(current, active)
+            active["rollback_core_restored"] = True
+            active["restored_installed_wrapper_sha256"] = (
+                sha(args.launcher) if args.launcher.exists() else None
+            )
+            active["restored_installed_plist_sha256"] = (
+                sha(args.plist) if args.plist.exists() else None
+            )
+            jwrite(current, active)
+            jwrite(backup / "transaction.json", active)
     if args.service == "systemd-user":
         if _systemctl(args, "daemon-reload").returncode:
             raise RuntimeError("Cannot reload user manager after rollback; recovery retained")
@@ -1979,13 +2039,15 @@ def rollback(args, *, _compensating=False):
                 and _systemctl(args, "enable", "--runtime", "--", args.plist.name).returncode
             ):
                 raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
-    restore_aux_services(active)
+    aux_services_restored = restore_aux_services(active, current)
     # The forward sync kickstarted the owned tunnel onto the new runtime; restart
     # it now so its live connect child drops back to the rolled-back runtime. Same
     # ownership guard as sync: only the plist next to the bridge, loaded from it.
+    tunnel_restarted = True
     if args.service == "launchd" and LABEL == "com.kirabridge.bridge":
         note = _restart_owned_tunnel(args.plist.parent)
         if note:
+            tunnel_restarted = False
             report("warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note)
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
@@ -2004,7 +2066,13 @@ def rollback(args, *, _compensating=False):
             )
     # Keep the complete active recovery record until every affected component
     # is restored. Desktop failure must not erase its transaction checkpoint.
-    if active["previous"]:
+    if not aux_services_restored or not tunnel_restarted:
+        report(
+            "warn",
+            "Zusatzdienste noch nicht vollständig zurückgesetzt",
+            detail="Der Rückweg bleibt für eine spätere Wiederherstellung gespeichert",
+        )
+    elif active["previous"]:
         jwrite(current, active["previous"])
     else:
         current.unlink()

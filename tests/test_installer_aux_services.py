@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import plistlib
 import subprocess
 from pathlib import Path
@@ -23,20 +24,30 @@ class FakeLaunchctl:
         self.loaded = set()
         self.fail_bootstrap = set()
         self.raise_for = set()
+        self.crash_for = set()
+        self.source_paths = {}
 
     def __call__(self, *argv, timeout=20):
         self.calls.append(argv)
         label = argv[-1].rsplit("/", 1)[-1].removesuffix(".plist")
+        if (argv[0], label) in self.crash_for:
+            self.crash_for.remove((argv[0], label))
+            raise KeyboardInterrupt("simulated process interruption")
         if (argv[0], label) in self.raise_for:
             raise subprocess.TimeoutExpired(argv, timeout)
         code, out = 0, ""
         if argv[0] == "print":
             if label in self.loaded:
-                out = f"\tpath = {self.agents / (label + '.plist')}\n"
+                loaded_path = self.source_paths.get(label, self.agents / (label + ".plist"))
+                out = f"\tpath = {loaded_path}\n"
             else:
                 code = 113
         elif argv[0] == "bootstrap" and label in self.fail_bootstrap:
             code = 1
+        if argv[0] == "bootout" and code == 0:
+            self.loaded.discard(label)
+        elif argv[0] == "bootstrap" and code == 0:
+            self.loaded.add(label)
         return subprocess.CompletedProcess(argv, code, out, "")
 
 
@@ -123,6 +134,137 @@ def test_sync_is_idempotent(installer, world):
     assert records == []
     assert {k: p.read_bytes() for k, p in world.files.items()} == after
     assert not [c for c in world.fake.calls if c[0] != "print"]
+
+
+def test_backup_preserves_aux_plist_mode(installer, world):
+    world.files["approvals"].chmod(0o640)
+
+    installer.sync_aux_services(world.args, world.new, world.backup, restart_tunnel=False)
+
+    saved = world.backup / "aux.com.kirabridge.approvals.plist"
+    assert saved.stat().st_mode & 0o777 == 0o640
+
+
+def test_sync_persists_recovery_before_rewrite_and_recovers_interruption(
+    installer, world, monkeypatch
+):
+    current = world.args.prefix / "current.json"
+    transaction = {"backup": str(world.backup), "aux_services": []}
+    installer.jwrite(current, transaction)
+    original = {
+        key: world.files[key].read_bytes() for key in ("approvals", "chat")
+    }
+    real_atomic = installer.atomic
+    interrupted = False
+
+    def interrupt_after_aux_replace(path, data, mode=0o600, *, exact_mode=False):
+        nonlocal interrupted
+        if Path(path) == world.files["approvals"] and not interrupted:
+            checkpoint = json.loads(current.read_text())
+            record = next(
+                item
+                for item in checkpoint["aux_services"]
+                if item["plist"] == str(world.files["approvals"])
+            )
+            assert record["original_sha256"]
+            assert record["installed_sha256"]
+            interrupted = True
+            real_atomic(path, data, mode, exact_mode=exact_mode)
+            raise OSError("simulated interruption after atomic replacement")
+        return real_atomic(path, data, mode, exact_mode=exact_mode)
+
+    monkeypatch.setattr(installer, "atomic", interrupt_after_aux_replace)
+    installer.sync_aux_services(world.args, world.new, world.backup, transaction=transaction)
+
+    assert interrupted
+    recovery = json.loads(current.read_text())
+    installer.restore_aux_services(recovery)
+    assert {key: world.files[key].read_bytes() for key in original} == original
+    # A repeated recovery safely recognizes that the original definitions are back.
+    installer.restore_aux_services(recovery)
+    assert {key: world.files[key].read_bytes() for key in original} == original
+
+
+def test_recovery_reloads_owned_service_interrupted_after_bootout(installer, world):
+    current = world.args.prefix / "current.json"
+    transaction = {"backup": str(world.backup), "aux_services": []}
+    installer.jwrite(current, transaction)
+    original = world.files["approvals"].read_bytes()
+    world.fake.crash_for = {("bootstrap", "com.kirabridge.approvals")}
+
+    with pytest.raises(KeyboardInterrupt, match="simulated process interruption"):
+        installer.sync_aux_services(world.args, world.new, world.backup, transaction=transaction)
+
+    assert world.files["approvals"].read_bytes() != original
+    assert "com.kirabridge.approvals" not in world.fake.loaded
+    recovery = json.loads(current.read_text())
+    record = next(
+        item
+        for item in recovery["aux_services"]
+        if item["plist"] == str(world.files["approvals"])
+    )
+    assert record["was_loaded"] is True
+
+    installer.restore_aux_services(recovery, current)
+
+    assert world.files["approvals"].read_bytes() == original
+    assert "com.kirabridge.approvals" in world.fake.loaded
+    bootstrap_count = sum(call[0] == "bootstrap" for call in world.fake.calls)
+    installer.restore_aux_services(json.loads(current.read_text()), current)
+    assert sum(call[0] == "bootstrap" for call in world.fake.calls) == bootstrap_count
+
+
+def test_recovery_preserves_foreign_loaded_binding(installer, world, monkeypatch):
+    current = world.args.prefix / "current.json"
+    transaction = {"backup": str(world.backup), "aux_services": []}
+    installer.jwrite(current, transaction)
+    original = world.files["approvals"].read_bytes()
+    installer.sync_aux_services(world.args, world.new, world.backup, transaction=transaction)
+    recovery = json.loads(current.read_text())
+    world.fake.source_paths["com.kirabridge.approvals"] = world.agents / "foreign.plist"
+    world.fake.calls.clear()
+    warnings = []
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: warnings.append(args))
+
+    assert installer.restore_aux_services(recovery, current) is False
+
+    assert world.files["approvals"].read_bytes() == original
+    assert "com.kirabridge.approvals" in world.fake.loaded
+    assert not any(
+        call[0] in {"bootout", "bootstrap"}
+        and "com.kirabridge.approvals" in " ".join(call)
+        for call in world.fake.calls
+    )
+    assert any("fremder plist" in " ".join(map(str, warning)) for warning in warnings)
+
+
+def test_recovery_reloads_owned_service_that_became_loaded(installer, world):
+    current = world.args.prefix / "current.json"
+    transaction = {"backup": str(world.backup), "aux_services": []}
+    installer.jwrite(current, transaction)
+    original = world.files["approvals"].read_bytes()
+    world.fake.loaded.remove("com.kirabridge.approvals")
+
+    installer.sync_aux_services(world.args, world.new, world.backup, transaction=transaction)
+
+    recovery = json.loads(current.read_text())
+    record = next(
+        item
+        for item in recovery["aux_services"]
+        if item["plist"] == str(world.files["approvals"])
+    )
+    assert record["was_loaded"] is False
+    world.fake.loaded.add("com.kirabridge.approvals")
+    world.fake.calls.clear()
+
+    assert installer.restore_aux_services(recovery, current) is True
+
+    assert world.files["approvals"].read_bytes() == original
+    assert "com.kirabridge.approvals" in world.fake.loaded
+    assert (
+        [call[0] for call in world.fake.calls if call[0] in {"bootout", "bootstrap"}]
+        == ["bootout", "bootstrap"]
+    )
 
 
 def test_one_failure_does_not_stop_others(installer, world):
