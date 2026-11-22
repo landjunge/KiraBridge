@@ -6,7 +6,7 @@ import pytest
 from test_mcp import http_bridge as live_http_fixture
 
 from kirabridge.bridge_core.config import NativeCodexBinding, TeamWorkerConfig
-from kirabridge.bridge_core.models import UncertainExecution, digest
+from kirabridge.bridge_core.models import BridgeError, UncertainExecution, digest
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 
 http_bridge = live_http_fixture
@@ -147,6 +147,11 @@ async def test_http_team_send_steers_only_exact_active_coordinator_and_never_rep
     assert bridge.config.team.enabled
     host = FakeNativeHost(config.visible_handoffs.native_codex, uncertain=True)
     bridge.team_dispatcher.codex_host = host
+
+    async def unexpected_budget_call(agent):
+        raise AssertionError(f"busy steering must not call the budget gate for {agent}")
+
+    monkeypatch.setattr(bridge.agents, "budget_note", unexpected_budget_call)
     await bridge.team_dispatcher.start()
     try:
         request = {
@@ -329,6 +334,8 @@ async def test_idle_codex_starts_exact_root_for_ping_without_ack(
         # The test fixture has no pinned TollGate, so the shared model-work
         # budget gate fails open and records that fact in the durable outcome.
         assert '"tollgate_unavailable":true' in outcome["metadata"]
+        assert '"tollgate_decision":"unavailable"' in outcome["metadata"]
+        assert '"reason"' not in outcome["metadata"] and '"limit_source"' not in outcome["metadata"]
         assert bridge.store.db.execute(
             "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
             "AND kind='team.message_native_ping_idle_pending'",
@@ -375,6 +382,57 @@ async def test_native_ping_steer_respects_disabled_interim_messages(
         ).fetchone()
         assert outcome is not None
         assert '"error_code":"interim_messages_disabled"' in outcome["metadata"]
+    finally:
+        await clients.__aexit__(None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_idle_native_ping_user_budget_denial_prevents_start(
+    http_bridge, config, monkeypatch, tmp_path
+):
+    bridge, _, clients = await _setup(http_bridge, config, monkeypatch, tmp_path)
+    host = FakeNativeHost(config.visible_handoffs.native_codex, operation="turn/start")
+    bridge.team_dispatcher.codex_host = host
+    budget_calls = []
+
+    async def denied_budget(agent):
+        budget_calls.append(agent)
+        raise BridgeError("tollgate_budget_reached", "user-set budget reached")
+
+    monkeypatch.setattr(bridge.agents, "budget_note", denied_budget)
+    try:
+        result = (
+            await clients.call(
+                "local",
+                "team_message_send",
+                {
+                    "request": {
+                        "team_id": "team-codex",
+                        "recipient": "codex",
+                        "body": "The user-set budget must gate a new idle turn.",
+                        "kind": "question",
+                        "idempotency_key": "idle-budget-denied",
+                    }
+                },
+            )
+        ).structuredContent
+        queued = bridge.teams.pending_native_pings(limit=1)[0]
+        await bridge.team_dispatcher._run_native_ping(queued)
+
+        assert budget_calls == ["codex"]
+        assert host.prepare_calls == 1 and host.deliveries == []
+        assert bridge.teams._message("team-codex", result["id"])["acknowledged"] is None
+        denied = bridge.store.db.execute(
+            "SELECT metadata FROM team_events WHERE team_id='team-codex' AND object_id=? "
+            "AND kind='team.message_native_ping_denied'",
+            (result["id"],),
+        ).fetchone()
+        assert denied is not None and '"error_code":"tollgate_budget_reached"' in denied["metadata"]
+        assert bridge.store.db.execute(
+            "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
+            "AND kind='team.message_native_ping_submitting'",
+            (result["id"],),
+        ).fetchone() is None
     finally:
         await clients.__aexit__(None, None, None)
 

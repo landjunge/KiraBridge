@@ -250,7 +250,6 @@ class TeamDispatcher:
         binding = bridge.config.visible_handoffs.native_codex
         attempt_started = False
         stage = "preflight"
-        tollgate_note = None
         tollgate_evidence = {}
 
         def record(kind, **metadata):
@@ -284,14 +283,17 @@ class TeamDispatcher:
                 and not bridge.config.visible_handoffs.allow_interim_messages
             ):
                 raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
-            # Match the existing native agent.execute route: user-set TollGate
-            # limits apply to model work; unavailable budget data fails open
-            # with explicit evidence.
-            tollgate_note = await bridge.agents.budget_note("codex")
-            if tollgate_note is not None:
-                tollgate_evidence["tollgate"] = tollgate_note
-                if tollgate_note.get("decision") == "unavailable":
-                    tollgate_evidence["tollgate_unavailable"] = True
+            if operation == "turn/start":
+                # Starting an idle model turn consumes model-run budget. Busy
+                # steering remains the existing delivery-only notification path.
+                tollgate_note = await bridge.agents.budget_note("codex")
+                if tollgate_note is not None:
+                    decision = tollgate_note.get("decision")
+                    if decision not in {"allow", "unknown", "deny"}:
+                        decision = "unavailable"
+                    tollgate_evidence["tollgate_decision"] = decision
+                    if decision == "unavailable":
+                        tollgate_evidence["tollgate_unavailable"] = True
 
             async def before_send(observation):
                 nonlocal attempt_started, stage
