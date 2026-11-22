@@ -71,6 +71,24 @@ def test_collector_keeps_only_numbers_and_phase_names(probe):
     assert collector.rows == [("ps_catalog", 12.5, "ok")]
 
 
+def test_native_time_share_sums_multiple_calls_per_catalog(probe):
+    text = probe.summary(
+        {
+            "found": 1,
+            "errors": [],
+            "walls": [2000],
+            "rows": [
+                ("terminal_catalog", 2000, "ok"),
+                ("terminal_native", 1000, "ok"),
+                ("terminal_native", 1000, "ok"),
+            ],
+        },
+        1,
+    )
+
+    assert "Davon wartet KiraBridge auf Terminal.app: 100 %" in text
+
+
 def test_refuses_to_run_off_macos(probe, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["measure_terminal_latency.py"])
     monkeypatch.setattr(probe.sys, "platform", "linux")

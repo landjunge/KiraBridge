@@ -94,8 +94,8 @@ def summary(result: dict, runs: int) -> str:
     lines.append(f"{'Ein Durchlauf insgesamt':<36} {_stats(result['walls'])}")
     catalog = by_phase.get("terminal_catalog", [])
     native = by_phase.get("terminal_native", [])
-    if catalog and native and statistics.mean(catalog) > 0:
-        share = 100 * statistics.mean(native) / statistics.mean(catalog)
+    if catalog and native and sum(catalog) > 0:
+        share = 100 * sum(native) / sum(catalog)
         lines.append("")
         lines.append(f"Davon wartet KiraBridge auf Terminal.app: {share:.0f} %")
     return "\n".join(lines)
