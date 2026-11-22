@@ -1404,7 +1404,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Wait for own durable completion notices, including already finished tasks.
 
         Pass source_id (the task id) to read that notice even when older unacked
-        notices still sit in the same target. Omit it to keep the oldest-first inbox.
+        notices still sit in the same target. Without source_id, notices are newest-first.
         Run a persistent consumer that rearms this bounded wait; no task-status polling.
         Receipts/IDs remain stable until completion_ack after consumer processing.
         A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.

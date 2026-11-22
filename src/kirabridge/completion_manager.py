@@ -247,9 +247,10 @@ class CompletionManager:
             )
         allowed = tuple(source if source in sources else "-" for source in SOURCE_CAPABILITIES)
         marks = ",".join("?" for _ in allowed)
-        with self.store.transaction():
+
+        def eligible_rows():
             if source_id is None:
-                rows = self.store.db.execute(
+                return self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
                     "AND acknowledged IS NULL AND source IN (" + marks + ") "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
@@ -257,38 +258,49 @@ class CompletionManager:
                     "ORDER BY seq DESC LIMIT ?",
                     (principal, target, *allowed, limit),
                 ).fetchall()
-            else:
-                # A known source is readable even when older unacked notices fill the inbox.
-                rows = self.store.db.execute(
-                    "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND source_id=? AND acknowledged IS NULL AND source IN (" + marks + ") "
-                    "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
-                    "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                    "ORDER BY seq DESC LIMIT ?",
-                    (principal, target, source_id, *allowed, limit),
-                ).fetchall()
+            # A known source is readable even when older unacked notices fill the inbox.
+            return self.store.db.execute(
+                "SELECT * FROM completion_notices WHERE principal=? AND target=? "
+                "AND source_id=? AND acknowledged IS NULL AND source IN (" + marks + ") "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='completions' AND h.item_id=completion_notices.id) "
+                "ORDER BY seq DESC LIMIT ?",
+                (principal, target, source_id, *allowed, limit),
+            ).fetchall()
+
+        rows = eligible_rows()
+        if rows:
+            # Empty inbox polls are read-only. If data is present, re-read it under
+            # the write lock before setting receipts or recording delivery evidence.
+            with self.store.transaction():
+                rows = eligible_rows()
+                notices = []
+                for row in rows:
+                    receipt, delivered = row["receipt"], row["delivered"]
+                    if receipt is None:
+                        receipt, delivered = str(uuid.uuid4()), time.time()
+                        self.store.db.execute(
+                            "UPDATE completion_notices SET receipt=?,delivered=? WHERE id=?",
+                            (receipt, delivered, row["id"]),
+                        )
+                        self.store.audit(
+                            "completion.returned_to_client",
+                            principal,
+                            None,
+                            {"notice_id": row["id"]},
+                        )
+                    notices.append(
+                        {
+                            "id": row["id"],
+                            "seq": row["seq"],
+                            "target": target,
+                            "receipt": receipt,
+                            "returned_at": delivered,
+                            "payload": json.loads(row["payload"]),
+                        }
+                    )
+        else:
             notices = []
-            for row in rows:
-                receipt, delivered = row["receipt"], row["delivered"]
-                if receipt is None:
-                    receipt, delivered = str(uuid.uuid4()), time.time()
-                    self.store.db.execute(
-                        "UPDATE completion_notices SET receipt=?,delivered=? WHERE id=?",
-                        (receipt, delivered, row["id"]),
-                    )
-                    self.store.audit(
-                        "completion.returned_to_client", principal, None, {"notice_id": row["id"]}
-                    )
-                notices.append(
-                    {
-                        "id": row["id"],
-                        "seq": row["seq"],
-                        "target": target,
-                        "receipt": receipt,
-                        "returned_at": delivered,
-                        "payload": json.loads(row["payload"]),
-                    }
-                )
         return {
             "notices": notices,
             "delivery_scope": "tool_response_to_client",

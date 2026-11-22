@@ -2,7 +2,9 @@
 
 import asyncio
 import json
+import sqlite3
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -20,6 +22,23 @@ from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 
 def automatic(config):
     config.principals["local"].approval_mode = "automatic"
+
+
+def test_empty_completion_read_does_not_wait_for_sqlite_writer(bridge):
+    writer = sqlite3.connect(bridge.config.state_path / "bridge.sqlite3", isolation_level=None)
+    original_timeout = bridge.store.db.execute("PRAGMA busy_timeout").fetchone()[0]
+    writer.execute("BEGIN IMMEDIATE")
+    bridge.store.db.execute("PRAGMA busy_timeout=50")
+    try:
+        started = time.monotonic()
+        result = bridge.completions.receive("local")
+        elapsed = time.monotonic() - started
+        assert result["notices"] == []
+        assert elapsed < 0.2
+    finally:
+        bridge.store.db.execute(f"PRAGMA busy_timeout={original_timeout}")
+        writer.execute("ROLLBACK")
+        writer.close()
 
 
 def terminal(config, code, task_id="work", timeout=3):
