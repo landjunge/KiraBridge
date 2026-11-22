@@ -4,6 +4,7 @@ import hashlib
 import os
 import sys
 import tomllib
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -12,6 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer
 
 from kirabridge.bridge_core.models import AgentToolGrant, BridgeError
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
+from kirabridge.openrouter_models import (
+    OPENROUTER_DEFAULT_FALLBACKS,
+    OPENROUTER_DEFAULT_MODEL,
+    OPENROUTER_FREE_MODELS,
+    OPENROUTER_PAID_MODELS,
+)
 
 _FULL_KEYBOARD_CAPABILITIES = frozenset(
     {
@@ -234,6 +241,16 @@ class AgentConfig(BaseModel):
     # Launch arguments for the opt-in kind "acp_pap" (see agent_manager/acp_pap_host.py).
     acp_pap_args: list[str] = Field(default_factory=list)
     api_key_env: str = "XAI_API_KEY"
+    openrouter_credential_source: Literal["environment"] = "environment"
+    openrouter_fallback_models: list[str] = Field(default_factory=list, max_length=4)
+    openrouter_max_prompt_bytes: int = Field(default=262144, ge=1, le=1048576)
+    openrouter_max_output_tokens: int = Field(default=1024, ge=1, le=32768)
+    openrouter_allow_paid: bool = False
+    openrouter_paid_max_prompt_bytes: int | None = Field(default=None, ge=1, le=1048576)
+    openrouter_paid_max_output_tokens: int | None = Field(default=None, ge=1, le=32768)
+    openrouter_paid_max_cost_usd: Decimal | None = Field(
+        default=None, gt=Decimal("0"), max_digits=12, decimal_places=8
+    )
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
     bridge_tools: bool = False
     allow_local_tools: bool = False
@@ -249,6 +266,10 @@ class AgentConfig(BaseModel):
         if self.kind != "qwen_acp":
             for key in list(value):
                 if key.startswith("qwen_"):
+                    value.pop(key)
+        if self.kind != "openrouter_api":
+            for key in list(value):
+                if key.startswith("openrouter_"):
                     value.pop(key)
         if self.grok_reasoning_effort is None:
             value.pop("grok_reasoning_effort", None)
@@ -290,6 +311,7 @@ class AgentConfig(BaseModel):
         defaults = {
             "qwen_acp": "",
             "acp_pap": "",
+            "openrouter_api": "OPENROUTER_API_KEY",
             "opencode": "OPENCODE_API_KEY",
             "gemini_cli": "GEMINI_API_KEY",
             "claude_code": "ANTHROPIC_API_KEY",
@@ -300,8 +322,61 @@ class AgentConfig(BaseModel):
             and isinstance(value.get("kind"), str)
             and value["kind"] in defaults
         ):
-            return {"api_key_env": defaults[value["kind"]], **value}
+            normalized = {"api_key_env": defaults[value["kind"]], **value}
+            if value["kind"] == "openrouter_api":
+                normalized.setdefault("model", OPENROUTER_DEFAULT_MODEL)
+                normalized.setdefault(
+                    "openrouter_fallback_models", list(OPENROUTER_DEFAULT_FALLBACKS)
+                )
+                normalized.setdefault("openrouter_credential_source", "environment")
+            return normalized
         return value
+
+    @model_validator(mode="after")
+    def openrouter_provider_policy(self):
+        fields = (
+            self.openrouter_credential_source != "environment"
+            or self.openrouter_fallback_models
+            or self.openrouter_max_prompt_bytes != 262144
+            or self.openrouter_max_output_tokens != 1024
+            or self.openrouter_allow_paid
+            or self.openrouter_paid_max_prompt_bytes is not None
+            or self.openrouter_paid_max_output_tokens is not None
+            or self.openrouter_paid_max_cost_usd is not None
+        )
+        if self.kind != "openrouter_api":
+            if fields:
+                raise ValueError("OpenRouter settings require kind openrouter_api")
+            return self
+        if not self.model:
+            raise ValueError("OpenRouter requires an explicit model")
+        if not self.openrouter_allow_paid and (
+            self.model not in OPENROUTER_FREE_MODELS
+            or any(item not in OPENROUTER_FREE_MODELS for item in self.openrouter_fallback_models)
+        ):
+            raise ValueError("OpenRouter models must be in the verified free-model set")
+        if self.openrouter_allow_paid and self.model not in (
+            OPENROUTER_FREE_MODELS | OPENROUTER_PAID_MODELS
+        ):
+            raise ValueError("OpenRouter paid model is not in the explicitly reviewed set")
+        if self.openrouter_allow_paid and any(
+            item not in OPENROUTER_FREE_MODELS for item in self.openrouter_fallback_models
+        ):
+            raise ValueError("OpenRouter paid fallbacks are not enabled")
+        paid_limits = (
+            self.openrouter_paid_max_prompt_bytes,
+            self.openrouter_paid_max_output_tokens,
+            self.openrouter_paid_max_cost_usd,
+        )
+        if self.openrouter_allow_paid and any(value is None for value in paid_limits):
+            raise ValueError("Paid OpenRouter models require prompt, output, and cost limits")
+        if not self.openrouter_allow_paid and any(value is not None for value in paid_limits):
+            raise ValueError("Paid OpenRouter limits require explicit paid-model opt-in")
+        if self.openrouter_paid_max_output_tokens is not None and (
+            self.openrouter_paid_max_output_tokens > self.openrouter_max_output_tokens
+        ):
+            raise ValueError("Paid output limit cannot exceed the global OpenRouter output limit")
+        return self
 
     @model_validator(mode="after")
     def local_provider_endpoint(self):
