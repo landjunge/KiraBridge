@@ -80,8 +80,9 @@ def test_update_rejects_silent_switch_to_another_config(installer, tmp_path):
 @pytest.mark.parametrize(
     "timeout_failure", [False, True], ids=["bootstrap-error", "bootstrap-timeout"]
 )
+@pytest.mark.parametrize("rollback_failure", [False, True], ids=["rollback-ok", "rollback-fails"])
 def test_launchd_failure_restores_previous_definition_without_config_restore(
-    installer, tmp_path, monkeypatch, timeout_failure
+    installer, tmp_path, monkeypatch, timeout_failure, rollback_failure
 ):
     prefix = tmp_path / "install"
     prefix.mkdir(mode=0o700)
@@ -140,13 +141,95 @@ def test_launchd_failure_restores_previous_definition_without_config_restore(
             raise failure
 
     monkeypatch.setattr(installer, "start_service", start)
-    with pytest.raises(type(failure), match="SIMULATED"):
-        installer.activate(args, release)
-    assert launcher.read_bytes() == old_launcher
-    assert plist.read_bytes() == old_plist
+    if rollback_failure:
+
+        def fail_rollback(*args, **kwargs):
+            raise RuntimeError("ROLLBACK guard mismatch token=do-not-print-this")
+
+        monkeypatch.setattr(installer, "rollback", fail_rollback)
+        with pytest.raises(RuntimeError, match="Aktivierung fehlgeschlagen") as raised:
+            installer.activate(args, release)
+        message = str(raised.value)
+        assert "SIMULATED launchd bootstrap" in message
+        assert "ROLLBACK guard mismatch token=[redacted]" in message
+        assert "do-not-print-this" not in message
+    else:
+        with pytest.raises(type(failure), match="SIMULATED"):
+            installer.activate(args, release)
     assert config.read_bytes() == original_config
-    assert not (prefix / "current.json").exists()
-    assert operations == ["stop", "start", "stop", "start"]
+    if rollback_failure:
+        assert (prefix / "current.json").exists()
+        assert operations == ["stop", "start"]
+    else:
+        assert launcher.read_bytes() == old_launcher
+        assert plist.read_bytes() == old_plist
+        assert not (prefix / "current.json").exists()
+        assert operations == ["stop", "start", "stop", "start"]
+
+
+def test_desktop_chatgpt_rollback_does_not_kickstart_same_service_twice(
+    installer, monkeypatch, tmp_path
+):
+    prefix = tmp_path / "install"
+    backup = prefix / "backups/transaction"
+    backup.mkdir(parents=True)
+    config = tmp_path / "config.toml"
+    config.write_text("")
+    launcher = tmp_path / "launcher"
+    launcher.write_text("new launcher")
+    plist = tmp_path / "service.plist"
+    plist.write_text("new plist")
+    (backup / "launcher.before").write_text("old launcher")
+    (backup / "service.before.plist").write_text("old plist")
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="launchd",
+    )
+    active = {
+        "backup": str(backup),
+        "config": str(config),
+        "launcher": str(launcher),
+        "plist": str(plist),
+        "service": "launchd",
+        "installed_wrapper_sha256": installer.sha(launcher),
+        "installed_plist_sha256": installer.sha(plist),
+        "had_wrapper": True,
+        "had_plist": True,
+        "was_loaded": False,
+        "previous": None,
+        "aux_services": [],
+        "desktop": {"services": [{"name": "chatgpt", "changed": True}]},
+    }
+    current = prefix / "current.json"
+    installer.jwrite(current, active)
+    kicks, desktop_restores = [], []
+
+    def restore_desktop(api, transaction, journal):
+        desktop_restores.append(transaction["desktop"]["services"][0]["name"])
+
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda args: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda args: None)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *args: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda config: contextlib.nullcontext())
+    monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    monkeypatch.setattr(installer, "loaded", lambda args: False)
+    monkeypatch.setattr(installer, "_restart_owned_tunnel", lambda agents: kicks.append(agents))
+    monkeypatch.setattr(
+        installer,
+        "desktop_module",
+        lambda args: SimpleNamespace(restore=restore_desktop),
+    )
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
+
+    installer.rollback(args)
+
+    assert desktop_restores == ["chatgpt"]
+    assert kicks == []
+    assert not current.exists()
 
 
 @pytest.mark.parametrize("interrupted_path", ["launcher", "plist"])

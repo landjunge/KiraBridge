@@ -170,6 +170,18 @@ def report_summary(title, rows, *, success=True):
     say(title + "".join(f"\n   {label}: {value}" for label, value in rows))
 
 
+def _safe_failure_detail(error):
+    """Keep useful bounded installer diagnostics without emitting credential values."""
+    detail = " ".join(str(error).split())
+    detail = re.sub(r"(?i)\b(?:bearer|basic)\s+[^\s,;]+", "[redacted authorization]", detail)
+    detail = re.sub(
+        r"(?i)([\"']?(?:access[_-]?token|refresh[_-]?token|token|secret|password|credential|api[_-]?key)[\"']?\s*[:=]\s*[\"']?)[^\s,;\"'}]+",
+        r"\1[redacted]",
+        detail,
+    )
+    return f"{type(error).__name__}: {detail[:400]}"
+
+
 def report_heading(args):
     """Wordmark, then the action with version and source of what is being installed."""
     titles = {
@@ -1926,14 +1938,24 @@ def activate(args, release):
                 types.SimpleNamespace(**globals()), args, release, before, current
             )
             report("ok", "Desktop-App, Konsole und Dienste aktualisiert")
-    except Exception:
+    except Exception as activation_error:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             report(
                 "warn",
                 "Umschaltung fehlgeschlagen",
                 detail="Der Rückweg wird unter erneuter Leerlaufprüfung versucht",
             )
-            rollback(args, _compensating=True)
+            try:
+                rollback(args, _compensating=True)
+            except Exception as rollback_error:
+                detail = (
+                    f"Aktivierung fehlgeschlagen ({_safe_failure_detail(activation_error)}); "
+                    "automatischer Rückweg fehlgeschlagen "
+                    f"({_safe_failure_detail(rollback_error)}); "
+                    "Transaktionsjournal für Fortsetzung erhalten"
+                )
+                report("fail", "Automatischer Rückweg fehlgeschlagen", detail=detail)
+                raise RuntimeError(detail) from rollback_error
         raise
     assert args.config.read_bytes() == config_after, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
@@ -2042,11 +2064,14 @@ def rollback(args, *, _compensating=False):
             ):
                 raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
     aux_services_restored = restore_aux_services(active, current)
-    # The forward sync kickstarted the owned tunnel onto the new runtime; restart
-    # it now so its live connect child drops back to the rolled-back runtime. Same
-    # ownership guard as sync: only the plist next to the bridge, loaded from it.
+    # Legacy transactions have no desktop service row, so restart the tunnel here.
+    # A changed desktop ChatGPT row owns its own stop/reload during restore().
     tunnel_restarted = True
-    if args.service == "launchd" and LABEL == "com.kirabridge.bridge":
+    desktop_chatgpt_owned = any(
+        row.get("name") == "chatgpt" and row.get("changed") is True
+        for row in (active.get("desktop") or {}).get("services", [])
+    )
+    if args.service == "launchd" and LABEL == "com.kirabridge.bridge" and not desktop_chatgpt_owned:
         note = _restart_owned_tunnel(args.plist.parent)
         if note:
             tunnel_restarted = False
