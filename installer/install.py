@@ -1474,6 +1474,20 @@ def restore_aux_services(active, transaction_path=None):
 SOURCE_FIELDS = ("source_package_path", "source_tree_sha256", "source_file_count")
 
 
+def source_tree_identity(package):
+    """Fingerprint one already-resolved package tree without importing it."""
+    package = Path(package).resolve(strict=True)
+    manifest = {str(p.relative_to(package)): sha(p) for p in sorted(package.rglob("*.py"))}
+    if not manifest:
+        raise RuntimeError("Target runtime source is unavailable")
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return {
+        "source_package_path": str(package),
+        "source_tree_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+        "source_file_count": len(manifest),
+    }
+
+
 def release_source(release):
     # Version strings can be shared by distinct builds. Resolve the installed
     # package with the target venv, ignoring the caller's PYTHONPATH/user site.
@@ -1499,15 +1513,7 @@ def release_source(release):
             allowed.append(candidate.resolve(strict=True))
     if not any(package == base or package.is_relative_to(base) for base in allowed):
         raise RuntimeError("Target runtime imports a package outside its release")
-    manifest = {str(p.relative_to(package)): sha(p) for p in sorted(package.rglob("*.py"))}
-    if not manifest:
-        raise RuntimeError("Target runtime source is unavailable")
-    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return {
-        "source_package_path": str(package),
-        "source_tree_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
-        "source_file_count": len(manifest),
-    }
+    return source_tree_identity(package)
 
 
 READINESS_SECONDS = 60

@@ -382,6 +382,7 @@ def services(desktop, monkeypatch, tmp_path):
         return {"backup": str(backup), "desktop": state}
 
     args = SimpleNamespace(service="launchd", config=config)
+    args.prefix = tmp_path / "install"
     api = SimpleNamespace(
         **{
             **vars(installer),
@@ -393,6 +394,77 @@ def services(desktop, monkeypatch, tmp_path):
     return SimpleNamespace(
         api=api, args=args, agents=agents, log=log, release=release, transaction=transaction
     )
+
+
+def recorded_previous_release(services):
+    prefix = services.args.prefix
+    releases = prefix / "releases"
+    backups = prefix / "backups"
+    releases.mkdir(parents=True, mode=0o700)
+    backups.mkdir(mode=0o700)
+    prefix.chmod(0o700)
+    commit = "93539ff8c482" + "a" * 28
+    release = releases / f"0.8.0rc57-{commit[:12]}"
+    package = release / "source/.venv/lib/python3.11/site-packages/kirabridge"
+    venv = release / "source/.venv"
+    (venv / "bin").mkdir(parents=True, mode=0o700)
+    package.mkdir(parents=True, mode=0o700)
+    (package / "__init__.py").write_text("__version__ = '0.8.0rc57'\n")
+    (venv / "bin/python").symlink_to("/usr/local/bin/python3.11")
+    (venv / "pyvenv.cfg").write_text(
+        "home = /usr/local/bin\nimplementation = CPython\nversion_info = 3.11.15\n"
+        "include-system-site-packages = false\n"
+    )
+    release.chmod(0o700)
+    native_relative = "native/KiraBridge.app/Contents/MacOS/KiraBridge"
+    native_file = release / native_relative
+    native_file.parent.mkdir(parents=True, mode=0o700)
+    native_file.write_bytes(b"verified prior desktop binary")
+    native_file.chmod(0o600)
+    files = {native_relative: hashlib.sha256(native_file.read_bytes()).hexdigest()}
+    modes = {native_relative: 0o600}
+    backup = backups / "20261119-061959-1740b1af"
+    backup.mkdir(mode=0o700)
+    manifest = {
+        "version": "0.8.0rc57",
+        "commit": commit,
+        "source_commit": commit,
+        "files": files,
+        "file_modes": modes,
+        "native_app_required": True,
+    }
+    manifest_path = release / "release.json"
+    manifest_path.write_text(json.dumps(manifest))
+    manifest_path.chmod(0o600)
+    transaction = {
+        "version": manifest["version"],
+        "commit": commit,
+        "source_commit": commit,
+        "release": str(release),
+        "backup": str(backup),
+        "files": files,
+        "file_modes": modes,
+    }
+    transaction_path = backup / "transaction.json"
+    transaction_path.write_text(json.dumps(transaction))
+    transaction_path.chmod(0o600)
+    source = {
+        "source_package_path": str(package),
+    }
+    source.update(services.api.source_tree_identity(package))
+    previous = {
+        "version": manifest["version"],
+        "commit": commit,
+        "source_commit": commit,
+        "release": str(release),
+        "backup": str(backup),
+        "files": files,
+        "file_modes": modes,
+    }
+    current_release = prefix / "releases/0.8.0rc59-945e3f3008e6"
+    (current_release / "source/.venv/bin").mkdir(parents=True, mode=0o700)
+    (current_release / "source/.venv/bin/python").symlink_to("/usr/local/bin/python3.11")
+    return current_release, previous, source, release
 
 
 def plist(services, name):
@@ -429,6 +501,121 @@ def test_install_moves_existing_services_to_release_venv_and_rollback_restores(d
     desktop.restore(services.api, active)
     for name, data in original.items():
         assert (services.agents / f"com.kirabridge.{name}.plist").read_bytes() == data
+
+
+def test_rc57_approvals_migration_is_transaction_proven_and_rollback_exact(desktop, services):
+    target = services.release("rc59")
+    current_release, previous, source, previous_release = recorded_previous_release(services)
+    approval_path = services.agents / "com.kirabridge.approvals.plist"
+    original = plistlib.dumps(
+        {
+            "Label": "com.kirabridge.approvals",
+            "ProgramArguments": [
+                str(previous_release / "source/.venv/bin/python"),
+                "-m",
+                "kirabridge.cli",
+                "--config",
+                str(services.args.config),
+                "approval-server",
+            ],
+        }
+    )
+    approval_path.write_bytes(original)
+    approval_path.chmod(0o600)
+    backup = services.args.prefix / "backups/candidate"
+    backup.mkdir(parents=True, mode=0o700)
+    state = desktop.snapshot(
+        services.api,
+        services.args,
+        target,
+        {
+            "release": str(current_release),
+            "previous": previous,
+            "previous_source": source,
+        },
+        backup,
+    )
+    assert state["services"][0]["name"] == "approvals"
+    assert state["services"][0]["before_sha256"] == hashlib.sha256(original).hexdigest()
+
+    active = {"backup": str(backup), "desktop": state}
+    current = services.args.prefix / "current.json"
+    desktop.activate(services.api, services.args, target, active, current)
+    assert plist(services, "approvals")["ProgramArguments"][0] == str(
+        target / "source/.venv/bin/python"
+    )
+    desktop.restore(services.api, active, current)
+    assert approval_path.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "mutation", ["external_interpreter", "foreign_label", "wrong_config", "bad_transaction"]
+)
+def test_rc57_approvals_migration_rejects_unproven_or_foreign_plist_before_mutation(
+    desktop, services, mutation
+):
+    target = services.release("rc59")
+    current_release, previous, source, previous_release = recorded_previous_release(services)
+    approval_path = services.agents / "com.kirabridge.approvals.plist"
+    definition = {
+        "Label": "com.kirabridge.approvals",
+        "ProgramArguments": [
+            str(previous_release / "source/.venv/bin/python"),
+            "-m",
+            "kirabridge.cli",
+            "--config",
+            str(services.args.config),
+            "approval-server",
+        ],
+    }
+    if mutation == "external_interpreter":
+        definition["ProgramArguments"][0] = "/tmp/untrusted/python"
+    elif mutation == "foreign_label":
+        definition["Label"] = "com.operator.approvals"
+    elif mutation == "wrong_config":
+        definition["ProgramArguments"][4] = "/tmp/other-config.toml"
+    else:
+        transaction_path = Path(previous["backup"]) / "transaction.json"
+        transaction_path.write_text(json.dumps({**previous, "commit": "f" * 40}))
+        transaction_path.chmod(0o600)
+    original = plistlib.dumps(definition)
+    approval_path.write_bytes(original)
+    approval_path.chmod(0o600)
+    backup = services.args.prefix / "backups/candidate"
+    backup.mkdir(parents=True, mode=0o700)
+    releases = services.args.prefix / "releases"
+    releases.mkdir(parents=True, mode=0o700, exist_ok=True)
+    called = []
+    source_tree_identity = services.api.source_tree_identity
+
+    def observe_source(package):
+        called.append(True)
+        return source_tree_identity(package)
+
+    services.api.source_tree_identity = observe_source
+    message = (
+        "Unexpected desktop service label"
+        if mutation == "foreign_label"
+        else "console service differs"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        desktop.snapshot(
+            services.api,
+            services.args,
+            target,
+            {
+                "release": str(current_release),
+                "previous": previous,
+                "previous_source": source,
+            },
+            backup,
+        )
+    assert called == ([] if mutation != "external_interpreter" else [True])
+    assert approval_path.read_bytes() == original
+    assert not (backup / "approvals.before.plist").exists()
+    assert not (backup / "desktop.before.app").exists()
+    assert not (Path.home() / "Applications/KiraBridge.app").exists()
+    assert services.log == []
 
 
 def test_update_repins_services_from_previous_release(desktop, services):

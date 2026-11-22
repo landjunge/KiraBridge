@@ -6,6 +6,7 @@ import os
 import plistlib
 import re
 import signal
+import stat
 import subprocess
 import time
 from pathlib import Path
@@ -20,6 +21,177 @@ def release_argv(api, args, release, name, argv=None):
         return [runtime, str(release / "source" / SENDER), *argv[2:]]
     command = {"approvals": ["approval-server"], "grok-app": ["grok-connector", "serve"]}
     return [runtime, "-m", "kirabridge.cli", "--config", str(args.config), *command[name]]
+
+
+def _private_record_path(path, *, directory):
+    """Require an owner-private, non-symlink path before trusting release records."""
+    path = Path(path)
+    if path.is_symlink() or not path.exists():
+        return False
+    info = path.lstat()
+    if info.st_uid != os.getuid() or info.st_mode & 0o077:
+        return False
+    if directory and not stat.S_ISDIR(info.st_mode):
+        return False
+    if not directory and not stat.S_ISREG(info.st_mode):
+        return False
+    for parent in path.parents:
+        if parent.is_symlink():
+            return False
+    return True
+
+
+def _verified_previous_approvals(api, args, previous, expected_source):
+    """Return a prior plist interpreter path only with static source/record proof."""
+    if not isinstance(previous, dict) or not isinstance(expected_source, dict):
+        return None
+    try:
+        version = previous.get("version")
+        commit = previous.get("commit")
+        source_commit = previous.get("source_commit")
+        if (
+            not isinstance(version, str)
+            or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+)?", version)
+            or not isinstance(commit, str)
+            or not re.fullmatch(r"[a-f0-9]{40}", commit)
+            or source_commit != commit
+        ):
+            return None
+
+        prefix = Path(args.prefix).resolve(strict=True)
+        release = prefix / "releases" / f"{version}-{commit[:12]}"
+        if previous.get("release") != str(release):
+            return None
+        if not _private_record_path(prefix, directory=True):
+            return None
+        if not _private_record_path(prefix / "releases", directory=True):
+            return None
+        if not _private_record_path(release, directory=True):
+            return None
+
+        manifest_path = release / "release.json"
+        if not _private_record_path(manifest_path, directory=False):
+            return None
+        manifest = json.loads(manifest_path.read_text())
+        files = manifest.get("files")
+        modes = manifest.get("file_modes")
+        if (
+            manifest.get("version") != version
+            or manifest.get("commit") != commit
+            or manifest.get("source_commit") != source_commit
+            or not isinstance(files, dict)
+            or not files
+            or not isinstance(modes, dict)
+            or set(modes) != set(files)
+            or previous.get("files") != files
+            or previous.get("file_modes") != modes
+            or any(
+                not isinstance(name, str)
+                or not isinstance(checksum, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", checksum)
+                or type(modes[name]) is not int
+                or not 0 <= modes[name] <= 0o777
+                for name, checksum in files.items()
+            )
+        ):
+            return None
+        for name, checksum in files.items():
+            member = api.bundle_member(release, name)
+            if (
+                api.sha(member) != checksum
+                or stat.S_IMODE(member.stat().st_mode) != modes[name]
+            ):
+                return None
+
+        backup = Path(previous.get("backup", ""))
+        if (
+            backup.parent != prefix / "backups"
+            or not _private_record_path(prefix / "backups", directory=True)
+            or not _private_record_path(backup, directory=True)
+        ):
+            return None
+        transaction_path = backup / "transaction.json"
+        if not _private_record_path(transaction_path, directory=False):
+            return None
+        transaction = json.loads(transaction_path.read_text())
+        if any(
+            transaction.get(key) != value
+            for key, value in {
+                "release": str(release),
+                "backup": str(backup),
+                "version": version,
+                "commit": commit,
+                "source_commit": source_commit,
+                "files": files,
+                "file_modes": modes,
+            }.items()
+        ):
+            return None
+
+        runtime = Path(api.python(release))
+        venv = Path(api.release_venv(release))
+        venv_config = venv / "pyvenv.cfg"
+        if (
+            runtime != release / "source/.venv/bin/python"
+            or not runtime.is_symlink()
+            or venv.is_symlink()
+            or release not in venv.parents
+            or not runtime.is_file()
+            or not _private_record_path(runtime.parent, directory=True)
+            or venv_config.is_symlink()
+            or not venv_config.is_file()
+        ):
+            return None
+
+        venv_metadata = {}
+        for line in venv_config.read_text().splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                venv_metadata[key.strip()] = value.strip()
+        version = venv_metadata.get("version_info", "")
+        if (
+            venv_metadata.get("implementation") != "CPython"
+            or venv_metadata.get("include-system-site-packages") != "false"
+            or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+            or not venv_metadata.get("home")
+        ):
+            return None
+        base_home = Path(venv_metadata["home"]).resolve(strict=True)
+        base_python = runtime.resolve(strict=True)
+        if (
+            not base_home.is_dir()
+            or base_home.parent not in base_python.parents
+            or not stat.S_ISREG(base_python.stat().st_mode)
+            or not base_python.stat().st_mode & 0o111
+            or not re.fullmatch(
+                r"python" + re.escape(".".join(version.split(".")[:2])), base_python.name
+            )
+        ):
+            return None
+
+        package_value = expected_source.get("source_package_path")
+        expected_hash = expected_source.get("source_tree_sha256")
+        expected_count = expected_source.get("source_file_count")
+        if (
+            not isinstance(package_value, str)
+            or not Path(package_value).is_absolute()
+            or not isinstance(expected_hash, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", expected_hash)
+            or type(expected_count) is not int
+            or expected_count <= 0
+        ):
+            return None
+        package = Path(package_value)
+        if package.resolve(strict=True) != package or venv not in package.parents:
+            return None
+        if any(path.is_symlink() for path in package.rglob("*")):
+            return None
+        observed_source = api.source_tree_identity(package)
+        if any(observed_source.get(key) != expected_source.get(key) for key in api.SOURCE_FIELDS):
+            return None
+        return runtime
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, AttributeError):
+        return None
 
 
 def files(root):
@@ -187,9 +359,16 @@ def snapshot(api, args, release, old, backup):
                 if (
                     not isinstance(argv, list)
                     or not argv
-                    or argv[0] not in allowed
                     or argv[1:] != release_argv(api, args, release, name)[1:]
                 ):
+                    raise RuntimeError("Existing console service differs; preserved")
+                if argv[0] not in allowed and old:
+                    previous_runtime = _verified_previous_approvals(
+                        api, args, old.get("previous"), old.get("previous_source")
+                    )
+                    if previous_runtime is not None:
+                        allowed.add(str(previous_runtime))
+                if argv[0] not in allowed:
                     raise RuntimeError("Existing console service differs; preserved")
             elif name != "chatgpt":
                 # Older setups ran these from a development checkout; any absolute
