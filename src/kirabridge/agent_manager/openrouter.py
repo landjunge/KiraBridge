@@ -291,15 +291,14 @@ class OpenRouterAdapter:
                         "max_price": OPENROUTER_DEEPSEEK_MAX_PRICE,
                     }
                 request_count += 1
-                await running(
-                    {
-                        "agent": args.agent,
-                        "adapter": "openrouter_api",
-                        "model": model,
-                        "event": "provider_request_sent",
-                        "provider_request_count": request_count,
-                    }
-                )
+                request_evidence = {
+                    "agent": args.agent,
+                    "adapter": "openrouter_api",
+                    "model": model,
+                    "event": "provider_request_sent",
+                    "provider_request_count": request_count,
+                }
+                await (running if request_count == 1 else progress)(request_evidence)
                 raw = await self._post_chat(client, body, config)
                 final_result, choice, message = self._parse_completion(raw)
                 usage = final_result.get("usage")
