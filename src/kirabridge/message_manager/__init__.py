@@ -94,6 +94,7 @@ class MessageManager:
         # Runtime-owned admission of NEW records only. Idempotent reads and
         # historical inbox entries never call this hook.
         self.delivery_hook = None
+        self.coordinator_check = None
         from kirabridge.voice_channel import VoiceChannel
         from kirabridge.voice_message_policy import VoiceMessagePolicy
 
@@ -266,6 +267,10 @@ class MessageManager:
             dispatch = (
                 message.kind not in {"answer", "result"} and message.recipient in limits.receivers
             )
+        if self.coordinator_check is not None and self.coordinator_check(message.recipient):
+            # A coordinator inbox notification is a delivery requirement even
+            # for answer/result messages, whose normal default avoids reply loops.
+            dispatch = True
         if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
             if message.recipient not in limits.receivers:
                 dispatch = False

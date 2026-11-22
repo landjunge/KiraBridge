@@ -634,8 +634,11 @@ async def test_fresh_authenticated_context_after_sixteen_items_and_recipient_onl
     assert "RECENT_RESULT_20" in prompt and 'RECENT_RESULT_0"' not in prompt
     assert "TARGET_INBOX_AFTER_20" in prompt
     messages = bridge.teams.messages("local", "restart-team")["messages"]
-    assert next(item for item in messages if item["id"] == target["id"])["acknowledged"]
+    assert next(item for item in messages if item["id"] == target["id"])["acknowledged"] is None
     assert all(item["acknowledged"] is None for item in messages if item["recipient"] == "grok")
+    bridge.teams.ack_context_messages(work["id"])
+    messages = bridge.teams.messages("local", "restart-team")["messages"]
+    assert next(item for item in messages if item["id"] == target["id"])["acknowledged"]
     assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
     assert not (Path(root) / "team-codex-invocations").exists()
 
@@ -646,6 +649,12 @@ class RecordingTeams:
         self.failures = []
         self.finished = []
         self.bound = []
+
+    def ack_context_messages(self, work_id):
+        return None
+
+    def record_context_messages(self, work_id, message_ids):
+        return None
 
     def fail(self, work_id, state, code, evidence):
         self.failures.append((work_id, state, code, evidence))
@@ -942,4 +951,96 @@ async def test_worker_session_is_recorded_and_resumed_for_followup_without_dupli
         assert "resume" in invocations[1]
         assert "01a1ce14-57d2-75f3-85c9-7208392ce422" in invocations[1]
         assert "resume" not in invocations[2]
+    await bridge.team_dispatcher.stop()
+
+
+async def test_incoming_team_message_wakes_coordinator_and_replies_in_same_channel(
+    http_bridge,  # noqa: F811
+    config,
+    tmp_path,
+    monkeypatch,
+):
+    bridge, endpoint = http_bridge
+    root = configure_team(
+        bridge,
+        config,
+        tmp_path,
+        monkeypatch,
+        answer=json.dumps(
+            {
+                "kirabridge_team": "1",
+                "result": "Coordinator read the message",
+                "actions": [
+                    {
+                        "type": "message",
+                        "recipient": "codex",
+                        "body": "Coordinator received your note.",
+                        "kind": "answer",
+                    }
+                ],
+            }
+        ),
+    )
+    config.team.workers["local"] = TeamWorkerConfig(agent="codex", cwd=root, timeout=3)
+    await bridge.team_dispatcher.start()
+    async with MCPClientPool() as clients:
+        for name, token in (
+            ("local", "local-test-" + "a" * 40),
+            ("codex", "codex-team-test-" + "x" * 40),
+            ("grok", "grok-team-test-" + "x" * 40),
+        ):
+            await clients.connect(Peer(name, url=endpoint, token=token))
+        created = await clients.call(
+            "local",
+            "team_create",
+            {
+                "request": {
+                    "team_id": "wake-team",
+                    "name": "Wake test",
+                    "coordinator": "local",
+                    "members": {
+                        "local": "coordinator",
+                        "codex": "worker",
+                        "grok": "worker",
+                    },
+                    "idempotency_key": "wake-team-create",
+                }
+            },
+        )
+        assert not created.structuredContent.get("error")
+        incoming = await clients.call(
+            "codex",
+            "team_message_send",
+            {
+                "request": {
+                    "team_id": "wake-team",
+                    "recipient": "grok",
+                    "body": "Please check this channel message.",
+                    "kind": "question",
+                    "idempotency_key": "wake-team-question",
+                }
+            },
+        )
+        assert not incoming.structuredContent.get("error")
+        async with asyncio.timeout(15):
+            while True:
+                work = bridge.store.db.execute(
+                    "SELECT w.* FROM team_coordinator_wakes n JOIN team_work w "
+                    "ON w.id=n.work_id WHERE n.team_id='wake-team'"
+                ).fetchone()
+                if work and work["state"] in {"completed", "failed", "unknown", "blocked"}:
+                    break
+                await asyncio.sleep(0.05)
+        assert work is not None, bridge.store.db.execute(
+            "SELECT id,state,work_id FROM team_coordinator_wakes WHERE team_id='wake-team'"
+        ).fetchall()
+        assert work["state"] == "completed", dict(work)
+        messages = bridge.teams.messages("local", "wake-team")["messages"]
+        assert any(row["id"] == incoming.structuredContent["id"] for row in messages)
+        reply = next(row for row in messages if row["body"] == "Coordinator received your note.")
+        assert reply["sender"] == "local" and reply["recipient"] == "codex"
+        wake_state = bridge.store.db.execute(
+            "SELECT state FROM team_coordinator_wakes WHERE team_id='wake-team'"
+        ).fetchone()[0]
+        assert wake_state == "completed"
     await bridge.team_dispatcher.stop()

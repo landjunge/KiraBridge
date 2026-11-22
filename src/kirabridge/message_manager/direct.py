@@ -48,6 +48,7 @@ class DirectDelivery:
         "native_codex_host_unavailable",
         "native_codex_host_unsupported",
         "native_codex_target_not_ready",
+        "native_codex_target_busy",
         "native_codex_target_changed",
         "native_codex_rpc_rejected",
         "native_codex_scope_changed",
@@ -112,9 +113,20 @@ class DirectDelivery:
         # local tombstone is dropped. Keep unrecorded attempts on storage faults.
         try:
             row = self.receiver.bridge.store.db.execute(
-                "SELECT state FROM message_jobs WHERE message_id=?", (message_id,)
+                "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
             ).fetchone()
-            if row is not None and row["state"] != "queued":
+            waiting = False
+            if row is not None and row["state"] == "queued":
+                try:
+                    evidence = json.loads(row["evidence"] or "{}")
+                except (TypeError, ValueError):
+                    evidence = {}
+                waiting = (
+                    isinstance(evidence, dict)
+                    and evidence.get("waiting_for_visible_target") is True
+                    and evidence.get("terminal_input_attempted") is False
+                )
+            if row is not None and (row["state"] != "queued" or waiting):
                 self._submitted.discard(message_id)
         except sqlite3.Error:
             pass
@@ -134,6 +146,16 @@ class DirectDelivery:
     def _pristine(self, message_id, row):
         """A different claim/receipt/hold since submit does not belong to this driver."""
         db = self.receiver.bridge.store.db
+        try:
+            evidence = json.loads(row["evidence"] or "{}") if row else {}
+        except (TypeError, ValueError):
+            evidence = None
+        retryable_wait = (
+            isinstance(evidence, dict)
+            and evidence.get("waiting_for_visible_target") is True
+            and evidence.get("terminal_input_attempted") is False
+            and evidence.get("reason") in self.receiver.DEFER_UNSENT
+        )
         return (
             row is not None
             and row["state"] == "queued"
@@ -151,7 +173,7 @@ class DirectDelivery:
                     "acknowledged",
                 )
             )
-            and self._empty_evidence(row["evidence"])
+            and (self._empty_evidence(row["evidence"]) or retryable_wait)
             and not db.execute(
                 "SELECT 1 FROM visible_handoffs WHERE message_id=?", (message_id,)
             ).fetchone()
@@ -433,11 +455,13 @@ class DirectDelivery:
         for capability in ("session.inspect", "session.input"):
             bridge.security.principal(principal, capability)
         prepared = await self.codex_host.prepare(binding)
-        if (
-            prepared["operation"] == "turn/steer"
-            and not bridge.config.visible_handoffs.allow_interim_messages
-        ):
-            raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
+        if prepared["operation"] != "turn/start":
+            # A normal message is never steered into an unrelated in-progress
+            # root turn. Keep the same durable row queued and retry only after
+            # a fresh host observation proves the root is idle.
+            raise BridgeError(
+                "native_codex_target_busy", "Codex root is busy; message remains queued"
+            )
         if not self._unclaimed(identifier):
             return
         claimed = self.receiver._claim(

@@ -8,8 +8,9 @@ from pydantic import ValidationError
 
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.config import AgentConfig, TeamConfig, TeamWorkerConfig
+from kirabridge.bridge_core.config import AgentConfig, ReceiverConfig, TeamConfig, TeamWorkerConfig
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, canonical, digest
+from kirabridge.message_manager import MessageSend
 from kirabridge.team_manager import TeamManager
 from kirabridge.team_manager.models import (
     TeamCreate,
@@ -367,6 +368,98 @@ def test_shared_messages_order_idempotency_real_recipient_ack_and_no_auto_jobs(d
     assert verify(bridge.store)["valid"]
     audit = " ".join(row[0] for row in bridge.store.db.execute("SELECT metadata FROM audit"))
     assert "Shared question" not in audit and "Actual shared result" not in audit
+
+
+def test_team_message_pings_active_coordinator_and_coalesces_before_dispatch(domain):
+    role(domain, "codex", "coordinator")
+    first = domain.send(
+        "grok",
+        message(
+            recipient="chatgpt",
+            body="First coordinator inbox item",
+            idempotency_key="wake-first",
+        ),
+    )
+    second = domain.send(
+        "local",
+        message(
+            recipient="chatgpt",
+            body="Second coordinator inbox item",
+            idempotency_key="wake-second",
+        ),
+    )
+
+    assert first["coordinator_wake"]["id"] == second["coordinator_wake"]["id"]
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_coordinator_wakes WHERE state='pending'"
+        ).fetchone()[0]
+        == 1
+    )
+    assert domain.dispatch_coordinator_wakes() == 1
+    wake = domain.store.db.execute(
+        "SELECT * FROM team_coordinator_wakes WHERE id=?",
+        (first["coordinator_wake"]["id"],),
+    ).fetchone()
+    work_item = domain.work_get("codex", "test-team", wake["work_id"])
+    assert work_item["assignee"] == "codex" and work_item["state"] == "queued"
+    assert first["id"] in work_item["body"] and second["id"] in work_item["body"]
+    assert "First coordinator inbox item" in work_item["body"]
+    assert "Second coordinator inbox item" in work_item["body"]
+    assert domain.dispatch_coordinator_wakes() == 0
+
+
+def test_context_message_ack_waits_for_explicit_completed_turn_reconciliation(domain):
+    addressed = domain.send(
+        "grok",
+        message(recipient="codex", idempotency_key="ack-after-turn"),
+    )
+    other = domain.send(
+        "grok",
+        message(recipient="chatgpt", idempotency_key="not-codex-recipient"),
+    )
+    work_item = domain.delegate("local", work(idempotency_key="ack-context-work"))
+    domain.record_context_messages(work_item["id"], [addressed["id"], other["id"]])
+
+    assert domain.messages("codex", "test-team")["messages"][0]["acknowledged"] is None
+    domain.ack_context_messages(work_item["id"])
+    rows = {item["id"]: item for item in domain.messages("codex", "test-team")["messages"]}
+    assert rows[addressed["id"]]["acknowledged"] is not None
+    assert rows[other["id"]]["acknowledged"] is None
+
+
+def test_direct_message_to_active_coordinator_always_creates_delivery_job(domain):
+    role(domain, "codex", "coordinator")
+    for principal in ("chatgpt", "codex"):
+        policy = domain.config.principals[principal]
+        policy.message_peers = ["chatgpt", "codex"]
+        policy.capabilities += ["message.send", "message.read", "message.ack"]
+    domain.config.messaging.receivers["codex"] = ReceiverConfig(cwd="/tmp", timeout=30)
+
+    sent = domain.bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="codex",
+            conversation_id="coordinator-result",
+            idempotency_key="coordinator-result",
+            body="This is a direct result notification",
+            kind="result",
+        ),
+    )
+
+    assert sent["processing"]["state"] == "queued"
+    assert sent["processing_route"] == "pending_managed_receiver"
+    repeated = domain.bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="codex",
+            conversation_id="coordinator-result",
+            idempotency_key="coordinator-result",
+            body="This is a direct result notification",
+            kind="result",
+        ),
+    )
+    assert repeated["id"] == sent["id"]
 
 
 def test_messages_and_work_utf8_bounds_apply_before_insertion(domain):

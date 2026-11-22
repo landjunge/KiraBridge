@@ -166,8 +166,9 @@ class TeamDispatcher:
             self.teams.wake.clear()
             try:
                 self.teams.resume_coordinators()
+                self.teams.dispatch_coordinator_wakes()
             except (BridgeError, sqlite3.Error):
-                pass  # notices stay pending and are retried on the next pass
+                pass  # durable notices stay pending and retry on the next pass
             selected = self._next()
             if selected is None:
                 try:
@@ -263,6 +264,35 @@ class TeamDispatcher:
             if existing:
                 claimed = work
             else:
+                wake = self.bridge.store.db.execute(
+                    "SELECT 1 FROM team_coordinator_wakes WHERE work_id=? LIMIT 1",
+                    (work["id"],),
+                ).fetchone()
+                if (
+                    wake
+                    and worker.execution_scope == "existing_native_codex_root"
+                    and recipient == "codex"
+                ):
+                    # Do not claim/ACK inbox work while the one assigned Codex
+                    # root is busy. The same persisted batch stays queued until
+                    # a fresh host observation proves that a turn can start.
+                    from kirabridge.platform_adapters.codex_host import CodexHost
+
+                    try:
+                        prepared = await CodexHost().prepare(
+                            self.bridge.config.visible_handoffs.native_codex
+                        )
+                    except BridgeError as exc:
+                        if exc.code in {
+                            "native_codex_host_unavailable",
+                            "native_codex_target_not_ready",
+                        }:
+                            self._defer[work["id"]] = time.monotonic() + 2
+                            return
+                        raise
+                    if prepared["operation"] != "turn/start":
+                        self._defer[work["id"]] = time.monotonic() + 2
+                        return
                 # Build context before claiming so a temporary read failure
                 # cannot create an ambiguous submitted/unsubmitted model turn.
                 prompt = await self._prompt(pool, work)
@@ -344,6 +374,13 @@ class TeamDispatcher:
             if shared["state"] in _CORE_TERMINAL:
                 return
             if core["state"] == "completed":
+                try:
+                    self.teams.ack_context_messages(work["id"])
+                except (BridgeError, sqlite3.Error):
+                    # The native turn is proven complete; retain the same core
+                    # task and retry only its durable inbox acknowledgement.
+                    self._defer[work["id"]] = time.monotonic() + 2
+                    return
                 # Keep the dispatcher's stable identity and overlay the freshly
                 # observed native evidence (including the provider session id).
                 await self._complete(pool, {**work, **shared}, core)
@@ -486,14 +523,7 @@ class TeamDispatcher:
             raise BridgeError("team_payload_limit", "Team context exceeds the adapter limit")
         keep = {item["id"] for item in messages}
         receipts = [item for item in receipts if item in keep]
-        for message_id in receipts:
-            # The fixed authenticated recipient confirms that its managed
-            # receiver accepted context. This is not a native execution proof.
-            await self._call(
-                pool,
-                "team_message_ack",
-                {"team_id": work["team_id"], "message_id": message_id},
-            )
+        self.teams.record_context_messages(work["id"], receipts)
         return prompt
 
     async def _complete(self, pool, work, core):

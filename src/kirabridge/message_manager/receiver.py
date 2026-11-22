@@ -45,6 +45,7 @@ class MessageReceiver:
         "visible_input_not_empty",
         "visible_target_scrolled",
         "visible_target_unknown",
+        "native_codex_target_busy",
     }
     # Busy or not ready, and no input was attempted. Wrong window, a draft,
     # a locked Mac, and permission failures stay permanent refusals.
@@ -57,6 +58,7 @@ class MessageReceiver:
         "visible_target_unknown",
         "execution_busy",
         "delivery_timeout",
+        "native_codex_target_busy",
     }
 
     def __init__(self, bridge):
@@ -923,7 +925,9 @@ class MessageReceiver:
     def _waiting(self, message_id, reason, observation=None):
         """A pre-dispatch observation is not a failed turn or an input attempt."""
         evidence = {
-            "session_scope": "existing_visible_terminal",
+            "session_scope": "existing_native_codex_root"
+            if reason.startswith("native_codex_")
+            else "existing_visible_terminal",
             "waiting_for_visible_target": True,
             "reason": reason,
             "terminal_input_attempted": False,
@@ -937,12 +941,18 @@ class MessageReceiver:
                 "visible_input_not_empty": "Vorhandener Eingabetext wird nicht überschrieben.",
                 "visible_target_scrolled": "Zur aktuellen Eingabeansicht zurückkehren.",
                 "visible_target_unknown": "Bereitschaft nicht eindeutig; Diagnose ansehen.",
+                "native_codex_target_busy": (
+                    "Codex arbeitet noch; die Nachricht bleibt ohne Eingabe in der Warteschlange."
+                ),
                 "execution_busy": "Ein früherer Lauf ist noch offen; die Nachricht wartet.",
                 "delivery_timeout": "Die Zustellung wartete ohne Eingabe und wird erneut geprüft.",
             }[reason],
         }
         if observation is not None:
             evidence["observation"] = observation
+        if reason.startswith("native_codex_"):
+            evidence["native_input_attempted"] = False
+            evidence["automatic_retry"] = True
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
                 "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
@@ -950,6 +960,13 @@ class MessageReceiver:
             previous = json.loads(row["evidence"]) if row else {}
             if "receiver_retry" in previous:
                 evidence["receiver_retry"] = previous["receiver_retry"]
+            if reason == "native_codex_target_busy":
+                retry = previous.get("native_codex_retry", {})
+                attempts = retry.get("attempts", 0) + 1 if isinstance(retry, dict) else 1
+                evidence["native_codex_retry"] = {
+                    "attempts": attempts,
+                    "next_attempt_at": time.time() + min(15, 1 + attempts),
+                }
 
             def comparable(value):
                 value = {**value}
@@ -1135,6 +1152,27 @@ class MessageReceiver:
                 # A deferred unsent message is delivered once the bound composer is ready.
                 continue
             if self._deferred_unsent(row) and self._recipient_turn_open(row["recipient"]):
+                continue
+            if (
+                self._deferred_unsent(row)
+                and row["recipient"] == "codex"
+                and self.bridge.config.visible_handoffs.native_codex is not None
+            ):
+                # Native Codex pings use the exact assigned root. A waiting row
+                # must not fall through to the peer mailbox path, which cannot
+                # prove that the active root received it. Re-admit the same ID
+                # after a bounded delay; the direct driver rechecks the host and
+                # only sends once it observes an idle root.
+                try:
+                    evidence = json.loads(row["evidence"] or "{}")
+                except (TypeError, ValueError):
+                    evidence = {}
+                retry = evidence.get("native_codex_retry", {}) if isinstance(evidence, dict) else {}
+                if not isinstance(retry, dict):
+                    retry = {}
+                if time.time() < retry.get("next_attempt_at", 0):
+                    continue
+                self.direct.submit(row["sender"], row["id"])
                 continue
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue

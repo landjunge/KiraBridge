@@ -274,6 +274,7 @@ async def test_framed_unix_websocket_protocol_fixture(binding):
 async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(delivery, binding):
     bridge, transport, direct, connected, _ = delivery
     p = Protocol(binding)
+    p.thread["status"] = {"type": "idle"}
     direct.codex_host = p.host()
     bridge.config.visible_handoffs.native_codex = binding
     before = bridge.config.visible_handoffs.bindings["codex"].model_copy(deep=True)
@@ -304,12 +305,12 @@ async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(d
         "grant",
         "hold",
         "withdrawal",
-        "interim_disabled",
     ],
 )
 async def test_late_scope_changes_prevent_native_io(delivery, binding, change):
     bridge, transport, direct, _, _ = delivery
     p = Protocol(binding)
+    p.thread["status"] = {"type": "idle"}
     direct.codex_host = p.host()
     bridge.config.visible_handoffs.native_codex = binding
     sent = new_message(bridge, key="native-late-" + change, recipient="codex")
@@ -327,8 +328,6 @@ async def test_late_scope_changes_prevent_native_io(delivery, binding, change):
             bridge.config.principals["chatgpt"].agents.remove("codex")
         elif change == "hold":
             bridge.queues._place_hold("chatgpt", "messages", sent["id"], "test-owner")
-        elif change == "interim_disabled":
-            bridge.config.visible_handoffs.allow_interim_messages = False
         else:
             bridge.store.db.execute(
                 "INSERT INTO queue_withdrawals(queue_id,item_id,actor,created,reason_sha256) "
@@ -346,6 +345,7 @@ async def test_late_scope_changes_prevent_native_io(delivery, binding, change):
 async def test_native_unknown_survives_duplicate_and_new_driver(delivery, binding):
     bridge, transport, direct, _, _ = delivery
     p = Protocol(binding)
+    p.thread["status"] = {"type": "idle"}
     direct.codex_host = p.host()
     bridge.config.visible_handoffs.native_codex = binding
     p.failure = "disconnect"
@@ -430,7 +430,7 @@ async def test_explicit_interim_handle_keeps_its_own_target_when_native_root_is_
     assert not p.calls and not transport["calls"]
 
 
-async def test_disabled_interim_messages_prevent_native_busy_admission(delivery, binding):
+async def test_native_busy_is_queued_without_steering_when_interim_disabled(delivery, binding):
     bridge, transport, direct, _, _ = delivery
     bridge.config.visible_handoffs.native_codex = binding
     bridge.config.visible_handoffs.allow_interim_messages = False
@@ -440,5 +440,77 @@ async def test_disabled_interim_messages_prevent_native_busy_admission(delivery,
     direct.submit("chatgpt", sent["id"])
     await settled(direct)
     outcome = job(bridge, sent)
-    assert outcome["state"] == "failed" and outcome["error"] == "interim_messages_disabled"
+    assert outcome["state"] == "queued"
+    assert outcome["evidence"]["reason"] == "native_codex_target_busy"
+    assert outcome["evidence"]["waiting_for_visible_target"] is True
+    assert outcome["evidence"]["native_input_attempted"] is False
     assert not p.inputs() and not transport["calls"]
+
+
+async def test_native_busy_message_retries_same_id_after_root_becomes_idle(delivery, binding):
+    bridge, transport, direct, _, _ = delivery
+    bridge.config.visible_handoffs.native_codex = binding
+    p = Protocol(binding)
+    direct.codex_host = p.host()
+    sent = new_message(bridge, key="native-busy-retry", recipient="codex")
+
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+    waiting = job(bridge, sent)
+    assert waiting["state"] == "queued"
+    assert waiting["evidence"]["reason"] == "native_codex_target_busy"
+    assert not p.inputs()
+
+    p.thread["status"] = {"type": "idle"}
+    evidence = waiting["evidence"]
+    evidence["native_codex_retry"]["next_attempt_at"] = 0
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=? WHERE message_id=?",
+        (json.dumps(evidence), sent["id"]),
+    )
+    await bridge.message_receiver._dispatch_next("codex", include_visible=False)
+    await settled(direct)
+
+    result = job(bridge, sent)
+    assert result["state"] == "completed"
+    assert result["evidence"]["completion_scope"] == "native_input_delivery"
+    assert len(p.inputs()) == 1 and p.inputs()[0]["method"] == "turn/start"
+    assert not transport["calls"]
+
+
+async def test_native_busy_wait_survives_receiver_recreation(delivery, binding):
+    bridge, transport, direct, _, _ = delivery
+    bridge.config.visible_handoffs.native_codex = binding
+    protocol = Protocol(binding)
+    direct.codex_host = protocol.host()
+    sent = new_message(bridge, key="native-busy-restart", recipient="codex")
+
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+    waiting = job(bridge, sent)
+    assert waiting["state"] == "queued"
+    assert waiting["evidence"]["native_input_attempted"] is False
+
+    from kirabridge.message_manager.receiver import MessageReceiver
+
+    replacement = MessageReceiver(bridge)
+    replacement.direct.accepting = True
+    replacement.direct.codex_host = protocol.host()
+    bridge.message_receiver = replacement
+    protocol.thread["status"] = {"type": "idle"}
+    evidence = waiting["evidence"]
+    evidence["native_codex_retry"]["next_attempt_at"] = 0
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=? WHERE message_id=?",
+        (json.dumps(evidence), sent["id"]),
+    )
+
+    await replacement._dispatch_next("codex", include_visible=False)
+    await settled(replacement.direct)
+
+    result = job(bridge, sent)
+    assert result["state"] == "completed"
+    assert result["evidence"]["completion_scope"] == "native_input_delivery"
+    assert len(protocol.inputs()) == 1
+    assert protocol.inputs()[0]["method"] == "turn/start"
+    assert not transport["calls"]
