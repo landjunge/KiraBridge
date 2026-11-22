@@ -137,14 +137,9 @@ Id-Liste keine Liste oder länger als 16, ergibt das
 `parentThreadId` und `attachedToThreadId` sind null, die Quelle ist `cli`,
 `vscode` oder `appServer`, und das aufgelöste Thread-cwd entspricht dem
 aufgelösten Auftrags-cwd. Eine andere Anzahl ergibt
-`native_codex_root_not_unique`. Bei einem neuen Teamping nutzt der Dispatcher
-`turn/steer` mit der exakten `expectedTurnId`, wenn der Root aktiv ist, und
-`turn/start` auf demselben Thread, wenn der Root idle ist. `allow_interim_messages=false`
-sperrt das Steuern eines aktiven Turns, aber nicht den Start auf einem idle Root.
-Ändert sich der beobachtete Zustand zwischen Vorbereitung und Senden, wird der
-Versuch ohne Wechsel der Operation abgelehnt. Historische `idle_pending`-Einträge
-werden nicht erneut eingereiht. Der Lauf setzt `terminal_input_attempted` auf false.
-Die Threadauswahl verwendet
+`native_codex_root_not_unique`. Ist der beobachtete Vorgang `turn/steer`, lehnt
+der Teampfad ab (`native_codex_target_not_ready`) und ruft nur `turn/start` auf.
+Der Lauf setzt `terminal_input_attempted` auf false. Die Threadauswahl verwendet
 kein Pane, keine Terminal-PID und keinen Rollout-Pfad. `CodexHost` prüft die
 Hostidentität (`native_codex_host_unverified`, dazu `codexHome` und
 `codex-tui/<major>.<minor>` gegen `protocol_version`). Ein Patch einer
@@ -159,6 +154,18 @@ Managed-Host-Pfad noch Socket-, Peer-, Root- oder Turnprüfungen. Patches dersel
 `protocol_version`; Agent und Art müssen `codex` sein. Fehlt die Bindung, ist
 der Code `native_codex_unconfigured`.
 
+## Nachrichten an den gebundenen Koordinator
+
+Neu eingereihte Team-Nachrichten, die ausdrücklich an den nativen `codex`-Koordinator
+adressiert sind, nutzen die separat konfigurierte `[visible_handoffs.native_codex]`
+Bindung; dieser Pfad wählt keinen Root anhand von `TeamWorkerConfig.cwd` aus. Ein
+nachweislich aktiver Turn wird mit seiner exakten `expectedTurnId` gesteuert; ein
+nachweislich inaktiver Root erhält `turn/start` auf demselben gebundenen Thread.
+`allow_interim_messages=false` sperrt nur das Steuern eines aktiven Turns. Die
+Nachricht erhält das normale native Agenten-Budget-Gate. Scope, Grants, Turn-Freshness
+und der persistierte Einmalversuch bleiben vor dem Input geprüft. Historische
+`idle_pending`-Einträge werden nicht neu eingereiht; native Annahme ist kein ACK.
+
 ## Team turns without a fixed binding
 
 `execution_scope = "existing_native_codex_root"` on `TeamWorkerConfig` selects
@@ -169,13 +176,9 @@ der Code `native_codex_unconfigured`.
 `native_codex_target_not_ready`. Otherwise it keeps a loaded, parentless root:
 `parentThreadId` and `attachedToThreadId` are null, the source is `cli`,
 `vscode` or `appServer`, and the resolved thread cwd equals the resolved task
-cwd. Any other count raises `native_codex_root_not_unique`. For a new team ping,
-the dispatcher uses `turn/steer` with the exact `expectedTurnId` when the root has
-an active turn, and `turn/start` on that same thread when it is idle.
-`allow_interim_messages=false` disables steering an active turn, but does not
-disable starting a turn on an idle root. A changed observation between
-preparation and submission is refused without switching operations. Historical
-`idle_pending` entries are not re-enqueued. The run sets
+cwd. Any other count raises `native_codex_root_not_unique`. When the observed
+operation is `turn/steer`, the team path refuses
+(`native_codex_target_not_ready`) and calls only `turn/start`. The run sets
 `terminal_input_attempted` to false.
 Thread selection uses no pane, terminal PID or rollout path. `CodexHost` checks
 host identity (`native_codex_host_unverified`, plus `codexHome` and
@@ -190,3 +193,15 @@ The worker needs
 `[visible_handoffs.native_codex]` with `codex_home`, `host_executable` and
 `protocol_version`; agent and kind must be `codex`. A missing binding raises
 `native_codex_unconfigured`.
+
+## Messages to the bound coordinator
+
+Newly queued team messages explicitly addressed to the native `codex` coordinator
+use the separately configured `[visible_handoffs.native_codex]` binding; this path
+does not discover a root through `TeamWorkerConfig.cwd`. A verified active turn is
+steered with its exact `expectedTurnId`; a verified idle root receives `turn/start`
+on that same bound thread. `allow_interim_messages=false` only disables steering an
+active turn. This path uses the ordinary native agent budget gate. Scope, grants,
+turn freshness and the durable one-attempt boundary remain checked before input.
+Historical `idle_pending` entries are not re-enqueued; native acceptance is not an
+ACK.

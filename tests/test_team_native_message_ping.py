@@ -326,6 +326,9 @@ async def test_idle_codex_starts_exact_root_for_ping_without_ack(
         ).fetchone()
         assert outcome is not None and '"operation":"turn/start"' in outcome["metadata"]
         assert '"native_input_attempted":true' in outcome["metadata"]
+        # The test fixture has no pinned TollGate, so the shared model-work
+        # budget gate fails open and records that fact in the durable outcome.
+        assert '"tollgate_unavailable":true' in outcome["metadata"]
         assert bridge.store.db.execute(
             "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
             "AND kind='team.message_native_ping_idle_pending'",

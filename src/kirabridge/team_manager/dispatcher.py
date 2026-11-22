@@ -250,6 +250,8 @@ class TeamDispatcher:
         binding = bridge.config.visible_handoffs.native_codex
         attempt_started = False
         stage = "preflight"
+        tollgate_note = None
+        tollgate_evidence = {}
 
         def record(kind, **metadata):
             with bridge.store.transaction():
@@ -282,6 +284,14 @@ class TeamDispatcher:
                 and not bridge.config.visible_handoffs.allow_interim_messages
             ):
                 raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
+            # Match the existing native agent.execute route: user-set TollGate
+            # limits apply to model work; unavailable budget data fails open
+            # with explicit evidence.
+            tollgate_note = await bridge.agents.budget_note("codex")
+            if tollgate_note is not None:
+                tollgate_evidence["tollgate"] = tollgate_note
+                if tollgate_note.get("decision") == "unavailable":
+                    tollgate_evidence["tollgate_unavailable"] = True
 
             async def before_send(observation):
                 nonlocal attempt_started, stage
@@ -296,7 +306,7 @@ class TeamDispatcher:
                             "native_codex_scope_changed", "Native Codex binding changed"
                         )
                     if (
-                        prepared["operation"] == "turn/steer"
+                        operation == "turn/steer"
                         and not bridge.config.visible_handoffs.allow_interim_messages
                     ):
                         raise BridgeError(
@@ -316,9 +326,10 @@ class TeamDispatcher:
                         sender,
                         "team.message_native_ping_submitting",
                         message_id,
-                        operation=prepared["operation"],
+                        operation=operation,
                         expected_turn_id=observation.get("expected_turn_id"),
                         native_input_attempted=True,
+                        **tollgate_evidence,
                     )
                 # Mark ownership only after the transactional attempt record
                 # committed. A competing lane cannot settle this attempt.
@@ -367,15 +378,17 @@ class TeamDispatcher:
                     stage=stage,
                     native_input_attempted=attempt_started,
                     automatic_retry=False,
+                    **tollgate_evidence,
                 )
                 return
             record(
                 "team.message_native_ping_submitted",
-                operation=prepared["operation"],
+                operation=operation,
                 turn_id=evidence.get("turn_id"),
                 native_input_attempted=True,
                 recipient_confirmed=False,
                 automatic_retry=False,
+                **tollgate_evidence,
             )
         except asyncio.CancelledError:
             raise
@@ -402,6 +415,7 @@ class TeamDispatcher:
                 stage=stage,
                 native_input_attempted=attempt_started,
                 automatic_retry=False,
+                **tollgate_evidence,
             )
 
     def _validate_native_ping(self, item, sender):
