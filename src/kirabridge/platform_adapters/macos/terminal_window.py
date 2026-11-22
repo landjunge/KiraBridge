@@ -54,8 +54,24 @@ class TerminalWindowProof:
     async def read(self, operation, arguments):
         for attempt in range(3):
             try:
-                result = await self.native.request(operation, arguments, principal=self.principal)
+                deadline = getattr(self, "_physical_read_deadline", None)
+                if deadline is None:
+                    result = await self.native.request(
+                        operation, arguments, principal=self.principal
+                    )
+                else:
+                    remaining = deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        raise TimeoutError
+                    async with asyncio.timeout(remaining):
+                        result = await self.native.request(
+                            operation, arguments, principal=self.principal
+                        )
                 break
+            except TimeoutError:
+                raise BridgeError(
+                    "visible_window_unconfirmed", "Physical Terminal window proof timed out"
+                ) from None
             except BridgeError as error:
                 if (
                     operation not in {"accessibility.inspect", "windows.list"}
@@ -117,6 +133,18 @@ class TerminalWindowProof:
 
     async def prove_existing_target(self, row, surface):
         """Bind a focused Terminal script window to one current on-screen CG window."""
+        timeout = getattr(self.native, "timeout", 12.0)
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+            timeout = 12.0
+        self._physical_read_deadline = (
+            asyncio.get_running_loop().time() + min(float(timeout) + 1.0, 31.0)
+        )
+        try:
+            return await self._prove_existing_target(row, surface)
+        finally:
+            self.__dict__.pop("_physical_read_deadline", None)
+
+    async def _prove_existing_target(self, row, surface):
         app_pid = surface.get("owner_pid")
         script_window = surface.get("window_id")
         tty = surface.get("tty")

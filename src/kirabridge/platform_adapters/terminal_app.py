@@ -794,6 +794,7 @@ class TerminalAppTransport:
         composer_only=False,
         require_physical_visibility=False,
         principal="local",
+        before_transport=None,
     ):
         surface_binding = None
         if require_physical_visibility:
@@ -804,6 +805,8 @@ class TerminalAppTransport:
                 expected_screen=expected_screen,
                 shell_snapshot=shell_snapshot,
             )
+            if before_transport is not None:
+                await before_transport()
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
             # worker. native() reaps that worker before the lease requests restore.
@@ -1295,7 +1298,7 @@ entries[0].click();JSON.stringify({detached:true});
             if expected_cwd is not None
             else ""
         )
-        if before_transport is not None:
+        if before_transport is not None and not require_physical_visibility:
             await before_transport()
         target = self.native_target(row["pane_id"])
         focused = self.native_focus(
@@ -1344,6 +1347,8 @@ entries[0].click();JSON.stringify({detached:true});
         # or activation in the dispatch.
         if not empty_shell_prompt(screen):
             raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
+        if before_transport is not None and require_physical_visibility:
+            await before_transport()
         return await self.native(
             target
             + identity_guard

@@ -103,10 +103,28 @@ async def test_unmatched_or_ambiguous_physical_window_is_not_proven(windows, cod
     assert failure.value.code == code
 
 
+async def test_physical_observation_deadline_includes_wait_for_native_transport():
+    class StalledObserver:
+        timeout = 0.01
+
+        async def request(self, operation, arguments, *, principal):
+            await asyncio.Event().wait()
+
+    native = TerminalAppTransport(asyncio.Lock())
+    native.system_transport = StalledObserver()
+
+    with pytest.raises(BridgeError) as failure:
+        await native.prove_existing_target(ROW, SURFACE, principal="chatgpt")
+
+    assert failure.value.code == "visible_window_unconfirmed"
+    assert "timed out" in str(failure.value).lower()
+
+
 async def test_offscreen_explicit_target_is_never_sent_input():
     native = TerminalAppTransport(asyncio.Lock())
     native.system_transport = SimpleNamespace(request=observer(windows=[]))
     native.read = AsyncMock(return_value="KiraBridge visible % ")
+    before_transport = AsyncMock()
     native.native = AsyncMock(
         return_value={"screen": "KiraBridge visible % ", "surface": SURFACE}
     )
@@ -116,6 +134,7 @@ async def test_offscreen_explicit_target_is_never_sent_input():
             ROW,
             "pwd",
             "501 ttys002 Wed Nov 4 12:00:00 2026",
+            before_transport=before_transport,
             require_physical_visibility=True,
             principal="chatgpt",
         )
@@ -123,6 +142,7 @@ async def test_offscreen_explicit_target_is_never_sent_input():
     assert failure.value.code == "visible_target_not_on_screen"
     assert native.native.await_count == 1
     assert native.native.await_args.kwargs["mutation"] is True
+    before_transport.assert_not_awaited()
     assert "app.doScript(" not in native.native.await_args.args[0]
 
 
@@ -130,22 +150,36 @@ async def test_exact_visible_target_gets_last_surface_guard_before_one_input():
     native = TerminalAppTransport(asyncio.Lock())
     native.system_transport = SimpleNamespace(request=observer(windows=[CG_WINDOW]))
     native.read = AsyncMock(return_value="KiraBridge visible % ")
+    events = []
+
+    async def before_transport():
+        assert native.native.await_count == 1
+        events.append("attempt")
+
+    async def dispatch(source, *, mutation):
+        assert mutation is True
+        if "app.doScript(" in source:
+            assert events == ["focus", "attempt"]
+            events.append("input")
+            return {"sent": True}
+        events.append("focus")
+        return {"screen": "KiraBridge visible % ", "surface": SURFACE}
+
     native.native = AsyncMock(
-        side_effect=[
-            {"screen": "KiraBridge visible % ", "surface": SURFACE},
-            {"sent": True},
-        ]
+        side_effect=dispatch
     )
 
     result = await native.send_confirmed(
         ROW,
         "pwd",
         "501 ttys002 Wed Nov 4 12:00:00 2026",
+        before_transport=before_transport,
         require_physical_visibility=True,
         principal="chatgpt",
     )
 
     assert result == {"sent": True}
+    assert events == ["focus", "attempt", "input"]
     assert native.native.await_count == 2
     final_source = native.native.await_args.args[0]
     assert "Physical Terminal window changed" in final_source
@@ -158,24 +192,41 @@ async def test_exact_visible_target_gets_last_surface_guard_before_one_input():
 
 
 async def test_visible_paste_does_not_reactivate_after_physical_proof():
+    events = []
+
     @asynccontextmanager
     async def clipboard_owner(_text):
+        events.append("clipboard")
         yield SimpleNamespace(generation=3)
 
     native = TerminalAppTransport(asyncio.Lock(), clipboard_owner=clipboard_owner)
     native.system_transport = SimpleNamespace(request=observer(windows=[CG_WINDOW]))
-    native.native = AsyncMock(
-        side_effect=[
-            {"screen": "KiraBridge visible % ", "surface": SURFACE},
-            {"paste_event_sent": True, "return_sent": False},
-        ]
-    )
+
+    async def dispatch(source, *, mutation):
+        assert mutation is True
+        if "app.activate()" in source:
+            events.append("focus")
+            return {"screen": "KiraBridge visible % ", "surface": SURFACE}
+        assert "app.doScript(" not in source
+        events.append("input")
+        return {"paste_event_sent": True, "return_sent": False}
+
+    native.native = AsyncMock(side_effect=dispatch)
+
+    async def before_transport():
+        assert events == ["focus"]
+        events.append("attempt")
 
     await native.insert(
-        ROW["pane_id"], "literal", require_physical_visibility=True, principal="chatgpt"
+        ROW["pane_id"],
+        "literal",
+        require_physical_visibility=True,
+        principal="chatgpt",
+        before_transport=before_transport,
     )
 
     assert native.native.await_count == 2
+    assert events == ["focus", "attempt", "clipboard", "input"]
     final_source = native.native.await_args.args[0]
     assert "app.activate()" not in final_source
     assert final_source.index("Physical Terminal window changed") < final_source.index(

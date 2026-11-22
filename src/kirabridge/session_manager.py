@@ -671,7 +671,7 @@ class SessionManager:
             if plain_paste:
                 self.terminal_app.validate_shell_paste_text(args.text)
                 context = await self.terminal_app.prepare_shell_paste(selected)
-                if before_transport is not None:
+                if before_transport is not None and not visible_direct:
                     await before_transport()
                 await self.terminal_app.insert(
                     args.pane_id,
@@ -679,6 +679,7 @@ class SessionManager:
                     identity_guard=context["identities"],
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
+                    **({"before_transport": before_transport} if visible_direct else {}),
                     **physical_visibility,
                 )
             elif visible_direct:
