@@ -232,6 +232,64 @@ def test_desktop_chatgpt_rollback_does_not_kickstart_same_service_twice(
     assert not current.exists()
 
 
+def test_desktop_chatgpt_activation_disables_followup_aux_tunnel_restart(
+    installer, monkeypatch, tmp_path
+):
+    prefix = tmp_path / "install"
+    prefix.mkdir()
+    config = tmp_path / "config.toml"
+    config.write_text("data_dir = " + json.dumps(str(tmp_path / "data")))
+    launcher = tmp_path / "bin/kirabridge"
+    plist = tmp_path / "service.plist"
+    release = tmp_path / "release"
+    release.mkdir()
+    (release / "release.json").write_text(
+        json.dumps({"version": "0.8.0rc1", "commit": "a" * 40})
+    )
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="none",
+        desktop=True,
+    )
+    services = [{"name": "chatgpt", "changed": False}]
+    observed = []
+
+    def snapshot(*args):
+        return {"services": services}
+
+    def activate_desktop(api, args, release, active, current):
+        services[0]["changed"] = True
+
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda *args: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda *args: None)
+    monkeypatch.setattr(installer, "validate_launcher_owner", lambda *args: None)
+    monkeypatch.setattr(installer, "fresh_config", lambda *args: None)
+    monkeypatch.setattr(installer, "loaded", lambda args: False)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *args: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda config: contextlib.nullcontext())
+    monkeypatch.setattr(installer, "start_service", lambda args: None)
+    monkeypatch.setattr(
+        installer,
+        "desktop_module",
+        lambda args: SimpleNamespace(snapshot=snapshot, activate=activate_desktop),
+    )
+
+    def sync_aux_services(*args, **kwargs):
+        observed.append(kwargs["restart_tunnel"])
+        return [], []
+
+    monkeypatch.setattr(installer, "sync_aux_services", sync_aux_services)
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
+
+    installer.activate(args, release)
+
+    assert observed == [False]
+
+
 @pytest.mark.parametrize("interrupted_path", ["launcher", "plist"])
 def test_persisted_checkpoint_rolls_back_after_partial_core_switch(
     installer, tmp_path, monkeypatch, interrupted_path

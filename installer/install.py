@@ -1273,6 +1273,13 @@ AUX_PREFIX = "com.kirabridge."
 TUNNEL_LABEL = "com.kirabridge.chatgpt"
 
 
+def _desktop_chatgpt_owned(active):
+    return any(
+        row.get("name") == "chatgpt" and row.get("changed") is True
+        for row in (active.get("desktop") or {}).get("services", [])
+    )
+
+
 def _launchctl(*argv, timeout=20):
     return subprocess.run(
         ["launchctl", *argv], capture_output=True, text=True, timeout=timeout, check=False
@@ -1962,7 +1969,13 @@ def activate(args, release):
     if args.service != "none":
         final_check(args, release)
     # Only after the new release is active and verified; never fails the upgrade.
-    aux_records, aux_problems = sync_aux_services(args, release, backup, transaction=before)
+    aux_records, aux_problems = sync_aux_services(
+        args,
+        release,
+        backup,
+        restart_tunnel=not _desktop_chatgpt_owned(before),
+        transaction=before,
+    )
     for label, problem in aux_problems:
         report("warn", f"Zusatzdienst {label.removeprefix(AUX_PREFIX)}", detail=problem)
     report_summary(
@@ -2067,11 +2080,11 @@ def rollback(args, *, _compensating=False):
     # Legacy transactions have no desktop service row, so restart the tunnel here.
     # A changed desktop ChatGPT row owns its own stop/reload during restore().
     tunnel_restarted = True
-    desktop_chatgpt_owned = any(
-        row.get("name") == "chatgpt" and row.get("changed") is True
-        for row in (active.get("desktop") or {}).get("services", [])
-    )
-    if args.service == "launchd" and LABEL == "com.kirabridge.bridge" and not desktop_chatgpt_owned:
+    if (
+        args.service == "launchd"
+        and LABEL == "com.kirabridge.bridge"
+        and not _desktop_chatgpt_owned(active)
+    ):
         note = _restart_owned_tunnel(args.plist.parent)
         if note:
             tunnel_restarted = False
