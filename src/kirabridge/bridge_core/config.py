@@ -512,7 +512,10 @@ class NativeCodexBinding(BaseModel):
     host_executable: str = Field(min_length=1, max_length=4096)
     source: Literal["cli", "vscode", "appServer"]
     # Same minor line only: a patch update of the installed host keeps the assignment.
-    protocol_version: str = Field(default="0.169.0", pattern=r"^0\.169\.[0-9]{1,3}$")
+    protocol_version: str = Field(
+        default="0.169.0",
+        pattern=r"^(?:0\.169\.[0-9]{1,3}|0\.171\.0)$",
+    )
 
     @model_validator(mode="after")
     def absolute_paths(self):

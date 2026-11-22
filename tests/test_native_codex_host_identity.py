@@ -171,7 +171,7 @@ def _release(home, version, arch="x86_64-apple-darwin"):
     return str(binary / "codex")
 
 
-def _binding(home, pinned):
+def _binding(home, pinned, protocol_version="0.169.0"):
     from kirabridge.bridge_core.config import NativeCodexBinding
 
     return NativeCodexBinding(
@@ -180,6 +180,7 @@ def _binding(home, pinned):
         codex_home=str(home),
         host_executable=pinned,
         source="vscode",
+        protocol_version=protocol_version,
     )
 
 
@@ -198,3 +199,36 @@ def test_host_patch_update_keeps_the_assignment_but_nothing_else_does(tmp_path):
     (outside / "codex").write_text("")
     assert not _same_host_line(binding, str(outside / "codex"))
     assert not _same_host_line(binding, str(home / "packages" / "missing" / "bin" / "codex"))
+
+
+@pytest.mark.parametrize("protocol_version", ["0.169.0", "0.169.999", "0.171.0"])
+def test_native_binding_accepts_only_existing_0169_or_explicit_0171_protocol_pins(
+    tmp_path, protocol_version
+):
+    home = tmp_path.resolve() / ".codex"
+    pinned = _release(home, protocol_version)
+    binding = _binding(home, pinned, protocol_version)
+    assert binding.protocol_version == protocol_version
+    assert binding.source == "vscode"
+
+
+@pytest.mark.parametrize("protocol_version", ["0.170.0", "0.171.1", "0.172.0", "0.169.1000"])
+def test_native_binding_rejects_unlisted_protocol_pins(tmp_path, protocol_version):
+    from pydantic import ValidationError
+
+    home = tmp_path.resolve() / ".codex"
+    pinned = _release(home, protocol_version)
+    with pytest.raises(ValidationError):
+        _binding(home, pinned, protocol_version)
+
+
+def test_0171_patch_host_uses_only_the_pinned_0171_minor_line(tmp_path):
+    from kirabridge.platform_adapters.codex_host import _same_host_line
+
+    home = tmp_path.resolve() / ".codex"
+    pinned = _release(home, "0.171.0")
+    binding = _binding(home, pinned, "0.171.0")
+    assert _same_host_line(binding, pinned)
+    assert not _same_host_line(binding, _release(home, "0.171.1"))
+    assert not _same_host_line(binding, _release(home, "0.170.9"))
+    assert not _same_host_line(binding, _release(home, "0.172.0"))

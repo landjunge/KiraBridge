@@ -142,10 +142,14 @@ der Teampfad ab (`native_codex_target_not_ready`) und ruft nur `turn/start` auf.
 Der Lauf setzt `terminal_input_attempted` auf false. Die Threadauswahl verwendet
 kein Pane, keine Terminal-PID und keinen Rollout-Pfad. `CodexHost` prüft die
 Hostidentität (`native_codex_host_unverified`, dazu `codexHome` und
-`codex-tui/<major>.<minor>` gegen `protocol_version`). Ein Patch derselben
-Major-/Minor-Linie und Plattform unter
+`codex-tui/<major>.<minor>` gegen `protocol_version`). Ein Patch einer
+unterstützten 0.169-Minorlinie und Plattform unter
 `codex_home/packages/app-server-daemon/releases/<version>/bin/codex` bleibt
-gültig. `protocol_version` entspricht `^0\.169\.[0-9]{1,3}$`. Der Worker braucht
+gültig. `protocol_version` entspricht entweder `^0\.169\.[0-9]{1,3}$` oder exakt
+`0.171.0`; der Standard bleibt `0.169.0`. Der 0.171-Support lockert weder den
+Managed-Host-Pfad noch Socket-, Peer-, Root- oder Turnprüfungen. Patches derselben
+0.169-Minorlinie bleiben zulässig; 0.171 User-Agent und Releasepfad müssen exakt
+`0.171.0` sein. Der Worker braucht
 `[visible_handoffs.native_codex]` mit `codex_home`, `host_executable` und
 `protocol_version`; Agent und Art müssen `codex` sein. Fehlt die Bindung, ist
 der Code `native_codex_unconfigured`.
@@ -165,10 +169,14 @@ operation is `turn/steer`, the team path refuses
 (`native_codex_target_not_ready`) and calls only `turn/start`. The run sets `terminal_input_attempted` to false.
 Thread selection uses no pane, terminal PID or rollout path. `CodexHost` checks
 host identity (`native_codex_host_unverified`, plus `codexHome` and
-`codex-tui/<major>.<minor>` against `protocol_version`). A patch of the same
-major/minor line and platform under
+`codex-tui/<major>.<minor>` against `protocol_version`). A patch of a supported
+0.169 minor line and platform under
 `codex_home/packages/app-server-daemon/releases/<version>/bin/codex` stays valid.
-`protocol_version` matches `^0\.169\.[0-9]{1,3}$`. The worker needs
+`protocol_version` matches `^0\.169\.[0-9]{1,3}$` or exactly `0.171.0`;
+the default remains `0.169.0`. The 0.171 support does not relax managed-host path,
+socket, peer, root, or turn checks. Patches on the existing 0.169 minor line
+remain supported; the 0.171 User-Agent and release path must be exactly `0.171.0`.
+The worker needs
 `[visible_handoffs.native_codex]` with `codex_home`, `host_executable` and
 `protocol_version`; agent and kind must be `codex`. A missing binding raises
 `native_codex_unconfigured`.

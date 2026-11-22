@@ -1,4 +1,4 @@
-"""Bounded RPC to an assigned root on the existing Codex 0.169 Unix WebSocket.
+"""Bounded RPC to an assigned root on the existing Codex 0.169/0.171 Unix WebSocket.
 
 No host start/resume, discovery by title/CWD, terminal input or retry. Assignment
 is configuration authority; host responses prove its current local continuity.
@@ -115,10 +115,13 @@ _RELEASE = re.compile(r"^(\d+)\.(\d+)\.(\d+)-([a-z0-9_]+-apple-darwin)$")
 
 
 def _same_host_line(binding, actual):
-    """The running host is the pinned one or a patch release of the same managed install.
+    """Verify the pinned managed install with its version-specific compatibility rule.
 
     Never trusts a path outside CODEX_HOME/packages/app-server-daemon/releases/<v>/bin/codex.
+    The established 0.169 line remains patch-tolerant; the new 0.171 pin is exact.
     """
+    if binding.protocol_version == "0.171.0":
+        return actual == binding.host_executable and _is_exact_0171_release(binding, actual)
     if actual == binding.host_executable:
         return True
     releases = Path(binding.codex_home) / "packages" / "app-server-daemon" / "releases"
@@ -137,6 +140,23 @@ def _same_host_line(binding, actual):
     except OSError:
         return False
     return bool(left and right and left.group(1, 2, 4) == right.group(1, 2, 4))
+
+
+def _is_exact_0171_release(binding, path):
+    candidate = Path(path)
+    releases = Path(binding.codex_home) / "packages" / "app-server-daemon" / "releases"
+    try:
+        if (
+            candidate != candidate.resolve(strict=True)
+            or candidate.name != "codex"
+            or candidate.parent.name != "bin"
+            or candidate.parent.parent.parent != releases
+        ):
+            return False
+        match = _RELEASE.match(candidate.parent.parent.name)
+    except OSError:
+        return False
+    return bool(match and match.group(1, 2, 3) == ("0", "171", "0"))
 
 
 def _process_path(pid):
@@ -222,12 +242,16 @@ class CodexHost:
                         "capabilities": {"experimentalApi": True},
                     },
                 )
-                agent = re.match(r"^codex-tui/(\d+)\.(\d+)\.\d+ ", initialized.get("userAgent", ""))
+                agent = re.match(
+                    r"^codex-tui/(\d+)\.(\d+)\.(\d+) ", initialized.get("userAgent", "")
+                )
                 wanted = binding.protocol_version.split(".")[:2]
                 if (
                     initialized.get("codexHome") != binding.codex_home
                     or agent is None
-                    or list(agent.groups()) != wanted
+                    or list(agent.groups()[:2]) != wanted
+                    or binding.protocol_version == "0.171.0"
+                    and ".".join(agent.groups()) != binding.protocol_version
                 ):
                     raise refused("native_codex_host_unverified")
                 await ws.send(json.dumps({"method": "initialized", "params": {}}))

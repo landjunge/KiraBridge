@@ -1,4 +1,4 @@
-"""Existing native root delivery with isolated stores and a Codex 0.169 protocol fixture.
+"""Existing native root delivery with isolated stores and 0.169/0.171 fixtures.
 
 No host Codex socket, installed config, TTY or provider is touched by these tests.
 """
@@ -37,7 +37,7 @@ def binding(tmp_path):
 
 
 class Protocol:
-    """The captured 0.169 request/response shapes, including steer.turnId."""
+    """Captured protocol shapes, including steer.turnId."""
 
     def __init__(self, binding):
         self.binding = binding
@@ -63,7 +63,10 @@ class Protocol:
         method, params = request["method"], request.get("params", {})
         self.calls.append(request)
         if method == "initialize":
-            return {"codexHome": self.binding.codex_home, "userAgent": "codex-tui/0.169.0 fixture"}
+            return {
+                "codexHome": self.binding.codex_home,
+                "userAgent": f"codex-tui/{self.binding.protocol_version} fixture",
+            }
         if method == "initialized":
             return None
         if method == "thread/read":
@@ -154,6 +157,38 @@ async def test_two_concurrent_threads_route_only_assigned_root_without_any_tty(b
     assert result["native_input_attempted"] and not result["terminal_input_attempted"]
     assert not result["agent_confirmed"] and not result["request_reply_satisfied"]
     assert all(sock.fileno() == -1 for sock in p.sockets)
+
+
+async def test_0171_protocol_prepares_only_the_assigned_active_turn(binding):
+    binding.protocol_version = "0.171.0"
+    p = Protocol(binding)
+    prepared = await p.host().prepare(binding)
+    assert prepared["operation"] == "turn/steer"
+    assert prepared["expected_turn_id"] == p.turn
+    assert [call["method"] for call in p.calls] == [
+        "initialize",
+        "initialized",
+        "thread/read",
+        "thread/turns/list",
+    ]
+
+
+async def test_0171_protocol_rejects_a_different_patch_user_agent(binding):
+    binding.protocol_version = "0.171.0"
+    p = Protocol(binding)
+    response = p.response
+
+    def changed_patch(request):
+        result = response(request)
+        if request["method"] == "initialize":
+            result["userAgent"] = "codex-tui/0.171.1 fixture"
+        return result
+
+    p.response = changed_patch
+    with pytest.raises(BridgeError) as exc:
+        await p.host().prepare(binding)
+    assert exc.value.code == "native_codex_host_unverified"
+    assert [call["method"] for call in p.calls] == ["initialize"]
 
 
 @pytest.mark.parametrize(
