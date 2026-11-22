@@ -10,14 +10,16 @@ execute model tool calls.
 The endpoint is fixed to `https://openrouter.ai/api/v1/chat/completions`; a
 profile cannot redirect the API key to another host.
 
-Use the explicitly named `OPENROUTER_API_KEY` environment variable. The
-adapter does not read OpenCode's credential store: the installed OpenCode CLI
-does not provide a targeted `auth export` command. Its existing OpenRouter
-credential therefore cannot be consumed through a supported safe resolver.
-Do not copy it into a plaintext file. The adapter reads the environment value
-only in memory, sends it in the HTTPS Authorization header, and never saves,
-returns it in task evidence, or includes it in an error. Missing credentials
-stop the task.
+Use the fixed `OPENROUTER_API_KEY` environment variable for servers and
+cross-platform deployments. On macOS desktop installs, an explicit
+`macos_keychain` source can read the fixed `KiraBridge.OpenRouter` / `openrouter`
+generic-password item into memory. `kirabridge openrouter credential-import`
+uses the system `security` tool's hidden TTY prompt; the key is not placed in an
+argument, file, or log. `kirabridge openrouter credential-status` reports only
+whether the item exists. This does not import or read the separate OpenCode
+credential: that CLI has no targeted export command, and its SQLite key rows
+have no safe provider mapping. The adapter never saves the key, returns it in
+task evidence, or includes it in an error.
 
 ```toml
 [agents.openrouter]
@@ -31,7 +33,9 @@ openrouter_allow_paid = false
 ```
 
 Provide `OPENROUTER_API_KEY` to the KiraBridge service. The config stores only
-the variable name. Add the agent identity to the existing principal's
+the fixed variable name. On a macOS desktop, use
+`openrouter_credential_source = "macos_keychain"` after importing the item with
+the local CLI. Server deployments must use the environment source. Add the agent identity to the existing principal's
 agent allowlist and use normal `task_request` / `task_get` permissions.
 
 ## Free and paid routing
@@ -75,9 +79,11 @@ post-trained on DeepSeek V4.1 Flash; it remains the default route.
 
 OpenRouter's catalog currently reports tool-call support for the two pinned
 models. This adapter deliberately sends no `tools` field and rejects MCP grants
-or local-tool requests until a separately scoped tool executor is reviewed.
-The model can therefore return coding advice/text, but cannot edit the project
-through KiraBridge in this adapter.
+or local-tool requests. The existing KiraBridge task-scoped MCP pipeline uses
+Qwen-specific operator allowlists and task setup; this adapter does not inherit
+that policy or tool catalog. A reviewed OpenRouter allowlist and bounded
+tool-call loop is still required. Until then, the model can return coding
+advice/text, but cannot inspect or edit the project through KiraBridge.
 
 OpenRouter reports that these free endpoints are not available through EU
 in-region routing at the checked date. Send only data authorized for that
