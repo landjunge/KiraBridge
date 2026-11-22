@@ -588,6 +588,11 @@ async def test_tampered_direct_wake_cannot_reply_or_ack(domain, field):
     assert stored["acknowledged"] is None
     assert stored["processing"]["state"] == "queued"
     assert len(domain.bridge.messages.conversation("chatgpt", "coordinator-dm")["messages"]) == 1
+    if field == "conversation_id":
+        foreign_rows = domain.bridge.messages.conversation(
+            "chatgpt", other["conversation_id"]
+        )["messages"]
+        assert [row["id"] for row in foreign_rows] == [other["id"]]
     wake = domain.store.db.execute(
         "SELECT state,ack_error FROM team_coordinator_wakes WHERE work_id=?", (work_id,)
     ).fetchone()
