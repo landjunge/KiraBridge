@@ -177,6 +177,12 @@ class AgentConfig(BaseModel):
     qwen_mcp_tools: list[str] = Field(default_factory=list, max_length=32)
     qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
+    openrouter_mcp_tools: list[str] = Field(default_factory=list, max_length=16)
+    openrouter_mcp_read_roots: list[str] = Field(default_factory=list, max_length=128)
+    openrouter_mcp_operations: list[str] = Field(default_factory=list, max_length=8)
+    openrouter_max_tool_calls: int = Field(default=8, ge=1, le=64)
+    openrouter_max_turns: int = Field(default=4, ge=1, le=16)
+    openrouter_max_tool_result_bytes: int = Field(default=32768, ge=1024, le=262144)
     qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
     grok_reasoning_effort: str | None = Field(default=None, pattern=r"^[a-z]{1,16}$")
     qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
@@ -300,6 +306,12 @@ class AgentConfig(BaseModel):
             or self.openrouter_paid_max_prompt_bytes is not None
             or self.openrouter_paid_max_output_tokens is not None
             or self.openrouter_paid_max_cost_usd is not None
+            or self.openrouter_mcp_tools
+            or self.openrouter_mcp_read_roots
+            or self.openrouter_mcp_operations
+            or self.openrouter_max_tool_calls != 8
+            or self.openrouter_max_turns != 4
+            or self.openrouter_max_tool_result_bytes != 32768
         )
         if self.kind != "openrouter_api":
             if fields:
@@ -324,6 +336,43 @@ class AgentConfig(BaseModel):
             item not in OPENROUTER_FREE_MODELS for item in self.openrouter_fallback_models
         ):
             raise ValueError("OpenRouter paid fallbacks are not enabled")
+        if self.openrouter_allow_paid and self.openrouter_fallback_models:
+            raise ValueError("Paid OpenRouter routing must not configure model fallbacks")
+        if not set(self.openrouter_mcp_tools) <= {
+            "task_request",
+            "task_get",
+            "task_events",
+            "read_query",
+            "bridge_epoch",
+            "bridge_health",
+            "operation_catalog",
+        }:
+            raise ValueError("OpenRouter MCP tools exceed the reviewed no-shell allowlist")
+        if not set(self.openrouter_mcp_operations) <= {
+            "file.read",
+            "file.list",
+            "file.write",
+            "file.mkdir",
+        }:
+            raise ValueError("OpenRouter task operations exceed the reviewed file-operation set")
+        if (self.openrouter_mcp_tools or self.openrouter_mcp_operations) and not self.bridge_tools:
+            raise ValueError("OpenRouter MCP tools require the explicit bridge_tools profile")
+        if any(
+            not Path(root).is_absolute() or ".." in Path(root).parts
+            for root in self.openrouter_mcp_read_roots
+        ):
+            raise ValueError("OpenRouter MCP read roots must be explicit absolute paths")
+        if (
+            set(self.openrouter_mcp_operations) & {"file.write", "file.mkdir"}
+            and not self.allow_local_tools
+        ):
+            raise ValueError(
+                "OpenRouter file writes require the explicit allow_local_tools profile"
+            )
+        if len(set(self.openrouter_mcp_tools)) != len(self.openrouter_mcp_tools):
+            raise ValueError("OpenRouter MCP tool allowlist contains duplicates")
+        if len(set(self.openrouter_mcp_operations)) != len(self.openrouter_mcp_operations):
+            raise ValueError("OpenRouter MCP operation allowlist contains duplicates")
         paid_limits = (
             self.openrouter_paid_max_prompt_bytes,
             self.openrouter_paid_max_output_tokens,
