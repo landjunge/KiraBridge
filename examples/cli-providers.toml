@@ -10,6 +10,16 @@ model = "ollama/kirabridge-text:latest"
 base_url = "http://127.0.0.1:11434/v1"
 allow_local_tools = false
 
+[agents.openrouter]
+kind = "openrouter_api"
+openrouter_credential_source = "environment"
+model = "particle-ai/particle-1:free"
+openrouter_fallback_models = ["baidu/ernie-5.5-flash-preview:free"]
+openrouter_max_prompt_bytes = 262144
+openrouter_max_output_tokens = 1024
+openrouter_allow_paid = false
+allow_local_tools = false
+
 [agents.gemini]
 kind = "gemini_cli"
 executable = "/usr/local/bin/gemini"

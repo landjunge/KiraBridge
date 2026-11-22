@@ -7,6 +7,7 @@ Laufzeitabhängigkeit und kein dauerhaft laufender Anbieter-Dispatcher sind nöt
 
 | CLI | Konfigurationsart | Lokal geprüfte Version | Zugang und Kosten | Anleitung |
 |---|---|---|---|---|
+| OpenRouter API | `openrouter_api` | OpenAI-kompatible API | Feste kostenlose Coding-Modelle und expliziter kostenloser Fallback; kostenpflichtige Modelle gesperrt und budgetbegrenzt | [OpenRouter](OPENROUTER.md) |
 | OpenCode | `opencode` | 1.4.4 | Ein explizites `provider/model`; lokal mit vorhandenem Ollama-Modell ohne Cloudgebühr, Cloudtarife separat | [OpenCode](OPENCODE.md) |
 | Gemini CLI | `gemini_cli` | 0.37.2 | Unterstützte Enterprise-Anmeldung oder ausdrücklich gewählter API-Key; der vorhandene persönliche OAuthzugang wird vom Anbieter abgewiesen | [Gemini](GEMINI.md) |
 | Claude Code | `claude_code` | 2.1.236 | Vorhandener nativer Login oder ausdrücklich gewählter Anthropic-Key; kein kostenloser Zugang angenommen | [Claude](CLAUDE.md) |
@@ -16,7 +17,7 @@ Die Tabelle beschreibt die lokal geprüften Versionen. Sie behauptet keine
 Kompatibilität mit jeder künftigen CLI-Version. Die verlinkten Anbieterberichte
 enthalten offizielle Quellen und die jeweils tatsächlich überprüften Grenzen.
 
-Die spätere [Qwen-ACP-/MCP-Quellintegration](QWEN.md) hat ein eigenes, auftragsgebundenes Werkzeugprofil und konfigurierbare Budgets. Die folgenden Aussagen zu den vier isolierten Textadaptern gelten weiterhin für deren jeweilige Profile.
+Die spätere [Qwen-ACP-/MCP-Quellintegration](QWEN.md) hat ein eigenes, auftragsgebundenes Werkzeugprofil und konfigurierbare Budgets. OpenRouter startet als textbasierter API-Adapter und führt keine Modell-Toolaufrufe aus. Die übrigen Aussagen zu den isolierten Textadaptern gelten weiterhin für deren jeweilige Profile.
 
 ## Bedienung
 
