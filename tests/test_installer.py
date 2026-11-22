@@ -77,6 +77,53 @@ def test_update_rejects_silent_switch_to_another_config(installer, tmp_path):
     assert path.read_bytes() == original
 
 
+def test_previous_health_waits_for_read_only_status_after_transient_timeout(
+    installer, monkeypatch, tmp_path
+):
+    now = 0.0
+    calls = []
+
+    def status(release, config, *args, timeout):
+        calls.append(timeout)
+        if len(calls) == 1:
+            raise installer.subprocess.TimeoutExpired("status", timeout)
+        return {"version": "0.8.0rc58", "dispatcher_active": True}
+
+    monkeypatch.setattr(installer, "cli", status)
+    monkeypatch.setattr(installer.time, "monotonic", lambda: now)
+
+    def sleep(duration):
+        nonlocal now
+        now += duration
+
+    monkeypatch.setattr(installer.time, "sleep", sleep)
+    health = installer.wait_previous_health(tmp_path / "release", tmp_path / "config", seconds=5)
+    assert health["version"] == "0.8.0rc58"
+    assert calls == [5, 4.5]
+
+
+def test_previous_health_timeout_is_bounded_and_does_not_switch(installer, monkeypatch, tmp_path):
+    now = 0.0
+    calls = []
+
+    def status(release, config, *args, timeout):
+        calls.append(timeout)
+        raise installer.subprocess.TimeoutExpired("status", timeout)
+
+    monkeypatch.setattr(installer, "cli", status)
+    monkeypatch.setattr(installer.time, "monotonic", lambda: now)
+
+    def sleep(duration):
+        nonlocal now
+        now += duration
+
+    monkeypatch.setattr(installer.time, "sleep", sleep)
+    with pytest.raises(RuntimeError, match="Existing service health unavailable; no switch"):
+        installer.wait_previous_health(tmp_path / "release", tmp_path / "config", seconds=1)
+    assert len(calls) == 2
+    assert calls[-1] == pytest.approx(0.5)
+
+
 @pytest.mark.parametrize(
     "timeout_failure", [False, True], ids=["bootstrap-error", "bootstrap-timeout"]
 )

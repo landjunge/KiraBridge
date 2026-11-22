@@ -488,6 +488,22 @@ def cli(release, config, *args, timeout=30):
     )
 
 
+def wait_previous_health(release, config, *, seconds=20):
+    """Wait briefly for authenticated, read-only status before switching a service."""
+    deadline = time.monotonic() + seconds
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            health = cli(release, config, "status", timeout=min(8, remaining))
+            if isinstance(health, dict) and isinstance(health.get("version"), str):
+                return health
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
+            pass
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(0.5, remaining))
+    raise RuntimeError("Existing service health unavailable; no switch")
+
+
 def bundle_member(root, name):
     if not isinstance(name, str):
         raise RuntimeError("Unsafe bundle member")
@@ -1812,11 +1828,13 @@ def activate(args, release):
             config_after = updated.encode()
     previous_health = None
     if args.service != "none":
-        try:
-            previous_health = cli(release, args.config, "status", timeout=8)
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
-            if was_loaded:
-                raise RuntimeError("Existing service health unavailable; no switch") from None
+        if was_loaded:
+            previous_health = wait_previous_health(release, args.config)
+        else:
+            try:
+                previous_health = cli(release, args.config, "status", timeout=8)
+            except (RuntimeError, subprocess.TimeoutExpired, ValueError):
+                previous_health = None
         if previous_health and not was_loaded:
             raise RuntimeError("Backend runs outside expected launchd service; no switch")
     before = {
