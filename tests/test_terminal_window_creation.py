@@ -268,6 +268,74 @@ process.stdout.write(JSON.stringify({receipt,opens,tags}));
             assert not result["receipt"]["creation_bound"] and result["tags"] == 0
 
 
+async def test_created_tab_guard_uses_returned_tab_identity_not_lagging_window_name():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("JavaScript runtime unavailable")
+    receipt = {
+        "window_id": 123,
+        "tty": "/dev/ttys004",
+        "nonce": TITLE,
+        "app_pid": 775,
+        "app_identity": "501 ?? Sun Nov 1 10:00:00 2026 1 /Terminal",
+    }
+    transport = TerminalAppTransport(asyncio.Lock(), desktop=object())
+    source = transport.created_tab_guard(receipt)
+    assert "targetWindow.name()" not in source
+
+    script = (
+        "const cfg="
+        + json.dumps({"source": source, "receipt": receipt})
+        + ";const vm=require('node:vm');"
+        + r"""
+const tty=cfg.receipt.tty, nonce=cfg.receipt.nonce;
+let customTitle=nonce, displayCustomTitle=true;
+let observedTty=tty;
+const tab={tty:()=>observedTty,customTitle:()=>customTitle,
+ titleDisplaysCustomTitle:()=>displayCustomTitle};
+const win={id:()=>cfg.receipt.window_id,tabs:()=>[tab],name:()=> 'stale derived window name'};
+const windows=[win];windows.byId=id=>windows.find(w=>w.id()===id);
+const app={running:()=>true,windows:()=>windows};app.windows.byId=windows.byId;
+const host={includeStandardAdditions:true,doShellScript:()=>cfg.receipt.app_identity};
+function Application(name){return name==='Terminal'?app:host;}
+Application.currentApplication=()=>host;
+function run(change){
+ customTitle=change==='wrong-title'?'Other':nonce;
+ observedTty=change==='wrong-tty'?'/dev/ttys005':tty;
+ displayCustomTitle=change!=='hidden-title';
+ if(change==='duplicate-title'){
+  const other={tty:()=>'/dev/ttys005',customTitle:()=>nonce,
+   titleDisplaysCustomTitle:()=>true};
+  windows.push({id:()=>124,tabs:()=>[other],name:()=> 'stale'});
+ }
+ try{vm.runInNewContext(cfg.source,{Application});return null;}
+ catch(e){return e.message;}
+ finally{windows.splice(1);}
+}
+process.stdout.write(JSON.stringify({
+ lagging_window_name:run(null),
+ wrong_tty:run('wrong-tty'),
+ wrong_title:run('wrong-title'),
+ hidden_title:run('hidden-title'),
+ duplicate_title:run('duplicate-title')
+}));
+"""
+    )
+    completed = await asyncio.to_thread(
+        subprocess.run,
+        [node, "-e", script],
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=3,
+    )
+    observed = json.loads(completed.stdout)
+    assert observed["lagging_window_name"] is None
+    assert observed["wrong_tty"] == "Selected tab no longer exists"
+    for key in ("wrong_title", "hidden_title", "duplicate_title"):
+        assert observed[key] == "Created terminal identity changed"
+
+
 async def test_real_send_source_checks_full_image_parent_cwd_and_final_empty_screen(tmp_path):
     node = shutil.which("node")
     if node is None:

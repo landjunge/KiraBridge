@@ -923,9 +923,13 @@ class TerminalAppTransport:
             + "if(targetWindow.tabs().length!==1||app.windows().flatMap(w=>w.ta"
             "bs()).filter(t=>t.tty()==="
             + json.dumps(receipt["tty"])
-            + ").length!==1||!targetWindow.name().includes("
+            + ").length!==1||tab.customTitle()!=="
             + json.dumps(receipt["nonce"])
-            + "))throw Error('Created terminal identity changed');}checkCreatedTab();"
+            + "||tab.titleDisplaysCustomTitle()!==true||app.windows().flatMap(w=>w.tabs())"
+            + ".filter(t=>t.customTitle()==="
+            + json.dumps(receipt["nonce"])
+            + "&&t.titleDisplaysCustomTitle()===true).length!==1)"
+            + "throw Error('Created terminal identity changed');}checkCreatedTab();"
         )
 
     async def move_created_tab(self, receipt):
