@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 
 SENDER = "integrations/chat-events/serve.py"
+SERVICE_UNLOAD_TIMEOUT_SECONDS = 10.0
+SERVICE_UNLOAD_POLL_SECONDS = 0.1
 
 
 def release_argv(api, args, release, name, argv=None):
@@ -216,10 +218,10 @@ def files(root):
     return result
 
 
-def job(api, label, *, path=None, definition=None):
+def job(api, label, *, path=None, definition=None, timeout=10):
     target = f"gui/{os.getuid()}/{label}"
     result = subprocess.run(
-        ["/bin/launchctl", "print", target], capture_output=True, text=True, timeout=10
+        ["/bin/launchctl", "print", target], capture_output=True, text=True, timeout=timeout
     )
     if result.returncode not in (0, 113):
         raise RuntimeError("Cannot inspect desktop service: " + label)
@@ -228,17 +230,44 @@ def job(api, label, *, path=None, definition=None):
         program = re.search(r"(?m)^\s*program = (.+)$", result.stdout)
         arguments = re.search(r"(?ms)^\s*arguments = \{\n(.*?)^\s*\}", result.stdout)
         expected = (definition or {}).get("ProgramArguments", [])
+        mismatches = []
+        if not recorded or Path(recorded[1].strip('"')) != path:
+            mismatches.append("path")
+        if not expected:
+            mismatches.append("expected_arguments")
+        if not program or not expected or program[1].strip() != expected[0]:
+            mismatches.append("program")
         if (
-            not recorded
-            or Path(recorded[1].strip('"')) != path
-            or not expected
-            or not program
-            or program[1].strip() != expected[0]
-            or not arguments
+            not arguments
             or [line.strip() for line in arguments[1].splitlines() if line.strip()] != expected
         ):
-            raise RuntimeError("Loaded desktop service differs from expected definition; preserved")
+            mismatches.append("arguments")
+        if mismatches:
+            fields = ",".join(mismatches)
+            raise RuntimeError(
+                "Loaded desktop service differs from expected definition; preserved "
+                f"(label={label}, mismatches={fields})"
+            )
     return result.returncode == 0
+
+
+def wait_unloaded(api, label, *, path, definition):
+    deadline = time.monotonic() + SERVICE_UNLOAD_TIMEOUT_SECONDS
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError(
+                f"Desktop service remained loaded after bootout; preserved (label={label})"
+            )
+        if not job(
+            api,
+            label,
+            path=path,
+            definition=definition,
+            timeout=min(10, remaining),
+        ):
+            return
+        time.sleep(min(SERVICE_UNLOAD_POLL_SECONDS, remaining))
 
 
 def stop(api, label, *, path=None, definition=None):
@@ -246,6 +275,8 @@ def stop(api, label, *, path=None, definition=None):
         api.run(
             ["/bin/launchctl", "bootout", f"gui/{os.getuid()}/{label}"], capture=True, timeout=30
         )
+        if path is not None:
+            wait_unloaded(api, label, path=path, definition=definition)
 
 
 def start(api, path):

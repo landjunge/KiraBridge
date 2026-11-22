@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import importlib.util
 import json
+import os
 import plistlib
 import subprocess
 from pathlib import Path
@@ -165,6 +166,104 @@ def test_loaded_job_identity_is_verified_before_unload(desktop, monkeypatch, tmp
         )
     assert len(calls) == 1
     assert calls[0][1] == "print"
+
+
+def test_stop_waits_for_exact_loaded_job_to_disappear_after_one_bootout(
+    desktop, monkeypatch, tmp_path
+):
+    path = tmp_path / "service.plist"
+    arguments = ["/trusted/python", "-m", "kirabridge.cli", "approval-server"]
+    output = (
+        f"path = {path}\nprogram = {arguments[0]}\narguments = {{\n"
+        + "\n".join(arguments)
+        + "\n}\n"
+    )
+    results = iter(
+        [
+            subprocess.CompletedProcess([], 0, stdout=output, stderr=""),
+            subprocess.CompletedProcess([], 0, stdout=output, stderr=""),
+            subprocess.CompletedProcess([], 113, stdout="", stderr=""),
+        ]
+    )
+    inspections, bootouts = [], []
+
+    def inspect(argv, **kwargs):
+        inspections.append(argv)
+        return next(results)
+
+    monkeypatch.setattr(desktop.subprocess, "run", inspect)
+    api = SimpleNamespace(run=lambda argv, **kwargs: bootouts.append(argv))
+
+    desktop.stop(
+        api,
+        "com.kirabridge.approvals",
+        path=path,
+        definition={"ProgramArguments": arguments},
+    )
+
+    assert [argv[1] for argv in inspections] == ["print", "print", "print"]
+    assert bootouts == [
+        ["/bin/launchctl", "bootout", f"gui/{os.getuid()}/com.kirabridge.approvals"]
+    ]
+
+
+def test_rollback_preserves_plist_if_loaded_definition_stays_wrong_after_bootout(
+    desktop, monkeypatch, tmp_path
+):
+    path = tmp_path / "chatgpt.plist"
+    installed = plistlib.dumps(
+        {"Label": "com.kirabridge.chatgpt", "ProgramArguments": ["/new/python", "run"]}
+    )
+    original = plistlib.dumps(
+        {"Label": "com.kirabridge.chatgpt", "ProgramArguments": ["/old/python", "run"]}
+    )
+    path.write_bytes(installed)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "chatgpt.before.plist").write_bytes(original)
+    loaded = f"path = {path}\nprogram = /new/python\narguments = {{\n/new/python\nrun\n}}\n"
+    stale = f"path = {path}\nprogram = /new/python\narguments = {{\n/new/python\nrun\nextra\n}}\n"
+    results = iter(
+        [
+            subprocess.CompletedProcess([], 0, stdout=loaded, stderr=""),
+            subprocess.CompletedProcess([], 0, stdout=stale, stderr=""),
+        ]
+    )
+    bootouts, writes = [], []
+
+    def inspect(argv, **kwargs):
+        return next(results)
+
+    monkeypatch.setattr(desktop.subprocess, "run", inspect)
+    api = SimpleNamespace(
+        sha=lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest(),
+        run=lambda argv, **kwargs: bootouts.append(argv),
+        atomic=lambda *args, **kwargs: writes.append(args[0]),
+    )
+    active = {
+        "backup": str(backup),
+        "desktop": {
+            "services": [
+                {
+                    "name": "chatgpt",
+                    "label": "com.kirabridge.chatgpt",
+                    "path": str(path),
+                    "changed": True,
+                    "existed": True,
+                    "was_loaded": True,
+                    "before_sha256": hashlib.sha256(original).hexdigest(),
+                    "installed_sha256": hashlib.sha256(installed).hexdigest(),
+                }
+            ]
+        },
+    }
+
+    with pytest.raises(RuntimeError, match=r"label=com.kirabridge.chatgpt, mismatches=arguments"):
+        desktop.restore(api, active)
+
+    assert path.read_bytes() == installed
+    assert writes == []
+    assert len(bootouts) == 1
 
 
 def test_pre_rename_interruption_preserves_untouched_old_app(desktop, tmp_path):
