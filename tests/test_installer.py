@@ -1,3 +1,4 @@
+import contextlib
 import importlib.util
 import json
 import plistlib
@@ -146,6 +147,95 @@ def test_launchd_failure_restores_previous_definition_without_config_restore(
     assert config.read_bytes() == original_config
     assert not (prefix / "current.json").exists()
     assert operations == ["stop", "start", "stop", "start"]
+
+
+@pytest.mark.parametrize("interrupted_path", ["launcher", "plist"])
+def test_persisted_checkpoint_rolls_back_after_partial_core_switch(
+    installer, tmp_path, monkeypatch, interrupted_path
+):
+    """A fresh rollback invocation can recover after either definition was replaced."""
+    prefix = tmp_path / "install"
+    prefix.mkdir(mode=0o700)
+    state = tmp_path / "empty-state"
+    state.mkdir()
+    config = tmp_path / "config.toml"
+    config.write_text("data_dir = " + json.dumps(str(state)))
+    launcher = tmp_path / "bin/kirabridge"
+    launcher.parent.mkdir()
+    old_launcher = (
+        "#!/bin/sh\nexec old-python -m kirabridge.cli --config "
+        + str(config)
+        + ' "$@"\n'
+    ).encode()
+    launcher.write_bytes(old_launcher)
+    plist = tmp_path / "service.plist"
+    old_plist = plistlib.dumps(
+        {
+            "Label": installer.LABEL,
+            "ProgramArguments": [
+                "old-python", "-m", "kirabridge.cli", "--config", str(config),
+                "serve", "--transport", "http",
+            ],
+        }
+    )
+    plist.write_bytes(old_plist)
+    release = prefix / "releases/new"
+    release.mkdir(parents=True)
+    (release / "release.json").write_text(
+        json.dumps({"version": "0.6.0", "commit": "a" * 40})
+    )
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="launchd",
+        full_access=True,
+    )
+    monkeypatch.setattr(installer, "loaded", lambda args: True)
+    monkeypatch.setattr(installer, "cli", lambda *a, **kw: {"version": "0.5.2"})
+    monkeypatch.setattr(installer, "wait_health", lambda *a, **kw: None)
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda *a: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda *a: None)
+    monkeypatch.setattr(installer, "validate_launcher_owner", lambda *a: None)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *a: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda *a: contextlib.nullcontext())
+    monkeypatch.setattr(installer, "stop_service", lambda *a: None)
+    monkeypatch.setattr(installer, "start_service", lambda *a: None)
+    monkeypatch.setattr(installer, "_restart_owned_tunnel", lambda *a: None)
+    monkeypatch.setattr(installer, "report", lambda *a, **kw: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *a, **kw: None)
+
+    real_atomic = installer.atomic
+    target = launcher if interrupted_path == "launcher" else plist
+
+    def interrupt_after_replace(path, data, mode=0o600, *, exact_mode=False):
+        real_atomic(path, data, mode, exact_mode=exact_mode)
+        if Path(path) == target:
+            raise KeyboardInterrupt("simulated process interruption")
+
+    monkeypatch.setattr(installer, "atomic", interrupt_after_replace)
+    with pytest.raises(KeyboardInterrupt, match="simulated process interruption"):
+        installer.activate(args, release)
+
+    current = prefix / "current.json"
+    checkpoint = json.loads(current.read_text())
+    backup = Path(checkpoint["backup"])
+    assert (backup / "transaction.json").is_file()
+    assert (backup / "launcher.before").read_bytes() == old_launcher
+    assert (backup / "service.before.plist").read_bytes() == old_plist
+    assert checkpoint["launcher"] == str(launcher)
+    assert checkpoint["plist"] == str(plist)
+    # The fixture has no bridge.sqlite3, so the test cannot copy production state.
+    assert not (backup / "bridge.before.sqlite3").exists()
+
+    monkeypatch.setattr(installer, "atomic", real_atomic)
+    # Simulate the next installer process by re-reading the persisted checkpoint.
+    assert json.loads(current.read_text()) == checkpoint
+    installer.rollback(args)
+    assert launcher.read_bytes() == old_launcher
+    assert plist.read_bytes() == old_plist
+    assert not current.exists()
 
 
 def test_command_timeout_is_bounded_and_does_not_leave_parent_running(installer):
