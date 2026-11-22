@@ -908,33 +908,55 @@ class TerminalAppTransport:
             + "receipt.app_identity=host.doShellScript('/usr/bin/env LC_ALL=C /"
             "bin/ps -p '+receipt.app_pid+' -o uid=,tty=,lstart=,ppid=,comm=')"
             ".trim().replace(/\\s+/g,' ');"
-            + "receipt.creation_bound=true;tab.customTitle="
-            + json.dumps(nonce)
-            + ";tab.titleDisplaysCustomTitle=true;receipt.tagged=true;"
+            + "receipt.creation_bound=true;receipt.tagged=false;"
             + "}catch(error){receipt.preparation_error=String(error);}JSON.stringify(receipt);"
         )
 
-    def created_tab_guard(self, receipt):
+    def created_tab_guard(self, receipt, *, require_tag=False):
         pane = f"terminal:{receipt['window_id']}:{Path(receipt['tty']).name}"
-        return (
+        source = (
             self.native_target(pane)
             + self.native_identity_guard({receipt["app_pid"]: receipt["app_identity"]})
             + "\nfunction checkCreatedTab(){checkTargetIdentity();"
             + "if(targetWindow.tabs().length!==1||app.windows().flatMap(w=>w.ta"
             "bs()).filter(t=>t.tty()==="
             + json.dumps(receipt["tty"])
-            + ").length!==1||tab.customTitle()!=="
-            + json.dumps(receipt["nonce"])
-            + "||tab.titleDisplaysCustomTitle()!==true||app.windows().flatMap(w=>w.tabs())"
-            + ".filter(t=>t.customTitle()==="
-            + json.dumps(receipt["nonce"])
-            + "&&t.titleDisplaysCustomTitle()===true).length!==1)"
-            + "throw Error('Created terminal identity changed');}checkCreatedTab();"
+            + ").length!==1)throw Error('Created terminal identity changed');}checkCreatedTab();"
+        )
+        if require_tag:
+            source += (
+                "function receiptTagMatches(){const matches=app.windows().flatMap(w=>w.tabs())"
+                ".filter(t=>t.customTitle()===" + json.dumps(receipt["nonce"])
+                + "&&t.titleDisplaysCustomTitle()===true);return matches.length===1&&"
+                "matches[0].tty()===" + json.dumps(receipt["tty"]) + "&&"
+                "tab.customTitle()===" + json.dumps(receipt["nonce"])
+                + "&&tab.titleDisplaysCustomTitle()===true;}"
+                "if(!receiptTagMatches())throw Error('Created terminal tag changed');"
+            )
+        return source
+
+    def tag_created_tab(self, receipt):
+        return (
+            self.created_tab_guard(receipt)
+            + "\nconst nonce=" + json.dumps(receipt["nonce"]) + ";"
+            + "if(app.windows().flatMap(w=>w.tabs()).some(t=>t.tty()!=="
+            + json.dumps(receipt["tty"])
+            + "&&t.customTitle()===nonce&&t.titleDisplaysCustomTitle()===true))"
+            + "throw Error('Created terminal tag is ambiguous');"
+            + "tab.selected=true;tab.customTitle=nonce;tab.titleDisplaysCustomTitle=true;"
+            + "const getterTitle=tab.customTitle(),getterDisplay=tab.titleDisplaysCustomTitle();"
+            + "const titleMatches=app.windows().flatMap(w=>w.tabs()).filter(t=>"
+            "t.customTitle()===nonce&&t.titleDisplaysCustomTitle()===true);"
+            + "if(getterTitle!==nonce||getterDisplay!==true||titleMatches.length!==1||"
+            "titleMatches[0].tty()!==" + json.dumps(receipt["tty"]) + ")"
+            + "throw Error('Created terminal tag readback failed');"
+            + "JSON.stringify({tagged:true,tty:tab.tty(),window_id:targetWindow.id(),"
+            "custom_title_readback:getterTitle,title_display_readback:getterDisplay});"
         )
 
     async def move_created_tab(self, receipt):
         source = (
-            self.created_tab_guard(receipt)
+            self.created_tab_guard(receipt, require_tag=True)
             + """
 const se=Application('System Events'), owners=se.processes().filter(p=>p.unixId()===__PID__);
 if(owners.length!==1||owners[0].bundleIdentifier()!=='com.apple.Terminal')
@@ -985,7 +1007,7 @@ entries[0].click();JSON.stringify({detached:true});
             require(
                 receipt.get("opened") is True
                 and receipt.get("creation_bound") is True
-                and receipt.get("tagged") is True
+                and receipt.get("tagged") is False
                 and not receipt.get("preparation_error")
                 and receipt.get("script_tab_count") == 1,
                 "Created Terminal receipt is incomplete",
@@ -999,6 +1021,16 @@ entries[0].click();JSON.stringify({detached:true});
                 + "\ncheckCreatedTab();checkFocus();JSON.stringify({focused:true});",
                 mutation=True,
             )
+            stamped = await self.native(self.tag_created_tab(receipt), mutation=True)
+            require(
+                stamped.get("tagged") is True
+                and stamped.get("tty") == receipt["tty"]
+                and stamped.get("window_id") == receipt["window_id"]
+                and stamped.get("custom_title_readback") == receipt["nonce"]
+                and stamped.get("title_display_readback") is True,
+                "Created Terminal tag receipt is incomplete",
+            )
+            receipt["tagged"] = True
             binding = await proof.isolate(receipt)
             return {**receipt, "physical_window": binding, "separate_window": True}
         except Exception as cause:

@@ -58,7 +58,7 @@ async def product(tmp_path, monkeypatch):
         "app_pid": 775,
         "app_identity": fixture.TERMINAL,
         "creation_bound": True,
-        "tagged": True,
+        "tagged": False,
         "script_tab_count": 1,
     }
 
@@ -67,8 +67,18 @@ async def product(tmp_path, monkeypatch):
         if "const tab=app.doScript(" in source:
             events.append("create")
             scene.created()
-            scene.phase = "tagged"
             return deepcopy(receipt)
+        if "const nonce=" in source and "tab.customTitle=nonce" in source:
+            events.append("tag")
+            scene.phase = "tagged"
+            receipt["tagged"] = True
+            return {
+                "tagged": True,
+                "tty": receipt["tty"],
+                "window_id": receipt["window_id"],
+                "custom_title_readback": receipt["nonce"],
+                "title_display_readback": True,
+            }
         if "entries[0].click()" in source:
             events.append("move")
             assert events.index("receipt") < events.index("move")
@@ -85,7 +95,8 @@ async def product(tmp_path, monkeypatch):
     )
 
     async def created(value):
-        assert value == receipt and "physical_window" not in value
+        assert "physical_window" not in value
+        assert value["tagged"] is ("tag" in events)
         events.append("receipt")
 
     return scene, leaf, events, receipt, created
@@ -94,7 +105,7 @@ async def product(tmp_path, monkeypatch):
 async def test_product_open_records_creation_before_one_move_and_pins_native_ids(product):
     scene, leaf, events, receipt, created = product
     result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
-    assert events == ["create", "receipt", "focus", "move"]
+    assert events == ["create", "receipt", "focus", "tag", "move"]
     assert result["separate_window"] and result["physical_window"]["own_tabbar_hidden"]
     assert result["physical_window"]["cg_window_id"] == 777 != receipt["window_id"]
     scene.groups = lambda: [(231, "live CLI title changed", 3), (777, "OSC replaced nonce", None)]
@@ -116,7 +127,7 @@ async def test_product_open_records_creation_before_one_move_and_pins_native_ids
 
     leaf.system_transport.request = resized_own
     await leaf.verify_opened(result, principal="chatgpt")
-    assert leaf.native.await_count == 3
+    assert leaf.native.await_count == 4
 
 
 async def test_product_unknown_move_retains_exact_creation_and_never_sends_or_reopens(product):
@@ -126,7 +137,7 @@ async def test_product_unknown_move_retains_exact_creation_and_never_sends_or_re
         await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
     assert error.value.provider_error["automatic_retry"] is False
-    assert events == ["create", "receipt", "focus", "move"]
+    assert events == ["create", "receipt", "focus", "tag", "move"]
 
 
 async def test_product_initial_separate_hidden_surface_preserves_original_groups(product):
@@ -134,7 +145,7 @@ async def test_product_initial_separate_hidden_surface_preserves_original_groups
     scene.already_isolated = True
     result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert result["physical_window"]["move_confirmed"] is False
-    assert events == ["create", "receipt", "focus"]
+    assert events == ["create", "receipt", "focus", "tag"]
 
 
 async def test_product_cold_terminal_uses_one_returned_tty_without_adopting_restored_windows(
@@ -163,7 +174,7 @@ async def test_product_cold_terminal_uses_one_returned_tty_without_adopting_rest
     leaf.system_transport.request = cold_request
     result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert result["separate_window"] and result["tty"] == "/dev/ttys004"
-    assert events == ["create", "receipt", "focus"]
+    assert events == ["create", "receipt", "focus", "tag"]
 
 
 @pytest.mark.parametrize("direct", [True, False])
@@ -263,7 +274,7 @@ process.stdout.write(JSON.stringify({receipt,opens,tags}));
             assert (
                 result["receipt"]["creation_bound"] and result["receipt"]["tty"] == "/dev/ttys004"
             )
-            assert result["tags"] == 1
+            assert result["tags"] == 0
         else:
             assert not result["receipt"]["creation_bound"] and result["tags"] == 0
 
@@ -333,7 +344,72 @@ process.stdout.write(JSON.stringify({
     assert observed["lagging_window_name"] is None
     assert observed["wrong_tty"] == "Selected tab no longer exists"
     for key in ("wrong_title", "hidden_title", "duplicate_title"):
-        assert observed[key] == "Created terminal identity changed"
+        assert observed[key] is None
+
+
+async def test_created_tab_is_stamped_only_after_focus_and_getter_readback():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("JavaScript runtime unavailable")
+    receipt = {
+        "window_id": 123,
+        "tty": "/dev/ttys004",
+        "nonce": TITLE,
+        "app_pid": 775,
+        "app_identity": "501 ?? Sun Nov 1 10:00:00 2026 1 /Terminal",
+    }
+    transport = TerminalAppTransport(asyncio.Lock(), desktop=object())
+    source = transport.tag_created_tab(receipt)
+    assert "tab.selected=true" in source
+    assert source.index("tab.selected=true") < source.index("tab.customTitle=nonce")
+    assert "getterTitle=tab.customTitle()" in source
+    script = (
+        "const cfg="
+        + json.dumps({"source": source, "receipt": receipt})
+        + ";const vm=require('node:vm');"
+        + r"""
+let title='zsh', display=true, tty=cfg.receipt.tty, duplicate=false, ignoreSetter=false;
+const tab={tty:()=>tty,selected:false};
+Object.defineProperty(tab,'customTitle',{get:()=>()=>title,set:value=>{if(!ignoreSetter)title=value;}});
+Object.defineProperty(tab,'titleDisplaysCustomTitle',{get:()=>()=>display,set:value=>{display=value;}});
+const win={id:()=>cfg.receipt.window_id,tabs:()=>[tab]};
+const windows=[win];windows.byId=id=>windows.find(w=>w.id()===id);
+const app={running:()=>true,windows:()=>{
+ if(duplicate) return [win,{id:()=>124,tabs:()=>[{tty:()=>'/dev/ttys099',
+ customTitle:()=>cfg.receipt.nonce,titleDisplaysCustomTitle:()=>true}]}];
+ return windows;}};app.windows.byId=id=>windows.find(w=>w.id()===id);
+const host={includeStandardAdditions:true,doShellScript:()=>cfg.receipt.app_identity};
+function Application(name){return name==='Terminal'?app:host;}
+Application.currentApplication=()=>host;
+function run(change){title='zsh';display=true;tty=cfg.receipt.tty;
+ duplicate=false;ignoreSetter=false;
+ if(change==='duplicate')duplicate=true;if(change==='wrong-tty')tty='/dev/ttys099';
+ if(change==='ignore-setter')ignoreSetter=true;
+ try{return JSON.parse(vm.runInNewContext(cfg.source,{Application}));}
+ catch(error){return {error:error.message};}}
+process.stdout.write(JSON.stringify({ok:run(null),duplicate:run('duplicate'),
+ wrong_tty:run('wrong-tty'),setter_ignored:run('ignore-setter')}));
+"""
+    )
+    completed = await asyncio.to_thread(
+        subprocess.run,
+        [node, "-e", script],
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=3,
+    )
+    observed = json.loads(completed.stdout)
+    assert observed["ok"] == {
+        "tagged": True,
+        "tty": receipt["tty"],
+        "window_id": receipt["window_id"],
+        "custom_title_readback": receipt["nonce"],
+        "title_display_readback": True,
+    }
+    assert observed["duplicate"]["error"] == "Created terminal tag is ambiguous"
+    assert observed["wrong_tty"]["error"] == "Selected tab no longer exists"
+    assert observed["setter_ignored"]["error"] == "Created terminal tag readback failed"
 
 
 async def test_real_send_source_checks_full_image_parent_cwd_and_final_empty_screen(tmp_path):
@@ -422,7 +498,7 @@ async def test_preopen_original_radio_replacement_stops_before_any_move(product)
     with pytest.raises(UncertainExecution) as error:
         await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
-    assert events == ["create", "receipt", "focus"]
+    assert events == ["create", "receipt", "focus", "tag"]
 
 
 async def test_existing_terminal_in_other_space_activates_once_then_only_bounded_reads(product):
@@ -496,7 +572,7 @@ async def test_one_confirmed_move_allows_either_split_surface_to_keep_shared_cg(
     result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert result["physical_window"]["cg_window_id"] == own_id
     assert result["physical_window"]["ax_window_token"] == f"{1:032x}"
-    assert events == ["create", "receipt", "focus", "move"]
+    assert events == ["create", "receipt", "focus", "tag", "move"]
     await leaf.verify_opened(result, principal="chatgpt")
 
 
@@ -534,5 +610,5 @@ async def test_postmove_only_count_mismatch_reads_again_without_repeating_move(p
         result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
         assert result["separate_window"] and result["physical_window"]["move_confirmed"]
         assert postmove_reads == 2
-    assert events == ["create", "receipt", "focus", "move"]
-    assert leaf.native.await_count == 3
+    assert events == ["create", "receipt", "focus", "tag", "move"]
+    assert leaf.native.await_count == 4
