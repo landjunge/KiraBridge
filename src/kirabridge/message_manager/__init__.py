@@ -95,6 +95,7 @@ class MessageManager:
         # historical inbox entries never call this hook.
         self.delivery_hook = None
         self.coordinator_check = None
+        self.coordinator_route = None
         from kirabridge.voice_channel import VoiceChannel
         from kirabridge.voice_message_policy import VoiceMessagePolicy
 
@@ -315,6 +316,7 @@ class MessageManager:
             return None
         hashed = digest({**message.model_dump(), "dispatch": dispatch})
         message_id = message.message_id or str(uuid.uuid4())
+        coordinator_routed = False
         with self.store.transaction():
             previous = self.store.db.execute(
                 "SELECT id,request_hash FROM messages WHERE sender=? AND idem=?",
@@ -474,8 +476,15 @@ class MessageManager:
                     ),
                 },
             )
+            if (
+                dispatch
+                and self.coordinator_check is not None
+                and self.coordinator_check(message.recipient)
+                and self.coordinator_route is not None
+            ):
+                coordinator_routed = bool(self.coordinator_route(principal, message_id))
         self.wake.set()
-        if dispatch and self.delivery_hook is not None:
+        if dispatch and not coordinator_routed and self.delivery_hook is not None:
             self.delivery_hook(principal, message_id)
         return self.get(principal, message_id)
 
@@ -491,6 +500,9 @@ class MessageManager:
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                 "h.queue_id='messages' AND h.item_id=messages.id) "
+                "AND NOT EXISTS (SELECT 1 FROM message_jobs j WHERE j.message_id=messages.id "
+                "AND j.state='queued' "
+                "AND json_extract(j.evidence, '$.coordinator_wake_id') IS NOT NULL) "
                 "AND NOT EXISTS (SELECT 1 FROM message_jobs j WHERE j.message_id=messages.id "
                 "AND j.state='queued' "
                 "AND json_extract(j.evidence, '$.waiting_for_visible_target') = 1 "

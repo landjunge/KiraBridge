@@ -636,7 +636,7 @@ async def test_fresh_authenticated_context_after_sixteen_items_and_recipient_onl
     messages = bridge.teams.messages("local", "restart-team")["messages"]
     assert next(item for item in messages if item["id"] == target["id"])["acknowledged"] is None
     assert all(item["acknowledged"] is None for item in messages if item["recipient"] == "grok")
-    bridge.teams.ack_context_messages(work["id"])
+    bridge.teams.ack_context_messages(work["id"], non_empty_result=True)
     messages = bridge.teams.messages("local", "restart-team")["messages"]
     assert next(item for item in messages if item["id"] == target["id"])["acknowledged"]
     assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
@@ -649,8 +649,24 @@ class RecordingTeams:
         self.failures = []
         self.finished = []
         self.bound = []
+        self.acks = []
+        self.direct_items = []
+        self.attention = []
 
-    def ack_context_messages(self, work_id):
+    def ack_context_messages(self, work_id, *, non_empty_result=False):
+        self.acks.append((work_id, non_empty_result))
+        return None
+
+    def coordinator_direct_messages(self, work_id):
+        return self.direct_items
+
+    def mark_context_attention(self, work_id, code):
+        self.attention.append((work_id, code))
+
+    def note_context_ack_failure(self, work_id, error_code):
+        return False
+
+    def context_ack_retry(self, work_id):
         return None
 
     def record_context_messages(self, work_id, message_ids):
@@ -670,6 +686,54 @@ class RecordingTeams:
 def isolated_dispatcher(config):
     teams = RecordingTeams()
     return TeamDispatcher(SimpleNamespace(config=config, teams=teams)), teams
+
+
+async def test_empty_completed_model_turn_does_not_ack_direct_messages(config):
+    dispatcher, teams = isolated_dispatcher(config)
+    teams.direct_items = [
+        {
+            "source_id": "direct-empty",
+            "sender": "local",
+            "recipient": "codex",
+            "conversation_id": "direct-empty-conversation",
+            "kind": "question",
+            "request_reply": True,
+        }
+    ]
+    calls = []
+
+    async def action(_pool, tool, arguments):
+        calls.append((tool, arguments))
+        return {"id": "sent-action"}
+
+    dispatcher._call = action
+    await dispatcher._complete(
+        None,
+        {"id": "empty-work", "team_id": "team", "assignee": "codex"},
+        {
+            "id": "empty-core",
+            "result": {
+                "text": json.dumps(
+                    {
+                        "kirabridge_team": "1",
+                        "result": "",
+                        "actions": [
+                            {
+                                "type": "message",
+                                "recipient": "local",
+                                "body": "Independent action",
+                                "kind": "note",
+                            }
+                        ],
+                    }
+                )
+            },
+        },
+    )
+    assert teams.acks == []
+    assert teams.attention == [("empty-work", "empty_model_result")]
+    assert teams.finished and teams.finished[0][0] == "empty-work"
+    assert calls and calls[0][0] == "team_message_send"
 
 
 @pytest.mark.parametrize("framing,action_count", [("strict_json", 0), ("work_reply_header", 1)])

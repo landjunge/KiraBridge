@@ -154,6 +154,13 @@ class TeamDispatcher:
             (False, self.teams.pending(limit=16)),
         ):
             for work in rows:
+                retry = self.teams.context_ack_retry(work["id"])
+                if retry and (
+                    retry["state"] == "attention"
+                    or retry["ack_retry_at"] is not None
+                    and retry["ack_retry_at"] > time.time()
+                ):
+                    continue
                 if not existing and not self.bridge.store.can_claim(work["created"]):
                     continue
                 if work["id"] not in self._active and self._defer.get(work["id"], 0) <= now:
@@ -374,13 +381,6 @@ class TeamDispatcher:
             if shared["state"] in _CORE_TERMINAL:
                 return
             if core["state"] == "completed":
-                try:
-                    self.teams.ack_context_messages(work["id"])
-                except (BridgeError, sqlite3.Error):
-                    # The native turn is proven complete; retain the same core
-                    # task and retry only its durable inbox acknowledgement.
-                    self._defer[work["id"]] = time.monotonic() + 2
-                    return
                 # Keep the dispatcher's stable identity and overlay the freshly
                 # observed native evidence (including the provider session id).
                 await self._complete(pool, {**work, **shared}, core)
@@ -557,6 +557,50 @@ class TeamDispatcher:
                 },
             )
             return
+        if turn.result.strip():
+            try:
+                for item in self.teams.coordinator_direct_messages(work["id"]):
+                    if item["recipient"] != work["assignee"] or item["conversation_id"] is None:
+                        raise BridgeError(
+                            "receipt_scope_conflict", "Direct receipt is outside this coordinator"
+                        )
+                    if item["kind"] not in {"question", "work"} or not item["request_reply"]:
+                        continue
+                    reply = {
+                        "recipient": item["sender"],
+                        "conversation_id": item["conversation_id"],
+                        "idempotency_key": "coordinator-wake-reply-"
+                        + digest([work["id"], item["source_id"]])[:32],
+                        "body": turn.result.encode()[
+                            : self.bridge.config.messaging.max_body_bytes
+                        ].decode("utf-8", "ignore"),
+                        "kind": "answer" if item["kind"] == "question" else "result",
+                        "reply_to": item["source_id"],
+                        "request_reply": False,
+                        "dispatch": False,
+                    }
+                    await self._call(pool, "message_send", {"message": reply})
+                self.teams.ack_context_messages(work["id"], non_empty_result=True)
+            except (BridgeError, sqlite3.Error) as exc:
+                code = exc.code if isinstance(exc, BridgeError) else "message_ack_storage"
+                attention = self.teams.note_context_ack_failure(work["id"], code)
+                if attention:
+                    self.teams.fail(
+                        work["id"],
+                        "failed",
+                        "message_ack_attention",
+                        {"ack_error": code, "ack_attempts": 5, "automatic_retry": False},
+                    )
+                else:
+                    retry = self.teams.context_ack_retry(work["id"])
+                    delay = max(
+                        2,
+                        (retry or {}).get("ack_retry_at", time.time() + 2) - time.time(),
+                    )
+                    self._defer[work["id"]] = time.monotonic() + delay
+                return
+        elif self.teams.coordinator_direct_messages(work["id"]):
+            self.teams.mark_context_attention(work["id"], "empty_model_result")
         observed_native = work.get("evidence", {}) if isinstance(work, dict) else {}
         nested_native = (
             observed_native.get("native_evidence", {}) if isinstance(observed_native, dict) else {}

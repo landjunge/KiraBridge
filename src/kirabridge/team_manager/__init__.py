@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS team_coordinator_resumes (
 CREATE TABLE IF NOT EXISTS team_coordinator_wakes (
  id TEXT PRIMARY KEY, team_id TEXT NOT NULL REFERENCES teams(id), coordinator TEXT NOT NULL,
  state TEXT NOT NULL, work_id TEXT UNIQUE REFERENCES team_work(id),
+ ack_attempts INTEGER NOT NULL DEFAULT 0, ack_retry_at REAL, ack_error TEXT,
  created REAL NOT NULL, updated REAL NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS team_coordinator_wake_pending
@@ -94,7 +95,8 @@ CREATE TABLE IF NOT EXISTS team_coordinator_wake_items (
  team_id TEXT NOT NULL REFERENCES teams(id), wake_id TEXT NOT NULL
  REFERENCES team_coordinator_wakes(id), source TEXT NOT NULL, source_id TEXT NOT NULL,
  sender TEXT NOT NULL, recipient TEXT NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL,
- created REAL NOT NULL, PRIMARY KEY(team_id,source,source_id)
+ conversation_id TEXT, receipt TEXT, created REAL NOT NULL,
+ PRIMARY KEY(team_id,source,source_id)
 );
 CREATE INDEX IF NOT EXISTS team_coordinator_wake_items_batch
  ON team_coordinator_wake_items(wake_id,created);
@@ -237,7 +239,30 @@ class TeamManager:
             }
             if "session_generation" not in work_columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN session_generation INTEGER")
+            for table, columns in (
+                (
+                    "team_coordinator_wakes",
+                    {
+                        "ack_attempts": "INTEGER NOT NULL DEFAULT 0",
+                        "ack_retry_at": "REAL",
+                        "ack_error": "TEXT",
+                    },
+                ),
+                (
+                    "team_coordinator_wake_items",
+                    {"conversation_id": "TEXT", "receipt": "TEXT"},
+                ),
+            ):
+                existing = {
+                    row["name"] for row in self.store.db.execute(f"PRAGMA table_info({table})")
+                }
+                for column, declaration in columns.items():
+                    if column not in existing:
+                        self.store.db.execute(
+                            f"ALTER TABLE {table} ADD COLUMN {column} {declaration}"
+                        )
         self.bridge.messages.coordinator_check = self.is_active_coordinator
+        self.bridge.messages.coordinator_route = self.queue_direct_coordinator_wake
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -261,7 +286,19 @@ class TeamManager:
             ).fetchone()
         )
 
-    def _queue_coordinator_wake(self, team_id, sender, recipient, kind, body, source_id):
+    def _queue_coordinator_wake(
+        self,
+        team_id,
+        sender,
+        recipient,
+        kind,
+        body,
+        source_id,
+        *,
+        source="team",
+        conversation_id=None,
+        receipt=None,
+    ):
         """Persist one coordinator inbox item; bursts share the open batch."""
         team = self.store.db.execute(
             "SELECT coordinator FROM teams WHERE id=?", (team_id,)
@@ -279,8 +316,8 @@ class TeamManager:
             return None
         if self.store.db.execute(
             "SELECT 1 FROM team_coordinator_wake_items WHERE team_id=? "
-            "AND source='team' AND source_id=?",
-            (team_id, source_id),
+            "AND source=? AND source_id=?",
+            (team_id, source, source_id),
         ).fetchone():
             return None
         now = time.time()
@@ -298,9 +335,21 @@ class TeamManager:
             )
         self.store.db.execute(
             "INSERT INTO team_coordinator_wake_items "
-            "(team_id,wake_id,source,source_id,sender,recipient,kind,body,created) "
-            "VALUES(?,?,'team',?,?,?,?,?,?)",
-            (team_id, wake_id, source_id, sender, recipient, kind, body, now),
+            "(team_id,wake_id,source,source_id,sender,recipient,kind,body,"
+            "conversation_id,receipt,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                team_id,
+                wake_id,
+                source,
+                source_id,
+                sender,
+                recipient,
+                kind,
+                body,
+                conversation_id,
+                receipt,
+                now,
+            ),
         )
         self.store.db.execute(
             "UPDATE team_coordinator_wakes SET updated=? WHERE id=?", (now, wake_id)
@@ -314,6 +363,60 @@ class TeamManager:
             wake_id=wake_id,
         )
         return wake_id
+
+    def queue_direct_coordinator_wake(self, sender, message_id):
+        """Route a direct coordinator message through durable team work."""
+        message = self.store.db.execute(
+            "SELECT id,seq,sender,recipient,kind,body,conversation_id,delivered,receipt "
+            "FROM messages WHERE id=?",
+            (message_id,),
+        ).fetchone()
+        if message is None or message["recipient"] not in self.config.team.workers:
+            return False
+        coordinator = message["recipient"]
+        if sender != message["sender"] or not self.is_active_coordinator(coordinator):
+            return False
+        team = self.store.db.execute(
+            "SELECT t.id FROM teams t JOIN team_members m "
+            "ON m.team_id=t.id AND m.principal=t.coordinator AND m.active=1 "
+            "WHERE t.coordinator=? ORDER BY t.created,t.id LIMIT 1",
+            (coordinator,),
+        ).fetchone()
+        if team is None:
+            return False
+        receipt = message["receipt"]
+        if receipt is None:
+            receipt = str(uuid.uuid4())
+            self.store.db.execute(
+                "UPDATE messages SET delivered=?,receipt=? WHERE id=? AND delivered IS NULL",
+                (time.time(), receipt, message_id),
+            )
+            self.bridge.messages._event(
+                message_id, "message.delivered", coordinator, {"receipt": receipt}
+            )
+        wake_id = self._queue_coordinator_wake(
+            team["id"],
+            sender,
+            coordinator,
+            message["kind"],
+            message["body"],
+            message_id,
+            source="direct",
+            conversation_id=message["conversation_id"],
+            receipt=receipt,
+        )
+        if wake_id:
+            self.store.db.execute(
+                "UPDATE message_jobs SET evidence=? WHERE message_id=? AND state='queued'",
+                (canonical({"coordinator_wake_id": wake_id}), message_id),
+            )
+            self.bridge.messages._event(
+                message_id,
+                "message.coordinator_wake_queued",
+                coordinator,
+                {"wake_id": wake_id, "team_id": team["id"]},
+            )
+        return bool(wake_id)
 
     def _team(self, principal, team_id, capability="team.read", write=False, manage=False):
         self._principal(principal, capability)
@@ -1244,8 +1347,29 @@ class TeamManager:
                 (canonical(evidence), work_id),
             )
 
-    def ack_context_messages(self, work_id):
-        """ACK only the exact messages addressed to this worker after its turn ends."""
+    def coordinator_direct_messages(self, work_id):
+        work = self._work(work_id)
+        wake = self.store.db.execute(
+            "SELECT id FROM team_coordinator_wakes WHERE work_id=? AND team_id=?",
+            (work_id, work["team_id"]),
+        ).fetchone()
+        if wake is None:
+            return []
+        return [
+            dict(row)
+            for row in self.store.db.execute(
+                "SELECT i.source_id,i.sender,i.recipient,i.conversation_id,i.receipt,"
+                "m.kind,m.request_reply,m.acknowledged FROM team_coordinator_wake_items i "
+                "LEFT JOIN messages m ON i.source='direct' AND m.id=i.source_id "
+                "WHERE i.wake_id=? AND i.source='direct' ORDER BY i.created,i.source_id",
+                (wake["id"],),
+            )
+        ]
+
+    def ack_context_messages(self, work_id, *, non_empty_result=False):
+        """ACK only exact, authorized source receipts after a non-empty model result."""
+        if not non_empty_result:
+            return False
         with self.store.transaction():
             work = self._work(work_id)
             for message_id in work["evidence"].get("context_message_ids", []):
@@ -1270,10 +1394,127 @@ class TeamManager:
                     message_id,
                     delivery_work_id=work_id,
                 )
+            wake = self.store.db.execute(
+                "SELECT id FROM team_coordinator_wakes WHERE work_id=? AND team_id=?",
+                (work_id, work["team_id"]),
+            ).fetchone()
+            if wake:
+                items = self.store.db.execute(
+                    "SELECT source_id,recipient,conversation_id,receipt FROM "
+                    "team_coordinator_wake_items WHERE wake_id=? AND source='direct'",
+                    (wake["id"],),
+                ).fetchall()
+                for item in items:
+                    row = self.store.db.execute(
+                        "SELECT conversation_id,receipt,acknowledged FROM messages "
+                        "WHERE id=? AND recipient=?",
+                        (item["source_id"], work["assignee"]),
+                    ).fetchone()
+                    if (
+                        item["recipient"] != work["assignee"]
+                        or not item["receipt"]
+                        or row is None
+                        or row["conversation_id"] != item["conversation_id"]
+                    ):
+                        raise BridgeError(
+                            "receipt_scope_conflict",
+                            "Direct receipt does not match its coordinator conversation",
+                        )
+                    self.bridge.messages.ack(work["assignee"], item["source_id"], item["receipt"])
+                    self.store.db.execute(
+                        "UPDATE message_jobs SET state='completed',finished=?,error=NULL,"
+                        "evidence=? WHERE message_id=? AND state='queued'",
+                        (
+                            time.time(),
+                            canonical(
+                                {
+                                    "coordinator_wake_id": wake["id"],
+                                    "receipt_acknowledged": True,
+                                    "model_work_id": work_id,
+                                }
+                            ),
+                            item["source_id"],
+                        ),
+                    )
             self.store.db.execute(
                 "UPDATE team_coordinator_wakes SET state='delivered',updated=? "
                 "WHERE work_id=? AND state='dispatched'",
                 (time.time(), work_id),
+            )
+        return True
+
+    def note_context_ack_failure(self, work_id, error_code):
+        code = error_code if isinstance(error_code, str) else "message_ack_failed"
+        with self.store.transaction():
+            wake = self.store.db.execute(
+                "SELECT id,team_id,coordinator,ack_attempts FROM team_coordinator_wakes "
+                "WHERE work_id=?",
+                (work_id,),
+            ).fetchone()
+            if wake is None:
+                return False
+            attempts = wake["ack_attempts"] + 1
+            attention = attempts >= 5
+            retry_at = None if attention else time.time() + min(120, 2**attempts)
+            state = "attention" if attention else "dispatched"
+            self.store.db.execute(
+                "UPDATE team_coordinator_wakes SET state=?,ack_attempts=?,ack_retry_at=?,"
+                "ack_error=?,updated=? WHERE id=?",
+                (state, attempts, retry_at, code[:80], time.time(), wake["id"]),
+            )
+            self.store.db.execute(
+                "UPDATE message_jobs SET evidence=json_set(evidence,"
+                "'$.ack_attempts',?,'$.ack_error',?,'$.coordinator_attention',?) "
+                "WHERE message_id IN (SELECT source_id FROM team_coordinator_wake_items "
+                "WHERE wake_id=? AND source='direct') AND state='queued'",
+                (attempts, code[:80], attention, wake["id"]),
+            )
+            self._event(
+                wake["team_id"],
+                wake["coordinator"],
+                "team.coordinator_wake_ack_attention"
+                if attention
+                else "team.coordinator_wake_ack_retry",
+                wake["id"],
+                attempts=attempts,
+                next_attempt_at=retry_at,
+                error_code=code[:80],
+            )
+        return attention
+
+    def context_ack_retry(self, work_id):
+        row = self.store.db.execute(
+            "SELECT state,ack_retry_at FROM team_coordinator_wakes WHERE work_id=?",
+            (work_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def mark_context_attention(self, work_id, code):
+        with self.store.transaction():
+            wake = self.store.db.execute(
+                "SELECT id,team_id,coordinator FROM team_coordinator_wakes WHERE work_id=?",
+                (work_id,),
+            ).fetchone()
+            if wake is None:
+                return
+            self.store.db.execute(
+                "UPDATE team_coordinator_wakes SET state='attention',ack_error=?,updated=? "
+                "WHERE id=?",
+                (code[:80], time.time(), wake["id"]),
+            )
+            self.store.db.execute(
+                "UPDATE message_jobs SET evidence=json_set(evidence,"
+                "'$.coordinator_attention',true,'$.ack_error',?) "
+                "WHERE message_id IN (SELECT source_id FROM team_coordinator_wake_items "
+                "WHERE wake_id=? AND source='direct') AND state='queued'",
+                (code[:80], wake["id"]),
+            )
+            self._event(
+                wake["team_id"],
+                wake["coordinator"],
+                "team.coordinator_wake_attention",
+                wake["id"],
+                error_code=code[:80],
             )
 
     def messages(self, principal, team_id, after=0, limit=50):

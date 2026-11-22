@@ -12,11 +12,13 @@ from test_mcp import http_bridge  # noqa: F401
 from test_team_coordinator_resume import connect
 from test_team_dispatcher import configure_team
 
-from kirabridge.bridge_core.config import NativeCodexBinding
+from kirabridge.bridge_core.config import NativeCodexBinding, ReceiverConfig, TeamWorkerConfig
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
-from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.message_manager import MessageSend
 from kirabridge.platform_adapters import codex_host
 from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
+from kirabridge.team_manager.dispatcher import TeamDispatcher
 
 ROOT = "01a1ebef-1b5b-7871-a0a1-fd5be34cac5c"
 OTHER = "01a1daf2-f415-7d82-9d87-eca8fc8b5678"
@@ -234,3 +236,108 @@ async def test_team_chain_runs_on_the_native_root_without_any_terminal(
     assert listed[0]["result"] == "NATIVE_DONE"
     assert state.sent == ["turn/start"] and "KiraBridge team turn" in state.body
     assert not (Path(root) / "team-codex-invocations").exists()  # no CLI/terminal ran
+
+
+async def test_direct_coordinator_message_waits_while_busy_then_replies_and_acks_once(
+    http_bridge, config, tmp_path, monkeypatch
+):
+    bridge, endpoint = http_bridge
+    root = configure_team(bridge, config, tmp_path, monkeypatch)
+    config.team.workers["codex"] = TeamWorkerConfig(
+        agent="codex",
+        cwd=root,
+        timeout=3,
+        execution_scope="existing_native_codex_root",
+    )
+    config.messaging.receivers["codex"] = ReceiverConfig(cwd=root, timeout=3)
+    for principal in ("local", "codex"):
+        config.principals[principal].message_peers = ["local", "codex"]
+        config.principals[principal].capabilities = list(
+            set(config.principals[principal].capabilities)
+            | {"message.send", "message.read", "message.ack"}
+        )
+    binding = template(tmp_path).model_copy(
+        update={"thread_id": ROOT, "session_id": ROOT, "source": "cli"}
+    )
+    config.visible_handoffs.native_codex = binding
+    state = FakeApp(root, active=True, answer="Direct coordinator response")
+
+    @asynccontextmanager
+    async def connection(self, current_binding):
+        assert current_binding.thread_id == ROOT
+        yield state, "generation"
+
+    monkeypatch.setattr(codex_host.CodexHost, "connection", connection)
+    await bridge.team_dispatcher.start()
+    async with MCPClientPool() as clients:
+        for name, token in (
+            ("local", "local-test-" + "a" * 40),
+            ("codex", "codex-team-test-" + "x" * 40),
+            ("grok", "grok-team-test-" + "x" * 40),
+        ):
+            await clients.connect(Peer(name, url=endpoint, token=token))
+        created = await clients.call(
+            "local",
+            "team_create",
+            {
+                "request": {
+                    "team_id": "direct-native",
+                    "name": "Direct native wake",
+                    "coordinator": "codex",
+                    "members": {"local": "worker", "codex": "coordinator", "grok": "reviewer"},
+                    "idempotency_key": "direct-native-team-create",
+                }
+            },
+        )
+        assert not created.structuredContent.get("error")
+        sent = await clients.call(
+            "local",
+            "message_send",
+            {
+                "message": MessageSend(
+                    recipient="codex",
+                    conversation_id="direct-coordinator-busy",
+                    idempotency_key="direct-coordinator-busy",
+                    body="Please handle this direct note.",
+                    kind="question",
+                    request_reply=True,
+                ).model_dump()
+            },
+        )
+        assert not sent.structuredContent.get("error"), sent.structuredContent
+        message_id = sent.structuredContent["id"]
+        await asyncio.sleep(0.2)
+        assert state.sent == []
+        stored = bridge.messages.get("local", message_id)
+        assert stored["processing"]["state"] == "queued"
+        assert stored["acknowledged"] is None and stored["receipt"]
+
+        await bridge.team_dispatcher.stop()
+        state.active = False
+        bridge.team_dispatcher = TeamDispatcher(bridge)
+        await bridge.team_dispatcher.start()
+        async with asyncio.timeout(20):
+            while True:
+                stored = bridge.messages.get("local", message_id)
+                replies = bridge.messages.conversation("local", "direct-coordinator-busy")[
+                    "messages"
+                ]
+                if stored["acknowledged"] and len(replies) > 1:
+                    break
+                await asyncio.sleep(0.05)
+    assert state.sent == ["turn/start"]
+    assert "Please handle this direct note." in state.body
+    assert stored["acknowledged"] is not None
+    assert stored["processing"]["state"] == "completed"
+    assert (
+        bridge.store.db.execute(
+            "SELECT count(*) FROM message_events WHERE message_id=? "
+            "AND kind='message.acknowledged'",
+            (message_id,),
+        ).fetchone()[0]
+        == 1
+    )
+    assert replies[1]["body"] == "Direct coordinator response"
+    assert replies[1]["reply_to"] == message_id
+    assert replies[1]["kind"] == "answer"
+    await bridge.team_dispatcher.stop()

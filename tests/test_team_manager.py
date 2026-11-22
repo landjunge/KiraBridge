@@ -422,7 +422,7 @@ def test_context_message_ack_waits_for_explicit_completed_turn_reconciliation(do
     domain.record_context_messages(work_item["id"], [addressed["id"], other["id"]])
 
     assert domain.messages("codex", "test-team")["messages"][0]["acknowledged"] is None
-    domain.ack_context_messages(work_item["id"])
+    domain.ack_context_messages(work_item["id"], non_empty_result=True)
     rows = {item["id"]: item for item in domain.messages("codex", "test-team")["messages"]}
     assert rows[addressed["id"]]["acknowledged"] is not None
     assert rows[other["id"]]["acknowledged"] is None
@@ -448,7 +448,8 @@ def test_direct_message_to_active_coordinator_always_creates_delivery_job(domain
     )
 
     assert sent["processing"]["state"] == "queued"
-    assert sent["processing_route"] == "pending_managed_receiver"
+    assert sent["processing"]["evidence"]["coordinator_wake_id"]
+    assert sent["receipt"] is not None and sent["acknowledged"] is None
     repeated = domain.bridge.messages.send(
         "chatgpt",
         MessageSend(
@@ -460,6 +461,134 @@ def test_direct_message_to_active_coordinator_always_creates_delivery_job(domain
         ),
     )
     assert repeated["id"] == sent["id"]
+
+
+def _coordinator_direct(domain, key, *, conversation_id="coordinator-dm", body="Direct inbox"):
+    current = domain.store.db.execute(
+        "SELECT coordinator FROM teams WHERE id='test-team'"
+    ).fetchone()[0]
+    if current != "codex":
+        role(domain, "codex", "coordinator")
+    for principal in ("chatgpt", "codex"):
+        policy = domain.config.principals[principal]
+        policy.message_peers = ["chatgpt", "codex"]
+        policy.capabilities = list(
+            set(policy.capabilities) | {"message.send", "message.read", "message.ack"}
+        )
+    domain.config.messaging.receivers["codex"] = ReceiverConfig(cwd="/tmp", timeout=30)
+    return domain.bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="codex",
+            conversation_id=conversation_id,
+            idempotency_key=key,
+            body=body,
+            kind="question",
+            request_reply=True,
+        ),
+    )
+
+
+def _coordinator_wake_work(domain, message_id):
+    evidence = json.loads(
+        domain.bridge.store.db.execute(
+            "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+        ).fetchone()[0]
+    )
+    wake_id = evidence["coordinator_wake_id"]
+    domain.dispatch_coordinator_wakes()
+    return domain.bridge.store.db.execute(
+        "SELECT work_id FROM team_coordinator_wakes WHERE id=?", (wake_id,)
+    ).fetchone()[0]
+
+
+def test_direct_receipt_ack_requires_nonempty_turn_and_exact_conversation(domain):
+    incoming = _coordinator_direct(domain, "direct-receipt")
+    work_id = _coordinator_wake_work(domain, incoming["id"])
+    assert domain.ack_context_messages(work_id) is False
+    assert domain.bridge.messages.get("chatgpt", incoming["id"])["acknowledged"] is None
+    domain.store.db.execute(
+        "UPDATE team_coordinator_wake_items SET conversation_id='foreign-conversation' "
+        "WHERE source='direct' AND source_id=?",
+        (incoming["id"],),
+    )
+    with pytest.raises(BridgeError) as error:
+        domain.ack_context_messages(work_id, non_empty_result=True)
+    assert error.value.code == "receipt_scope_conflict"
+    domain.store.db.execute(
+        "UPDATE team_coordinator_wake_items SET conversation_id=(SELECT conversation_id FROM "
+        "messages WHERE id=source_id),recipient='local' "
+        "WHERE source='direct' AND source_id=?",
+        (incoming["id"],),
+    )
+    with pytest.raises(BridgeError) as foreign:
+        domain.ack_context_messages(work_id, non_empty_result=True)
+    assert foreign.value.code == "receipt_scope_conflict"
+    assert domain.bridge.messages.get("chatgpt", incoming["id"])["acknowledged"] is None
+
+
+def test_valid_direct_receipt_ack_is_idempotent(domain):
+    incoming = _coordinator_direct(domain, "direct-idempotent-ack")
+    work_id = _coordinator_wake_work(domain, incoming["id"])
+    assert domain.ack_context_messages(work_id, non_empty_result=True) is True
+    assert domain.ack_context_messages(work_id, non_empty_result=True) is True
+    stored = domain.bridge.messages.get("chatgpt", incoming["id"])
+    assert stored["acknowledged"] is not None
+    assert stored["processing"]["state"] == "completed"
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM message_events WHERE message_id=? "
+            "AND kind='message.acknowledged'",
+            (incoming["id"],),
+        ).fetchone()[0]
+        == 1
+    )
+
+
+def test_bad_direct_receipt_enters_bounded_attention_without_starving_same_conversation(domain):
+    first = _coordinator_direct(domain, "direct-bad-receipt")
+    first_work = _coordinator_wake_work(domain, first["id"])
+    domain.store.db.execute(
+        "UPDATE team_coordinator_wake_items SET receipt='corrupt-receipt' "
+        "WHERE source='direct' AND source_id=?",
+        (first["id"],),
+    )
+    with pytest.raises(BridgeError) as error:
+        domain.ack_context_messages(first_work, non_empty_result=True)
+    assert error.value.code == "receipt_conflict"
+    domain.store.db.execute(
+        "UPDATE team_coordinator_wake_items SET conversation_id=(SELECT conversation_id FROM "
+        "messages WHERE id=source_id) WHERE source='direct' AND source_id=?",
+        (first["id"],),
+    )
+    with pytest.raises(BridgeError) as receipt_error:
+        domain.ack_context_messages(first_work, non_empty_result=True)
+    assert receipt_error.value.code == "receipt_conflict"
+    assert domain.bridge.messages.get("chatgpt", first["id"])["acknowledged"] is None
+
+    for attempt in range(5):
+        assert domain.note_context_ack_failure(first_work, "receipt_conflict") is (attempt == 4)
+    wake = domain.store.db.execute(
+        "SELECT state,ack_attempts,ack_error FROM team_coordinator_wakes WHERE work_id=?",
+        (first_work,),
+    ).fetchone()
+    assert tuple(wake) == ("attention", 5, "receipt_conflict")
+    first_job = domain.bridge.messages.get("chatgpt", first["id"])["processing"]
+    assert first_job["evidence"]["coordinator_attention"] == 1
+
+    second = _coordinator_direct(
+        domain,
+        "direct-after-attention",
+        body="Fresh message in the same conversation",
+    )
+    second_work = _coordinator_wake_work(domain, second["id"])
+    assert second_work and second_work != first_work
+    assert domain.bridge.messages.get("chatgpt", second["id"])["acknowledged"] is None
+    assert domain.bridge.messages.receive("codex", after=0, limit=10)["messages"] == []
+    from kirabridge.team_manager.dispatcher import TeamDispatcher
+
+    selected = TeamDispatcher(domain.bridge)._next()
+    assert selected[0]["id"] == second_work
 
 
 def test_messages_and_work_utf8_bounds_apply_before_insertion(domain):
