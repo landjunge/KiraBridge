@@ -284,8 +284,21 @@ def test_coordinator_can_replay_exact_role_handoff_after_self_demotion(domain):
     # original actor's key to retrieve or repeat the role operation.
     with pytest.raises(BridgeError, match="owner or coordinator"):
         domain.set_role("codex", request)
-    with pytest.raises(BridgeError, match="different"):
+    with pytest.raises(BridgeError, match="different") as conflict:
         domain.set_role("chatgpt", request.model_copy(update={"role": "reviewer"}))
+    assert conflict.value.code == "idempotency_conflict"
+
+    # A stored write receipt does not bypass a subsequently revoked read grant.
+    domain.config.principals["chatgpt"].capabilities = [
+        capability
+        for capability in domain.config.principals["chatgpt"].capabilities
+        if capability != "team.read"
+    ]
+    with pytest.raises(BridgeError) as denied:
+        domain.set_role("chatgpt", request)
+    assert denied.value.code == "forbidden"
+    assert "members" not in str(denied.value)
+    assert domain.get("local", "test-team")["revision"] == 2
 
 
 def test_observers_read_only_and_revoked_members_cannot_read(domain):

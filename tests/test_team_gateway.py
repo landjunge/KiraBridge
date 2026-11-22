@@ -16,7 +16,7 @@ from kirabridge.team_manager.models import TeamWorkCreate
 http_bridge = live_http_fixture
 
 
-async def setup_team(http_bridge):
+async def setup_team(http_bridge, *, coordinator="local"):
     bridge, endpoint = http_bridge
     bridge.config.team = TeamConfig(
         enabled=True, workers={name: TeamWorkerConfig() for name in ("local", "other")}
@@ -36,7 +36,7 @@ async def setup_team(http_bridge):
                 "team_id": "gateway",
                 "name": "Gateway team",
                 "members": {"other": "worker"},
-                "coordinator": "local",
+                "coordinator": coordinator,
                 "idempotency_key": "create-gateway",
             }
         },
@@ -134,6 +134,55 @@ async def test_authenticated_team_identity_roles_and_manual_work(http_bridge):
         )
         assert blocked.structuredContent["error"]["code"] == "team_role_denied"
         assert not bridge.store.db.execute("SELECT id FROM tasks").fetchall()
+    finally:
+        await pool.__aexit__(None, None, None)
+
+
+async def test_mcp_coordinator_self_demotion_retry_obeys_read_grant(http_bridge):
+    bridge, _, pool = await setup_team(http_bridge, coordinator="other")
+    request = {
+        "team_id": "gateway",
+        "member": "local",
+        "role": "coordinator",
+        "active": True,
+        "expected_revision": 1,
+        "idempotency_key": "mcp-coordinator-handoff",
+    }
+    try:
+        first = await pool.call("peer", "team_set_role", {"request": request})
+        assert first.structuredContent["coordinator"] == "local"
+        assert first.structuredContent["revision"] == 2
+
+        # The old coordinator can read back its exact operation after losing
+        # manage rights, without repeating the write.
+        replay = await pool.call("peer", "team_set_role", {"request": request})
+        assert replay.structuredContent["coordinator"] == "local"
+        assert replay.structuredContent["revision"] == 2
+
+        changed = await pool.call(
+            "peer",
+            "team_set_role",
+            {"request": {**request, "role": "worker"}},
+        )
+        assert changed.structuredContent["error"]["code"] == "idempotency_conflict"
+        assert not {"members", "revision", "coordinator"} & changed.structuredContent.keys()
+
+        # Idempotency records are principal-scoped: another actor cannot read
+        # the first actor's receipt and receives no team snapshot.
+        other_actor = await pool.call("owner", "team_set_role", {"request": request})
+        assert other_actor.structuredContent["error"]["code"] == "team_revision_conflict"
+        assert not {"members", "revision", "coordinator"} & other_actor.structuredContent.keys()
+
+        bridge.config.principals["other"].capabilities = [
+            capability
+            for capability in bridge.config.principals["other"].capabilities
+            if capability != "team.read"
+        ]
+        denied = await pool.call("peer", "team_set_role", {"request": request})
+        assert denied.structuredContent["error"]["code"] == "forbidden"
+        assert not {"members", "revision", "coordinator"} & denied.structuredContent.keys()
+        denied_read = await pool.call("peer", "team_get", {"team_id": "gateway"})
+        assert denied_read.structuredContent["error"]["code"] == "forbidden"
     finally:
         await pool.__aexit__(None, None, None)
 

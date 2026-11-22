@@ -878,6 +878,9 @@ class TeamManager:
             team = self._team(principal, request.team_id, "team.write")
             prior = self._previous(principal, request.team_id, "role", request)
             if prior:
+                # Replaying the stored operation returns the same team view as
+                # team_get, so it must still honor the caller's read grant.
+                self._team(principal, request.team_id, "team.read")
                 return self._view_team(request.team_id)
             self._automatic(principal)
             team = self._team(principal, request.team_id, "team.write", manage=True)
