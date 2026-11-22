@@ -86,9 +86,9 @@ async def test_passive_epoch_avoids_binary_reads_and_invalidates_on_native_file_
     from pathlib import Path
 
     from kirabridge.discovery import epoch
+    from kirabridge.platform_adapters.macos import system_transport as native
     from kirabridge.platform_adapters.macos.capabilities import CapabilityProbe
     from kirabridge.platform_adapters.macos.provider import MacOSProvider
-    from kirabridge.platform_adapters.macos import system_transport as native
 
     monkeypatch.setattr(native.sys, "platform", "darwin")
     app = tmp_path / "KiraBridge.app"

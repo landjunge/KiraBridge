@@ -106,7 +106,9 @@ class MacOSProvider:
         self.leaves.update({leaf: system_modules for leaf in set(SYSTEM_LEAVES.values())})
         self.leaves["system_reports"] = system_reports
         self.capability_probe = capabilities or CapabilityProbe(
-            native_metadata=system_modules.snapshot_metadata if system_modules is not None else None,
+            native_metadata=(
+                system_modules.snapshot_metadata if system_modules is not None else None
+            ),
             passive_native_metadata=(
                 system_modules.passive_metadata if system_modules is not None else None
             ),
