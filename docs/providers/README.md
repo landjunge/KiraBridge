@@ -17,7 +17,13 @@ Die Tabelle beschreibt die lokal geprüften Versionen. Sie behauptet keine
 Kompatibilität mit jeder künftigen CLI-Version. Die verlinkten Anbieterberichte
 enthalten offizielle Quellen und die jeweils tatsächlich überprüften Grenzen.
 
-Die spätere [Qwen-ACP-/MCP-Quellintegration](QWEN.md) hat ein eigenes, auftragsgebundenes Werkzeugprofil und konfigurierbare Budgets. OpenRouter startet als textbasierter API-Adapter und führt keine Modell-Toolaufrufe aus. Die übrigen Aussagen zu den isolierten Textadaptern gelten weiterhin für deren jeweilige Profile.
+Die spätere [Qwen-ACP-/MCP-Quellintegration](QWEN.md) hat ein eigenes,
+auftragsgebundenes Werkzeugprofil und konfigurierbare Budgets. OpenRouter
+unterstützt Modell-Toolaufrufe über die auftragsgebundene KiraBridge-MCP-
+Schnittstelle, wenn Betreiberprofil und Auftrag die Werkzeuge ausdrücklich
+freigeben. Dabei werden keine nativen Providerwerkzeuge oder Shellbefehle
+gestartet. Die übrigen Aussagen zu den isolierten Textadaptern gelten für die
+jeweiligen CLI-Profile.
 
 ## Bedienung
 

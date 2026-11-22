@@ -69,9 +69,11 @@ Before a paid request, KiraBridge reads the public OpenRouter model catalog,
 uses the highest listed prompt/completion rate (including pricing overrides),
 and computes a conservative bound from UTF-8 prompt bytes plus framing overhead
 and the configured maximum output tokens. Missing price data or a cost above
-the cap blocks the request. Paid model fallback is not enabled. Each task makes
-at most one Chat Completions request and the adapter never retries an uncertain
-outcome.
+the cap blocks the request. Paid model fallback is not enabled. Each task can
+make up to `openrouter_max_turns` Chat Completions requests. The default is 4
+turns and the configured maximum is 16. Paid tasks still require the separate
+input, output and total-cost limits above; their cost budget is reserved across
+every turn. The adapter never retries an uncertain outcome.
 
 The provider itself limits free variants; the current OpenRouter documentation
 lists 20 requests/minute and 50/day, with a higher daily limit only after buying
@@ -85,6 +87,22 @@ post-trained on DeepSeek V4.1 Flash; it remains the default route.
 DeepSeek requests also send OpenRouter's hard `provider.max_price` filter at
 those per-million-token rates. The task cost cap separately reserves the
 maximum input/output spend across every allowed model turn.
+
+Paid configuration example:
+
+```toml
+model = "deepseek/deepseek-v4.1-flash"
+openrouter_allow_paid = true
+openrouter_fallback_models = []
+openrouter_paid_max_prompt_bytes = 32768
+openrouter_paid_max_output_tokens = 512
+openrouter_paid_max_cost_usd = 0.01
+```
+
+Set `openrouter_fallback_models = []` explicitly for a paid route. Otherwise
+KiraBridge fills in its default free fallback, and paid configuration rejects
+the resulting mixed paid/free route. The separate limits remain required for
+every configured turn.
 
 ## Tool and data scope
 
