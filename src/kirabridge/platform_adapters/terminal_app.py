@@ -438,11 +438,11 @@ class TerminalAppTransport:
     }}
 """
 
-    def native_focus(self, pane_id):
+    def native_focus(self, pane_id, *, include_surface=False):
         window, tty = pane_id.split(":")[1:]
         attempts = int(TerminalAppTransport.FOCUS_ATTEMPTS)
         last_attempt = attempts - 1
-        return (
+        source = (
             self.native_target(pane_id)
             + f"""
     const w=targetWindow; tab.selected=true; app.activate(); w.frontmost=true; delay(0.15);
@@ -480,6 +480,77 @@ class TerminalAppTransport:
      }}
     }}"""
         )
+        if include_surface:
+            source += """
+    const focusedWindow=app.windows()[0], focusedBounds=focusedWindow.bounds(),
+     terminalOwner=se.processes.byName('Terminal');
+    checkFocus();
+    JSON.stringify({screen:Array.from(tab.history().slice(-131072)).slice(-65536).join(''),
+     surface:{window_id:focusedWindow.id(),tty:focusedWindow.selectedTab().tty(),
+      owner_pid:terminalOwner.unixId(),title:focusedWindow.name(),
+      bounds:{x:focusedBounds.x,y:focusedBounds.y,
+       width:focusedBounds.width,height:focusedBounds.height}}});
+"""
+        return source
+
+    @staticmethod
+    def native_window_surface_guard(binding):
+        bounds = binding["bounds"]
+        return (
+            "\nconst provenBounds=targetWindow.bounds(), provenValues=[provenBounds.x,"
+            "provenBounds.y,provenBounds.width,provenBounds.height];"
+            "if(!provenValues.every(v=>typeof v==='number'&&Number.isFinite(v))"
+            "||targetWindow.id()!=="
+            + str(binding["terminal_window_id"])
+            + "||tab.tty()!=="
+            + json.dumps(binding["tty"])
+            + "||targetWindow.name()!=="
+            + json.dumps(binding["title"])
+            + "||Math.abs(provenBounds.x-"
+            + repr(bounds["x"])
+            + ")>1||Math.abs(provenBounds.y-"
+            + repr(bounds["y"])
+            + ")>1||Math.abs(provenBounds.width-"
+            + repr(bounds["width"])
+            + ")>1||Math.abs(provenBounds.height-"
+            + repr(bounds["height"])
+            + ")>1)throw Error('Physical Terminal window changed');"
+        )
+
+    async def prove_existing_target(self, row, surface, *, principal):
+        from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+        return await TerminalWindowProof(
+            self, getattr(self, "system_transport", None), principal
+        ).prove_existing_target(row, surface)
+
+    async def focus_and_prove_existing_target(
+        self, row, *, principal, identity_guard=None, expected_screen=None, shell_snapshot=None
+    ):
+        target = self.native_target(row["pane_id"])
+        surface = await self.native(
+            target
+            + self.native_identity_guard(identity_guard)
+            + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
+            + self.native_screen_guard(expected_screen)
+            + self.native_focus(row["pane_id"], include_surface=True)[len(target) :],
+            mutation=True,
+        )
+        if (
+            not isinstance(surface, dict)
+            or not isinstance(surface.get("screen"), str)
+            or not isinstance(surface.get("surface"), dict)
+        ):
+            raise BridgeError(
+                "visible_window_unconfirmed", "Focused Terminal window evidence is incomplete"
+            )
+        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+        if expected_screen is not None and not empty_shell_prompt(surface["screen"]):
+            raise BridgeError(
+                "visible_input_changed", "Terminal input changed before physical proof"
+            )
+        return await self.prove_existing_target(row, surface["surface"], principal=principal)
 
     @staticmethod
     def native_identity_guard(identities):
@@ -721,13 +792,29 @@ class TerminalAppTransport:
         shell_snapshot=None,
         agent_target=None,
         composer_only=False,
+        require_physical_visibility=False,
+        principal="local",
     ):
+        surface_binding = None
+        if require_physical_visibility:
+            surface_binding = await self.focus_and_prove_existing_target(
+                {"pane_id": pane_id, "tty": "/dev/" + pane_id.rsplit(":", 1)[1]},
+                principal=principal,
+                identity_guard=identity_guard,
+                expected_screen=expected_screen,
+                shell_snapshot=shell_snapshot,
+            )
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
             # worker. native() reaps that worker before the lease requests restore.
             async with self.clipboard_owner(text) as lease:
+                focus_prefix = (
+                    self.native_target(pane_id) + self.native_focus_check(pane_id)
+                    if surface_binding is not None
+                    else self.native_focus(pane_id)
+                )
                 await self.native(
-                    self.native_focus(pane_id)
+                    focus_prefix
                     + self.native_identity_guard(identity_guard)
                     + self.native_paste_observation(text, target=agent_target)
                     + f"""
@@ -759,6 +846,11 @@ class TerminalAppTransport:
                     )
                     + "\ncheckFocus(); checkClipboard();"
                     + self.native_screen_guard(expected_screen, composer_only=composer_only)
+                    + (
+                        self.native_window_surface_guard(surface_binding)
+                        if surface_binding is not None
+                        else ""
+                    )
                     + """
         const beforePaste="""
                     + self.native_input_tail(65536)
@@ -1153,7 +1245,15 @@ entries[0].click();JSON.stringify({detached:true});
                 await reap_process(child, process_group=False)
 
     async def send_confirmed(
-        self, row, text, identity, *, before_transport=None, expected_cwd=None
+        self,
+        row,
+        text,
+        identity,
+        *,
+        before_transport=None,
+        expected_cwd=None,
+        require_physical_visibility=False,
+        principal="local",
     ):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
         if identity.split()[1] != Path(row["tty"]).name:
@@ -1198,6 +1298,11 @@ entries[0].click();JSON.stringify({detached:true});
         if before_transport is not None:
             await before_transport()
         target = self.native_target(row["pane_id"])
+        focused = self.native_focus(
+            row["pane_id"], include_surface=require_physical_visibility
+        )[len(target) :]
+        if not require_physical_visibility:
+            focused += "\ncheckFocus(); JSON.stringify(" + self.native_input_tail(65536) + ");"
         identity_check = (
             "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
             + "\nconst observed=host.doShellScript("
@@ -1207,19 +1312,32 @@ entries[0].click();JSON.stringify({detached:true});
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
         )
-        screen = await self.native(
+        focused_result = await self.native(
             target
             + identity_guard
             + own_boundary
             + identity_check
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             + self.native_screen_guard(screen)
-            + self.native_focus(row["pane_id"])[len(target) :]
-            + "\ncheckFocus(); JSON.stringify("
-            + self.native_input_tail(65536)
-            + ");",
+            + focused,
             mutation=True,
         )
+        surface_binding = None
+        if require_physical_visibility:
+            if (
+                not isinstance(focused_result, dict)
+                or not isinstance(focused_result.get("screen"), str)
+                or not isinstance(focused_result.get("surface"), dict)
+            ):
+                raise BridgeError(
+                    "visible_window_unconfirmed", "Focused Terminal window evidence is incomplete"
+                )
+            screen = focused_result["screen"]
+            surface_binding = await self.prove_existing_target(
+                row, focused_result["surface"], principal=principal
+            )
+        else:
+            screen = focused_result
         # Tab selection may reflow history or change blank row padding. Accept
         # only the fresh history tail read AFTER that transition in the same
         # focus call. Compare it byte-for-byte later, without another selection
@@ -1233,6 +1351,11 @@ entries[0].click();JSON.stringify({detached:true});
             + identity_check
             + TerminalAppTransport.native_focus_check(row["pane_id"])
             + "\ncheckFocus();"
+            + (
+                self.native_window_surface_guard(surface_binding)
+                if surface_binding is not None
+                else ""
+            )
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             # Use the accepted screen, not a second prompt parser that can drift.
             + self.native_screen_guard(screen)

@@ -391,7 +391,11 @@ class VisibleTerminal:
                 {"execution_route": "visible_terminal", **reference.model_dump(), "tty": row["tty"]}
             )
             await bridge.sessions.terminal_app.send_confirmed(
-                current, "/bin/zsh -f " + shlex.quote(str(script_path)), identity
+                current,
+                "/bin/zsh -f " + shlex.quote(str(script_path)),
+                identity,
+                require_physical_visibility=True,
+                principal=principal,
             )
         deadline = time.monotonic() + args.timeout
         while time.monotonic() < deadline:

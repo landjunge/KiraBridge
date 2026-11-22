@@ -65,7 +65,7 @@ def command(bridge, config, monkeypatch):
         state["identities"].append(pid)
         return "501 ttys004 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         assert all(selected[key] == value for key, value in row.items())
         assert observed_identity.startswith("501 ttys004 ")
         state["posts"].append(text)
@@ -241,7 +241,7 @@ async def test_unknown_input_creates_separate_controlled_shell_when_requested(co
         assert pid == created["expected_pid"]
         return "501 ttys005 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         assert selected["pane_id"] == created["pane_id"]
         assert observed_identity.startswith("501 ttys005 ")
         state["posts"].append((selected["pane_id"], text))
@@ -373,7 +373,7 @@ async def test_checking_stops_at_the_first_suitable_window(command, monkeypatch)
     async def identity(pid):
         return "501 ttys003 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         posts.append(selected["pane_id"])
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
@@ -459,7 +459,7 @@ async def test_a_vanishing_candidate_does_not_stop_the_choice_of_another(command
     async def identity(pid):
         return "501 ttys005 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         posts.append(selected["pane_id"])
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
@@ -592,7 +592,7 @@ async def test_setup_and_interrupt_receipts_fail_at_once(command, monkeypatch, p
     bridge, state, args = command
     transport = bridge.sessions.terminal_app
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
         receipt = {"nonce": nonce, "exit_code": 125 if phase == "setup" else 130, "phase": phase}

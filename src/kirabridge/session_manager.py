@@ -663,6 +663,11 @@ class SessionManager:
                 )
             plain_paste = args.pane_id.startswith("terminal:") and not args.submit
             args = self.input_release.dispatch(principal, args, task_id)
+            physical_visibility = (
+                {"require_physical_visibility": True, "principal": principal}
+                if visible_direct
+                else {}
+            )
             if plain_paste:
                 self.terminal_app.validate_shell_paste_text(args.text)
                 context = await self.terminal_app.prepare_shell_paste(selected)
@@ -674,11 +679,16 @@ class SessionManager:
                     identity_guard=context["identities"],
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
+                    **physical_visibility,
                 )
             elif visible_direct:
                 identity = await self.terminal_app.process_identity(selected["expected_pid"])
                 await self.terminal_app.send_confirmed(
-                    selected, args.text, identity, before_transport=before_transport
+                    selected,
+                    args.text,
+                    identity,
+                    before_transport=before_transport,
+                    **physical_visibility,
                 )
             else:
                 identities = None
