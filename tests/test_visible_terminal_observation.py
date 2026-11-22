@@ -219,16 +219,86 @@ async def test_idle_shell_unconfirmed_input_is_not_reported_as_process_busy(comm
     running.assert_not_awaited()
 
 
-async def test_unknown_input_without_safe_shell_does_not_open_replacement_window(command):
+async def test_unknown_input_creates_separate_controlled_shell_when_requested(command, monkeypatch):
     bridge, state, args = command
-    bridge.sessions.terminal_app.read = AsyncMock(return_value="host project%    ")
-    bridge.sessions.open = AsyncMock(side_effect=AssertionError("must preserve ambiguous input"))
+    transport = bridge.sessions.terminal_app
+    existing = copy.deepcopy(state["row"])
+    created = copy.deepcopy(existing)
+    created.update(
+        pane_id="terminal:124:ttys005",
+        expected_pid=346,
+        tty="/dev/ttys005",
+        processes=[{"pid": 346, "ppid": 343, "name": "zsh", "image": "/bin/zsh"}],
+    )
+    async def catalog():
+        rows = [existing, created] if bridge.sessions.open.await_count else [existing]
+        return copy.deepcopy(rows)
+
+    async def read(pane):
+        return "host project%    " if pane == existing["pane_id"] else "KiraBridge visible % "
+
+    async def identity(pid):
+        assert pid == created["expected_pid"]
+        return "501 ttys005 Wed Nov 4 12:00:00 2026"
+
+    async def send(selected, text, observed_identity):
+        assert selected["pane_id"] == created["pane_id"]
+        assert observed_identity.startswith("501 ttys005 ")
+        state["posts"].append((selected["pane_id"], text))
+        script = Path(shlex.split(text)[-1])
+        nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
+        write_private(script.parent / "result.json", json.dumps({"nonce": nonce, "exit_code": 0}))
+
+    monkeypatch.setattr(transport, "catalog", catalog)
+    monkeypatch.setattr(transport, "read", read)
+    monkeypatch.setattr(transport, "process_identity", identity)
+    monkeypatch.setattr(transport, "send_confirmed", send)
+    bridge.sessions.open = AsyncMock(
+        return_value={
+            "pane_id": created["pane_id"],
+            "expected_pid": created["expected_pid"],
+            "tty": created["tty"],
+        }
+    )
     args.pop("pane_id")
     args.pop("expected_pid")
     args["create_if_needed"] = True
+    result = await bridge.visible_terminal.execute(
+        {"id": "separate-controlled-shell", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    bridge.sessions.open.assert_awaited_once()
+    opened_args = bridge.sessions.open.await_args
+    assert opened_args.args[1].controlled_shell is True
+    assert result["pane_id"] == created["pane_id"] and result["success"]
+    assert result["terminal_target"] == {
+        "route": "new_controlled_visible_shell",
+        "preserved_existing_input_issue": "visible_input_unknown",
+    }
+    assert [pane for pane, _text in state["posts"]] == [created["pane_id"]]
+    state["posts"].clear()
+    reused = await bridge.visible_terminal.execute(
+        {"id": "reuse-controlled-shell", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert reused["pane_id"] == created["pane_id"] and reused["success"]
+    assert reused["terminal_target"]["route"] == "existing_visible_shell"
+    assert [pane for pane, _text in state["posts"]] == [created["pane_id"]]
+    bridge.sessions.open.assert_awaited_once()
+
+
+async def test_unknown_input_create_if_needed_false_does_not_open(command):
+    bridge, state, args = command
+    bridge.sessions.terminal_app.read = AsyncMock(return_value="host project%    ")
+    bridge.sessions.open = AsyncMock(side_effect=AssertionError("creation is disabled"))
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = False
     with pytest.raises(BridgeError) as failure:
         await bridge.visible_terminal.execute(
-            {"id": "no-window-loop", "principal": "local"},
+            {"id": "no-fallback", "principal": "local"},
             VisibleTerminalInput.model_validate(args),
             AsyncMock(),
         )
@@ -264,6 +334,10 @@ async def test_auto_selection_uses_existing_safe_shell_beside_unknown_input(comm
         AsyncMock(),
     )
     assert result["pane_id"] == safe["pane_id"] and result["exit_code"] == 0
+    assert result["terminal_target"] == {
+        "route": "existing_visible_shell",
+        "preserved_existing_input_issue": "visible_input_unknown",
+    }
     assert len(state["posts"]) == 1
     bridge.sessions.open.assert_not_awaited()
 

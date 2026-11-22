@@ -1267,8 +1267,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """Direct native terminal work with task-bound output and observed exit status.
 
-        Reuses one suitable empty existing Terminal.app shell or opens a separate visible
-        window under the same exact-task/standing grant. Busy agents are preserved.
+        Reuses one suitable empty existing Terminal.app shell or, when create_if_needed is
+        true, opens a separate controlled visible shell if no confirmed-empty shell exists.
+        Ambiguous existing prompts are preserved; busy agents are preserved. Window creation
+        remains under the same exact-task/standing grant.
         Optional pane_id/expected_pid binds an explicit current target. Inspect task_get
         for actual visible command completion; an uncertain outcome must never be replayed.
         On Linux, executes exact argv in a fresh short-lived owned PTY and closes it after

@@ -76,6 +76,18 @@ def test_input_or_unknown_prompts_stay_protected(screen):
     assert not empty_shell_prompt(screen)
 
 
+def test_terminal_right_padding_without_cursor_proof_is_ambiguous():
+    # Live readback supplied for the idle user shell: its last line is the
+    # normal prompt followed by 55 spaces. The current Terminal.app history
+    # source does not report a cursor column, so this cannot be distinguished
+    # from a whitespace-only draft by text parsing alone.
+    padded = "➜  ~" + " " * 55 + "\n\n"
+    assert empty_shell_prompt("➜  ~ ")
+    assert not empty_shell_prompt(padded)
+    assert not empty_shell_prompt("➜  ~ echo harmless ")
+    assert not empty_shell_prompt("➜  ~ " + " " * 55 + "echo harmless ")
+
+
 @pytest.fixture
 def direct_shell(bridge, config, monkeypatch):
     # Use the production client-type decision, not a monkeypatched direct() flag.
