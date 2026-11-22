@@ -660,7 +660,19 @@ class RecordingTeams:
 
 def isolated_dispatcher(config):
     teams = RecordingTeams()
-    return TeamDispatcher(SimpleNamespace(config=config, teams=teams)), teams
+
+    class EmptyRows:
+        @staticmethod
+        def fetchall():
+            return []
+
+    class EmptyDatabase:
+        @staticmethod
+        def execute(*_args):
+            return EmptyRows()
+
+    bridge = SimpleNamespace(config=config, teams=teams, store=SimpleNamespace(db=EmptyDatabase()))
+    return TeamDispatcher(bridge), teams
 
 
 @pytest.mark.parametrize("framing,action_count", [("strict_json", 0), ("work_reply_header", 1)])

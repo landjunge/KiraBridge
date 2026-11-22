@@ -79,6 +79,12 @@ CREATE TABLE IF NOT EXISTS team_events (
  at REAL NOT NULL, kind TEXT NOT NULL, principal TEXT NOT NULL,
  object_id TEXT, metadata TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS team_native_ping_queue ON team_events(seq,team_id,object_id)
+ WHERE kind='team.message_native_ping_queued';
+CREATE INDEX IF NOT EXISTS team_native_ping_outcomes ON team_events(team_id,object_id,kind)
+ WHERE kind IN ('team.message_native_ping_idle_pending','team.message_native_ping_denied',
+ 'team.message_native_ping_failed','team.message_native_ping_submitting',
+ 'team.message_native_ping_submitted','team.message_native_ping_unknown');
 CREATE TABLE IF NOT EXISTS team_coordinator_resumes (
  notice_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES team_work(id),
  resume_work_id TEXT UNIQUE NOT NULL REFERENCES team_work(id), created REAL NOT NULL
@@ -982,6 +988,7 @@ class TeamManager:
     def _send(self, principal, request, *, message_id=None, validate_only=False):
         self._automatic(principal)
         self._size(request.body, self.config.team.max_body_bytes)
+        native_ping_enrolled = False
         with self.store.transaction():
             self._team(principal, request.team_id, "team.write", write=True)
             self._member(request.team_id, request.recipient, writable=True)
@@ -1033,6 +1040,28 @@ class TeamManager:
                 content_sha256=digest(request.body),
                 **({"limit_notes": notes} if notes else {}),
             )
+            team = self.store.db.execute(
+                "SELECT coordinator FROM teams WHERE id=?", (request.team_id,)
+            ).fetchone()
+            if (
+                request.recipient == "codex"
+                and team is not None
+                and team["coordinator"] == "codex"
+                and self.config.visible_handoffs.native_codex is not None
+            ):
+                # This durable marker enrolls only this newly-created, explicitly
+                # addressed message. Replays return above and cannot enqueue a
+                # second native notification.
+                self._event(
+                    request.team_id,
+                    principal,
+                    "team.message_native_ping_queued",
+                    message_id,
+                    recipient="codex",
+                )
+                native_ping_enrolled = True
+        if native_ping_enrolled:
+            self.bridge.team_dispatcher.wake_native_ping()
         self.wake.set()
         stored = self._message(request.team_id, message_id)
         if notes:
@@ -1050,6 +1079,22 @@ class TeamManager:
             "messages": [dict(row) for row in rows],
             "next_cursor": rows[-1]["seq"] if rows else after,
         }
+
+    def pending_native_pings(self, limit=16):
+        """Return only newly enrolled messages with no recorded attempt outcome."""
+        rows = self.store.db.execute(
+            "SELECT e.team_id,e.object_id,m.sender,m.recipient FROM team_events e "
+            "JOIN team_messages m ON m.team_id=e.team_id AND m.id=e.object_id "
+            "WHERE e.kind='team.message_native_ping_queued' AND NOT EXISTS ("
+            "SELECT 1 FROM team_events done WHERE done.team_id=e.team_id "
+            "AND done.object_id=e.object_id AND done.kind IN ("
+            "'team.message_native_ping_idle_pending','team.message_native_ping_denied',"
+            "'team.message_native_ping_failed','team.message_native_ping_submitting',"
+            "'team.message_native_ping_submitted','team.message_native_ping_unknown')) "
+            "ORDER BY e.seq LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def ack(self, principal, team_id, message_id):
         with self.store.transaction():

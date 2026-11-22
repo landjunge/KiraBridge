@@ -1453,10 +1453,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         exact same message. Work/questions to CLI agents use their assigned visible terminal
         even with dispatch=false. One bounded visible attempt is observed before returning;
         busy/missing/changed targets fail without a waiting backlog or hidden fallback.
-        For guidance to an already-working cooperating agent, use a NEW note with
-        dispatch=false and request_reply=false on its agreed conversation_id.
-        The recipient must poll message_receive and deduplicate IDs before applying/ACK;
-        this inbox route does not wake or automatically steer the active session.
+        For an addressed message to the assigned native Codex, use dispatch=true only
+        when the sender has the existing message-peer, agent.execute, session.inspect
+        and session.input grants. The verified native route steers the exact active turn
+        (or starts the assigned route when idle); accepted input is not proof of reading,
+        an ACK, or a reply. The recipient must process and ACK the original message ID.
+        dispatch=false is explicitly a passive inbox post: it does not wake or steer an
+        active session. Use it only when polling/reading later is intended.
         Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         Returned answers stay in the sender's client inbox; they do not automatically
