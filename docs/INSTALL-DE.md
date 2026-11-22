@@ -70,6 +70,14 @@ niemand geändert hat.
 Der launchd-Benutzerdienst läuft weiter, wenn Terminal oder Browser geschlossen
 werden. Die sichtbare Installation ist kein Fenster, das den Dienst am Leben hält.
 
+Nach erfolgreicher Umschaltung und Prüfung stellt der Installer die Zusatzdienste
+(`com.kirabridge.*` neben der Bridge, etwa Freigaben, Chat-Events, Grok) auf die neue
+Release um: Pfade unter `install/releases/<version>/` werden ersetzt, die alte plist
+liegt im Rückweg-Backup, der Dienst wird neu gestartet; der ChatGPT-Tunnel wird per
+`kickstart -k` neu gestartet. Fehlt eine Datei in der neuen Release oder scheitert ein
+Neustart, bleibt diese plist unverändert und die Zusammenfassung nennt sie; das Update
+selbst gilt trotzdem. `rollback` stellt die umgestellten plists wieder her.
+
 ## DMG-Installer (Quellbau, noch nicht veröffentlicht)
 
 Für eine übliche Installation per Ziehen und Ablegen lässt sich aus demselben

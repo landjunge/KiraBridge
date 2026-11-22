@@ -319,6 +319,10 @@ def test_activate_and_rollback_release_sqlite_before_bootstrap(installer, monkey
         installer, "wait_health", lambda *a, **kw: {"version": "0.8.0rc15", "runtime": {"pid": 1}}
     )
     monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    tunnel_restarts = []
+    monkeypatch.setattr(
+        installer, "_restart_owned_tunnel", lambda agents: tunnel_restarts.append(agents)
+    )
     writes = []
 
     def bootstrap(args):
@@ -329,10 +333,78 @@ def test_activate_and_rollback_release_sqlite_before_bootstrap(installer, monkey
 
     monkeypatch.setattr(installer, "start_service", bootstrap)
     installer.activate(args, release)
+    assert tunnel_restarts == [args.plist.parent]
     installer.rollback(args)
+    assert tunnel_restarts == [args.plist.parent, args.plist.parent]
     assert writes == ["bootstrap", "bootstrap"]
     with sqlite3.connect(database) as db:
         assert db.execute("select count(*) from preserved").fetchone()[0] == 2
+
+
+def test_rollback_retains_core_checkpoint_until_tunnel_restart_succeeds(
+    installer, monkeypatch, tmp_path
+):
+    from contextlib import nullcontext
+
+    prefix = tmp_path / "install"
+    backup = prefix / "backups/b1"
+    backup.mkdir(parents=True)
+    config = tmp_path / "config.toml"
+    config.write_text("")
+    launcher = tmp_path / "bin/kirabridge"
+    launcher.parent.mkdir()
+    launcher.write_text("new launcher")
+    plist = tmp_path / "service.plist"
+    plist.write_text("new plist")
+    (backup / "launcher.before").write_text("old launcher")
+    (backup / "service.before.plist").write_text("old plist")
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="launchd",
+    )
+    active = {
+        "backup": str(backup),
+        "config": str(config),
+        "launcher": str(launcher),
+        "plist": str(plist),
+        "service": "launchd",
+        "installed_wrapper_sha256": installer.sha(launcher),
+        "installed_plist_sha256": installer.sha(plist),
+        "had_wrapper": True,
+        "had_plist": True,
+        "was_loaded": False,
+        "previous": None,
+        "aux_services": [],
+    }
+    current = prefix / "current.json"
+    installer.jwrite(current, active)
+    tunnel_results = iter(["Neustart fehlgeschlagen", None])
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda args: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda args: None)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *args: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda config: nullcontext())
+    monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    monkeypatch.setattr(installer, "start_service", lambda args: None)
+    monkeypatch.setattr(installer, "loaded", lambda args: False)
+    monkeypatch.setattr(installer, "_restart_owned_tunnel", lambda agents: next(tunnel_results))
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
+
+    installer.rollback(args)
+
+    checkpoint = json.loads(current.read_text())
+    assert checkpoint["rollback_core_restored"] is True
+    assert checkpoint["restored_installed_wrapper_sha256"] == installer.sha(launcher)
+    assert checkpoint["restored_installed_plist_sha256"] == installer.sha(plist)
+    assert launcher.read_text() == "old launcher"
+    assert plist.read_text() == "old plist"
+
+    installer.rollback(args)
+
+    assert not current.exists()
 
 
 def test_queue_holds_block_unsafe_downgrade_before_service_switch(
