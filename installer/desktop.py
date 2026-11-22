@@ -23,6 +23,16 @@ def release_argv(api, args, release, name, argv=None):
     return [runtime, "-m", "kirabridge.cli", "--config", str(args.config), *command[name]]
 
 
+def _run_readiness_probe(api, argv, *, label, timeout):
+    """Run a read-only authenticated readiness check with a safe, named failure."""
+    try:
+        api.run(argv, capture=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{label} readiness timed out") from None
+    except (OSError, RuntimeError):
+        raise RuntimeError(f"{label} readiness probe failed") from None
+
+
 def _private_record_path(path, *, directory):
     """Require an owner-private, non-symlink path before trusting release records."""
     path = Path(path)
@@ -512,7 +522,8 @@ def activate(api, args, release, active, current):
         save(api, current, active)
         start(api, path)
     # Authenticated console probe; does not print a login ticket or open a browser.
-    api.run(
+    _run_readiness_probe(
+        api,
         [
             api.python(release),
             "-c",
@@ -525,24 +536,22 @@ def activate(api, args, release, active, current):
             "  time.sleep(.2)\n",
             str(args.config),
         ],
-        capture=True,
+        label="approval console",
         timeout=35,
     )
     if any(row["name"] == "chatgpt" for row in state["services"]):
-        api.run(
+        _run_readiness_probe(
+            api,
             [
                 api.python(release),
                 "-c",
-                "from kirabridge.chatgpt_setup import runtime_status; "
+                "from kirabridge.chatgpt_setup import wait_for_tunnel_readiness; "
                 "from kirabridge.setup_dependencies import local_client; "
-                "import pathlib,sys,time; p=pathlib.Path(sys.argv[1]); "
-                "b=local_client(p); deadline=time.monotonic()+75\n"
-                "while not runtime_status(b,p).get('connected'):\n"
-                " if time.monotonic()>=deadline: raise RuntimeError('ChatGPT readiness timeout')\n"
-                " time.sleep(.5)\n",
+                "import pathlib,sys; p=pathlib.Path(sys.argv[1]); "
+                "b=local_client(p); wait_for_tunnel_readiness(b,p,timeout=75)\n",
                 str(args.config),
             ],
-            capture=True,
+            label="ChatGPT tunnel",
             timeout=95,
         )
     state["app_started"] = start_app(api, app)

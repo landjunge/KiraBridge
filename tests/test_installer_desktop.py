@@ -116,6 +116,21 @@ def test_desktop_module_rejects_corruption_before_executing(tmp_path):
         module.desktop_module(SimpleNamespace(bundle=tmp_path))
 
 
+@pytest.mark.parametrize("failure", ["timeout", "process"])
+def test_readiness_probe_failure_is_named_and_sanitized(desktop, monkeypatch, failure):
+    def run(*args, **kwargs):
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired("secret-argument", 1)
+        raise RuntimeError("credential=private-value")
+
+    api = SimpleNamespace(run=run)
+    with pytest.raises(RuntimeError) as error:
+        desktop._run_readiness_probe(api, ["ignored"], label="approval console", timeout=1)
+    assert "approval console readiness" in str(error.value)
+    assert "private-value" not in str(error.value)
+    assert "secret-argument" not in str(error.value)
+
+
 @pytest.mark.parametrize("difference", ["path", "program", "arguments"])
 def test_loaded_job_identity_is_verified_before_unload(desktop, monkeypatch, tmp_path, difference):
     path = tmp_path / "service.plist"
