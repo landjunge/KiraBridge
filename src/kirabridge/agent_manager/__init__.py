@@ -590,7 +590,7 @@ class AgentManager:
             "opencode_acp": OpenCodeACPAdapter(terminal),
             "opencode_http": OpenCodeHTTPAdapter(),
             "opencode_http_v2": OpenCodeHTTPV2Adapter(),
-            "openrouter_api": OpenRouterAdapter(),
+            "openrouter_api": OpenRouterAdapter(config),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
             "copilot_cli": CopilotCLIAdapter(terminal),
@@ -764,7 +764,7 @@ class AgentManager:
         if full_access and config.kind in {"grok_acp", "opencode_http", "opencode_http_v2"}:
             args = args.model_copy(update={"local_tools": True})
         if args.local_tools and (
-            (config.kind not in {"grok_acp", "qwen_acp"} and not full_access)
+            (config.kind not in {"grok_acp", "qwen_acp", "openrouter_api"} and not full_access)
             or not config.allow_local_tools
             or "agent.local_tools" not in principal.capabilities
         ):
