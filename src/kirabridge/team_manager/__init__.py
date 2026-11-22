@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TaskRequest, canonical, digest
+from kirabridge.message_manager import MessageSend
 from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
@@ -1350,21 +1351,74 @@ class TeamManager:
     def coordinator_direct_messages(self, work_id):
         work = self._work(work_id)
         wake = self.store.db.execute(
-            "SELECT id FROM team_coordinator_wakes WHERE work_id=? AND team_id=?",
+            "SELECT id,coordinator FROM team_coordinator_wakes WHERE work_id=? AND team_id=?",
             (work_id, work["team_id"]),
         ).fetchone()
         if wake is None:
             return []
-        return [
-            dict(row)
-            for row in self.store.db.execute(
-                "SELECT i.source_id,i.sender,i.recipient,i.conversation_id,i.receipt,"
-                "m.kind,m.request_reply,m.acknowledged FROM team_coordinator_wake_items i "
-                "LEFT JOIN messages m ON i.source='direct' AND m.id=i.source_id "
-                "WHERE i.wake_id=? AND i.source='direct' ORDER BY i.created,i.source_id",
-                (wake["id"],),
+        if wake["coordinator"] != work["assignee"]:
+            raise BridgeError("receipt_scope_conflict", "Wake belongs to a different principal")
+        result = []
+        for row in self.store.db.execute(
+            "SELECT i.source_id,i.sender AS wake_sender,i.recipient AS wake_recipient,"
+            "i.conversation_id AS wake_conversation_id,i.receipt AS wake_receipt,"
+            "m.sender,m.recipient,m.conversation_id,m.receipt,m.kind,m.request_reply,"
+            "m.acknowledged FROM team_coordinator_wake_items i LEFT JOIN messages m "
+            "ON m.id=i.source_id WHERE i.wake_id=? AND i.source='direct' "
+            "ORDER BY i.created,i.source_id",
+            (wake["id"],),
+        ):
+            if (
+                row["sender"] is None
+                or row["recipient"] != work["assignee"]
+                or row["wake_recipient"] != row["recipient"]
+                or row["wake_sender"] != row["sender"]
+                or row["wake_conversation_id"] != row["conversation_id"]
+                or not row["receipt"]
+                or row["wake_receipt"] != row["receipt"]
+            ):
+                raise BridgeError(
+                    "receipt_scope_conflict", "Wake metadata differs from its original message"
+                )
+            result.append(
+                {
+                    "source_id": row["source_id"],
+                    "sender": row["sender"],
+                    "recipient": row["recipient"],
+                    "conversation_id": row["conversation_id"],
+                    "receipt": row["receipt"],
+                    "kind": row["kind"],
+                    "request_reply": bool(row["request_reply"]),
+                    "acknowledged": row["acknowledged"],
+                }
             )
-        ]
+        return result
+
+    def reply_and_ack_context_messages(self, work_id, reply_body):
+        """Revalidate source receipts and persist reply plus ACK atomically."""
+        if not isinstance(reply_body, str) or not reply_body.strip():
+            raise BridgeError("team_agent_no_text", "A non-empty model result is required")
+        with self.store.transaction():
+            work = self._work(work_id)
+            sources = self.coordinator_direct_messages(work_id)
+            for item in sources:
+                if item["request_reply"] and item["kind"] in {"question", "work"}:
+                    body = reply_body.encode()[: self.config.messaging.max_body_bytes].decode(
+                        "utf-8", "ignore"
+                    )
+                    reply = MessageSend(
+                        recipient=item["sender"],
+                        conversation_id=item["conversation_id"],
+                        idempotency_key="coordinator-wake-reply-"
+                        + digest([work_id, item["source_id"]])[:32],
+                        body=body,
+                        kind="answer" if item["kind"] == "question" else "result",
+                        reply_to=item["source_id"],
+                        request_reply=False,
+                        dispatch=False,
+                    )
+                    self.bridge.messages.send(work["assignee"], reply)
+            self.ack_context_messages(work_id, non_empty_result=True)
 
     def ack_context_messages(self, work_id, *, non_empty_result=False):
         """ACK only exact, authorized source receipts after a non-empty model result."""
@@ -1400,21 +1454,23 @@ class TeamManager:
             ).fetchone()
             if wake:
                 items = self.store.db.execute(
-                    "SELECT source_id,recipient,conversation_id,receipt FROM "
+                    "SELECT source_id,sender,recipient,conversation_id,receipt FROM "
                     "team_coordinator_wake_items WHERE wake_id=? AND source='direct'",
                     (wake["id"],),
                 ).fetchall()
                 for item in items:
                     row = self.store.db.execute(
-                        "SELECT conversation_id,receipt,acknowledged FROM messages "
+                        "SELECT sender,conversation_id,receipt,acknowledged FROM messages "
                         "WHERE id=? AND recipient=?",
                         (item["source_id"], work["assignee"]),
                     ).fetchone()
                     if (
                         item["recipient"] != work["assignee"]
-                        or not item["receipt"]
                         or row is None
+                        or row["sender"] != item["sender"]
+                        or not item["receipt"]
                         or row["conversation_id"] != item["conversation_id"]
+                        or row["receipt"] != item["receipt"]
                     ):
                         raise BridgeError(
                             "receipt_scope_conflict",

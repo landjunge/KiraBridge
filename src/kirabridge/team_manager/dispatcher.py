@@ -559,30 +559,18 @@ class TeamDispatcher:
             return
         if turn.result.strip():
             try:
-                for item in self.teams.coordinator_direct_messages(work["id"]):
-                    if item["recipient"] != work["assignee"] or item["conversation_id"] is None:
-                        raise BridgeError(
-                            "receipt_scope_conflict", "Direct receipt is outside this coordinator"
-                        )
-                    if item["kind"] not in {"question", "work"} or not item["request_reply"]:
-                        continue
-                    reply = {
-                        "recipient": item["sender"],
-                        "conversation_id": item["conversation_id"],
-                        "idempotency_key": "coordinator-wake-reply-"
-                        + digest([work["id"], item["source_id"]])[:32],
-                        "body": turn.result.encode()[
-                            : self.bridge.config.messaging.max_body_bytes
-                        ].decode("utf-8", "ignore"),
-                        "kind": "answer" if item["kind"] == "question" else "result",
-                        "reply_to": item["source_id"],
-                        "request_reply": False,
-                        "dispatch": False,
-                    }
-                    await self._call(pool, "message_send", {"message": reply})
-                self.teams.ack_context_messages(work["id"], non_empty_result=True)
+                self.teams.reply_and_ack_context_messages(work["id"], turn.result)
             except (BridgeError, sqlite3.Error) as exc:
                 code = exc.code if isinstance(exc, BridgeError) else "message_ack_storage"
+                if code == "receipt_scope_conflict":
+                    self.teams.mark_context_attention(work["id"], code)
+                    self.teams.fail(
+                        work["id"],
+                        "failed",
+                        "message_ack_attention",
+                        {"ack_error": code, "automatic_retry": False},
+                    )
+                    return
                 attention = self.teams.note_context_ack_failure(work["id"], code)
                 if attention:
                     self.teams.fail(
@@ -599,8 +587,21 @@ class TeamDispatcher:
                     )
                     self._defer[work["id"]] = time.monotonic() + delay
                 return
-        elif self.teams.coordinator_direct_messages(work["id"]):
-            self.teams.mark_context_attention(work["id"], "empty_model_result")
+        else:
+            try:
+                if self.teams.coordinator_direct_messages(work["id"]):
+                    self.teams.mark_context_attention(work["id"], "empty_model_result")
+            except BridgeError as exc:
+                if exc.code == "receipt_scope_conflict":
+                    self.teams.mark_context_attention(work["id"], exc.code)
+                    self.teams.fail(
+                        work["id"],
+                        "failed",
+                        "message_ack_attention",
+                        {"ack_error": exc.code, "automatic_retry": False},
+                    )
+                    return
+                raise
         observed_native = work.get("evidence", {}) if isinstance(work, dict) else {}
         nested_native = (
             observed_native.get("native_evidence", {}) if isinstance(observed_native, dict) else {}

@@ -660,6 +660,9 @@ class RecordingTeams:
     def coordinator_direct_messages(self, work_id):
         return self.direct_items
 
+    def reply_and_ack_context_messages(self, work_id, reply_body):
+        self.acks.append((work_id, reply_body))
+
     def mark_context_attention(self, work_id, code):
         self.attention.append((work_id, code))
 

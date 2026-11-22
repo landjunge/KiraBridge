@@ -463,21 +463,28 @@ def test_direct_message_to_active_coordinator_always_creates_delivery_job(domain
     assert repeated["id"] == sent["id"]
 
 
-def _coordinator_direct(domain, key, *, conversation_id="coordinator-dm", body="Direct inbox"):
+def _coordinator_direct(
+    domain,
+    key,
+    *,
+    conversation_id="coordinator-dm",
+    body="Direct inbox",
+    sender="chatgpt",
+):
     current = domain.store.db.execute(
         "SELECT coordinator FROM teams WHERE id='test-team'"
     ).fetchone()[0]
     if current != "codex":
         role(domain, "codex", "coordinator")
-    for principal in ("chatgpt", "codex"):
+    for principal in ("chatgpt", "codex", "local"):
         policy = domain.config.principals[principal]
-        policy.message_peers = ["chatgpt", "codex"]
+        policy.message_peers = ["chatgpt", "codex", "local"]
         policy.capabilities = list(
             set(policy.capabilities) | {"message.send", "message.read", "message.ack"}
         )
     domain.config.messaging.receivers["codex"] = ReceiverConfig(cwd="/tmp", timeout=30)
     return domain.bridge.messages.send(
-        "chatgpt",
+        sender,
         MessageSend(
             recipient="codex",
             conversation_id=conversation_id,
@@ -545,6 +552,48 @@ def test_valid_direct_receipt_ack_is_idempotent(domain):
     )
 
 
+@pytest.mark.parametrize("field", ["sender", "conversation_id", "receipt"])
+async def test_tampered_direct_wake_cannot_reply_or_ack(domain, field):
+    incoming = _coordinator_direct(domain, "tampered-direct-" + field)
+    tamper_value = "foreign-value"
+    if field == "sender":
+        other = _coordinator_direct(
+            domain,
+            "valid-foreign-sender",
+            conversation_id="valid-foreign-sender-conversation",
+            sender="local",
+        )
+        tamper_value = other["sender"]
+    elif field == "conversation_id":
+        other = _coordinator_direct(
+            domain,
+            "valid-foreign-conversation",
+            conversation_id="valid-but-foreign-conversation",
+        )
+        tamper_value = other["conversation_id"]
+    work_id = _coordinator_wake_work(domain, incoming["id"])
+    domain.store.db.execute(
+        f"UPDATE team_coordinator_wake_items SET {field}=? WHERE source='direct' AND source_id=?",
+        (tamper_value, incoming["id"]),
+    )
+    from kirabridge.team_manager.dispatcher import TeamDispatcher
+
+    text = json.dumps({"kirabridge_team": "1", "result": "Private answer", "actions": []})
+    await TeamDispatcher(domain.bridge)._complete(
+        None,
+        {"id": work_id, "team_id": "test-team", "assignee": "codex", "evidence": {}},
+        {"id": "core-tampered", "result": {"text": text}},
+    )
+    stored = domain.bridge.messages.get("chatgpt", incoming["id"])
+    assert stored["acknowledged"] is None
+    assert stored["processing"]["state"] == "queued"
+    assert len(domain.bridge.messages.conversation("chatgpt", "coordinator-dm")["messages"]) == 1
+    wake = domain.store.db.execute(
+        "SELECT state,ack_error FROM team_coordinator_wakes WHERE work_id=?", (work_id,)
+    ).fetchone()
+    assert tuple(wake) == ("attention", "receipt_scope_conflict")
+
+
 def test_bad_direct_receipt_enters_bounded_attention_without_starving_same_conversation(domain):
     first = _coordinator_direct(domain, "direct-bad-receipt")
     first_work = _coordinator_wake_work(domain, first["id"])
@@ -555,7 +604,7 @@ def test_bad_direct_receipt_enters_bounded_attention_without_starving_same_conve
     )
     with pytest.raises(BridgeError) as error:
         domain.ack_context_messages(first_work, non_empty_result=True)
-    assert error.value.code == "receipt_conflict"
+    assert error.value.code == "receipt_scope_conflict"
     domain.store.db.execute(
         "UPDATE team_coordinator_wake_items SET conversation_id=(SELECT conversation_id FROM "
         "messages WHERE id=source_id) WHERE source='direct' AND source_id=?",
@@ -563,7 +612,7 @@ def test_bad_direct_receipt_enters_bounded_attention_without_starving_same_conve
     )
     with pytest.raises(BridgeError) as receipt_error:
         domain.ack_context_messages(first_work, non_empty_result=True)
-    assert receipt_error.value.code == "receipt_conflict"
+    assert receipt_error.value.code == "receipt_scope_conflict"
     assert domain.bridge.messages.get("chatgpt", first["id"])["acknowledged"] is None
 
     for attempt in range(5):
