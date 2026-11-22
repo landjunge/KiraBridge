@@ -68,22 +68,29 @@ Adaptereintrag oder eine vorhandene ausführbare Datei nicht behoben.
 
 ## Tatsächlicher Funktionsumfang
 
-Alle vier neuen Adapter führen **isolierte Textaufträge** in eigenen begrenzten
-Sitzungen aus. Ihre nativen Werkzeuge, MCP-Erweiterungen, Plugins und Projekthooks
-sind deaktiviert. Das angeforderte Arbeitsverzeichnis wird geprüft; die CLI läuft
-in einem eigenen leeren temporären Ordner. Zulässigen Projektkontext muss der
-Aufrufer ausdrücklich im Prompt übergeben. Dies ist keine Betriebssystem-Sandbox.
+Die vier CLI-Adapter OpenCode, Gemini, Claude und Copilot führen **isolierte
+Textaufträge** in eigenen begrenzten Sitzungen aus. Ihre nativen Werkzeuge,
+MCP-Erweiterungen, Plugins und Projekthooks sind deaktiviert. Das angeforderte
+Arbeitsverzeichnis wird geprüft; jede CLI läuft in einem eigenen leeren
+temporären Ordner. Zulässigen Projektkontext muss der Aufrufer ausdrücklich im
+Prompt übergeben. Dies ist keine Betriebssystem-Sandbox.
 
-Eine vorhandene interaktive Sitzung wird weder übernommen noch beendet. Lokale
-Dateibearbeitung, Shellwerkzeuge und die Fortsetzung bestehender Sitzungen sind
-für diese vier Adapter noch nicht implementiert. `local_tools=true` wird vor
-Ausführung abgelehnt. Die bisherigen Codex-/Grok-Funktionen bleiben eigenständig.
-Ein erfolgreich beendeter Modellturn beweist keinen vollständigen Projektabschluss.
+OpenRouter ist ein separater API-Adapter. Er kann ausschließlich ausdrücklich
+freigegebene, auftragsgebundene KiraBridge-MCP-Bridge-Werkzeuge nutzen. Native
+Providerwerkzeuge, Plugins und Shellbefehle werden nicht ausgeführt.
 
-Die native Isolation ist pro Anbieter nötig: Beispielsweise bedeutet bei der
-geprüften Copilot-Version eine leere Werkzeug-Allowlist tatsächlich keine
-Einschränkung. Gemini behandelt eine leere MCP-Allowlist ebenfalls als uneingeschränkt.
-Die Adapter und nativen Offlineprüfungen berücksichtigen diese Unterschiede.
+Die vier CLI-Adapter übernehmen oder beenden keine vorhandene interaktive
+Sitzung. Lokale Dateibearbeitung, Shellwerkzeuge und die Fortsetzung bestehender
+Sitzungen sind für diese Profile nicht implementiert. `local_tools=true` wird
+vor Ausführung abgelehnt. Die bisherigen Codex-/Grok-Funktionen bleiben
+eigenständig. Ein erfolgreich beendeter Modellturn beweist keinen vollständigen
+Projektabschluss.
+
+Die native Isolation der vier CLI-Adapter ist pro Anbieter nötig:
+Beispielsweise bedeutet bei der geprüften Copilot-Version eine leere
+Werkzeug-Allowlist tatsächlich keine Einschränkung. Gemini behandelt eine leere
+MCP-Allowlist ebenfalls als uneingeschränkt. Die Adapter und nativen
+Offlineprüfungen berücksichtigen diese Unterschiede.
 
 ## Weitere untersuchte Kandidaten
 
