@@ -137,9 +137,14 @@ Id-Liste keine Liste oder länger als 16, ergibt das
 `parentThreadId` und `attachedToThreadId` sind null, die Quelle ist `cli`,
 `vscode` oder `appServer`, und das aufgelöste Thread-cwd entspricht dem
 aufgelösten Auftrags-cwd. Eine andere Anzahl ergibt
-`native_codex_root_not_unique`. Ist der beobachtete Vorgang `turn/steer`, lehnt
-der Teampfad ab (`native_codex_target_not_ready`) und ruft nur `turn/start` auf.
-Der Lauf setzt `terminal_input_attempted` auf false. Die Threadauswahl verwendet
+`native_codex_root_not_unique`. Bei einem neuen Teamping nutzt der Dispatcher
+`turn/steer` mit der exakten `expectedTurnId`, wenn der Root aktiv ist, und
+`turn/start` auf demselben Thread, wenn der Root idle ist. `allow_interim_messages=false`
+sperrt das Steuern eines aktiven Turns, aber nicht den Start auf einem idle Root.
+Ändert sich der beobachtete Zustand zwischen Vorbereitung und Senden, wird der
+Versuch ohne Wechsel der Operation abgelehnt. Historische `idle_pending`-Einträge
+werden nicht erneut eingereiht. Der Lauf setzt `terminal_input_attempted` auf false.
+Die Threadauswahl verwendet
 kein Pane, keine Terminal-PID und keinen Rollout-Pfad. `CodexHost` prüft die
 Hostidentität (`native_codex_host_unverified`, dazu `codexHome` und
 `codex-tui/<major>.<minor>` gegen `protocol_version`). Ein Patch einer
@@ -164,9 +169,14 @@ der Code `native_codex_unconfigured`.
 `native_codex_target_not_ready`. Otherwise it keeps a loaded, parentless root:
 `parentThreadId` and `attachedToThreadId` are null, the source is `cli`,
 `vscode` or `appServer`, and the resolved thread cwd equals the resolved task
-cwd. Any other count raises `native_codex_root_not_unique`. When the observed
-operation is `turn/steer`, the team path refuses
-(`native_codex_target_not_ready`) and calls only `turn/start`. The run sets `terminal_input_attempted` to false.
+cwd. Any other count raises `native_codex_root_not_unique`. For a new team ping,
+the dispatcher uses `turn/steer` with the exact `expectedTurnId` when the root has
+an active turn, and `turn/start` on that same thread when it is idle.
+`allow_interim_messages=false` disables steering an active turn, but does not
+disable starting a turn on an idle root. A changed observation between
+preparation and submission is refused without switching operations. Historical
+`idle_pending` entries are not re-enqueued. The run sets
+`terminal_input_attempted` to false.
 Thread selection uses no pane, terminal PID or rollout path. `CodexHost` checks
 host identity (`native_codex_host_unverified`, plus `codexHome` and
 `codex-tui/<major>.<minor>` against `protocol_version`). A patch of a supported

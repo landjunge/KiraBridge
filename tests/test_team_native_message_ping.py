@@ -264,7 +264,7 @@ async def test_http_team_send_steers_only_exact_active_coordinator_and_never_rep
 
 
 @pytest.mark.asyncio
-async def test_idle_codex_keeps_ping_pending_without_start_or_ack(
+async def test_idle_codex_starts_exact_root_for_ping_without_ack(
     http_bridge, config, monkeypatch, tmp_path
 ):
     bridge, endpoint, clients = await _setup(http_bridge, config, monkeypatch, tmp_path)
@@ -310,21 +310,116 @@ async def test_idle_codex_keeps_ping_pending_without_start_or_ack(
         for _ in range(100):
             if bridge.store.db.execute(
                 "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
-                "AND kind='team.message_native_ping_idle_pending'",
+                "AND kind='team.message_native_ping_submitted'",
                 (result["id"],),
             ).fetchone():
                 break
             await asyncio.sleep(0.02)
-        assert host.deliveries == []
+        assert len(host.deliveries) == 1
+        assert host.deliveries[0][0] == result["id"]
+        assert host.deliveries[0][2] == "turn/start"
         assert bridge.teams._message("team-codex", result["id"])["acknowledged"] is None
         outcome = bridge.store.db.execute(
             "SELECT metadata FROM team_events WHERE team_id='team-codex' AND object_id=? "
-            "AND kind='team.message_native_ping_idle_pending'",
+            "AND kind='team.message_native_ping_submitted'",
             (result["id"],),
         ).fetchone()
-        assert outcome is not None and '"native_input_attempted":false' in outcome["metadata"]
+        assert outcome is not None and '"operation":"turn/start"' in outcome["metadata"]
+        assert '"native_input_attempted":true' in outcome["metadata"]
+        assert bridge.store.db.execute(
+            "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
+            "AND kind='team.message_native_ping_idle_pending'",
+            (result["id"],),
+        ).fetchone() is None
     finally:
         await bridge.team_dispatcher.stop()
+        await clients.__aexit__(None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_native_ping_steer_respects_disabled_interim_messages(
+    http_bridge, config, monkeypatch, tmp_path
+):
+    bridge, _, clients = await _setup(http_bridge, config, monkeypatch, tmp_path)
+    bridge.config.visible_handoffs.allow_interim_messages = False
+    host = FakeNativeHost(config.visible_handoffs.native_codex, operation="turn/steer")
+    bridge.team_dispatcher.codex_host = host
+    try:
+        result = (
+            await clients.call(
+                "local",
+                "team_message_send",
+                {
+                    "request": {
+                        "team_id": "team-codex",
+                        "recipient": "codex",
+                        "body": "Do not interrupt the active coordinator turn.",
+                        "kind": "question",
+                        "idempotency_key": "interim-disabled",
+                    }
+                },
+            )
+        ).structuredContent
+        queued = bridge.teams.pending_native_pings(limit=1)[0]
+        await bridge.team_dispatcher._run_native_ping(queued)
+
+        assert host.prepare_calls == 1 and host.deliveries == []
+        assert bridge.teams._message("team-codex", result["id"])["acknowledged"] is None
+        outcome = bridge.store.db.execute(
+            "SELECT metadata FROM team_events WHERE team_id='team-codex' AND object_id=? "
+            "AND kind='team.message_native_ping_denied'",
+            (result["id"],),
+        ).fetchone()
+        assert outcome is not None
+        assert '"error_code":"interim_messages_disabled"' in outcome["metadata"]
+    finally:
+        await clients.__aexit__(None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_idle_native_ping_unknown_is_attempted_once_without_replay(
+    http_bridge, config, monkeypatch, tmp_path
+):
+    bridge, _, clients = await _setup(http_bridge, config, monkeypatch, tmp_path)
+    host = FakeNativeHost(
+        config.visible_handoffs.native_codex, operation="turn/start", uncertain=True
+    )
+    bridge.team_dispatcher.codex_host = host
+    try:
+        result = (
+            await clients.call(
+                "local",
+                "team_message_send",
+                {
+                    "request": {
+                        "team_id": "team-codex",
+                        "recipient": "codex",
+                        "body": "An uncertain native start must never be replayed.",
+                        "kind": "question",
+                        "idempotency_key": "idle-unknown-once",
+                    }
+                },
+            )
+        ).structuredContent
+        queued = bridge.teams.pending_native_pings(limit=1)[0]
+        await bridge.team_dispatcher._run_native_ping(queued)
+        await bridge.team_dispatcher._run_native_ping(queued)
+
+        assert host.prepare_calls == 1
+        assert len(host.deliveries) == 1 and host.deliveries[0][2] == "turn/start"
+        assert bridge.teams._message("team-codex", result["id"])["acknowledged"] is None
+        assert bridge.store.db.execute(
+            "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
+            "AND kind='team.message_native_ping_submitting'",
+            (result["id"],),
+        ).fetchone()[0] == 1
+        unknown = bridge.store.db.execute(
+            "SELECT metadata FROM team_events WHERE team_id='team-codex' AND object_id=? "
+            "AND kind='team.message_native_ping_unknown'",
+            (result["id"],),
+        ).fetchone()
+        assert unknown is not None and '"automatic_retry":false' in unknown["metadata"]
+    finally:
         await clients.__aexit__(None, None, None)
 
 

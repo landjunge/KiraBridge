@@ -243,7 +243,7 @@ class TeamDispatcher:
         self.ping_wake.set()
 
     async def _run_native_ping(self, item):
-        """Steer one enrolled message into the verified, already-active Codex turn."""
+        """Deliver one enrolled message to the exact assigned native Codex root."""
         team_id, message_id = item["team_id"], item["object_id"]
         sender = item["sender"]
         bridge = self.bridge
@@ -272,16 +272,15 @@ class TeamDispatcher:
             self._validate_native_ping(item, sender)
             stage = "host_prepare"
             prepared = await self.codex_host.prepare(binding.model_copy(deep=True))
-            if prepared["operation"] != "turn/steer":
-                # Do not create an idle turn or silently change the established budget.
-                self._validate_native_ping(item, sender)
-                record(
-                    "team.message_native_ping_idle_pending",
-                    operation=prepared["operation"],
-                    native_input_attempted=False,
+            operation = prepared.get("operation")
+            if operation not in {"turn/start", "turn/steer"}:
+                raise BridgeError(
+                    "native_codex_target_not_ready", "Native Codex turn is unavailable"
                 )
-                return
-            if not bridge.config.visible_handoffs.allow_interim_messages:
+            if (
+                operation == "turn/steer"
+                and not bridge.config.visible_handoffs.allow_interim_messages
+            ):
                 raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
 
             async def before_send(observation):
@@ -296,7 +295,10 @@ class TeamDispatcher:
                         raise BridgeError(
                             "native_codex_scope_changed", "Native Codex binding changed"
                         )
-                    if not bridge.config.visible_handoffs.allow_interim_messages:
+                    if (
+                        prepared["operation"] == "turn/steer"
+                        and not bridge.config.visible_handoffs.allow_interim_messages
+                    ):
                         raise BridgeError(
                             "interim_messages_disabled", "Interim Codex input is disabled"
                         )
@@ -314,7 +316,7 @@ class TeamDispatcher:
                         sender,
                         "team.message_native_ping_submitting",
                         message_id,
-                        operation="turn/steer",
+                        operation=prepared["operation"],
                         expected_turn_id=observation.get("expected_turn_id"),
                         native_input_attempted=True,
                     )
@@ -369,7 +371,7 @@ class TeamDispatcher:
                 return
             record(
                 "team.message_native_ping_submitted",
-                operation="turn/steer",
+                operation=prepared["operation"],
                 turn_id=evidence.get("turn_id"),
                 native_input_attempted=True,
                 recipient_confirmed=False,
