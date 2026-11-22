@@ -159,6 +159,33 @@ class MessageManager:
                     agent_work_completion_verified=False,
                     request_reply_satisfied=False,
                 )
+                if delivery_scope == "native_input_delivery":
+                    # Native input only proves delivery. Expose a reply id only
+                    # when the final addressed answer can be verified below.
+                    result["processing"]["reply_id"] = None
+                if (
+                    delivery_scope == "native_input_delivery"
+                    and job["state"] == "completed"
+                    and job["error"] is None
+                    and result["request_reply"]
+                    and result["acknowledged"] is not None
+                    and result["processing"]["evidence"].get("native_input_attempted") is True
+                ):
+                    replies = self.store.db.execute(
+                        "SELECT id FROM messages WHERE reply_to=? AND conversation_id=? "
+                        "AND sender=? AND recipient=? AND kind IN ('answer','result') "
+                        "ORDER BY seq LIMIT 2",
+                        (
+                            message_id,
+                            result["conversation_id"],
+                            result["recipient"],
+                            result["sender"],
+                        ),
+                    ).fetchall()
+                    if len(replies) == 1:
+                        result["processing"].update(
+                            reply_id=replies[0]["id"], request_reply_satisfied=True
+                        )
             if result["processing"]["evidence"].get("completion_scope") == "local_agent_turn":
                 local = result["processing"]["evidence"].pop("local_reply_result", None)
                 result["processing"].update(
