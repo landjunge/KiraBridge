@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 import httpx
 
+from kirabridge.agent_manager.openrouter_credentials import keychain_credential
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.openrouter_models import (
     OPENROUTER_CHAT_API,
@@ -27,6 +28,8 @@ def _credential(config) -> str:
         if key:
             return key
         raise BridgeError("agent_auth", "OpenRouter credential is unavailable")
+    if config.openrouter_credential_source == "macos_keychain":
+        return keychain_credential()
     raise BridgeError("agent_auth", "OpenRouter credential source is unsupported")
 
 
@@ -204,6 +207,8 @@ class OpenRouterAdapter:
 
         try:
             result = json.loads(raw)
+            if not isinstance(result, dict):
+                raise ValueError("completion must be an object")
             choices = result.get("choices")
             choice = choices[0] if isinstance(choices, list) and choices else None
             message = choice.get("message") if isinstance(choice, dict) else None

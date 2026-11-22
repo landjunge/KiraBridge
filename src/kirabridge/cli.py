@@ -357,6 +357,17 @@ def parse_request(path: str) -> TaskRequest:
 
 
 async def execute(args) -> None:
+    if args.command == "openrouter":
+        from kirabridge.agent_manager.openrouter_credentials import (
+            import_from_hidden_tty,
+            keychain_status,
+        )
+
+        if args.action == "credential-import":
+            emit({"imported": import_from_hidden_tty()})
+        else:
+            emit({"present": keychain_status()})
+        return
     if args.command == "family":
         from kirabridge.family_windows import execute_family, failure
 
@@ -1081,6 +1092,14 @@ def main() -> None:
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
+    openrouter = sub.add_parser("openrouter", help="Manage the local OpenRouter Keychain item")
+    openrouter_actions = openrouter.add_subparsers(dest="action", required=True)
+    openrouter_actions.add_parser(
+        "credential-import", help="Import a key using hidden macOS Keychain TTY input"
+    )
+    openrouter_actions.add_parser(
+        "credential-status", help="Report only whether the local Keychain item exists"
+    )
     connector = sub.add_parser("grok-connector", help="Connect the Grok app/Eve through OAuth MCP")
     connector_actions = connector.add_subparsers(dest="action", required=True)
     preparation = connector_actions.add_parser("setup")

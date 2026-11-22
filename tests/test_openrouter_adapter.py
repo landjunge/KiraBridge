@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -9,9 +10,10 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from kirabridge.agent_manager import openrouter_credentials
 from kirabridge.agent_manager.openrouter import OpenRouterAdapter
 from kirabridge.bridge_core.config import AgentConfig
-from kirabridge.bridge_core.models import AgentInput, BridgeError
+from kirabridge.bridge_core.models import AgentInput, BridgeError, UncertainExecution
 from kirabridge.openrouter_models import OPENROUTER_DEFAULT_MODEL
 
 
@@ -19,7 +21,7 @@ def _config(**kwargs):
     return AgentConfig(
         kind="openrouter_api",
         model=OPENROUTER_DEFAULT_MODEL,
-        api_key_env="TEST_OPENROUTER_API_KEY",
+        api_key_env="OPENROUTER_API_KEY",
         openrouter_credential_source="environment",
         **kwargs,
     )
@@ -51,7 +53,7 @@ def _mock_client(monkeypatch, handler):
 
 async def test_free_text_request_uses_only_pinned_free_models_and_no_tools(monkeypatch):
     secret = "synthetic-request-key"
-    monkeypatch.setenv("TEST_OPENROUTER_API_KEY", secret)
+    monkeypatch.setenv("OPENROUTER_API_KEY", secret)
     observed = {}
 
     def handler(request):
@@ -105,7 +107,7 @@ async def _record(events, value):
 
 
 async def test_openrouter_task_tool_grants_are_rejected(monkeypatch):
-    monkeypatch.setenv("TEST_OPENROUTER_API_KEY", "synthetic-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "synthetic-key")
     with pytest.raises(BridgeError, match="does not execute tools"):
         await OpenRouterAdapter().execute(
             {},
@@ -129,7 +131,7 @@ def test_paid_model_requires_explicit_opt_in_and_bounded_prompt_output_cost():
     config = AgentConfig(
         kind="openrouter_api",
         model="deepseek/deepseek-v4.1-flash",
-        api_key_env="TEST_OPENROUTER_API_KEY",
+        api_key_env="OPENROUTER_API_KEY",
         openrouter_credential_source="environment",
         openrouter_allow_paid=True,
         openrouter_max_output_tokens=50,
@@ -142,7 +144,7 @@ def test_paid_model_requires_explicit_opt_in_and_bounded_prompt_output_cost():
         AgentConfig(
             kind="openrouter_api",
             model="vendor/arbitrary-paid-model",
-            api_key_env="TEST_OPENROUTER_API_KEY",
+            api_key_env="OPENROUTER_API_KEY",
             openrouter_credential_source="environment",
             openrouter_allow_paid=True,
             openrouter_max_output_tokens=50,
@@ -164,6 +166,86 @@ def test_openrouter_config_defaults_free_and_omits_settings_for_other_agents():
     assert not any(
         key.startswith("openrouter_") for key in AgentConfig(kind="grok_api").model_dump()
     )
+
+
+def test_openrouter_api_key_environment_name_is_fixed():
+    with pytest.raises(ValidationError, match="OPENROUTER_API_KEY"):
+        AgentConfig(
+            kind="openrouter_api",
+            api_key_env="OTHER_SECRET",
+            openrouter_credential_source="environment",
+        )
+
+
+@pytest.mark.parametrize("response_body", [[], "not-an-object", 42, None])
+async def test_malformed_json_200_is_sanitized_protocol_error(monkeypatch, response_body):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "synthetic-malformed-key")
+    _mock_client(monkeypatch, lambda _: httpx.Response(200, json=response_body))
+    with pytest.raises(UncertainExecution) as exc:
+        await OpenRouterAdapter().execute({}, _args(), _config(), [], _callback, _callback)
+    assert getattr(exc.value, "code", None) == "provider_protocol"
+
+
+def test_keychain_reader_is_exact_and_never_prints_secret(monkeypatch):
+    secret = "synthetic-keychain-secret"
+    observed = {}
+    monkeypatch.setattr(openrouter_credentials.sys, "platform", "darwin")
+
+    def run(argv, **kwargs):
+        observed.update(argv=argv, kwargs=kwargs)
+        return subprocess.CompletedProcess(argv, 0, stdout=(secret + "\n").encode())
+
+    monkeypatch.setattr(openrouter_credentials.subprocess, "run", run)
+    assert openrouter_credentials.keychain_credential() == secret
+    assert observed["argv"] == [
+        "/usr/bin/security",
+        "find-generic-password",
+        "-s",
+        "KiraBridge.OpenRouter",
+        "-a",
+        "openrouter",
+        "-w",
+    ]
+    assert observed["kwargs"]["stdout"] == subprocess.PIPE
+    assert secret not in repr(observed)
+
+
+def test_keychain_import_uses_native_hidden_tty_prompt_without_secret_argv(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(openrouter_credentials.sys, "platform", "darwin")
+
+    class TTY:
+        def isatty(self):
+            return True
+
+    monkeypatch.setattr(openrouter_credentials.sys, "stdin", TTY())
+    monkeypatch.setattr(openrouter_credentials.sys, "stdout", TTY())
+
+    def run(argv, **kwargs):
+        seen.update(argv=argv, kwargs=kwargs)
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(openrouter_credentials.subprocess, "run", run)
+    assert openrouter_credentials.import_from_hidden_tty() is True
+    assert seen["argv"][-1] == "-w"
+    assert seen["kwargs"]["stdin"] is None
+    assert seen["kwargs"]["stderr"] is None
+    assert not any("synthetic" in str(arg) for arg in seen["argv"])
+
+
+def test_keychain_status_checks_presence_without_reading_value(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(openrouter_credentials.sys, "platform", "darwin")
+
+    def run(argv, **kwargs):
+        seen.update(argv=argv, kwargs=kwargs)
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(openrouter_credentials.subprocess, "run", run)
+    assert openrouter_credentials.keychain_status() is True
+    assert "-w" not in seen["argv"]
+    assert seen["kwargs"]["stdout"] == subprocess.DEVNULL
+    assert seen["kwargs"]["stderr"] == subprocess.DEVNULL
 
 
 async def test_agent_manager_routes_openrouter_api_without_visible_terminal(tmp_path):
@@ -227,7 +309,7 @@ async def test_paid_cost_guard_checks_live_metadata_before_chat_request(monkeypa
     config = AgentConfig(
         kind="openrouter_api",
         model="deepseek/deepseek-v4.1-flash",
-        api_key_env="TEST_OPENROUTER_API_KEY",
+        api_key_env="OPENROUTER_API_KEY",
         openrouter_credential_source="environment",
         openrouter_allow_paid=True,
         openrouter_max_output_tokens=50,
@@ -244,7 +326,7 @@ async def test_paid_cost_guard_checks_live_metadata_before_chat_request(monkeypa
 
 async def test_provider_error_body_and_key_are_never_returned(monkeypatch):
     secret = "synthetic-api-key-never-echo"
-    monkeypatch.setenv("TEST_OPENROUTER_API_KEY", secret)
+    monkeypatch.setenv("OPENROUTER_API_KEY", secret)
 
     def handler(request):
         return httpx.Response(429, json={"error": secret})

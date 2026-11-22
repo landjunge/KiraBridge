@@ -198,7 +198,7 @@ class AgentConfig(BaseModel):
     # Launch arguments for the opt-in kind "acp_pap" (see agent_manager/acp_pap_host.py).
     acp_pap_args: list[str] = Field(default_factory=list)
     api_key_env: str = "XAI_API_KEY"
-    openrouter_credential_source: Literal["environment"] = "environment"
+    openrouter_credential_source: Literal["environment", "macos_keychain"] = "environment"
     openrouter_fallback_models: list[str] = Field(default_factory=list, max_length=4)
     openrouter_max_prompt_bytes: int = Field(default=262144, ge=1, le=1048576)
     openrouter_max_output_tokens: int = Field(default=1024, ge=1, le=32768)
@@ -307,6 +307,10 @@ class AgentConfig(BaseModel):
             return self
         if not self.model:
             raise ValueError("OpenRouter requires an explicit model")
+        if self.api_key_env != "OPENROUTER_API_KEY":
+            raise ValueError("OpenRouter credentials must use OPENROUTER_API_KEY")
+        if self.openrouter_credential_source == "macos_keychain" and sys.platform != "darwin":
+            raise ValueError("OpenRouter Keychain credentials are available on macOS only")
         if not self.openrouter_allow_paid and (
             self.model not in OPENROUTER_FREE_MODELS
             or any(item not in OPENROUTER_FREE_MODELS for item in self.openrouter_fallback_models)
