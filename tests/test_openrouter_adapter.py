@@ -403,7 +403,13 @@ async def test_openrouter_oversized_tool_result_is_terminal_and_not_replayed(mon
 
 async def test_openrouter_unknown_mcp_mutation_is_never_replayed(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "synthetic-tool-key")
-    _mock_client(monkeypatch, lambda _: httpx.Response(200, json=_function_response()))
+    provider_requests = []
+
+    def provider(_):
+        provider_requests.append("request")
+        return httpx.Response(200, json=_function_response())
+
+    _mock_client(monkeypatch, provider)
     proxy = _fake_task_proxy(monkeypatch, error=UncertainExecution("peer_unknown", "unknown"))
     with pytest.raises(UncertainExecution) as exc:
         await OpenRouterAdapter(bridge_config=object()).execute(
@@ -416,6 +422,7 @@ async def test_openrouter_unknown_mcp_mutation_is_never_replayed(monkeypatch):
         )
     assert exc.value.code == "peer_unknown"
     assert len(proxy["calls"]) == 1
+    assert len(provider_requests) == 1
 
 
 async def test_openrouter_task_server_policy_binds_task_owner_args_cwd_and_read_only():
