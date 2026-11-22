@@ -18,6 +18,7 @@ def bind_macos_provider(bridge):
                 facts=previous.capability_probe.facts,
                 executable=previous.capability_probe.executable,
                 native_metadata=bridge.system_modules.snapshot_metadata,
+                passive_native_metadata=bridge.system_modules.passive_metadata,
             ),
             permissions=previous.permission_probe,
             actor_identities=previous.actor_identities,

@@ -38,6 +38,15 @@ class FixtureTransport:
     def snapshot_metadata(self):
         return {"available": True, "revision": "fixture-v1", "keyboard_protocol": 1}
 
+    def passive_metadata(self):
+        return {
+            "available": False,
+            "reason": "native_binary_not_verified",
+            "revision": "fixture-v1",
+            "provider_generation": "fixture-v1",
+            "keyboard_protocol": 1,
+        }
+
     async def request(self, operation, arguments, *, principal, before_send=None):
         self.entered.set()
         await self.release.wait()

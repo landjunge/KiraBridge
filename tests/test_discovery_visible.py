@@ -3,6 +3,7 @@
 import asyncio
 import copy
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from conftest import request
@@ -75,6 +76,76 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         await pool.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
         assert pool.connection_ids["local"] != connection_id
         assert (await pool.list_tools("local"))[0].meta["kirabridge"]["revision"] != before
+
+
+async def test_passive_epoch_avoids_binary_reads_and_invalidates_on_native_file_change(
+    bridge, tmp_path, monkeypatch
+):
+    import hashlib
+    import plistlib
+    from pathlib import Path
+
+    from kirabridge.discovery import epoch
+    from kirabridge.platform_adapters.macos.capabilities import CapabilityProbe
+    from kirabridge.platform_adapters.macos.provider import MacOSProvider
+    from kirabridge.platform_adapters.macos import system_transport as native
+
+    monkeypatch.setattr(native.sys, "platform", "darwin")
+    app = tmp_path / "KiraBridge.app"
+    (app / "Contents/MacOS").mkdir(parents=True)
+    executable = app / "Contents/MacOS/KiraBridge"
+    binary = b"initial verified executable"
+    executable.write_bytes(binary)
+    executable.chmod(0o700)
+    (app / "Contents/Info.plist").write_bytes(
+        plistlib.dumps(
+            {
+                "KiraBridgeSystemProtocol": 1,
+                "CFBundleIdentifier": native.BUNDLE_ID,
+                "CFBundleExecutable": "KiraBridge",
+                "KiraBridgeSourceCommit": "a" * 40,
+            }
+        )
+    )
+    worker = native.NativeSystemTransport(
+        app,
+        expected_commit="a" * 40,
+        expected_binary_sha256=hashlib.sha256(binary).hexdigest(),
+        process_factory=AsyncMock(side_effect=AssertionError("must refuse before launch")),
+    )
+    probe = CapabilityProbe(
+        facts={"platform": "darwin", "os_version": "15.7.4"},
+        executable=lambda _: True,
+        native_metadata=worker.snapshot_metadata,
+        passive_native_metadata=worker.passive_metadata,
+    )
+    bridge.macos = MacOSProvider(capabilities=probe)
+    read_paths = []
+    private_file = native._private_file
+
+    def record_file(path, limit):
+        read_paths.append(Path(path))
+        return private_file(path, limit)
+
+    monkeypatch.setattr(native, "_private_file", record_file)
+    before = epoch(bridge, "local")
+    repeated = epoch(bridge, "local")
+    assert before == repeated and read_paths == [app / "Contents/Info.plist"] * 2
+
+    executable.write_bytes(b"replacement executable with changed identity")
+    after = epoch(bridge, "local")
+    assert after["platform_revision"] != before["platform_revision"]
+    assert after["revision"] != before["revision"]
+    assert read_paths == [app / "Contents/Info.plist"] * 3
+
+    monkeypatch.setattr(native, "_private_file", private_file)
+    full = bridge.macos.snapshot()
+    assert not full["capabilities"]["system"]["available"]
+    assert full["revision"] == after["platform_revision"]
+    with pytest.raises(BridgeError) as refused:
+        await worker.request("system.info", {}, principal="local")
+    assert refused.value.code == "system_transport_unavailable"
+    worker.factory.assert_not_awaited()
 
 
 async def test_window_request_uses_existing_full_grant_without_second_local_token(

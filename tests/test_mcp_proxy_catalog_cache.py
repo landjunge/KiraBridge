@@ -88,6 +88,17 @@ async def test_catalog_invalidation_expires_a_warm_entry(monkeypatch, change):
     assert session.list_tools.await_count == previous + 1
 
 
+async def test_unchanged_passive_epoch_keeps_the_warm_schema(monkeypatch):
+    connection, session, _ = proxy(monkeypatch)
+    session.call_tool.return_value = CallToolResult(
+        content=[], structuredContent={"discovery": {"revision": "first"}}
+    )
+    await connection.call_tool("write_once", {})
+    await connection.call_tool("write_once", {})
+    assert session.list_tools.await_count == 1
+    assert session.call_tool.await_count == 2
+
+
 async def test_dirty_refresh_failure_never_dispatches_with_cached_schemas(monkeypatch):
     connection, session, _ = proxy(monkeypatch)
     await connection.call_tool("write_once", {})

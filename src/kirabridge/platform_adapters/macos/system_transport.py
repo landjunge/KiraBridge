@@ -75,13 +75,43 @@ def _private_file(path, limit):
             # The extra byte detects growth; a short read is never a valid snapshot.
             data = stream.read(info.st_size + 1)
         after = os.fstat(fd)
-        if len(data) != info.st_size or (info.st_ino, info.st_size, info.st_mtime_ns) != (
-            after.st_ino,
-            after.st_size,
-            after.st_mtime_ns,
-        ):
+        if len(data) != info.st_size or _stat_identity(info) != _stat_identity(after):
             raise ValueError("Native app changed during metadata read")
         return data, after
+    finally:
+        os.close(fd)
+
+
+def _stat_identity(info):
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+        info.st_mode,
+        info.st_uid,
+        info.st_gid,
+    )
+
+
+def _private_stat(path, limit):
+    """Validate a pinned native file without reading its contents."""
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    fd = os.open(path, flags)
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid not in {0, os.getuid()}
+            or info.st_mode & 0o022
+            or info.st_size > limit
+        ):
+            raise ValueError("Untrusted native app file")
+        after = os.fstat(fd)
+        if _stat_identity(info) != _stat_identity(after):
+            raise ValueError("Native app changed during metadata read")
+        return after
     finally:
         os.close(fd)
 
@@ -117,6 +147,13 @@ class NativeSystemTransport:
 
     def snapshot_metadata(self):
         """No app launch, framework/API call, permission probe or user-content read."""
+        return self._read_app_metadata(verify_binary=True)
+
+    def passive_metadata(self):
+        """Return epoch identity from small metadata plus executable stat, never binary bytes."""
+        return self._read_app_metadata(verify_binary=False)
+
+    def _read_app_metadata(self, *, verify_binary):
         if sys.platform != "darwin":
             return {"available": False, "reason": "unsupported_platform"}
         try:
@@ -137,31 +174,58 @@ class NativeSystemTransport:
             ):
                 raise ValueError("Native protocol metadata mismatch")
             executable = self.app_path / "Contents/MacOS/KiraBridge"
-            binary, mode = _private_file(executable, 32 * 1024 * 1024)
-            if not mode.st_mode & 0o111:
+            if verify_binary:
+                binary, file_identity = _private_file(executable, 32 * 1024 * 1024)
+            else:
+                file_identity = _private_stat(executable, 32 * 1024 * 1024)
+            if not file_identity.st_mode & 0o111:
                 raise ValueError("Native app executable missing")
-            binary_sha256 = hashlib.sha256(binary).hexdigest()
-            if (
-                self.expected_binary_sha256 is not None
-                and binary_sha256 != self.expected_binary_sha256
-            ):
-                raise ValueError("Native app binary identity mismatch")
-            return {
+            result = {
                 "available": True,
                 "protocol": PROTOCOL,
                 "reason": "available",
                 "revision": "system-v1:" + commit,
+                "provider_generation": self._provider_generation(info, file_identity),
                 "source_commit": commit,
                 "executable": str(executable.absolute()),
                 "bundle_id": BUNDLE_ID,
-                "binary_sha256": binary_sha256,
-                "keyboard_protocol": 1
-                if type(metadata.get("KiraBridgeKeyboardProtocol")) is int
-                and metadata["KiraBridgeKeyboardProtocol"] == 1
-                else 0,
+                "keyboard_protocol": (
+                    1
+                    if type(metadata.get("KiraBridgeKeyboardProtocol")) is int
+                    and metadata["KiraBridgeKeyboardProtocol"] == 1
+                    else 0
+                ),
             }
+            if verify_binary:
+                binary_sha256 = hashlib.sha256(binary).hexdigest()
+                result["binary_sha256"] = binary_sha256
+                if (
+                    self.expected_binary_sha256 is not None
+                    and binary_sha256 != self.expected_binary_sha256
+                ):
+                    result.update(
+                        available=False,
+                        reason="native_app_protocol_unavailable",
+                    )
+            else:
+                result.update(
+                    available=False,
+                    reason="native_binary_not_verified",
+                )
+            return result
         except (OSError, ValueError, TypeError, RecursionError, plistlib.InvalidFileException):
             return {"available": False, "reason": "native_app_protocol_unavailable"}
+
+    def _provider_generation(self, info, file_identity):
+        value = {
+            "info_sha256": hashlib.sha256(info).hexdigest(),
+            "binary_stat": _stat_identity(file_identity),
+            "expected_commit": self.expected_commit,
+            "expected_binary_sha256": self.expected_binary_sha256,
+        }
+        return hashlib.sha256(
+            json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
 
     async def _discard(self):
         child, self.process = self.process, None
@@ -378,6 +442,14 @@ class SystemModules:
 
     def snapshot_metadata(self):
         return self.transport.snapshot_metadata()
+
+    def passive_metadata(self):
+        reader = getattr(self.transport, "passive_metadata", None)
+        return (
+            reader()
+            if callable(reader)
+            else {"available": False, "reason": "native_binary_not_verified"}
+        )
 
     async def close(self):
         await self.transport.close()

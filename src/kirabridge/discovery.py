@@ -10,11 +10,11 @@ from kirabridge.permissions import decision, direct_terminal_required, permissio
 from kirabridge.platform_adapters import current_platform
 
 
-def _snapshot_facts(bridge, principal):
+def _snapshot_facts(bridge, principal, *, passive=False):
     policy = bridge.security.principal(principal)
     observed = getattr(bridge, "discovery_observations", {}).get(principal)
     current_permissions = permission_revision(bridge.config)
-    platform = bridge.macos.snapshot()
+    platform = bridge.macos.passive_snapshot() if passive else bridge.macos.snapshot()
     access = decision(bridge.config, principal, "session.catalog")
     if observed and observed.get("permission_revision") != current_permissions:
         observed = None
@@ -43,7 +43,7 @@ def _snapshot_facts(bridge, principal):
 
 def epoch(bridge, principal):
     """Fresh lightweight schema epoch, without the full presentation payload."""
-    _, _, permissions, platform, revision = _snapshot_facts(bridge, principal)
+    _, _, permissions, platform, revision = _snapshot_facts(bridge, principal, passive=True)
     return {
         "version": __version__,
         "instance_id": bridge.runtime["instance_id"],

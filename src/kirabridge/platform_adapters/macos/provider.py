@@ -106,7 +106,10 @@ class MacOSProvider:
         self.leaves.update({leaf: system_modules for leaf in set(SYSTEM_LEAVES.values())})
         self.leaves["system_reports"] = system_reports
         self.capability_probe = capabilities or CapabilityProbe(
-            native_metadata=system_modules.snapshot_metadata if system_modules is not None else None
+            native_metadata=system_modules.snapshot_metadata if system_modules is not None else None,
+            passive_native_metadata=(
+                system_modules.passive_metadata if system_modules is not None else None
+            ),
         )
         self.permission_probe = permissions or PermissionProbe()
         self.actor_identities = dict(actor_identities or {})
@@ -118,7 +121,14 @@ class MacOSProvider:
 
     def snapshot(self):
         """Metadata only. No leaf/native probe, task, clipboard or window access."""
-        technical = self.capability_probe.snapshot()
+        return self._snapshot(passive=False)
+
+    def passive_snapshot(self):
+        """Epoch-only metadata; native executable identity is stat-checked, never read."""
+        return self._snapshot(passive=True)
+
+    def _snapshot(self, *, passive):
+        technical = self.capability_probe.snapshot(passive=passive)
         permissions = self.permission_probe.snapshot()
         payload = {
             "schema_version": 1,
@@ -129,14 +139,30 @@ class MacOSProvider:
             "authorization": "existing_principal_policy_and_target_guards",
         }
         # Revisions represent facts, not elapsed wall time.
-        payload["revision"] = digest(
-            {
-                **payload,
-                "permissions": [
-                    {k: v for k, v in p.items() if k != "observed_at"} for p in permissions
-                ],
-            }
-        )
+        revision_payload = {
+            **deepcopy(payload),
+            "permissions": [
+                {k: v for k, v in p.items() if k != "observed_at"} for p in permissions
+            ],
+        }
+        # Schema epochs track provider identity and metadata, not whether a full
+        # binary verification has most recently succeeded. That readiness remains
+        # visible in capability rows and is enforced again by the request transport.
+        for name in (
+            "system",
+            "apps",
+            "accessibility",
+            "windows",
+            "capture",
+            "notifications",
+            "preferences",
+            "keyboard",
+        ):
+            capability = revision_payload["capabilities"].get(name)
+            if isinstance(capability, dict):
+                capability.pop("available", None)
+                capability.pop("reason", None)
+        payload["revision"] = digest(revision_payload)
         return deepcopy(payload)
 
     def _permission_rows(self, descriptor):

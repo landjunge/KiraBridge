@@ -10,8 +10,8 @@ class _LinuxCapabilities(CapabilityProbe):
         super().__init__(facts=facts)
         self.leaves = leaves
 
-    def snapshot(self):
-        result = super().snapshot()
+    def snapshot(self, *, passive=False):
+        result = super().snapshot(passive=passive)
         linux = self.facts.get("platform", "").startswith("linux")
         if not linux:
             for capability in result["capabilities"].values():

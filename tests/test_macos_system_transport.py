@@ -539,6 +539,39 @@ def test_metadata_is_passive_and_pins_binary_commit(tmp_path, monkeypatch):
     assert worker.process is None
 
 
+def test_passive_metadata_fingerprints_binary_without_reading_or_hashing_it(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(native.sys, "platform", "darwin")
+    app = make_app(tmp_path)
+    binary_path = app / "Contents/MacOS/KiraBridge"
+    binary = binary_path.read_bytes()
+    worker = native.NativeSystemTransport(app, expected_commit=COMMIT)
+    read_paths = []
+    hashed_values = []
+    private_file = native._private_file
+    sha256 = native.hashlib.sha256
+
+    def record_file(path, limit):
+        read_paths.append(Path(path))
+        return private_file(path, limit)
+
+    def record_hash(value=b""):
+        hashed_values.append(value)
+        return sha256(value)
+
+    monkeypatch.setattr(native, "_private_file", record_file)
+    monkeypatch.setattr(native.hashlib, "sha256", record_hash)
+    passive = worker.passive_metadata()
+
+    assert not passive["available"]
+    assert passive["reason"] == "native_binary_not_verified"
+    assert passive["provider_generation"]
+    assert read_paths == [app / "Contents/Info.plist"]
+    assert binary not in hashed_values
+    assert worker.process is None
+
+
 def test_installed_binary_digest_pin_accepts_exact_native_code(tmp_path, monkeypatch):
     monkeypatch.setattr(native.sys, "platform", "darwin")
     app = make_app(tmp_path)
