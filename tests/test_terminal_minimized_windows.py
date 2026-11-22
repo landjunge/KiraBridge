@@ -62,8 +62,11 @@ async def test_minimized_anchors_allow_one_owned_window_without_restoring_old_wi
     result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert result["separate_window"]
     assert events == (
-        ["create", "receipt", "focus"] if all_minimized else ["create", "receipt", "focus", "move"]
+        ["create", "receipt", "focus", "tag"]
+        if all_minimized
+        else ["create", "receipt", "focus", "tag", "move"]
     )
+    assert events.count("create") == 1
     await leaf.verify_opened(result, principal="chatgpt")
     sources = [call.args[0] for call in leaf.native.await_args_list]
     assert not any("activation_sent" in source or "miniaturized=" in source for source in sources)
@@ -77,8 +80,9 @@ async def test_minimized_anchor_change_during_creation_stops_without_detach_or_r
     _, leaf, events, _, created = minimized_scene(product, all_minimized=True, change=change)
     with pytest.raises(UncertainExecution):
         await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
-    assert events == ["create", "receipt", "focus"]
-    assert leaf.native.await_count == 2
+    assert events == ["create", "receipt", "focus", "tag"]
+    assert events.count("create") == 1 and "move" not in events
+    assert leaf.native.await_count == 3  # create, focus, and exact-TTY tag only
 
 
 async def test_visible_count_mismatch_with_minimized_anchors_still_refuses_before_creation(
