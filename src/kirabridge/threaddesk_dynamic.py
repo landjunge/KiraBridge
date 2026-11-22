@@ -510,6 +510,10 @@ async def _fresh_tools(manager: Any, *, operation: bool = False) -> dict[str, di
         raise BridgeError("threaddesk_tool_limit", "Tool catalog is too large")
     approved: dict[str, dict[str, Any]] = {}
     for tool in tools:
+        # A complete catalog can contain hundreds of independently bounded
+        # schemas. Validation is synchronous CPU work; yield between schemas so
+        # it cannot monopolize the MCP server's event loop for the whole list.
+        await asyncio.sleep(0)
         item = _validated_tool(tool)
         if item is not None:
             if item["name"] in approved:
