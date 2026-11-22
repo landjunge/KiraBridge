@@ -1,9 +1,9 @@
 # OpenRouter API in KiraBridge
 
 Checked against OpenRouter's public model catalog on **22 November 2026**. This
-adapter sends one bounded, text-only Chat Completions request per KiraBridge
-task. It does not run local commands, access files, resume provider sessions, or
-execute model tool calls.
+adapter sends bounded Chat Completions requests for each KiraBridge task. It
+does not run local commands or resume provider sessions. Explicitly granted
+tool calls use the existing task-scoped KiraBridge MCP proxy.
 
 ## Provider and credential source
 
@@ -30,6 +30,14 @@ openrouter_fallback_models = ["baidu/ernie-5.5-flash-preview:free"]
 openrouter_max_prompt_bytes = 262144
 openrouter_max_output_tokens = 1024
 openrouter_allow_paid = false
+# Optional: only these no-shell MCP bridge tools are eligible for exposure.
+bridge_tools = true
+openrouter_mcp_tools = ["task_request", "task_get"]
+openrouter_mcp_operations = ["file.read", "file.list", "file.write"]
+openrouter_mcp_read_roots = []
+openrouter_max_tool_calls = 8
+openrouter_max_turns = 4
+openrouter_max_tool_result_bytes = 32768
 ```
 
 Provide `OPENROUTER_API_KEY` to the KiraBridge service. The config stores only
@@ -74,16 +82,24 @@ DeepSeek V4.1 Flash is currently listed at $0.0498/M input and $0.1992/M output
 tokens. It is never selected by the free route and never used as an automatic
 fallback. OpenRouter describes the free `particle-ai/particle-1:free` model as
 post-trained on DeepSeek V4.1 Flash; it remains the default route.
+DeepSeek requests also send OpenRouter's hard `provider.max_price` filter at
+those per-million-token rates. The task cost cap separately reserves the
+maximum input/output spend across every allowed model turn.
 
 ## Tool and data scope
 
-OpenRouter's catalog currently reports tool-call support for the two pinned
-models. This adapter deliberately sends no `tools` field and rejects MCP grants
-or local-tool requests. The existing KiraBridge task-scoped MCP pipeline uses
-Qwen-specific operator allowlists and task setup; this adapter does not inherit
-that policy or tool catalog. A reviewed OpenRouter allowlist and bounded
-tool-call loop is still required. Until then, the model can return coding
-advice/text, but cannot inspect or edit the project through KiraBridge.
+OpenRouter's catalog reports tool-call support for the pinned models. KiraBridge
+uses the existing task-scoped stdio MCP proxy and `AgentTaskPolicy`, which bind
+the task, owner, arguments and CWD, filter the tool catalog, recheck permissions
+per call and consume the task call budget before dispatch. OpenRouter's separate
+operator allowlist accepts only `task_request`, `task_get`, `task_events`,
+`read_query`, and bridge status/catalog tools. Child operations are limited to
+`file.read`, `file.list`, `file.write`, and `file.mkdir`, scoped by current
+principal roots and task CWD. Shell, terminal, and arbitrary operation dispatch
+are not exposed. File writes additionally require explicit operator and
+principal local-tool grants plus task-supplied operation scope. Tool turns,
+calls, results, request bytes and total paid cost are bounded; an uncertain MCP
+outcome is never replayed automatically.
 
 OpenRouter reports that these free endpoints are not available through EU
 in-region routing at the checked date. Send only data authorized for that
@@ -96,4 +112,5 @@ provider route.
 - [DeepSeek V4.1 Flash](https://openrouter.ai/deepseek/deepseek-v4.1-flash)
 - [OpenRouter free models and rate limits](https://openrouter.ai/collections/free-models)
 - [OpenRouter model fallback routing](https://openrouter.ai/blog/insights/model-routing/)
+- [OpenRouter `provider.max_price`](https://openrouter.ai/docs/guides/routing/provider-selection#max-price)
 - [OpenCode provider credential export](https://opencode.ai/docs/cli/providers/)
