@@ -20,6 +20,7 @@ from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.agent_manager.opencode_acp import OpenCodeACPAdapter
 from kirabridge.agent_manager.opencode_http import OpenCodeHTTPAdapter
 from kirabridge.agent_manager.opencode_http_v2 import OpenCodeHTTPV2Adapter
+from kirabridge.agent_manager.openrouter import OpenRouterAdapter
 from kirabridge.agent_manager.qwen_acp import QwenACPAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
@@ -547,6 +548,7 @@ class AgentManager:
             "opencode_acp": OpenCodeACPAdapter(terminal),
             "opencode_http": OpenCodeHTTPAdapter(),
             "opencode_http_v2": OpenCodeHTTPV2Adapter(),
+            "openrouter_api": OpenRouterAdapter(),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
             "copilot_cli": CopilotCLIAdapter(terminal),
@@ -594,7 +596,15 @@ class AgentManager:
                             "authentication_status": "unknown",
                         }
                         if config.kind
-                        in {"opencode", "opencode_http", "gemini_cli", "claude_code", "copilot_cli"}
+                        in {
+                            "opencode",
+                            "opencode_http",
+                            "opencode_http_v2",
+                            "openrouter_api",
+                            "gemini_cli",
+                            "claude_code",
+                            "copilot_cli",
+                        }
                         else {}
                     ),
                     **(
@@ -685,7 +695,7 @@ class AgentManager:
         if (
             self.config.visible_handoffs.enabled
             and not separate_managed
-            and config.kind not in {"opencode_http", "opencode_http_v2"}
+            and config.kind not in {"opencode_http", "opencode_http_v2", "openrouter_api"}
         ):
             if owned_resume_session is not None or handoff_reply or args.resume_session:
                 raise BridgeError(
