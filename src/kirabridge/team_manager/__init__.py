@@ -869,12 +869,18 @@ class TeamManager:
         }
 
     def set_role(self, principal, request: TeamRoleSet):
-        self._automatic(principal)
+        # First bind the retry to an authenticated, active team member.  A
+        # coordinator may demote itself as part of a successful handoff; if
+        # the response is lost, that same actor must still be able to read
+        # back its exact idempotent operation.  All active members may read
+        # the team, so this does not disclose anything beyond team_get.
         with self.store.transaction():
-            team = self._team(principal, request.team_id, "team.write", manage=True)
+            team = self._team(principal, request.team_id, "team.write")
             prior = self._previous(principal, request.team_id, "role", request)
             if prior:
                 return self._view_team(request.team_id)
+            self._automatic(principal)
+            team = self._team(principal, request.team_id, "team.write", manage=True)
             if team["revision"] != request.expected_revision:
                 raise BridgeError(
                     "team_revision_conflict", "Team roles changed; read the current revision"
