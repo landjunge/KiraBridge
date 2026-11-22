@@ -247,34 +247,32 @@ class CompletionManager:
             )
         allowed = tuple(source if source in sources else "-" for source in SOURCE_CAPABILITIES)
         marks = ",".join("?" for _ in allowed)
-
-        def eligible_rows():
-            if source_id is None:
-                return self.store.db.execute(
-                    "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND acknowledged IS NULL AND source IN (" + marks + ") "
-                    "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
-                    "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                    "ORDER BY seq DESC LIMIT ?",
-                    (principal, target, *allowed, limit),
-                ).fetchall()
+        source_filter = " AND source_id=?" if source_id is not None else ""
+        eligible_where = (
+            "principal=? AND target=?" + source_filter + " AND acknowledged IS NULL "
+            "AND source IN (" + marks + ") AND NOT EXISTS ("
+            "SELECT 1 FROM queue_holds h WHERE h.queue_id='completions' "
+            "AND h.item_id=completion_notices.id)"
+        )
+        eligible_params = [principal, target]
+        if source_id is not None:
             # A known source is readable even when older unacked notices fill the inbox.
-            return self.store.db.execute(
-                "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                "AND source_id=? AND acknowledged IS NULL AND source IN (" + marks + ") "
-                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
-                "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                "ORDER BY seq DESC LIMIT ?",
-                (principal, target, source_id, *allowed, limit),
-            ).fetchall()
-
-        rows = eligible_rows()
-        if rows:
+            eligible_params.append(source_id)
+        eligible_params.extend(allowed)
+        notices = []
+        if self.store.db.execute(
+            "SELECT 1 FROM completion_notices WHERE " + eligible_where + " LIMIT 1",
+            eligible_params,
+        ).fetchone():
             # Empty inbox polls are read-only. If data is present, re-read it under
             # the write lock before setting receipts or recording delivery evidence.
             with self.store.transaction():
-                rows = eligible_rows()
-                notices = []
+                rows = self.store.db.execute(
+                    "SELECT * FROM completion_notices WHERE "
+                    + eligible_where
+                    + " ORDER BY seq DESC LIMIT ?",
+                    (*eligible_params, limit),
+                ).fetchall()
                 for row in rows:
                     receipt, delivered = row["receipt"], row["delivered"]
                     if receipt is None:
@@ -299,8 +297,6 @@ class CompletionManager:
                             "payload": json.loads(row["payload"]),
                         }
                     )
-        else:
-            notices = []
         return {
             "notices": notices,
             "delivery_scope": "tool_response_to_client",
