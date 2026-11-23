@@ -1601,6 +1601,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "input_operation": "session.input",
                 },
                 "jobs": {row["state"]: row["count"] for row in states},
+                # Team replies are stored and pulled; no push to this caller exists.
+                "team_return_path": bridge.teams.return_path_status(principal),
                 "limits": config.messaging.model_dump(exclude={"receivers"}),
             }
 
@@ -1646,6 +1648,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def team_coordinator_status(team_id: str, ctx: Context) -> dict[str, Any]:
         """Read the team coordinator, authorized session candidates and any pending handoff."""
         return safe(lambda: bridge.teams.coordinator_status(identity(ctx), team_id))
+
+    # Publicly observed short name. Same function, identity, authorization and result;
+    # previously absent from the catalog (proxy: tool_unavailable).
+    server.add_tool(
+        team_coordinator_status,
+        name="coordinator_status",
+        annotations=read,
+        description="Alias of team_coordinator_status; identical authorization and result.",
+    )
 
     @server.tool(annotations=write)
     def team_coordinator_handoff(request: TeamCoordinatorHandoff, ctx: Context) -> dict[str, Any]:

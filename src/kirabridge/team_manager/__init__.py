@@ -1297,6 +1297,92 @@ class TeamManager:
             )
             return True
 
+    RETURN_PATH_PUSH = {
+        "team_reply_push": "not_supported",
+        "events_sidecar_scope": "task_completion_only",
+        "host_subscription": "not_verified",
+        "external_dependency": (
+            "A ChatGPT host MCP Events subscription with a verified webhook callback, "
+            "plus a recipient-scoped team-reply event contract; neither exists today"
+        ),
+    }
+
+    def return_path_status(self, principal, *, limit=10):
+        """Passive (pull) state of this principal's own team mail. Read-only.
+
+        Only messages this authenticated principal sent or received, in teams where it
+        is an active member, are counted. References carry no body. Retrieval never
+        acknowledges; only the addressed recipient's explicit ``team_message_ack`` does.
+        """
+        base = {
+            "delivery_mode": "passive_pull",
+            "pull_tools": ["team_messages", "team_message_ack"],
+            "push": dict(self.RETURN_PATH_PUSH),
+            "ack_semantics": (
+                "explicit addressed-recipient team_message_ack only; storage, retrieval, "
+                "webhook receipt and processing are separate facts and never imply ACK"
+            ),
+        }
+        try:
+            self._principal(principal, "team.read")
+        except BridgeError:
+            return {**base, "state": "not_team_member", "teams": 0}
+        teams = [
+            row["team_id"]
+            for row in self.store.db.execute(
+                "SELECT team_id FROM team_members WHERE principal=? AND active=1 ORDER BY team_id",
+                (principal,),
+            )
+        ]
+        if not teams:
+            return {**base, "state": "not_team_member", "teams": 0}
+        scope = ",".join("?" * len(teams))
+        db = self.store.db
+        incoming = db.execute(
+            "SELECT count(*) AS total,coalesce(sum(reply_to IS NOT NULL),0) AS replies "
+            "FROM team_messages WHERE recipient=? AND acknowledged IS NULL "
+            f"AND team_id IN ({scope})",
+            (principal, *teams),
+        ).fetchone()
+        references = db.execute(
+            "SELECT team_id,id,seq,sender,kind,reply_to,created FROM team_messages "
+            f"WHERE recipient=? AND acknowledged IS NULL AND team_id IN ({scope}) "
+            "ORDER BY seq LIMIT ?",
+            (principal, *teams, limit),
+        ).fetchall()
+        outgoing = db.execute(
+            "SELECT count(*) AS total,coalesce(sum(acknowledged IS NOT NULL),0) AS acked "
+            f"FROM team_messages WHERE sender=? AND team_id IN ({scope})",
+            (principal, *teams),
+        ).fetchone()
+        return {
+            **base,
+            "state": "observed",
+            "teams": len(teams),
+            "incoming": {
+                "unacknowledged": incoming["total"],
+                "unacknowledged_replies": incoming["replies"],
+                "references": [
+                    {
+                        "team_id": row["team_id"],
+                        "message_id": row["id"],
+                        "seq": row["seq"],
+                        "sender": row["sender"],
+                        "kind": row["kind"],
+                        "reply_to": row["reply_to"],
+                        "created": row["created"],
+                    }
+                    for row in references
+                ],
+                "references_truncated": incoming["total"] > len(references),
+            },
+            "outgoing": {
+                "sent": outgoing["total"],
+                "recipient_acknowledged": outgoing["acked"],
+                "awaiting_recipient_ack": outgoing["total"] - outgoing["acked"],
+            },
+        }
+
     def ack(self, principal, team_id, message_id):
         with self.store.transaction():
             self._team(principal, team_id, "team.write", write=True)
