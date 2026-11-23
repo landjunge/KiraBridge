@@ -106,12 +106,16 @@ the saved result. An observed reply does not fabricate a mailbox message, inbox
 receipt, agent ACK or project completion. Authenticated mailbox answers retain
 their separate normal operations.
 
-Any cancellation, rejected or malformed response, disconnect or timeout after the
-durable attempt remains UNKNOWN. Reads, repeated send keys, process replacement,
-host refresh and daemon restart do not replay it. Old failed/UNKNOWN/held messages
-and their receipts remain unchanged. There is no historical queue release and no
-second retry loop. Busy delivery retains the existing delivery-only model-budget
-classification; an idle start consumes the ordinary model-run budget.
+Without a durable acceptance receipt, interrupted input remains UNKNOWN.
+If the daemon stopped after persisting an exact `turn/start` acceptance while
+waiting for its requested reply, startup restores only the reply observation.
+The current configured binding must match the recorded fingerprint and the
+original job and acceptance event must match. The observer reads the accepted
+turn from Codex, including persisted history, and records a verified reply or a
+concrete UNKNOWN reason. It never resubmits input. Previously settled messages,
+holds and their receipts remain unchanged. Busy delivery retains the existing
+delivery-only model-budget classification; an idle start consumes the ordinary
+model-run budget.
 
 ## Minimal operational rollout
 

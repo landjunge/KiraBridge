@@ -85,10 +85,14 @@ class DirectDelivery:
         event = self.ready[message_id] = asyncio.Event()
         deadline = asyncio.get_running_loop().time() + self.delivery_timeout
         task = asyncio.create_task(self._deliver(principal, message_id, event))
-        self.active[message_id] = task
         watchdog = asyncio.create_task(self._watch(message_id, task, event, deadline))
         self._watchdogs[message_id] = watchdog
         watchdog.add_done_callback(self._consume)
+        self._track(message_id, task, event)
+        return True
+
+    def _track(self, message_id, task, event):
+        self.active[message_id] = task
 
         def finished(result):
             self.active.pop(message_id, None)
@@ -105,7 +109,74 @@ class DirectDelivery:
             self.receiver.messages.wake.set()
 
         task.add_done_callback(finished)
-        return True
+
+    def native_reply_receipt(self, row):
+        """Only the durable acceptance event can authorize a restart read of a turn."""
+        evidence = json.loads(row["evidence"])
+        if (
+            row["recipient"] != "codex"
+            or not row["request_reply"]
+            or row["started"] is None
+            or not isinstance(evidence, dict)
+            or evidence.get("run_id") != row["run_id"]
+            or evidence.get("session_scope") != "existing_native_codex_root"
+            or evidence.get("completion_scope") != "native_input_delivery"
+            or evidence.get("operation") != "turn/start"
+            or evidence.get("native_input_attempted") is not True
+            or evidence.get("terminal_input_attempted") is not False
+            or not isinstance(evidence.get("turn_id"), str)
+            or not evidence["turn_id"]
+            or type(evidence.get("accepted_at")) not in {int, float}
+        ):
+            return None
+        receipts = self.receiver.bridge.store.db.execute(
+            "SELECT evidence FROM message_events WHERE message_id=? "
+            "AND kind='message.native_submitted' LIMIT 2",
+            (row["message_id"],),
+        ).fetchall()
+        if len(receipts) == 1 and receipts[0]["evidence"] == row["evidence"]:
+            return evidence
+        return None
+
+    def recover_native_reply(self, message, evidence):
+        """Recover observation only. The original input is never submitted here."""
+        identifier = message["id"]
+        if identifier in self.active:
+            return
+        event = self.ready[identifier] = asyncio.Event()
+        event.set()
+        self._claimed[identifier] = evidence["run_id"]
+        task = asyncio.create_task(self._recover_native_reply(message, evidence))
+        self._track(identifier, task, event)
+
+    async def _recover_native_reply(self, message, evidence):
+        bridge = self.receiver.bridge
+        binding = bridge.config.visible_handoffs.native_codex
+        receiver = bridge.config.messaging.receivers.get("codex")
+        try:
+            if (
+                binding is None
+                or receiver is None
+                or evidence["binding_sha256"] != digest(binding.model_dump())
+                or evidence["thread_id"] != binding.thread_id
+                or evidence["session_id"] != binding.session_id
+                or message["execution_cwd"] != receiver.cwd
+            ):
+                raise BridgeError("native_codex_binding_changed", "Native reply binding changed")
+            bridge.security.principal(message["sender"], "session.inspect")
+            # Allow one bounded read even after the original reply budget expired:
+            # the native turn can already have committed its answer.
+            remaining = max(3, evidence["accepted_at"] + receiver.timeout - time.time())
+            await self._observe_native_reply(
+                message,
+                binding,
+                {**evidence, "reconciled_without_input": True},
+                timeout=min(receiver.timeout, remaining),
+            )
+        except asyncio.CancelledError:
+            raise  # Keep the durable receipt available to the next process.
+        except Exception as failure:
+            self.fail(message["id"], failure)
 
     def _forget_recorded(self, message_id):
         # A durable claim/outcome still rejects submit via _pristine after the
@@ -222,7 +293,8 @@ class DirectDelivery:
         bridge = self.receiver.bridge
         with bridge.store.transaction():
             row = bridge.store.db.execute(
-                "SELECT j.*,m.sender,m.delivered,m.receipt,m.acknowledged "
+                "SELECT j.*,m.sender,m.recipient,m.request_reply,"
+                "m.delivered,m.receipt,m.acknowledged "
                 "FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE j.message_id=?",
                 (message_id,),
@@ -236,7 +308,7 @@ class DirectDelivery:
             elif not self._pristine(message_id, row):
                 return  # A concurrent owner changed this record, not this driver.
             if preserve_delivered and row["state"] == "running":
-                if self.receiver._reply_can_finish(row):
+                if self.receiver._reply_can_finish(row) or self.native_reply_receipt(row):
                     return  # The normal receiver recovers the delivered reply waiter.
             possible = uncertain or row["started"] is not None or row["acknowledged"] is not None
             native = None
@@ -544,10 +616,11 @@ class DirectDelivery:
         if observe_reply:
             await self._observe_native_reply(message, binding, evidence)
 
-    async def _observe_native_reply(self, message, binding, evidence):
+    async def _observe_native_reply(self, message, binding, evidence, *, timeout=None):
         bridge = self.receiver.bridge
         identifier = message["id"]
-        timeout = bridge.config.messaging.receivers["codex"].timeout
+        if timeout is None:
+            timeout = bridge.config.messaging.receivers["codex"].timeout
         try:
             text = await self.codex_host.wait_reply(
                 binding, evidence["turn_id"], message["body"], timeout

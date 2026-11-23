@@ -454,11 +454,15 @@ async def test_shutdown_during_reply_observation_preserves_accepted_turn(deliver
     assert job(bridge, sent)["evidence"]["turn_id"] == "new-root-turn"
     await direct.stop()
     result = job(bridge, sent)
-    assert result["state"] == "unknown" and result["error"] == "receiver_interrupted"
+    assert result["state"] == "running" and result["error"] is None
     assert result["evidence"]["turn_id"] == "new-root-turn"
+    bridge.config.messaging.receivers["codex"].timeout = 0.05
     await bridge.message_receiver.start()
     try:
-        assert job(bridge, sent)["error"] == "receiver_interrupted"
+        await settled(direct)
+        assert job(bridge, sent)["state"] == "unknown"
+        assert job(bridge, sent)["error"] == "native_codex_reply_timeout"
+        assert job(bridge, sent)["evidence"]["turn_id"] == "new-root-turn"
         assert not direct.submit("chatgpt", sent["id"])
         assert len(p.inputs()) == 1 and not transport["calls"]
     finally:

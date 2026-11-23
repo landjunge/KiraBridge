@@ -54,14 +54,14 @@ class PersistedCodex:
             assert identifier not in self.loaded and params["excludeTurns"] is True
             self.loaded.add(identifier)
             return {"thread": self.thread(identifier)}
-        assert self.loaded == {ROOT, OTHER}
         past = self.turns()
         if method == "thread/turns/list":
             return {"data": list(reversed(past[-params["limit"] :]))}
+        assert self.loaded == {ROOT, OTHER}
         assert method == "turn/start" and "expectedTurnId" not in params
         body = params["input"][0]["text"]
         self.inputs.append((params["clientUserMessageId"], body))
-        if body == "PING":
+        if body in {"PING", "PING-BEFORE-RESTART"}:
             answer = "PONG"
         elif body == "FAIL":
             answer = None
@@ -186,6 +186,16 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
     config_file = tmp_path / "config.json"
     config_file.write_text(config.model_dump_json())
     history = tmp_path / "codex-turns.json"
+    observe_reply = CodexHost.wait_reply
+    before_ledger = asyncio.Event()
+
+    async def pause_before_ledger(host, binding, turn_id, body, timeout, **kwargs):
+        if body == "PING-BEFORE-RESTART":
+            before_ledger.set()
+            await asyncio.Event().wait()
+        return await observe_reply(host, binding, turn_id, body, timeout, **kwargs)
+
+    monkeypatch.setattr(CodexHost, "wait_reply", pause_before_ledger)
     first = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="before-restart")
     async with connected(config, first, monkeypatch) as clients:
         team = await call(
@@ -214,12 +224,20 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
         order = await call(
             clients, "codex", "team_work_create", request=team_order("local", "Open order", "open")
         )
+        pending = await ping(clients, "PING-BEFORE-RESTART", "pending-restart-ping")
+        async with asyncio.timeout(3):
+            await before_ledger.wait()
+        pending_read = await call(clients, "local", "message_get", message_id=pending["id"])
+        assert pending_read["processing"]["state"] == "running"
+        assert pending_read["processing"]["evidence"]["turn_id"] == first.turns()[-1]["id"]
+        assert first.turns()[-1]["items"][-1]["text"] == "PONG"
     historical = first.turns()[0]
     assert "Prior decision" in historical["items"][0]["content"][0]["text"]
     assert "DECISION_RECORDED" in historical["items"][-1]["text"]
 
     second = PersistedCodex(root, history, loaded=initially_loaded, generation="after-restart")
     restored = Config.model_validate_json(config_file.read_text())
+    monkeypatch.setattr(CodexHost, "wait_reply", observe_reply)
     async with connected(restored, second, monkeypatch) as clients:
         team = await call(clients, "local", "team_get", team_id="e2e")
         assert team["coordinator"] == "codex" and team["revision"] == 1
@@ -227,6 +245,16 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
         opened = await call(clients, "local", "team_work_get", team_id="e2e", work_id=order["id"])
         assert done["result"] == "DECISION_RECORDED"
         assert opened["state"] == "queued_manual" and opened["body"] == "Open order"
+        recovered = await poll(
+            lambda: call(clients, "local", "message_get", message_id=pending["id"]),
+            lambda row: row["processing"]["state"] == "completed",
+        )
+        assert recovered["processing"]["result"]["text"] == "PONG"
+        assert recovered["processing"]["result"]["message_id"] == pending["id"]
+        assert recovered["processing"]["result"]["turn_id"] == first.turns()[1]["id"]
+        assert recovered["processing"]["evidence"]["reconciled_without_input"] is True
+        assert not second.inputs
+        assert second.loaded == initially_loaded
         sent = await ping(clients, "PING", "after-restart-ping")
         pong = await poll(
             lambda: call(clients, "local", "message_get", message_id=sent["id"]),

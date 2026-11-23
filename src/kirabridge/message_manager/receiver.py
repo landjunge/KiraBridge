@@ -82,15 +82,20 @@ class MessageReceiver:
         if self.worker:
             return
         self.recovered_handoffs.clear()
+        recovered_native = []
         # The task dispatcher owns the exclusive runtime lock before this is called.
         with self.bridge.store.transaction():
             rows = self.bridge.store.db.execute(
-                "SELECT message_id,evidence FROM message_jobs WHERE state='running'"
+                "SELECT j.*,m.id,m.sender,m.recipient,m.request_reply,m.body FROM message_jobs j "
+                "JOIN messages m ON m.id=j.message_id WHERE j.state='running'"
             ).fetchall()
             for row in rows:
                 if self._reply_can_finish(row):
                     self.recovered_handoffs.add(row["message_id"])
                     continue  # Return already happened; do not interrupt or paste again.
+                if receipt := self.direct.native_reply_receipt(row):
+                    recovered_native.append((row, receipt))
+                    continue
                 previous = json.loads(row["evidence"])
                 native = (
                     previous
@@ -99,7 +104,7 @@ class MessageReceiver:
                     else {}
                 )
                 self._finish(
-                    row[0],
+                    row["message_id"],
                     "unknown",
                     {
                         **native,
@@ -123,6 +128,8 @@ class MessageReceiver:
                         continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
         self._reconcile_recovered_handoffs()
+        for row, receipt in recovered_native:
+            self.direct.recover_native_reply(row, receipt)
         if not self.bridge.config.messaging.receivers:
             return
         self.stopping = False
