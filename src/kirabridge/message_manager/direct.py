@@ -623,7 +623,11 @@ class DirectDelivery:
             timeout = bridge.config.messaging.receivers["codex"].timeout
         try:
             text = await self.codex_host.wait_reply(
-                binding, evidence["turn_id"], message["body"], timeout
+                binding,
+                evidence["turn_id"],
+                message["body"],
+                timeout,
+                cwd=evidence.get("thread_cwd"),
             )
         except TimeoutError:
             error = "native_codex_reply_timeout"

@@ -45,6 +45,7 @@ class Protocol:
             "id": ROOT,
             "sessionId": ROOT,
             "source": "vscode",
+            "cwd": binding.codex_home,
             "parentThreadId": None,
             "attachedToThreadId": None,
             "canAcceptDirectInput": True,

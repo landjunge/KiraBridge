@@ -1,7 +1,7 @@
 """Run one team turn on the assigned Codex root through the app-server API.
 
-The configured ordinary root must be idle and match the worker cwd. Its own
-turn record supplies the exact final answer.
+The configured ordinary root must be idle. Its own turn record supplies
+the exact final answer.
 Host identity is verified by CodexHost. Nothing here retries input after it was sent.
 """
 
@@ -12,10 +12,10 @@ from kirabridge.platform_adapters.codex_host import CodexHost, refused
 
 
 class NativeCodexTurns(CodexHost):
-    async def execute(self, binding, cwd, message_id, body, timeout, running):
+    async def execute(self, binding, message_id, body, timeout, running):
         if binding is None:
             raise BridgeError("native_codex_unconfigured", "Native Codex host is not configured")
-        prepared = await self.prepare(binding, cwd=cwd)
+        prepared = await self.prepare(binding)
         if prepared["operation"] != "turn/start":
             # A team turn never steers a turn that someone else is running.
             raise refused("native_codex_target_not_ready")
@@ -31,9 +31,11 @@ class NativeCodexTurns(CodexHost):
                 }
             )
 
-        sent = await self.deliver(binding, prepared, message_id, body, before_send, cwd=cwd)
+        sent = await self.deliver(binding, prepared, message_id, body, before_send)
         try:
-            text = await self.wait_reply(binding, sent["turn_id"], body, timeout, cwd=cwd)
+            text = await self.wait_reply(
+                binding, sent["turn_id"], body, timeout, cwd=sent["thread_cwd"]
+            )
         except TimeoutError as error:
             raise UncertainExecution(
                 "native_codex_reply_unknown", "Native turn did not finish in time"

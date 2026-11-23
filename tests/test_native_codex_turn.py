@@ -97,7 +97,6 @@ async def noop(evidence):
 async def execute(app, tmp_path, timeout=5):
     return await NativeCodexTurns().execute(
         template(tmp_path),
-        str(tmp_path),
         "11111111-1111-4111-8111-111111111111",
         "BODY",
         timeout,
@@ -126,24 +125,26 @@ async def test_no_fallback_when_the_assignment_cannot_be_verified(app, tmp_path,
     assert error.value.code == "native_codex_binding_changed" and app.sent == []
 
 
-async def test_other_cwd_is_not_a_candidate(app, tmp_path):
-    app.cwd = tmp_path / "elsewhere"
-    with pytest.raises(BridgeError):
+async def test_bound_root_cwd_change_between_prepare_and_submission_refuses_input(app, tmp_path):
+    read = app.thread
+
+    def change_cwd(identifier):
+        row = read(identifier)
+        if app.calls.count("thread/read") == 2:
+            row["cwd"] = str(tmp_path / "elsewhere")
+        return row
+
+    app.thread = change_cwd
+    with pytest.raises(BridgeError) as error:
         await execute(app, tmp_path)
+    assert error.value.code == "native_codex_target_changed"
     assert app.sent == []
 
 
 async def test_relative_thread_cwd_is_never_chosen(app, tmp_path):
     app.cwd = Path(".")
     with pytest.raises(BridgeError) as error:
-        await NativeCodexTurns().execute(
-            template(tmp_path),
-            str(Path.cwd()),
-            "11111111-1111-4111-8111-111111111111",
-            "BODY",
-            5,
-            noop,
-        )
+        await execute(app, tmp_path)
     assert error.value.code == "native_codex_binding_changed" and app.sent == []
 
 

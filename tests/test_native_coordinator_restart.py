@@ -164,14 +164,19 @@ async def ping(clients, text, key):
 async def test_team_and_both_routes_recover_exactly_after_restart(
     config, tmp_path, monkeypatch, initially_loaded
 ):
-    root = configure_team(None, config, tmp_path, monkeypatch)
+    worker_cwd = configure_team(None, config, tmp_path, monkeypatch)
+    native_cwd = tmp_path / "operator-session"
+    native_cwd.mkdir()
+    receiver_cwd = tmp_path / "message-worker"
+    receiver_cwd.mkdir()
+    assert len({worker_cwd, str(native_cwd), str(receiver_cwd)}) == 3
     config.team.workers["codex"].execution_scope = "existing_native_codex_root"
     config.team.coordinator_resume = True
     config.visible_handoffs.enabled = True
     config.visible_handoffs.native_codex = template(tmp_path).model_copy(
         update={"protocol_version": "0.171.0"}
     )
-    config.messaging.receivers["codex"] = ReceiverConfig(cwd=root, timeout=3)
+    config.messaging.receivers["codex"] = ReceiverConfig(cwd=str(receiver_cwd), timeout=3)
     for principal in ("local", "codex"):
         config.principals[principal].capabilities += [
             "message.send",
@@ -196,7 +201,9 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
         return await observe_reply(host, binding, turn_id, body, timeout, **kwargs)
 
     monkeypatch.setattr(CodexHost, "wait_reply", pause_before_ledger)
-    first = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="before-restart")
+    first = PersistedCodex(
+        str(native_cwd), history, loaded={ROOT, OTHER}, generation="before-restart"
+    )
     async with connected(config, first, monkeypatch) as clients:
         team = await call(
             clients,
@@ -235,7 +242,9 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
     assert "Prior decision" in historical["items"][0]["content"][0]["text"]
     assert "DECISION_RECORDED" in historical["items"][-1]["text"]
 
-    second = PersistedCodex(root, history, loaded=initially_loaded, generation="after-restart")
+    second = PersistedCodex(
+        str(native_cwd), history, loaded=initially_loaded, generation="after-restart"
+    )
     restored = Config.model_validate_json(config_file.read_text())
     monkeypatch.setattr(CodexHost, "wait_reply", observe_reply)
     async with connected(restored, second, monkeypatch) as clients:
@@ -253,6 +262,7 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
         assert recovered["processing"]["result"]["message_id"] == pending["id"]
         assert recovered["processing"]["result"]["turn_id"] == first.turns()[1]["id"]
         assert recovered["processing"]["evidence"]["reconciled_without_input"] is True
+        assert recovered["processing"]["evidence"]["thread_cwd"] == str(native_cwd.resolve())
         assert not second.inputs
         assert second.loaded == initially_loaded
         sent = await ping(clients, "PING", "after-restart-ping")
@@ -310,7 +320,9 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
         )
         assert {params["threadId"] for _, params in second.calls} == {ROOT}
 
-    third = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="lookup-restart")
+    third = PersistedCodex(
+        str(native_cwd), history, loaded={ROOT, OTHER}, generation="lookup-restart"
+    )
     async with connected(
         Config.model_validate_json(config_file.read_text()), third, monkeypatch
     ) as clients:

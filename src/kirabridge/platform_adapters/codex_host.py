@@ -286,18 +286,17 @@ class CodexHost:
             or thread.get("parentThreadId") is not None
             or thread.get("attachedToThreadId") is not None
             or (
-                cwd is not None
-                and (
-                    not isinstance(thread_cwd, str)
-                    or not Path(thread_cwd).is_absolute()
-                    or Path(thread_cwd).resolve() != Path(cwd).resolve()
-                )
+                not isinstance(thread_cwd, str)
+                or not Path(thread_cwd).is_absolute()
+                or cwd is not None
+                and Path(thread_cwd).resolve() != Path(cwd)
             )
         ):
             raise refused()
 
     async def observe(self, rpc, generation, binding, *, cwd=None, resume=False):
         thread = await self.read_bound_thread(rpc, binding, cwd=cwd)
+        thread_cwd = str(Path(thread["cwd"]).resolve())
         status = thread.get("status", {})
         if not isinstance(status, dict):
             raise refused("native_codex_target_not_ready")
@@ -312,8 +311,8 @@ class CodexHost:
             restored = await rpc.call(
                 "thread/resume", {"threadId": binding.thread_id, "excludeTurns": True}
             )
-            self._verify_thread(restored.get("thread"), binding, cwd)
-            thread = await self.read_bound_thread(rpc, binding, cwd=cwd)
+            self._verify_thread(restored.get("thread"), binding, thread_cwd)
+            thread = await self.read_bound_thread(rpc, binding, cwd=thread_cwd)
             status = thread.get("status", {})
         if thread.get("canAcceptDirectInput") is not True:
             raise refused()
@@ -345,23 +344,25 @@ class CodexHost:
             "host_generation": generation,
             "thread_id": binding.thread_id,
             "session_id": binding.session_id,
+            "thread_cwd": thread_cwd,
             "expected_turn_id": active["id"] if active else None,
             "operation": "turn/steer" if active else "turn/start",
         }
 
-    async def prepare(self, binding, *, cwd=None):
+    async def prepare(self, binding):
         async with self.connection(binding) as (rpc, generation):
-            return await self.observe(rpc, generation, binding, cwd=cwd, resume=True)
+            return await self.observe(rpc, generation, binding, resume=True)
 
-    async def deliver(self, binding, prepared, message_id, body, before_send, *, cwd=None):
+    async def deliver(self, binding, prepared, message_id, body, before_send):
         async with self.connection(binding) as (rpc, generation):
-            current = await self.observe(rpc, generation, binding, cwd=cwd)
+            current = await self.observe(rpc, generation, binding)
             # A host restart may refresh physical generation; a different turn
             # never changes a claimed steering attempt into another operation.
             for key in (
                 "binding_sha256",
                 "thread_id",
                 "session_id",
+                "thread_cwd",
                 "operation",
                 "expected_turn_id",
             ):

@@ -943,7 +943,6 @@ class Bridge:
                 await running({"evidence_type": "native_codex_turn_dispatch"})
                 result = await NativeCodexTurns().execute(
                     self.config.visible_handoffs.native_codex,
-                    args.cwd,
                     str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + task["id"])),
                     args.prompt,
                     min(args.timeout, worker.timeout),

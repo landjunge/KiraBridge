@@ -146,8 +146,11 @@ message acceptance remain separate outcomes.
 Automatische Folgeaufträge für
 `execution_scope = "existing_native_codex_root"` verwenden dieselbe in
 `[visible_handoffs.native_codex]` konfigurierte Thread-/Sitzungsidentität wie
-Direktnachrichten. Das Arbeitsverzeichnis prüft den Auftrag und den gebundenen
-Root, es dient nicht zur Auswahl eines anderen Threads. Auch bei zwei passenden
+Direktnachrichten. Der versiegelte Auftrag behält das konfigurierte
+Arbeitsverzeichnis des Team-Workers. Der native Root hat sein eigenes,
+vom App-Server bestätigtes Arbeitsverzeichnis. KiraBridge prüft es erneut
+vor der Eingabe und beim Lesen der Antwort. Beide Arbeitsverzeichnisse dürfen
+sich vom lokalen Nachrichtenempfänger unterscheiden. Auch bei zwei passenden
 Roots bleibt die Zuordnung erhalten. Ist der gebundene Root beschäftigt,
 startet der Teampfad keinen zusätzlichen Turn und steuert den bestehenden
 Turn nicht. Der Abschluss des bestehenden Workerauftrags und die daraus
@@ -169,9 +172,12 @@ und der persistierte Einmalversuch bleiben vor dem Input geprüft. Historische
 
 Automatic follow-ups with `execution_scope = "existing_native_codex_root"`
 use the same thread and session identity configured in
-`[visible_handoffs.native_codex]` as direct messages. The worker cwd is
-validated against the assigned root. Another root with the same cwd has no
-effect on assignment. A team turn requires the assigned root to be idle
+`[visible_handoffs.native_codex]` as direct messages. The sealed request retains
+its team worker cwd. The bound native root keeps the absolute cwd reported by
+the authenticated App-Server, which is checked again before submission and when
+reading its reply. The team worker, native root and local message receiver may
+each have a different cwd. Another root with the same cwd has no effect on
+assignment. A team turn requires the assigned root to be idle
 and is never sent using `turn/steer`. The existing SQLite team, work and
 completion records retain their IDs across daemon restart.
 
