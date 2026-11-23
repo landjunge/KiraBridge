@@ -596,7 +596,7 @@ async def read(bridge: Any, principal: str, name: str, arguments: dict[str, Any]
         _validate(tool, arguments)
     # The read runs outside the discovery lock: a hanging call must not block the catalog.
     result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
-    success, value = bridge.threaddesk.decode(result, mutation=False)
+    success, value = bridge.threaddesk.decode(result, mutation=False, verified_read_tool=name)
     return {
         "success": success,
         "value": value,
@@ -642,7 +642,7 @@ async def call(
             contract = digest(tool)
     if not mutation:
         result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
-        success, value = bridge.threaddesk.decode(result, mutation=False)
+        success, value = bridge.threaddesk.decode(result, mutation=False, verified_read_tool=name)
         return {
             "success": success,
             "value": value,
