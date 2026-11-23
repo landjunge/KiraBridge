@@ -1120,7 +1120,9 @@ def main() -> None:
     create.add_argument(
         "--members", required=True, help="Comma-separated operator-enabled identities"
     )
-    create.add_argument("--coordinator", required=True)
+    create.add_argument(
+        "--coordinator", help="Select a member or let the first eligible session take the role"
+    )
     role = actions.add_parser("role")
     role.add_argument("team_id")
     role.add_argument("member")

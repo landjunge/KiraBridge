@@ -660,6 +660,7 @@ class RecordingTeams:
 
 def isolated_dispatcher(config):
     teams = RecordingTeams()
+    teams.coordinator_roles = SimpleNamespace(linked_work=lambda _work_id: None)
 
     class EmptyRows:
         @staticmethod
