@@ -176,7 +176,13 @@ def test_concurrent_handoffs_cannot_bypass_revision_or_replace_ongoing_handoff(d
     assert busy.value.code == "team_coordinator_handoff_pending"
     with pytest.raises(BridgeError) as wrong:
         domain.request_coordinator_handoff(
-            "local", request.model_copy(update={"idempotency_key": "stale", "expected_revision": 1})
+            "local",
+            request.model_copy(
+                update={
+                    "idempotency_key": "different-revision",
+                    "expected_revision": request.expected_revision + 1,
+                }
+            ),
         )
     assert wrong.value.code == "team_revision_conflict"
     # A legitimate role change invalidates the preserved handoff revision.

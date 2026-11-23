@@ -117,13 +117,16 @@ class CoordinatorRoles:
     def _native_scope(binding):
         return {"native_codex_binding_sha256": digest(binding.model_dump())}
 
-    def _assign(self, team_id, principal, session):
+    def _store_binding(self, team_id, principal, session):
         self.db.execute(
             "INSERT INTO team_coordinator_bindings VALUES(?,?,?,?,?) "
             "ON CONFLICT(team_id) DO UPDATE SET principal=excluded.principal,"
             "session_id=excluded.session_id,generation=excluded.generation,session=excluded.session",
             (team_id, principal, session["session_id"], session["generation"], canonical(session)),
         )
+
+    def _assign(self, team_id, principal, session):
+        self._store_binding(team_id, principal, session)
         self.db.execute(
             "UPDATE team_members SET role='worker' WHERE team_id=? AND role='coordinator'",
             (team_id,),
@@ -148,7 +151,10 @@ class CoordinatorRoles:
         ):
             return
         session = self._reference(row)
-        self._assign(team_id, principal, session)
+        if team["coordinator"]:
+            self._store_binding(team_id, principal, session)
+        else:
+            self._assign(team_id, principal, session)
         self.manager._event(
             team_id, principal, "team.coordinator_bound", session_sha256=digest(session)
         )
