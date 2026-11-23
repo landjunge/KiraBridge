@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.team_manager.continuation import REVIEW
@@ -224,7 +225,9 @@ class ChatGPTTeamStatus:
                     recipient=RECIPIENT,
                     body=body,
                     kind="note",
-                    idempotency_key=key,
+                    # The stable receipt lives in the same transaction. An
+                    # agent's public message key cannot occupy that receipt.
+                    idempotency_key="kb-status-send-" + uuid.uuid4().hex,
                 ),
             )
             self._remember_status({**dict(team), "id": event["team_id"]}, key, event, message)

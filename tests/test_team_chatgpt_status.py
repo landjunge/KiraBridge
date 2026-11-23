@@ -10,20 +10,20 @@ from test_team_manager import domain as imported_domain
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.team_manager import continuation
-from kirabridge.team_manager.models import TeamRoleSet, TeamWorkComplete
+from kirabridge.team_manager.models import TeamMessageSend, TeamRoleSet, TeamWorkComplete
 
 domain = imported_domain
 TEAM_ID = "test-team"
 
 
-def manual_completed(domain, key="manual-work"):
+def manual_completed(domain, key="manual-work", team_id=TEAM_ID):
     pending = domain.delegate(
-        "local", work(assignee="local", idempotency_key=key, body="PRIVATE PLAN")
+        "local", work(team_id=team_id, assignee="local", idempotency_key=key, body="PRIVATE PLAN")
     )
     original = domain.work_complete(
         "local",
         TeamWorkComplete(
-            team_id=TEAM_ID,
+            team_id=team_id,
             work_id=pending["id"],
             idempotency_key="finish-" + key,
             result="PRIVATE RESULT",
@@ -131,6 +131,44 @@ def test_preexisting_malformed_event_does_not_block_startup_or_pending_report(do
         assert reopened.teams.publish_chatgpt_status() == 0
     finally:
         reopened.store.close()
+
+
+def test_public_message_keys_cannot_starve_status_receipts(domain):
+    role(domain, "codex", "coordinator")
+    for index in range(8):
+        manual_completed(domain, f"blocked-key-{index}")
+    keys = [
+        event["metadata"]["chatgpt_status_key"]
+        for event in domain.events("codex", TEAM_ID)["events"]
+        if "chatgpt_status_key" in event["metadata"]
+    ]
+    assert len(keys) == 8
+    for key in keys:
+        domain.send(
+            "codex",
+            TeamMessageSend(
+                team_id=TEAM_ID,
+                recipient="local",
+                body="Separate message using a public key",
+                idempotency_key=key,
+            ),
+        )
+    setup_team(domain, coordinator="grok")
+    domain.set_role(
+        "local",
+        TeamRoleSet(
+            team_id=TEAM,
+            member="chatgpt",
+            role="worker",
+            expected_revision=domain.get("local", TEAM)["revision"],
+            idempotency_key="add-chatgpt",
+        ),
+    )
+    other = manual_completed(domain, "unrelated-status", team_id=TEAM)
+    assert domain.publish_chatgpt_status() == 8
+    assert domain.publish_chatgpt_status() == 1
+    assert domain.publish_chatgpt_status() == 0
+    assert any(other in message["body"] for message in inbox(domain, TEAM))
 
 
 async def test_dispatcher_publishes_status_during_long_running_turn(domain, monkeypatch):
