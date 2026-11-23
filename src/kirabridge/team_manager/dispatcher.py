@@ -198,6 +198,10 @@ class TeamDispatcher:
                 self.teams.resume_coordinators()
             except (BridgeError, sqlite3.Error):
                 pass  # notices stay pending and are retried on the next pass
+            try:
+                self.teams.publish_chatgpt_status()
+            except (BridgeError, sqlite3.Error):
+                pass  # The original status evidence survives a failed publish.
             selected = self._next()
             if selected is None and self.continuation is not None:
                 try:

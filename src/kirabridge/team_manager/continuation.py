@@ -317,12 +317,15 @@ class TeamContinuation:
                     return True
         return False
 
-    def _pending_review(self, policy):
-        selected = self.store.db.execute(
+    def _last_selected(self, policy):
+        return self.store.db.execute(
             "SELECT w.id,w.state FROM team_operations o JOIN team_work w ON w.id=o.object_id "
             "WHERE o.team_id=? AND o.operation=? ORDER BY w.seq DESC LIMIT 1",
             (policy.team_id, CLAIM),
         ).fetchone()
+
+    def _pending_review(self, policy):
+        selected = self._last_selected(policy)
         if selected is None:
             return False
         if selected["state"] != "completed":
@@ -394,6 +397,7 @@ class TeamContinuation:
                         return None
                     owner = role[1]
                     key = self.key(policy, source)
+                    previous = self._last_selected(policy)
                     work = self.teams.delegate(
                         principal,
                         TeamWorkCreate(
@@ -417,6 +421,7 @@ class TeamContinuation:
                         **proof,
                         board_revision=revision,
                         operation_key=key,
+                        **({"predecessor_work_id": previous["id"]} if previous else {}),
                     )
                     return work
         return None

@@ -29,6 +29,7 @@ from kirabridge.team_manager.models import (
     TeamWorkCreate,
     TeamWorkReprocess,
 )
+from kirabridge.team_manager.status_reporting import ChatGPTTeamStatus
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS teams (
@@ -83,6 +84,8 @@ CREATE TABLE IF NOT EXISTS team_events (
  at REAL NOT NULL, kind TEXT NOT NULL, principal TEXT NOT NULL,
  object_id TEXT, metadata TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS team_chatgpt_status_events ON team_events(team_id,seq)
+ WHERE json_extract(metadata,'$.chatgpt_status_key') IS NOT NULL;
 CREATE INDEX IF NOT EXISTS team_native_ping_queue ON team_events(seq,team_id,object_id)
  WHERE kind='team.message_native_ping_queued';
 CREATE INDEX IF NOT EXISTS team_native_ping_outcomes ON team_events(team_id,object_id,kind)
@@ -240,6 +243,7 @@ class TeamManager:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN session_generation INTEGER")
         self.coordinator_roles = CoordinatorRoles(self)
         self.continuation = TeamContinuation(self)
+        self.chatgpt_status = ChatGPTTeamStatus(self)
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -319,6 +323,7 @@ class TeamManager:
         )
 
     def _event(self, team_id, principal, kind, object_id=None, **metadata):
+        metadata.update(self.chatgpt_status.source_fields(team_id, kind, object_id, metadata))
         event_seq = self.store.db.execute(
             "INSERT INTO team_events(team_id,at,kind,principal,object_id,metadata) "
             "VALUES(?,?,?,?,?,?)",
@@ -330,6 +335,9 @@ class TeamManager:
         if self.on_change is not None:
             self.on_change()
         return event_seq
+
+    def publish_chatgpt_status(self):
+        return self.chatgpt_status.publish()
 
     def _view_team(self, team_id):
         result = dict(
@@ -2089,6 +2097,13 @@ class TeamManager:
                     state=shared_state,
                     core_task_id=core_task["id"],
                     evidence_sha256=digest(evidence),
+                    **(
+                        {"native_start_confirmed": True}
+                        if self.chatgpt_status.confirmed_start(
+                            core_task, evidence["native_evidence"]
+                        )
+                        else {}
+                    ),
                 )
             self.coordinator_roles.record_observation(work, worker, evidence["native_evidence"])
             self.record_session({**work, "state": shared_state}, evidence["native_evidence"])
@@ -2145,6 +2160,7 @@ class TeamManager:
                 result_sha256=digest(result),
                 evidence_sha256=digest(sanitized),
             )
+            self.chatgpt_status.record_review_acceptance(work, result)
             self._record_work_notice(work_id, event_seq)
         self.wake.set()
         return self._work(work_id)
