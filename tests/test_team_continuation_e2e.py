@@ -192,7 +192,7 @@ async def wait_for_work(clients, predicate):
             await asyncio.sleep(0.05)
 
 
-async def create_bound_coordinator(bridge, clients, endpoint, *, seed_second=False):
+async def create_bound_coordinator(bridge, clients, endpoint, *, seed_second=False, members=None):
     for principal, token in TOKENS.items():
         await clients.connect(Peer(principal, url=endpoint, token=token))
     await rpc(
@@ -204,7 +204,12 @@ async def create_bound_coordinator(bridge, clients, endpoint, *, seed_second=Fal
                 "team_id": TEAM,
                 "name": "Continuation fixture",
                 "coordinator": "codex",
-                "members": {"local": "worker", "codex": "coordinator", "grok": "worker"},
+                "members": {
+                    "local": "worker",
+                    "codex": "coordinator",
+                    "grok": "worker",
+                    **(members or {}),
+                },
                 "idempotency_key": "fixture-team",
             }
         },
