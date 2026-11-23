@@ -31,6 +31,7 @@ from kirabridge.team_manager.models import (
     TeamWorkCreate,
     TeamWorkReprocess,
 )
+from kirabridge.visible_handoff import peer_route_status
 
 
 def inline_task_timeout(operation: str) -> float:
@@ -1570,6 +1571,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                             and bridge.message_receiver.worker
                             and not bridge.message_receiver.worker.done()
                         ),
+                        "route": peer_route_status(bridge, config, peer),
                     }
                     for peer in policy.message_peers
                 },

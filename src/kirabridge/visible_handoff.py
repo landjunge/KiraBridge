@@ -8,6 +8,7 @@ import time
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
+from kirabridge.process_lifecycle import fresh_generations, same_generation
 from kirabridge.session_manager import SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
@@ -20,6 +21,35 @@ from kirabridge.visible_binding import (
 from kirabridge.visible_readiness import assess, input_view
 
 RETURN_OBSERVATION_TIMEOUT = 8.0
+# Two sweeper rounds. An older "available" observation is reported as aged.
+PRESENCE_FRESH_SECONDS = 180.0
+
+
+def peer_route_status(bridge, config, peer):
+    """Sanitized route state for one authorized peer: no pane, PID or process data.
+
+    Never reports a recipient as ready. Exact selection, identity and readiness are
+    re-validated at the effect point of every attempt.
+    """
+    base = {"known_ready": False, "effect_point": "exact_target_revalidated_before_input"}
+    if peer == "codex" and config.visible_handoffs.native_codex is not None:
+        return {**base, "kind": "native_codex_root", "state": "validated_per_attempt"}
+    if peer not in config.visible_handoffs.bindings:
+        return {**base, "kind": "no_visible_binding", "state": "not_applicable"}
+    presence = bridge.visible_handoffs.presence(peer)
+    state, observed = presence["state"], presence.get("observed_at")
+    age = max(0.0, time.time() - observed) if isinstance(observed, (int, float)) else None
+    if state in {"available", "replaced"} and (age is None or age > PRESENCE_FRESH_SECONDS):
+        state = "observation_aged"
+    evidence = presence.get("evidence") or {}
+    return {
+        **base,
+        "kind": "visible_terminal",
+        "state": state,
+        "reason": presence.get("reason"),
+        "observed_age_seconds": round(age) if age is not None else None,
+        **({"remedy": evidence["remedy"]} if isinstance(evidence.get("remedy"), str) else {}),
+    }
 
 
 def _text_sha256(value):
@@ -212,6 +242,143 @@ class VisibleHandoffs:
                 "id TEXT NOT NULL REFERENCES visible_handoffs(id),"
                 "at REAL NOT NULL,state TEXT NOT NULL,evidence TEXT NOT NULL)"
             )
+            # Kernel generation of an exact binding triple, recorded once at an
+            # authorized, fresh native match. Equality-only; legacy rows stay absent.
+            store.db.execute(
+                "CREATE TABLE IF NOT EXISTS binding_generations ("
+                "pane_id TEXT NOT NULL,expected_pid INTEGER NOT NULL,"
+                "agent_pid INTEGER NOT NULL,target TEXT NOT NULL,"
+                "generations TEXT NOT NULL,recorded_at REAL NOT NULL,"
+                "PRIMARY KEY(pane_id,expected_pid,agent_pid))"
+            )
+            # Current per-target receiver presence; reporting only, never an effect.
+            store.db.execute(
+                "CREATE TABLE IF NOT EXISTS receiver_presence ("
+                "target TEXT PRIMARY KEY,state TEXT NOT NULL,binding TEXT NOT NULL,"
+                "evidence TEXT NOT NULL,observed_at REAL NOT NULL)"
+            )
+
+    PRESENCE_STATES = frozenset(
+        {"available", "stale", "absent", "ambiguous", "replaced", "unknown"}
+    )
+
+    # Injectable for tests: (pids) -> {pid: generation} or None when unverifiable.
+    generation_observer = staticmethod(fresh_generations)
+
+    def recorded_generations(self, binding):
+        import json
+
+        row = self.store.db.execute(
+            "SELECT generations FROM binding_generations "
+            "WHERE pane_id=? AND expected_pid=? AND agent_pid=?",
+            (binding.pane_id, binding.expected_pid, binding.agent_pid),
+        ).fetchone()
+        if row is None:
+            return None
+        saved = json.loads(row["generations"])
+        return {int(pid): value for pid, value in saved.items()}
+
+    def verify_generation(self, target, binding, before, after):
+        """Effect-point identity for one exact native match. Never infers legacy birth.
+
+        ``before``/``after`` are kernel observations taken around the catalog match;
+        equal values prove the matched PIDs belonged to those generations. The first
+        such fresh match records the generation; later matches must be equal.
+        Returns ``verified`` or ``unverified``; raises on a proven different process.
+        """
+        pids = (binding.expected_pid, binding.agent_pid)
+        recorded = self.recorded_generations(binding)
+        fresh = (
+            before is not None
+            and after is not None
+            and all(same_generation(before.get(p), after.get(p)) for p in pids)
+        )
+        if recorded is not None:
+            if not fresh:
+                raise BridgeError(
+                    "visible_target_unknown",
+                    "Recorded process generation cannot be re-verified now; no input",
+                )
+            if not all(same_generation(recorded.get(p), after.get(p)) for p in pids):
+                error = BridgeError(
+                    "visible_target_changed",
+                    "Same PID number, different kernel process generation; no input",
+                )
+                error.observation = {
+                    "state": "target_changed",
+                    "reason": "process_generation_changed",
+                    "target": target,
+                }
+                raise error
+            return "verified"
+        if not fresh:
+            return "unverified"
+        with self.store.transaction():
+            self.store.db.execute(
+                "INSERT OR IGNORE INTO binding_generations VALUES(?,?,?,?,?,?)",
+                (
+                    binding.pane_id,
+                    binding.expected_pid,
+                    binding.agent_pid,
+                    target,
+                    canonical({str(p): after[p] for p in pids}),
+                    time.time(),
+                ),
+            )
+        return "verified"
+
+    def record_presence(self, principal, target, state, binding, evidence):
+        import json
+
+        if state not in self.PRESENCE_STATES:
+            raise ValueError(state)
+        now = time.time()
+        with self.store.transaction():
+            previous = self.store.db.execute(
+                "SELECT state,evidence FROM receiver_presence WHERE target=?", (target,)
+            ).fetchone()
+            self.store.db.execute(
+                "INSERT INTO receiver_presence VALUES(?,?,?,?,?) ON CONFLICT(target) DO UPDATE "
+                "SET state=excluded.state,binding=excluded.binding,"
+                "evidence=excluded.evidence,observed_at=excluded.observed_at",
+                (target, state, canonical(binding.model_dump()), canonical(evidence), now),
+            )
+            if (
+                previous is None
+                or previous["state"] != state
+                or (json.loads(previous["evidence"]).get("reason") != evidence.get("reason"))
+            ):
+                self.store.audit(
+                    "receiver_presence_changed",
+                    principal,
+                    None,
+                    {
+                        "target": target,
+                        "state": state,
+                        "previous_state": previous["state"] if previous else None,
+                        "reason": evidence.get("reason"),
+                        "pane_id": binding.pane_id,
+                        "automatic_retry": False,
+                    },
+                )
+
+    def presence(self, target):
+        import json
+
+        row = self.store.db.execute(
+            "SELECT * FROM receiver_presence WHERE target=?", (target,)
+        ).fetchone()
+        if row is None:
+            return {"target": target, "state": "unknown", "reason": "never_observed"}
+        evidence = json.loads(row["evidence"])
+        return {
+            "target": target,
+            "state": row["state"],
+            "reason": evidence.get("reason"),
+            "evidence": evidence,
+            "binding": json.loads(row["binding"]),
+            "observed_at": row["observed_at"],
+        }
 
     def status(self, principal, identifier):
         self.security.principal(principal, "task.read")
@@ -818,7 +985,23 @@ class VisibleHandoffs:
         await self.reconcile_target_reservations(
             principal, target, binding, observed_sessions=observed
         )
-        await self.check_target(principal, target, binding, ready=True)
+        presence = self.presence(target)
+        try:
+            await self.check_target(principal, target, binding, ready=True)
+        except BridgeError as error:
+            # Same pre-input code as before; the sender additionally learns the
+            # persisted receiver state. Never starts, picks or rebinds an agent.
+            if (
+                error.code == "session_selection_changed"
+                and presence["state"] in {"stale", "absent", "ambiguous", "unknown"}
+                and getattr(error, "observation", None) is None
+            ):
+                error.observation = {
+                    "state": presence["state"],
+                    "reason": presence["reason"] or "unobserved",
+                    "target": target,
+                }
+            raise
 
     async def refreshed_binding(self, principal, target, binding):
         """Use the saved binding while its process lives. Replace only a dead unique agent.
@@ -826,34 +1009,98 @@ class VisibleHandoffs:
         The returned session list is the catalog snapshot that proved the replacement.
         Callers may use it to ignore reservations on that dead pane. A matched binding
         returns no snapshot, so an unrelated reservation keeps its existing lock.
+        Every outcome is recorded as receiver presence; none of them sends input.
         """
+        selection_reason = None
         try:
             selected = await self.sessions.selected(
                 principal, binding.pane_id, binding.expected_pid
             )
-        except BridgeError:
+        except BridgeError as error:
             selected = None
+            detail = getattr(error, "provider_error", None)
+            selection_reason = (
+                detail.get("reason") if isinstance(detail, dict) else None
+            ) or error.code
         if selected is not None and self.sessions.binding_matches(selected, binding, target):
+            self.record_presence(principal, target, "available", binding, {"reason": "matched"})
             return binding, None
         try:
             catalog = await self.sessions.catalog(principal)
-        except BridgeError:
+        except BridgeError as error:
+            self.record_presence(
+                principal, target, "unknown", binding, {"reason": "catalog_" + error.code}
+            )
             return binding, None
         if not catalog_can_replace(catalog):
+            self.record_presence(
+                principal, target, "unknown", binding, {"reason": "catalog_incomplete"}
+            )
             return binding, None
         sessions = catalog.get("sessions") or []
         try:
             await self.sessions.prove_original_target_gone(principal, binding.model_dump())
-        except BridgeError:
+        except BridgeError as error:
+            # Strict proof failed (e.g. an original PID number is occupied). A
+            # legacy binding has no kernel generation, so nothing can be proven:
+            # the operator must assign the receiver again, exactly, once.
+            self.record_presence(
+                principal,
+                target,
+                "stale",
+                binding,
+                {
+                    "reason": error.code,
+                    "selection_reason": selection_reason,
+                    "identity": (
+                        "generation_recorded"
+                        if self.recorded_generations(binding) is not None
+                        else "unverified_legacy"
+                    ),
+                    "remedy": "new_exact_assignment_required",
+                },
+            )
             return binding, None
         updated = replacement_binding(target, binding, sessions)
         if updated is None:
             # The catalog is complete and the configured pane is proven gone;
             # retain that snapshot even without a replacement so an orphaned
             # reservation on this exact binding can be released.
+            candidates = [
+                row
+                for row in sessions
+                if row.get("agent_candidate") == target
+                or row.get("agent_candidates_ambiguous")
+                and any(p.get("name") == target for p in row.get("processes", []))
+            ]
+            self.record_presence(
+                principal,
+                target,
+                "ambiguous" if candidates else "absent",
+                binding,
+                {
+                    "reason": (
+                        "replacement_not_unique"
+                        if candidates
+                        else "original_target_gone_no_replacement"
+                    ),
+                    "candidates": len(candidates),
+                    "remedy": "new_exact_assignment_required",
+                },
+            )
             return binding, sessions
         self.config.visible_handoffs.bindings[target] = updated
         save_refresh(self.config, target, binding, updated)
+        self.record_presence(
+            principal,
+            target,
+            "replaced",
+            updated,
+            {
+                "reason": "unique_replacement_bound",
+                "previous_pane_id": binding.pane_id,
+            },
+        )
         self.store.audit(
             "visible_binding_refreshed",
             principal,
@@ -975,6 +1222,8 @@ class VisibleHandoffs:
             )
 
     async def check_target(self, principal, target, binding, *, ready=False):
+        pids = (binding.expected_pid, binding.agent_pid)
+        before = self.generation_observer(pids)
         row = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
         with self.sessions.observation_scope(principal, row):
             matches = [
@@ -986,6 +1235,10 @@ class VisibleHandoffs:
                 raise BridgeError(
                     "visible_target_changed", "Bound CLI process is not in this exact terminal"
                 )
+            if row.get("transport") == "terminal_app" and row.get("expected_pid") == pids[0]:
+                # Only a real native row is an authorized exact OS observation.
+                after = self.generation_observer(pids)
+                self.verify_generation(target, binding, before, after)
             output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
             if ready:
                 observation = await self.binding_readiness(

@@ -1116,7 +1116,8 @@ class Bridge:
         Read-only. Only a binding that is no longer in the catalogue goes through the
         existing proven-absence and unique-live-agent replacement (refreshed_binding), so a
         restart of KiraBridge, Terminal.app or an agent never leaves a dead binding behind.
-        Returns the targets that were replaced.
+        Returns the targets that were replaced. Every evaluated target's outcome is
+        persisted as receiver presence by refreshed_binding; nothing is sent.
         """
         from kirabridge.visible_binding import binding_still_present
 
@@ -1131,6 +1132,19 @@ class Bridge:
         replaced = []
         for target, binding in bindings.items():
             if binding_still_present(binding, sessions):
+                # Unchanged skip rule. Report, but never call an exact match "ready":
+                # readiness and identity are re-validated at the effect point.
+                exact = any(self.sessions.binding_matches(r, binding, target) for r in sessions)
+                try:
+                    self.visible_handoffs.record_presence(
+                        principal,
+                        target,
+                        "available" if exact else "stale",
+                        binding,
+                        {"reason": "matched" if exact else "original_pane_or_pid_in_catalog"},
+                    )
+                except Exception:  # noqa: BLE001 - reporting never stops the sweep
+                    pass
                 continue
             try:
                 updated, _ = await self.visible_handoffs.refreshed_binding(

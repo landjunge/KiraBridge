@@ -237,6 +237,17 @@ class DirectDelivery:
             ).fetchone()
         )
 
+    def _claim_pristine(self, message_id, **options):
+        """Claim only a still-pristine record, with no await between check and claim.
+
+        An authenticated recipient may pull the same message (delivery receipt)
+        while this driver awaited a peer connection. That receipt belongs to the
+        recipient; the direct driver then must neither claim nor send input.
+        """
+        if not self._unclaimed(message_id):
+            return None
+        return self.receiver._claim(message_id, direct=True, **options)
+
     def _unclaimed(self, message_id):
         row = self.receiver.bridge.store.db.execute(
             "SELECT j.*,m.delivered,m.receipt,m.acknowledged "
@@ -433,7 +444,7 @@ class DirectDelivery:
                     raise BridgeError("visible_target_changed", "Explicit message target changed")
                 async with MCPClientPool(call_timeout=15) as pool:
                     await pool.connect(peer(bridge.config, recipient))
-                    claimed = self.receiver._claim(message_id, direct=True, interim=True)
+                    claimed = self._claim_pristine(message_id, interim=True)
                     if claimed is not None:
                         self._claimed[message_id] = claimed[1]
                         await self.receiver._process(
@@ -482,7 +493,7 @@ class DirectDelivery:
                 await pool.connect(peer(bridge.config, recipient))
                 if not self._unclaimed(message_id):
                     return
-                claimed = self.receiver._claim(message_id, direct=True)
+                claimed = self._claim_pristine(message_id)
                 if claimed is None:
                     raise BridgeError("delivery_not_admitted", "Message was not admitted")
                 self._claimed[message_id] = claimed[1]
@@ -533,10 +544,8 @@ class DirectDelivery:
             and not bridge.config.visible_handoffs.allow_interim_messages
         ):
             raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
-        if not self._unclaimed(identifier):
-            return
-        claimed = self.receiver._claim(
-            identifier, direct=True, interim=prepared["operation"] == "turn/steer", native=True
+        claimed = self._claim_pristine(
+            identifier, interim=prepared["operation"] == "turn/steer", native=True
         )
         if claimed is None:
             return
