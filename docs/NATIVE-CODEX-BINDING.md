@@ -153,8 +153,12 @@ vor der Eingabe und beim Lesen der Antwort. Beide Arbeitsverzeichnisse dürfen
 sich vom lokalen Nachrichtenempfänger unterscheiden. Auch bei zwei passenden
 Roots bleibt die Zuordnung erhalten. Ist der gebundene Root beschäftigt,
 startet der Teampfad keinen zusätzlichen Turn und steuert den bestehenden
-Turn nicht. Der Abschluss des bestehenden Workerauftrags und die daraus
-erzeugte Folgezuordnung bleiben mit ihren IDs im selben Bridge-Speicher.
+Turn nicht. Bestätigt der App-Server, dass der gebundene Root aktiv ist,
+bleibt der automatische Folgeauftrag unter seiner ursprünglichen ID bis
+zur nächsten Prüfung in der Warteschlange. Der bestehende Ablaufzeitpunkt
+gilt weiter. Nach Übernahme des Auftrags wird ein unklarer Ausgang unter
+der Original-ID festgehalten. Der Abschluss des bestehenden Workerauftrags
+und die daraus erzeugte Folgezuordnung bleiben im selben Bridge-Speicher.
 
 ## Nachrichten an den gebundenen Koordinator
 
@@ -178,8 +182,11 @@ the authenticated App-Server, which is checked again before submission and when
 reading its reply. The team worker, native root and local message receiver may
 each have a different cwd. Another root with the same cwd has no effect on
 assignment. A team turn requires the assigned root to be idle
-and is never sent using `turn/steer`. The existing SQLite team, work and
-completion records retain their IDs across daemon restart.
+and is never sent using `turn/steer`. When a read of the exact bound root
+confirms that it is active, an automatic follow-up keeps its original
+queue entry, completion link and expiry until the next check. An ambiguous
+outcome after the claim is recorded on the original task. The existing
+SQLite team, work and completion records retain their IDs across daemon restart.
 
 ## Messages to the bound coordinator
 

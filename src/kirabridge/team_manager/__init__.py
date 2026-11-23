@@ -1531,14 +1531,15 @@ class TeamManager:
             result.append(event)
         return {"events": result, "next_cursor": rows[-1]["seq"] if rows else after}
 
-    def pending(self, limit=16):
+    def pending(self, limit=16, *, excluded=(), after=0):
         if not self.config.team.enabled:
             return []
         self._page(0, limit)
         rows = self.store.db.execute(
             "SELECT id FROM team_work WHERE state='queued' AND core_task_id IS NULL "
-            "ORDER BY seq LIMIT ?",
-            (limit,),
+            "AND id NOT IN (SELECT value FROM json_each(?)) "
+            "ORDER BY seq <= ?, seq LIMIT ?",
+            (json.dumps(excluded), after, limit),
         ).fetchall()
         return [self._work(row["id"]) for row in rows]
 

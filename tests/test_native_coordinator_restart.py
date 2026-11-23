@@ -3,6 +3,8 @@
 import asyncio
 import json
 import socket
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 import pytest
@@ -14,6 +16,7 @@ from kirabridge.bridge_core.config import Config, ReceiverConfig
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.platform_adapters.codex_host import CodexHost
+from kirabridge.team_manager.models import TeamCreate, TeamWorkComplete, TeamWorkCreate
 
 
 class PersistedCodex:
@@ -22,6 +25,7 @@ class PersistedCodex:
         self.history = history
         self.loaded = set(loaded)
         self.generation = generation
+        self.active = False
         self.calls = []
         self.inputs = []
         self.scrollback = []
@@ -40,7 +44,10 @@ class PersistedCodex:
             "attachedToThreadId": None,
             "ephemeral": False,
             "canAcceptDirectInput": True if loaded else None,
-            "status": {"type": "idle" if loaded else "notLoaded"},
+            "status": {
+                "type": ("active" if self.active else "idle") if loaded else "notLoaded",
+                "activeFlags": [],
+            },
         }
 
     async def call(self, method, params):
@@ -56,8 +63,11 @@ class PersistedCodex:
             return {"thread": self.thread(identifier)}
         past = self.turns()
         if method == "thread/turns/list":
+            if self.active:
+                past.append({"id": "active-user-turn", "status": "inProgress", "items": []})
             return {"data": list(reversed(past[-params["limit"] :]))}
         assert self.loaded == {ROOT, OTHER}
+        assert not self.active, "the active user turn must receive no input"
         assert method == "turn/start" and "expectedTurnId" not in params
         body = params["input"][0]["text"]
         self.inputs.append((params["clientUserMessageId"], body))
@@ -110,7 +120,7 @@ async def connected(config, host, monkeypatch):
                     await clients.connect(
                         Peer("codex", url=endpoint, token="codex-team-test-" + "x" * 40)
                     )
-                    yield clients
+                    yield clients, bridge
             finally:
                 server.should_exit = True
                 await asyncio.wait_for(serving, 8)
@@ -120,7 +130,9 @@ async def call(clients, who, tool, **params):
     result = await clients.call(who, tool, params)
     assert not result.isError, result.structuredContent
     content = result.structuredContent
-    assert not content.get("error") or (tool == "message_send" and "id" in content), content
+    assert not content.get("error") or (
+        tool in {"message_send", "team_work_get"} and "id" in content
+    ), content
     return result.structuredContent
 
 
@@ -141,6 +153,197 @@ def team_order(assignee, title, key):
         "body": title,
         "idempotency_key": key,
     }
+
+
+@pytest.fixture
+def followup_setup(config, tmp_path, monkeypatch):
+    root = configure_team(None, config, tmp_path, monkeypatch)
+    config.team.workers["codex"].execution_scope = "existing_native_codex_root"
+    config.team.coordinator_resume = True
+    config.team.concurrency = 1
+    config.visible_handoffs.native_codex = template(tmp_path)
+    config.principals["local"].token_env = "RESTART_TEST_LOCAL"
+    monkeypatch.setenv("RESTART_TEST_LOCAL", "local-" + "x" * 40)
+    return config, root, tmp_path / "codex-turns.json"
+
+
+def create_followup_team(bridge):
+    bridge.teams.create(
+        "local",
+        TeamCreate(
+            team_id="e2e",
+            name="Follow-ups",
+            coordinator="codex",
+            members={"local": "worker", "codex": "coordinator", "grok": "worker"},
+            idempotency_key="followup-team",
+        ),
+    )
+
+
+def enqueue_followup(bridge, *, key):
+    teams = bridge.teams
+    original = teams.delegate("codex", TeamWorkCreate(**team_order("local", "Original order", key)))
+    teams.work_complete(
+        "local",
+        TeamWorkComplete(
+            team_id="e2e",
+            work_id=original["id"],
+            success=True,
+            result="Completed delegated work",
+            idempotency_key="completed-" + key,
+        ),
+    )
+    assert teams.resume_coordinators() == 1
+    return dict(
+        bridge.store.db.execute(
+            "SELECT * FROM team_coordinator_resumes WHERE work_id=?", (original["id"],)
+        ).fetchone()
+    )
+
+
+async def followup_work(clients, work_id, state):
+    return await poll(
+        lambda: call(clients, "local", "team_work_get", team_id="e2e", work_id=work_id),
+        lambda work: work["state"] == state,
+    )
+
+
+async def test_busy_followup_survives_restart_and_submits_same_work_once(
+    followup_setup, monkeypatch
+):
+    config, root, history = followup_setup
+    first = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="busy-before-restart")
+    first.active = True
+    async with connected(config, first, monkeypatch) as (clients, bridge):
+        create_followup_team(bridge)
+        link = enqueue_followup(bridge, key="resume-busy")
+        identifier = link["resume_work_id"]
+        await poll(lambda: asyncio.sleep(0, result=first.calls), bool)
+        pending = await followup_work(clients, identifier, "queued")
+        assert pending["core_task_id"] is None and identifier in bridge.team_dispatcher._defer
+        assert [method for method, _ in first.calls] == ["thread/read"]
+        assert not first.inputs
+
+    second = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="busy-after-restart")
+    second.active = True
+    async with connected(config, second, monkeypatch) as (clients, bridge):
+        await poll(lambda: asyncio.sleep(0, result=second.calls), bool)
+        restored = await followup_work(clients, identifier, "queued")
+        assert restored["created"] == pending["created"] and restored["core_task_id"] is None
+        assert (
+            dict(bridge.store.db.execute("SELECT * FROM team_coordinator_resumes").fetchone())
+            == link
+        )
+        notice = bridge.store.db.execute(
+            "SELECT receipt,acknowledged FROM completion_notices WHERE id=?", (link["notice_id"],)
+        ).fetchone()
+        assert notice["receipt"] == "resume-" + identifier and notice["acknowledged"] is not None
+        assert not second.inputs
+        second.active = False
+        done = await followup_work(clients, identifier, "completed")
+        core_id = "team-" + identifier
+        assert done["id"] == identifier and done["core_task_id"] == core_id
+        expected_input = str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + core_id))
+        assert [message_id for message_id, _ in second.inputs] == [expected_input]
+        assert link["work_id"] in second.inputs[0][1]
+        core = bridge.store.get(core_id)
+        assert core["state"] == "completed" and core["attempt"] == 1 and core["receipt"]
+
+    third = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="after-completion")
+    async with connected(config, third, monkeypatch) as (clients, bridge):
+        await followup_work(clients, identifier, "completed")
+        assert (
+            bridge.store.db.execute("SELECT count(*) FROM team_coordinator_resumes").fetchone()[0]
+            == 1
+        )
+        assert not third.inputs
+
+
+@pytest.mark.parametrize("failure", ["wrong-session", "reoccupied"])
+async def test_unverified_or_reoccupied_followup_is_never_replayed(
+    followup_setup, monkeypatch, failure
+):
+    config, root, history = followup_setup
+    host = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation=failure)
+    original_thread = host.thread
+
+    def thread(identifier):
+        if failure == "reoccupied":
+            host.active = len(host.calls) > 1
+        else:
+            host.active = True
+        result = original_thread(identifier)
+        if failure == "wrong-session":
+            result["sessionId"] = OTHER
+        return result
+
+    host.thread = thread
+    async with connected(config, host, monkeypatch) as (clients, bridge):
+        create_followup_team(bridge)
+        link = enqueue_followup(bridge, key=failure)
+        identifier = link["resume_work_id"]
+        original = await followup_work(clients, identifier, "unknown")
+        expected_error = (
+            "native_codex_binding_changed"
+            if failure == "wrong-session"
+            else "native_codex_target_not_ready"
+        )
+        assert (
+            original["error"] == expected_error and original["core_task_id"] == "team-" + identifier
+        )
+        assert not host.inputs and identifier not in bridge.team_dispatcher._defer
+        assert {params["threadId"] for _, params in host.calls} == {ROOT}
+        core = bridge.store.get(original["core_task_id"])
+        assert core["state"] == "unknown" and core["receipt"] and core["attempt"] == 1
+
+    idle = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="verified-idle")
+    async with connected(config, idle, monkeypatch) as (clients, bridge):
+        observed = await followup_work(clients, identifier, "unknown")
+        assert (
+            observed == original
+            and bridge.store.get(original["core_task_id"])["receipt"] == core["receipt"]
+        )
+        assert not idle.calls and not idle.inputs
+
+
+async def test_busy_followups_leave_later_worker_work_visible_and_expire(
+    followup_setup, monkeypatch
+):
+    config, root, history = followup_setup
+    host = PersistedCodex(root, history, loaded={ROOT, OTHER}, generation="busy-queue")
+    host.active = True
+    original_call = host.call
+
+    async def slow_call(method, params):
+        await asyncio.sleep(0.02)
+        return await original_call(method, params)
+
+    host.call = slow_call
+    monkeypatch.setattr("kirabridge.team_manager.dispatcher._NATIVE_BUSY_RECHECK_SECONDS", 0.01)
+    async with connected(config, host, monkeypatch) as (clients, bridge):
+        create_followup_team(bridge)
+        busy = [
+            enqueue_followup(bridge, key=f"busy-{index}")["resume_work_id"] for index in range(16)
+        ]
+        ordinary = bridge.teams.delegate(
+            "local", TeamWorkCreate(**team_order("grok", "Ordinary worker order", "ordinary"))
+        )
+        expired = enqueue_followup(bridge, key="expired")["resume_work_id"]
+        with bridge.store.transaction():
+            bridge.store.db.execute(
+                "UPDATE team_work SET created=? WHERE id=?",
+                (time.time() - config.queue_stale_seconds - 1, expired),
+            )
+        done = await followup_work(clients, ordinary["id"], "completed")
+        assert done["result"] == "GROK_CHILD_DONE"
+        ended = await followup_work(clients, expired, "blocked")
+        assert ended["error"] == "stale_queue_expired" and ended["core_task_id"] is None
+        assert all(
+            bridge.teams.work_get("local", "e2e", identifier)["core_task_id"] is None
+            for identifier in busy
+        )
+        assert not host.inputs
+        assert all(method == "thread/read" for method, _ in host.calls)
 
 
 async def ping(clients, text, key):
@@ -204,7 +407,7 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
     first = PersistedCodex(
         str(native_cwd), history, loaded={ROOT, OTHER}, generation="before-restart"
     )
-    async with connected(config, first, monkeypatch) as clients:
+    async with connected(config, first, monkeypatch) as (clients, _):
         team = await call(
             clients,
             "local",
@@ -247,7 +450,7 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
     )
     restored = Config.model_validate_json(config_file.read_text())
     monkeypatch.setattr(CodexHost, "wait_reply", observe_reply)
-    async with connected(restored, second, monkeypatch) as clients:
+    async with connected(restored, second, monkeypatch) as (clients, _):
         team = await call(clients, "local", "team_get", team_id="e2e")
         assert team["coordinator"] == "codex" and team["revision"] == 1
         done = await call(clients, "local", "team_work_get", team_id="e2e", work_id=prior["id"])
@@ -325,7 +528,7 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
     )
     async with connected(
         Config.model_validate_json(config_file.read_text()), third, monkeypatch
-    ) as clients:
+    ) as (clients, _):
         persisted = await call(clients, "local", "message_get", message_id=sent["id"])
         assert persisted["processing"]["result"]["text"] == "PONG"
         persisted_failure = await call(clients, "local", "message_get", message_id=failed["id"])

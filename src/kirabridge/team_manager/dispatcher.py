@@ -105,6 +105,7 @@ def parse_team_turn(
 
 
 _CORE_TERMINAL = {"completed", "failed", "blocked", "unknown", "cancelled"}
+_NATIVE_BUSY_RECHECK_SECONDS = 2
 
 
 VISIBLE_PROMPT_CHARS = 15800
@@ -129,6 +130,7 @@ class TeamDispatcher:
         self.stopping = False
         self._active: set[str] = set()
         self._defer: dict[str, float] = {}
+        self._pending_after = 0
         self._ping_defer: dict[str, float] = {}
         self.codex_host = CodexHost()
 
@@ -163,14 +165,24 @@ class TeamDispatcher:
                 del self._defer[identifier]
         for existing, rows in (
             (True, self.teams.inflight(limit=32)),
-            (False, self.teams.pending(limit=16)),
+            (
+                False,
+                self.teams.pending(
+                    limit=16,
+                    excluded=tuple(self._active | self._defer.keys()),
+                    after=self._pending_after,
+                ),
+            ),
         ):
             for work in rows:
                 if not existing and not self.bridge.store.can_claim(work["created"]):
                     continue
                 if work["id"] not in self._active and self._defer.get(work["id"], 0) <= now:
+                    if not existing:
+                        self._pending_after = 0
                     self._active.add(work["id"])
                     return work, existing
+        self._pending_after = 0
         return None
 
     async def _loop(self):
@@ -517,6 +529,41 @@ class TeamDispatcher:
                 return None
             raise
 
+    async def _defer_active_native_resume(self, work, worker):
+        config = self.bridge.config
+        binding = config.visible_handoffs.native_codex
+        if (
+            binding is None
+            or worker.execution_scope != "existing_native_codex_root"
+            or worker.agent != "codex"
+            or work["created"] <= time.time() - config.queue_stale_seconds
+            or not self.bridge.store.db.execute(
+                "SELECT 1 FROM team_coordinator_resumes WHERE resume_work_id=?", (work["id"],)
+            ).fetchone()
+        ):
+            return False
+        binding = binding.model_copy(deep=True)
+        try:
+            self.teams._execution_allowed(work)
+            async with self.codex_host.connection(binding) as (rpc, _):
+                thread = await self.codex_host.read_bound_thread(rpc, binding)
+        except BridgeError:
+            return False  # The ordinary sealed path owns invalid or unverified targets.
+        status = thread.get("status")
+        if (
+            not isinstance(status, dict)
+            or status.get("type") != "active"
+            or config.visible_handoffs.native_codex != binding
+        ):
+            return False
+        # The persisted work and completion link survive restart without a core
+        # claim. Only the next metadata observation is delayed in memory.
+        self._defer[work["id"]] = time.monotonic() + _NATIVE_BUSY_RECHECK_SECONDS
+        # Keep scanning newer work even when earlier delays expire during a
+        # slow native probe. An ordinary selection returns to FIFO.
+        self._pending_after = work["seq"]
+        return True
+
     async def _run(self, work, *, existing):
         recipient = work["assignee"]
         worker = self.bridge.config.team.workers.get(recipient)
@@ -527,6 +574,8 @@ class TeamDispatcher:
                 "team_worker_unavailable",
                 {"automatic_worker": False},
             )
+            return
+        if not existing and await self._defer_active_native_resume(work, worker):
             return
         # The fixed recipient selects the authenticated identity. No action,
         # model output, or caller-controlled sender can select another token.
