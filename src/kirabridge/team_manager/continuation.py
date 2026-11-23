@@ -213,7 +213,7 @@ class TeamContinuation:
         summary = next((row for row in entries if row["id"] == source.entry_id), None)
         if (
             summary is None
-            or summary.get("entry_type") != "task"
+            or summary.get("entry_type") != source.entry_type
             or "whiteboard_edit" in summary["metadata"]
             or "whiteboard_edited" in summary["metadata"]
             or self._has_other_activity(entries, source)
@@ -235,7 +235,7 @@ class TeamContinuation:
         if (
             entry.get("id") != source.entry_id
             or entry.get("thread_id") != board_id
-            or entry.get("entry_type") != "task"
+            or entry.get("entry_type") != source.entry_type
             or entry.get("truncated") is True
             or not isinstance(content, str)
             or hashlib.sha256(content.encode("utf-8")).hexdigest() != source.content_sha256
@@ -296,6 +296,7 @@ class TeamContinuation:
 
     @staticmethod
     def _has_other_activity(entries, source):
+        relevant_types = {"task", "claimed", "progress", "result", "problem", source.entry_type}
         for entry in entries:
             if entry["id"] == source.entry_id:
                 continue
@@ -308,7 +309,7 @@ class TeamContinuation:
                 correction.get("previous_entry_id"),
             ):
                 return True
-            if entry.get("entry_type") in {"task", "claimed", "progress", "result", "problem"}:
+            if entry.get("entry_type") in relevant_types:
                 if (
                     entry.get("task_id") == source.task_id
                     or entry.get("handoff_id") == source.entry_id
@@ -432,6 +433,8 @@ class TeamContinuation:
             "workspace_id": policy.workspace_id,
             "board_id": self.board(policy, source),
             "entry_id": source.entry_id,
+            # Legacy task proofs omitted the entry type. Keep their hashes stable.
+            **({"entry_type": source.entry_type} if source.entry_type != "task" else {}),
             "task_id": source.task_id,
             "source_sha256": source.content_sha256,
             "assignee": source.assignee,

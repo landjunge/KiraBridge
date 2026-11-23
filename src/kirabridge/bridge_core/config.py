@@ -128,6 +128,7 @@ class TeamWorkerConfig(BaseModel):
 class TeamContinuationSource(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     board_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    entry_type: Literal["task", "decision"] = "task"
     entry_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
     task_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
     content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")

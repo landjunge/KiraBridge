@@ -50,7 +50,7 @@ entries=[]
 for row in json.load(sys.stdin):
     board_id=boards[row["board"]]
     result=svc.append_whiteboard(board_id,actor="Fixture",actor_type="human",
-                                 entry_type="task",content=row["content"])
+                                 entry_type=row["entry_type"],content=row["content"])
     entry_id=result["entry"]["id"]
     if row["historical"]:
         owner.edit(board_id,entry_id=entry_id,content="Current replacement")
@@ -60,7 +60,9 @@ print(json.dumps({"workspace_id":CommandApplication(svc).workspace_id,
 """
 
 
-def card(task_id, *, board="allowed", state="READY", historical=False, assignee="grok"):
+def card(
+    task_id, *, board="allowed", state="READY", historical=False, assignee="grok", entry_type="task"
+):
     content = json.dumps(
         {
             "schema": "kirabridge-team-ready.v1",
@@ -78,6 +80,7 @@ def card(task_id, *, board="allowed", state="READY", historical=False, assignee=
         "task_id": task_id,
         "historical": historical,
         "assignee": assignee,
+        "entry_type": entry_type,
     }
 
 
@@ -265,7 +268,7 @@ async def test_acceptance_fixture_uses_a_real_managed_coordinator_binding(
     assert verify(bridge.store)["valid"]
 
 
-def authorize_sources(bridge, fixture, cards, indices, root, *, mismatched=()):
+def authorize_sources(bridge, fixture, cards, indices, root, *, mismatched=(), decision_pins=()):
     from kirabridge.bridge_core.config import TeamContinuationConfig, TeamContinuationSource
 
     sources = []
@@ -281,6 +284,7 @@ def authorize_sources(bridge, fixture, cards, indices, root, *, mismatched=()):
                 content_sha256=hashlib.sha256(content.encode()).hexdigest(),
                 assignee=value["assignee"],
                 cwd=str(root),
+                **({"entry_type": "decision"} if index in decision_pins else {}),
             )
         )
     bridge.config.team.continuation = TeamContinuationConfig(
@@ -320,12 +324,16 @@ async def test_continuation_parallel_selection_restart_and_exactly_one_acknowled
 ):
     bridge, endpoint = http_bridge
     root = configure_workers(bridge, config, tmp_path, monkeypatch)
-    cards = [card("first"), card("not-authorized", board="foreign"), card("next", board="foreign")]
+    cards = [
+        card("first"),
+        card("not-authorized", board="foreign", entry_type="decision"),
+        card("next", board="foreign", entry_type="decision"),
+    ]
     owner_root, fixture = owner_workspace(cards)
     before = board_bytes(owner_root)
     async with MCPClientPool() as clients:
         await create_bound_coordinator(bridge, clients, endpoint)
-        authorize_sources(bridge, fixture, cards, (0, 2), root)
+        authorize_sources(bridge, fixture, cards, (0, 2), root, decision_pins=(2,))
         # Both triggers can read the peer, but only one Work can be committed.
         contender = Bridge(config)
         try:
@@ -372,6 +380,13 @@ async def test_continuation_parallel_selection_restart_and_exactly_one_acknowled
             first["id"],
             second["id"],
         ]
+        for row, expected_type in [(first, None), (second, "decision")]:
+            proof = next(
+                event["metadata"]
+                for event in bridge.teams.events("local", TEAM, limit=100)["events"]
+                if event["kind"] == "team.continuation_selected" and event["object_id"] == row["id"]
+            )
+            assert proof.get("entry_type") == expected_type
     invocations = inspect_invocations(root)
     assert [turn["subject"] for turn in invocations if turn["principal"] == "grok"] == [
         "Fixture first",
@@ -381,7 +396,13 @@ async def test_continuation_parallel_selection_restart_and_exactly_one_acknowled
     assert verify(bridge.store)["valid"]
 
 
-@pytest.mark.parametrize("scenario", ["empty", "unapproved", "changed_hash", "historical", "hold"])
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "empty", "unapproved", "changed_hash", "historical", "hold", "decision_default",
+        "decision_historical", "decision_changed_hash", "decision_wrong_type",
+    ],
+)
 async def test_continuation_without_a_current_authorized_source_creates_no_agent_work(
     http_bridge,
     config,
@@ -392,11 +413,18 @@ async def test_continuation_without_a_current_authorized_source_creates_no_agent
 ):
     bridge, endpoint = http_bridge
     root = configure_workers(bridge, config, tmp_path, monkeypatch)
+    decision_types = {
+        "decision_default": "decision",
+        "decision_historical": "decision",
+        "decision_changed_hash": "decision",
+        "decision_wrong_type": "note",
+    }
     cards = [
         card(
             "candidate",
-            historical=scenario == "historical",
+            historical=scenario in {"historical", "decision_historical"},
             state="HOLD" if scenario == "hold" else "READY",
+            entry_type=decision_types.get(scenario, "task"),
         )
     ]
     if scenario == "empty":
@@ -412,6 +440,7 @@ async def test_continuation_without_a_current_authorized_source_creates_no_agent
     else:
         owner_root, fixture = owner_workspace(cards)
     before = board_bytes(owner_root)
+    pinned_decision = scenario in decision_types and scenario != "decision_default"
     async with MCPClientPool() as clients:
         await create_bound_coordinator(bridge, clients, endpoint)
         authorize_sources(
@@ -420,7 +449,8 @@ async def test_continuation_without_a_current_authorized_source_creates_no_agent
             cards,
             (0,),
             root,
-            mismatched=(0,) if scenario == "changed_hash" else (),
+            mismatched=(0,) if scenario in {"changed_hash", "decision_changed_hash"} else (),
+            decision_pins=(0,) if pinned_decision else (),
         )
         await bridge.team_dispatcher.continuation.select()
         assert not selected(await list_work(clients))
@@ -437,7 +467,11 @@ async def test_continuation_does_not_advance_past_an_active_or_unknown_work(
 ):
     bridge, endpoint = http_bridge
     root = configure_workers(bridge, config, tmp_path, monkeypatch)
-    cards = [card("interrupted"), card("would-be-next")]
+    cards = [
+        card("interrupted"),
+        card("would-be-next"),
+        card("interrupted", board="foreign", entry_type="decision"),
+    ]
     owner_root, fixture = owner_workspace(cards)
     before = board_bytes(owner_root)
     async with MCPClientPool() as clients:
@@ -458,6 +492,8 @@ async def test_continuation_does_not_advance_past_an_active_or_unknown_work(
             ),
         )
         await bridge.team_dispatcher.stop()
+        # A new decision pin for the same logical task cannot replay the old claim.
+        authorize_sources(bridge, fixture, cards, (2, 1), root, decision_pins=(2,))
         await bridge.team_dispatcher.continuation.select()
         final = await list_work(clients)
         (original,) = selected(final)
