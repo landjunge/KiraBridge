@@ -198,10 +198,7 @@ class TeamDispatcher:
                 self.teams.resume_coordinators()
             except (BridgeError, sqlite3.Error):
                 pass  # notices stay pending and are retried on the next pass
-            try:
-                self.teams.publish_chatgpt_status()
-            except (BridgeError, sqlite3.Error):
-                pass  # The original status evidence survives a failed publish.
+            self._publish_chatgpt_status()
             selected = self._next()
             if selected is None and self.continuation is not None:
                 try:
@@ -242,6 +239,12 @@ class TeamDispatcher:
                     )
             finally:
                 self._active.discard(work["id"])
+
+    def _publish_chatgpt_status(self):
+        try:
+            self.teams.publish_chatgpt_status()
+        except (BridgeError, sqlite3.Error):
+            pass  # The original status evidence survives a failed publish.
 
     async def _ping_loop(self):
         """Keep native addressed pings independent from slow team-work turns."""
@@ -754,6 +757,7 @@ class TeamDispatcher:
 
     async def _observe(self, pool, work, core, timeout):
         deadline = time.monotonic() + timeout + 30
+        next_status_drain = 0.0
         while True:
             shared = self.teams.bind_task(work["id"], core)
             if shared["state"] in _CORE_TERMINAL:
@@ -765,7 +769,13 @@ class TeamDispatcher:
                 return
             if core["state"] in _CORE_TERMINAL:
                 return
-            if time.monotonic() >= deadline:
+            now = time.monotonic()
+            if now >= next_status_drain:
+                # A single dispatcher worker can be occupied here for the
+                # entire turn. Publish observed milestones while it is active.
+                self._publish_chatgpt_status()
+                next_status_drain = now + 1
+            if now >= deadline:
                 # Observation is bounded; the persisted original remains queued
                 # or active and a later receiver only reads that same task.
                 self._defer[work["id"]] = time.monotonic() + 2

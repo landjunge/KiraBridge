@@ -115,6 +115,31 @@ def test_historical_event_and_core_claim_without_start_are_silent(domain):
     assert "nachweisbar gestartet" in inbox(domain)[0]["body"]
 
 
+async def test_dispatcher_publishes_status_during_long_running_turn(domain, monkeypatch):
+    role(domain, "codex", "coordinator")
+    pending = domain.delegate("local", work(assignee="codex"))
+    claimed = domain.claim(pending["id"])
+    observed = core(
+        domain,
+        claimed,
+        state="running",
+        receipt="started-receipt",
+        evidence={"event": "turn.started", "session_id": "codex-session"},
+    )
+    dispatcher = domain.bridge.team_dispatcher
+
+    async def poll(_pool, task_id):
+        assert task_id == claimed["core_task_id"]
+        assert domain._work(claimed["id"])["state"] == "running"
+        (started,) = inbox(domain)
+        assert "nachweisbar gestartet" in started["body"]
+        return {**observed, "state": "failed"}
+
+    monkeypatch.setattr(dispatcher, "_task", poll)
+    await dispatcher._observe(None, claimed, observed, 1)
+    assert domain._work(claimed["id"])["state"] == "failed"
+
+
 async def test_only_verified_review_claims_factual_success_and_links_followup(domain, monkeypatch):
     setup_team(domain, coordinator="codex")
     record(domain, "codex")
