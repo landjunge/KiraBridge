@@ -19,6 +19,7 @@ from kirabridge.keyboard_system import KeyboardSystemKeyInput
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
 from kirabridge.team_manager.models import (
+    TeamCoordinatorHandoff,
     TeamCreate,
     TeamMessageSend,
     TeamOnboardRegister,
@@ -1640,6 +1641,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.teams.get(identity(ctx), team_id))
 
     @server.tool(annotations=read)
+    def team_coordinator_status(team_id: str, ctx: Context) -> dict[str, Any]:
+        """Read the team coordinator, authorized session candidates and any pending handoff."""
+        return safe(lambda: bridge.teams.coordinator_status(identity(ctx), team_id))
+
+    @server.tool(annotations=write)
+    def team_coordinator_handoff(request: TeamCoordinatorHandoff, ctx: Context) -> dict[str, Any]:
+        """Offer a proven session the coordinator role, effective only after acceptance."""
+        return safe(lambda: bridge.teams.request_coordinator_handoff(identity(ctx), request))
+
+    @server.tool(annotations=read)
     def team_context(team_id: str, ctx: Context) -> dict[str, Any]:
         """Bounded current team context, recent results and this member's pending messages."""
         return safe(lambda: bridge.teams.context(identity(ctx), team_id))
@@ -1670,7 +1681,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
-        """Send addressed team data; sender is authenticated, never supplied.
+        """Send to a named member or to recipient 'coordinator'; sender comes from authentication.
 
         Kira and Eve need no special approval marker; normal team permissions apply.
         Historical buffers never release automatically.

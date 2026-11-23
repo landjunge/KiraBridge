@@ -470,7 +470,7 @@ class TeamDispatcher:
             (message_id, team_id),
         ).fetchone()
         queued = self.bridge.store.db.execute(
-            "SELECT 1 FROM team_events WHERE team_id=? AND object_id=? "
+            "SELECT metadata FROM team_events WHERE team_id=? AND object_id=? "
             "AND kind='team.message_native_ping_queued' LIMIT 1",
             (team_id, message_id),
         ).fetchone()
@@ -489,6 +489,12 @@ class TeamDispatcher:
             or held is not None
         ):
             raise BridgeError("native_codex_scope_changed", "Team message scope changed")
+        expected = json.loads(queued["metadata"]).get("coordinator_binding_sha256")
+        if expected is not None and (
+            digest(self.teams.coordinator_roles.binding(team_id)) != expected
+            or not self.teams.coordinator_roles.native_ping_matches(team_id)
+        ):
+            raise BridgeError("native_codex_scope_changed", "Coordinator session changed")
         outcomes = self.bridge.store.db.execute(
             "SELECT kind,metadata FROM team_events WHERE team_id=? AND object_id=? AND kind IN ("
             "'team.message_native_ping_submitting','team.message_native_ping_idle_pending',"
@@ -616,6 +622,24 @@ class TeamDispatcher:
             return
         if not existing and await self._defer_active_native_resume(work, worker):
             return
+        linked = self.teams.coordinator_roles.linked_work(work["id"])
+        if (
+            not existing
+            and linked
+            and work["created"] > (time.time() - self.bridge.config.queue_stale_seconds)
+        ):
+            slot = self.teams.coordinator_roles.check_work(work, linked)
+            if slot["state"] != "idle":
+                self._defer[work["id"]] = time.monotonic() + _NATIVE_BUSY_RECHECK_SECONDS
+                return
+            if worker.execution_scope == "existing_native_codex_root":
+                binding = self.bridge.config.visible_handoffs.native_codex
+                async with self.codex_host.connection(binding) as (rpc, _):
+                    thread = await self.codex_host.read_bound_thread(rpc, binding)
+                status = thread.get("status")
+                if isinstance(status, dict) and status.get("type") == "active":
+                    self._defer[work["id"]] = time.monotonic() + _NATIVE_BUSY_RECHECK_SECONDS
+                    return
         # The fixed recipient selects the authenticated identity. No action,
         # model output, or caller-controlled sender can select another token.
         # Submission may inline-observe for MAX_WAIT_SECONDS; leave transport headroom.
@@ -730,6 +754,9 @@ class TeamDispatcher:
                 return
 
     async def _prompt(self, pool, work):
+        linked = self.teams.coordinator_roles.linked_work(work["id"])
+        if linked:
+            return self.teams.coordinator_roles.prompt(work, linked)
         snapshot = await self._call(pool, "team_context", {"team_id": work["team_id"]})
         team = snapshot["team"]
         context = []
@@ -815,6 +842,7 @@ class TeamDispatcher:
                 '{"type":"task","assignee":"member","title":"title","body":"request"}]}. '
                 f"At most {self.bridge.config.team.max_actions_per_turn} actions. "
                 "Optional message reply_to must refer to an existing team message. "
+                "Address the coordinator role with message recipient 'coordinator'. "
                 "Use only message or task actions; never sender, role, shell, command, "
                 "or parent fields. "
                 "Message actions deliver to an inbox without starting a model. "
@@ -875,6 +903,16 @@ class TeamDispatcher:
         limits = self.bridge.config.team
         result = core.get("result") or {}
         text = result.get("text", result.get("final_message", ""))
+        linked = self.teams.coordinator_roles.linked_work(work["id"])
+        if linked:
+            if result.get("success", True) is True and isinstance(text, str):
+                bounded = text.encode()[: limits.max_result_bytes].decode("utf-8", "ignore")
+                self.teams.finish(work["id"], bounded, {"model_turn_completed": True})
+            else:
+                self.teams.fail(
+                    work["id"], "failed", "team_coordinator_unconfirmed", {"actions_applied": 0}
+                )
+            return
         core_result_hash = None
         if isinstance(text, str):
             try:

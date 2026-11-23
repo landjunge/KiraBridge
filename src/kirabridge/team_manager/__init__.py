@@ -14,6 +14,8 @@ from pathlib import Path
 
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TaskRequest, canonical, digest
 from kirabridge.permissions import automatic_for
+from kirabridge.team_manager.coordinator_roles import SCHEMA as COORDINATOR_SCHEMA
+from kirabridge.team_manager.coordinator_roles import CoordinatorRoles
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
@@ -162,6 +164,7 @@ def _native_evidence(value):
         "session_id",
         "thread_id",
         "sessionId",
+        "model",
         "stop_reason",
         "pid",
         "exit_code",
@@ -206,7 +209,7 @@ class TeamManager:
         self.wake = asyncio.Event()
         self.on_change = None
         with self.store.transaction():
-            for statement in SCHEMA.split(";"):
+            for statement in (SCHEMA + COORDINATOR_SCHEMA).split(";"):
                 if statement.strip():
                     self.store.db.execute(statement)
             columns = {row["name"] for row in self.store.db.execute("PRAGMA table_info(team_work)")}
@@ -233,6 +236,7 @@ class TeamManager:
             }
             if "session_generation" not in work_columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN session_generation INTEGER")
+        self.coordinator_roles = CoordinatorRoles(self)
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -328,6 +332,7 @@ class TeamManager:
         result = dict(
             self.store.db.execute("SELECT * FROM teams WHERE id=?", (team_id,)).fetchone()
         )
+        result["coordinator"] = result["coordinator"] or None
         result["api_version"] = "1"
         result["members"] = {
             row["principal"]: {
@@ -402,6 +407,12 @@ class TeamManager:
         if row is not None and row["state"] == "cleared":
             row = None
         return {"session": self._session_view(row)}
+
+    def coordinator_status(self, principal, team_id):
+        return self.coordinator_roles.status(principal, team_id)
+
+    def request_coordinator_handoff(self, principal, request):
+        return self.coordinator_roles.request_handoff(principal, request)
 
     def clear_session(self, principal, request: TeamSessionClear):
         self._automatic(principal)
@@ -651,6 +662,15 @@ class TeamManager:
             if core and isinstance(core.get("args", {}).get("cwd"), str):
                 cwd = core["args"]["cwd"]
         provider_binding = self._qwen_profile(worker.agent, worker) if adapter == "qwen_acp" else {}
+        if worker.execution_scope == "existing_native_codex_root":
+            native_binding = self.config.visible_handoffs.native_codex
+            if (
+                native_binding is None
+                or session_id != native_binding.session_id
+                or native.get("thread_id") != native_binding.thread_id
+            ):
+                return
+            provider_binding = self.coordinator_roles._native_scope(native_binding)
         now = time.time()
         self.store.db.execute(
             "INSERT INTO team_sessions(team_id,principal,agent,adapter,session_id,cwd,state,"
@@ -692,6 +712,7 @@ class TeamManager:
                 session_id_sha256=digest(session_id),
                 session_resumed=bool(work.get("resume_session")),
             )
+        self.coordinator_roles.observe_session(work["team_id"], work["assignee"])
 
     def create(self, principal, request: TeamCreate):
         self._automatic(principal, "team.manage")
@@ -706,14 +727,15 @@ class TeamManager:
             raise BridgeError(
                 "team_member_denied", "Members must belong to the operator participation roster"
             )
-        if request.coordinator not in members:
+        if request.coordinator is not None and request.coordinator not in members:
             raise BridgeError("team_role_denied", "The coordinator must be a team member")
         if any(
             role == "coordinator" and member != request.coordinator
             for member, role in members.items()
         ):
             raise BridgeError("team_role_denied", "Select exactly one coordinator")
-        members[request.coordinator] = "coordinator"
+        if request.coordinator is not None:
+            members[request.coordinator] = "coordinator"
         self._size(request.name, 256)
         with self.store.transaction():
             prior = self._previous(principal, request.team_id, "create", request)
@@ -731,7 +753,7 @@ class TeamManager:
                 raise BridgeError("team_store_full", "The team archive is full")
             self.store.db.execute(
                 "INSERT INTO teams VALUES(?,?,?,?,1,?)",
-                (request.team_id, request.name, principal, request.coordinator, time.time()),
+                (request.team_id, request.name, principal, request.coordinator or "", time.time()),
             )
             self.store.db.executemany(
                 "INSERT INTO team_members VALUES(?,?,?,1)",
@@ -916,6 +938,15 @@ class TeamManager:
                 )
             if request.role == "coordinator" and not request.active:
                 raise BridgeError("team_coordinator_required", "The coordinator must be active")
+            if (
+                request.role == "coordinator"
+                and request.member != team["coordinator"]
+                and self.coordinator_roles.lifecycle_enabled(request.team_id, team)
+            ):
+                raise BridgeError(
+                    "team_coordinator_handoff_required",
+                    "Coordinator changes require a confirmed session handoff",
+                )
             exists = self.store.db.execute(
                 "SELECT 1 FROM team_members WHERE team_id=? AND principal=?",
                 (request.team_id, request.member),
@@ -969,7 +1000,8 @@ class TeamManager:
         from kirabridge.voice_channel import VOICE_PRINCIPALS
 
         self._team(principal, request.team_id, "team.write", write=True)
-        self._member(request.team_id, request.recipient, writable=True)
+        if request.recipient != "coordinator":
+            self._member(request.team_id, request.recipient, writable=True)
         if {principal, request.recipient} == VOICE_PRINCIPALS:
             return self.bridge.messages.send(
                 principal,
@@ -995,8 +1027,18 @@ class TeamManager:
         self._size(request.body, self.config.team.max_body_bytes)
         native_ping_enrolled = False
         with self.store.transaction():
-            self._team(principal, request.team_id, "team.write", write=True)
-            self._member(request.team_id, request.recipient, writable=True)
+            team = self._team(principal, request.team_id, "team.write", write=True)
+            addressed_role = request.recipient == "coordinator"
+            if addressed_role:
+                prior = self._previous(principal, request.team_id, "message", request)
+                if prior and not validate_only:
+                    return self._message(request.team_id, prior)
+            recipient = team["coordinator"] if addressed_role else request.recipient
+            if not recipient:
+                raise BridgeError(
+                    "team_coordinator_unassigned", "No coordinator session has started"
+                )
+            self._member(request.team_id, recipient, writable=True)
             if validate_only:
                 return None
             prior = self._previous(principal, request.team_id, "message", request)
@@ -1004,7 +1046,7 @@ class TeamManager:
                 return self._message(request.team_id, prior)
             if request.reply_to:
                 parent = self._message(request.team_id, request.reply_to)
-                if parent["recipient"] != principal or parent["sender"] != request.recipient:
+                if parent["recipient"] != principal or parent["sender"] != recipient:
                     raise BridgeError("reply_conflict", "Reply must reverse the addressed message")
             notes = []
             if (
@@ -1016,7 +1058,7 @@ class TeamManager:
                 "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                 "h.queue_id='team-messages' AND h.item_id=team_messages.id)",
-                (request.recipient,),
+                (recipient,),
             ).fetchone()[0]
             if count >= self.config.team.max_pending_per_member:
                 notes.append("message_queue_full")
@@ -1028,7 +1070,7 @@ class TeamManager:
                     message_id,
                     request.team_id,
                     principal,
-                    request.recipient,
+                    recipient,
                     request.kind,
                     request.body,
                     request.reply_to,
@@ -1041,18 +1083,24 @@ class TeamManager:
                 principal,
                 "team.message_queued",
                 message_id,
-                recipient=request.recipient,
+                recipient=recipient,
+                **({"recipient_role": "coordinator"} if addressed_role else {}),
                 content_sha256=digest(request.body),
                 **({"limit_notes": notes} if notes else {}),
             )
-            team = self.store.db.execute(
-                "SELECT coordinator FROM teams WHERE id=?", (request.team_id,)
-            ).fetchone()
+            binding = self.coordinator_roles.binding(request.team_id)
+            native_binding = self.config.visible_handoffs.native_codex
             if (
-                request.recipient == "codex"
-                and team is not None
+                recipient == "codex"
                 and team["coordinator"] == "codex"
-                and self.config.visible_handoffs.native_codex is not None
+                and native_binding is not None
+                and (
+                    binding is None
+                    or (
+                        binding["session_id"] == native_binding.session_id
+                        and self.coordinator_roles.native_ping_matches(request.team_id)
+                    )
+                )
             ):
                 # This durable marker enrolls only this newly-created, explicitly
                 # addressed message. Replays return above and cannot enqueue a
@@ -1063,8 +1111,13 @@ class TeamManager:
                     "team.message_native_ping_queued",
                     message_id,
                     recipient="codex",
+                    **({"coordinator_binding_sha256": digest(binding)} if binding else {}),
                 )
                 native_ping_enrolled = True
+            elif addressed_role and request.kind in {"question", "work", "note"}:
+                self.coordinator_roles.queue_notification(
+                    principal, message_id, request.team_id, recipient
+                )
         if native_ping_enrolled:
             self.bridge.team_dispatcher.wake_native_ping()
         self.wake.set()
@@ -1707,6 +1760,9 @@ class TeamManager:
                 return None
             try:
                 self._execution_allowed(work)
+                linked = self.coordinator_roles.linked_work(work_id)
+                if linked and self.coordinator_roles.check_work(work, linked)["state"] != "idle":
+                    return None
             except BridgeError as exc:
                 self._fail(work, "blocked", exc.code, {"reason": "execution_not_authorized"})
                 return None
@@ -1720,7 +1776,11 @@ class TeamManager:
                     "team.limit_noted", work["assignee"], None, {"limit": "hourly_turn_limit"}
                 )
             core_id = "team-" + work["id"]
-            resume_session = self.resume_session(work)
+            try:
+                resume_session = self.resume_session(work)
+            except BridgeError as exc:
+                self._fail(work, "blocked", exc.code, {"reason": "session_not_available"})
+                return None
             generation = self._generation(work["team_id"], work["assignee"])
             self.store.db.execute(
                 "UPDATE team_work SET state='dispatching',core_task_id=?,claimed=?,"
@@ -1876,6 +1936,9 @@ class TeamManager:
                 "team_task_conflict", "Linked task does not match the fixed worker scope"
             )
         resume_session = args.get("resume_session")
+        linked = self.coordinator_roles.linked_work(work["id"])
+        if linked:
+            self.coordinator_roles.check_work(work, linked, claimed=True)
         if resume_session is not None:
             stored = self._session_row(work["team_id"], work["assignee"])
             if (
@@ -1965,10 +2028,20 @@ class TeamManager:
                 native = core_task.get("result") or {}
                 if isinstance(native, dict):
                     result = native.get("text", native.get("final_message", ""))
-                    if native.get("success") is True and isinstance(result, str):
+                    if native.get("success", True) is True and isinstance(result, str):
                         evidence["core_result_sha256"] = hashlib.sha256(
                             result.encode("utf-8")
                         ).hexdigest()
+                    if (
+                        native.get("reply_source") == "native_codex_app_server"
+                        and self.config.team.workers[work["assignee"]].execution_scope
+                        == "existing_native_codex_root"
+                    ):
+                        evidence["native_evidence"].update(
+                            _native_evidence(
+                                {key: native.get(key) for key in ("session_id", "thread_id")}
+                            )
+                        )
                 result = _bounded_text(result, self.config.team.max_result_bytes)
             error = None
             if isinstance(core_task.get("error"), dict):
@@ -2010,6 +2083,7 @@ class TeamManager:
                     core_task_id=core_task["id"],
                     evidence_sha256=digest(evidence),
                 )
+            self.coordinator_roles.record_observation(work, worker, evidence["native_evidence"])
             self.record_session({**work, "state": shared_state}, evidence["native_evidence"])
         return self._work(work_id)
 
@@ -2032,6 +2106,11 @@ class TeamManager:
             ):
                 sanitized["core_result_sha256"] = core_result_hash
             self._size(canonical(sanitized), self.config.team.max_result_bytes)
+            linked = self.coordinator_roles.linked_work(work_id)
+            if linked and linked["purpose"] == "handoff":
+                self.coordinator_roles.finish_handoff(work, linked, result)
+            elif linked:
+                self.coordinator_roles.finish_notification(work, linked, result)
             self.store.db.execute(
                 "UPDATE team_work SET state='completed',result=?,evidence=?,finished=? WHERE id=?",
                 (result, canonical(sanitized), time.time(), work_id),
@@ -2088,6 +2167,8 @@ class TeamManager:
         if not self.config.team.coordinator_resume:
             return
         work = self._work(work_id)
+        if self.coordinator_roles.linked_work(work_id):
+            return
         if work["assigned_by"] == work["assignee"]:
             return
         operation = self.store.db.execute(
