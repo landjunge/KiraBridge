@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS team_events (
  object_id TEXT, metadata TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS team_chatgpt_status_events ON team_events(team_id,seq)
- WHERE json_extract(metadata,'$.chatgpt_status_key') IS NOT NULL;
+ WHERE (CASE WHEN json_valid(metadata) THEN json_extract(metadata,'$.chatgpt_status_key') END)
+ IS NOT NULL;
 CREATE INDEX IF NOT EXISTS team_native_ping_queue ON team_events(seq,team_id,object_id)
  WHERE kind='team.message_native_ping_queued';
 CREATE INDEX IF NOT EXISTS team_native_ping_outcomes ON team_events(team_id,object_id,kind)

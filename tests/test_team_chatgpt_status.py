@@ -115,6 +115,24 @@ def test_historical_event_and_core_claim_without_start_are_silent(domain):
     assert "nachweisbar gestartet" in inbox(domain)[0]["body"]
 
 
+def test_preexisting_malformed_event_does_not_block_startup_or_pending_report(domain):
+    role(domain, "codex", "coordinator")
+    historic = manual_completed(domain, "historic-malformed")
+    domain.store.db.execute("DROP INDEX team_chatgpt_status_events")
+    domain.store.db.execute(
+        "UPDATE team_events SET metadata='{' WHERE object_id=?",
+        (historic,),
+    )
+    current = manual_completed(domain, "pending-after-malformed")
+    reopened = Bridge(domain.config)
+    try:
+        assert reopened.teams.publish_chatgpt_status() == 1
+        assert current in inbox(reopened.teams)[0]["body"]
+        assert reopened.teams.publish_chatgpt_status() == 0
+    finally:
+        reopened.store.close()
+
+
 async def test_dispatcher_publishes_status_during_long_running_turn(domain, monkeypatch):
     role(domain, "codex", "coordinator")
     pending = domain.delegate("local", work(assignee="codex"))

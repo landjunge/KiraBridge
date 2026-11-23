@@ -14,6 +14,9 @@ RECIPIENT = "chatgpt"
 END_STATES = {"completed", "failed", "unknown", "blocked", "cancelled"}
 START_EVENTS = {"turn.started", "assistant_message", "prompt_response_observed"}
 WORK_ID = re.compile(r"tw-[a-f0-9]{32}")
+SOURCE_KEY = (
+    "(CASE WHEN json_valid(e.metadata) THEN json_extract(e.metadata,'$.chatgpt_status_key') END)"
+)
 
 
 class ChatGPTTeamStatus:
@@ -120,7 +123,7 @@ class ChatGPTTeamStatus:
         row = self.db.execute(
             "SELECT json_extract(metadata,'$.predecessor_work_id') AS predecessor "
             "FROM team_events WHERE team_id=? AND object_id=? "
-            "AND kind='team.continuation_selected' "
+            "AND kind='team.continuation_selected' AND json_valid(metadata) "
             "ORDER BY seq DESC LIMIT 1",
             (work["team_id"], work["id"]),
         ).fetchone()
@@ -130,11 +133,13 @@ class ChatGPTTeamStatus:
         row = self.db.execute(
             "SELECT w.id,w.state,EXISTS (SELECT 1 FROM team_events s "
             "WHERE s.team_id=w.team_id AND s.object_id=w.id "
-            "AND json_extract(s.metadata,'$.chatgpt_status')='started') AS start_proven "
+            "AND CASE WHEN json_valid(s.metadata) "
+            "THEN json_extract(s.metadata,'$.chatgpt_status') END='started') AS start_proven "
             "FROM team_work w WHERE w.team_id=? AND (w.parent_id=? OR EXISTS ("
             "SELECT 1 FROM team_events e WHERE e.team_id=w.team_id AND e.object_id=w.id "
             "AND e.kind='team.continuation_selected' "
-            "AND json_extract(e.metadata,'$.predecessor_work_id')=?)) "
+            "AND CASE WHEN json_valid(e.metadata) "
+            "THEN json_extract(e.metadata,'$.predecessor_work_id') END=?)) "
             "AND w.state IN ('queued','queued_manual','accepted','accepted_manual','running') "
             "ORDER BY w.seq LIMIT 1",
             (work["team_id"], work["id"], work["id"]),
@@ -251,10 +256,10 @@ class ChatGPTTeamStatus:
             return 0
         marks = ",".join("?" for _ in teams)
         candidates = self.db.execute(
-            "SELECT e.* FROM team_events e WHERE e.team_id IN (" + marks + ") "
-            "AND json_extract(e.metadata,'$.chatgpt_status_key') IS NOT NULL "
+            f"SELECT e.* FROM team_events e WHERE e.team_id IN ({marks}) "
+            f"AND {SOURCE_KEY} IS NOT NULL "
             "AND NOT EXISTS (SELECT 1 FROM team_operations o WHERE o.team_id=e.team_id "
-            "AND o.operation=? AND o.idem=json_extract(e.metadata,'$.chatgpt_status_key')) "
+            f"AND o.operation=? AND o.idem={SOURCE_KEY}) "
             "ORDER BY e.seq LIMIT ?",
             (*teams, OPERATION, limit),
         ).fetchall()
