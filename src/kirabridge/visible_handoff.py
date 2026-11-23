@@ -8,7 +8,7 @@ import time
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
-from kirabridge.process_lifecycle import fresh_generations, same_generation
+from kirabridge.process_lifecycle import fresh_generations, same_generation, valid_generation
 from kirabridge.session_manager import SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
@@ -38,9 +38,14 @@ def peer_route_status(bridge, config, peer):
         return {**base, "kind": "no_visible_binding", "state": "not_applicable"}
     presence = bridge.visible_handoffs.presence(peer)
     state, observed = presence["state"], presence.get("observed_at")
-    age = max(0.0, time.time() - observed) if isinstance(observed, (int, float)) else None
-    if state in {"available", "replaced"} and (age is None or age > PRESENCE_FRESH_SECONDS):
+    age = time.time() - observed if isinstance(observed, (int, float)) else None
+    # A negative age means the wall clock stepped back; it is never "fresh".
+    if state in {"available", "replaced", "rehomed"} and (
+        age is None or age < -5.0 or age > PRESENCE_FRESH_SECONDS
+    ):
         state = "observation_aged"
+    if age is not None:
+        age = max(0.0, age)
     evidence = presence.get("evidence") or {}
     return {
         **base,
@@ -249,6 +254,7 @@ class VisibleHandoffs:
                 "pane_id TEXT NOT NULL,expected_pid INTEGER NOT NULL,"
                 "agent_pid INTEGER NOT NULL,target TEXT NOT NULL,"
                 "generations TEXT NOT NULL,recorded_at REAL NOT NULL,"
+                "source TEXT NOT NULL DEFAULT 'exact_match_bootstrap',"
                 "PRIMARY KEY(pane_id,expected_pid,agent_pid))"
             )
             # Current per-target receiver presence; reporting only, never an effect.
@@ -259,24 +265,116 @@ class VisibleHandoffs:
             )
 
     PRESENCE_STATES = frozenset(
-        {"available", "stale", "absent", "ambiguous", "replaced", "unknown"}
+        {"available", "stale", "absent", "ambiguous", "replaced", "rehomed", "unknown"}
     )
+    # The only receiver-management owner: the local operator identity. Capabilities
+    # such as session.open/terminal.execute are granted to remote callers too and
+    # are not authority to replace a persistent assignment.
+    OWNER_PRINCIPAL = "local"
+    # Lineage: a legacy triple first matched exactly, or a fresh owner assignment.
+    GENERATION_SOURCES = frozenset({"exact_match_bootstrap", "owner_started_assignment"})
 
     # Injectable for tests: (pids) -> {pid: generation} or None when unverifiable.
     generation_observer = staticmethod(fresh_generations)
 
-    def recorded_generations(self, binding):
+    def recorded_generations(self, binding, target=None):
+        """Recorded generations of this exact triple (scoped to ``target`` if given).
+
+        A malformed record is returned as an empty mapping: it exists, so it can
+        never be bootstrapped over, and it never compares equal.
+        """
         import json
 
-        row = self.store.db.execute(
+        query = (
             "SELECT generations FROM binding_generations "
-            "WHERE pane_id=? AND expected_pid=? AND agent_pid=?",
-            (binding.pane_id, binding.expected_pid, binding.agent_pid),
-        ).fetchone()
+            "WHERE pane_id=? AND expected_pid=? AND agent_pid=?"
+        )
+        values = [binding.pane_id, binding.expected_pid, binding.agent_pid]
+        if target is not None:
+            query += " AND target=?"
+            values.append(target)
+        row = self.store.db.execute(query, values).fetchone()
         if row is None:
             return None
-        saved = json.loads(row["generations"])
-        return {int(pid): value for pid, value in saved.items()}
+        try:
+            saved = json.loads(row["generations"])
+            return {
+                int(pid): value
+                for pid, value in saved.items()
+                if valid_generation(value) and value["pid"] == int(pid)
+            }
+        except (TypeError, ValueError, AttributeError):
+            return {}
+
+    def generation_source(self, binding, target):
+        row = self.store.db.execute(
+            "SELECT source FROM binding_generations WHERE pane_id=? AND expected_pid=? "
+            "AND agent_pid=? AND target=?",
+            (binding.pane_id, binding.expected_pid, binding.agent_pid, target),
+        ).fetchone()
+        return row["source"] if row else None
+
+    def _store_generation(self, target, binding, observed, source):
+        if source not in self.GENERATION_SOURCES:
+            raise ValueError(source)
+        pids = (binding.expected_pid, binding.agent_pid)
+        with self.store.transaction():
+            self.store.db.execute(
+                "INSERT OR IGNORE INTO binding_generations VALUES(?,?,?,?,?,?,?)",
+                (
+                    binding.pane_id,
+                    binding.expected_pid,
+                    binding.agent_pid,
+                    target,
+                    canonical({str(p): observed[p] for p in pids}),
+                    time.time(),
+                    source,
+                ),
+            )
+
+    def fresh_pair(self, binding):
+        """Two kernel reads of the binding PIDs; equal means one stable generation."""
+        pids = (binding.expected_pid, binding.agent_pid)
+        try:
+            first = self.generation_observer(pids)
+            second = self.generation_observer(pids)
+        except Exception:  # noqa: BLE001 - an adapter fault is unverifiable, never "same"
+            return None
+        if (
+            not isinstance(first, dict)
+            or not isinstance(second, dict)
+            or not all(same_generation(first.get(p), second.get(p)) for p in pids)
+        ):
+            return None
+        return second
+
+    def effect_generation_guard(self, target, binding):
+        """Immediately before transport: a recorded lineage must still be the same.
+
+        No record keeps the legacy route unchanged. A record that cannot be
+        re-verified, or differs, refuses before any input.
+        """
+        recorded = self.recorded_generations(binding, target)
+        if recorded is None:
+            return "unverified"
+        current = self.fresh_pair(binding)
+        pids = (binding.expected_pid, binding.agent_pid)
+        if current is None or not all(
+            same_generation(recorded.get(p), current.get(p)) for p in pids
+        ):
+            error = BridgeError(
+                "visible_target_changed",
+                "Receiver process generation changed or unverifiable at input; no input",
+            )
+            error.observation = {
+                "state": "target_changed",
+                "reason": "process_generation_changed"
+                if current is not None
+                else "process_generation_unverifiable",
+                "target": target,
+            }
+            raise error
+        return "verified"
 
     def verify_generation(self, target, binding, before, after):
         """Effect-point identity for one exact native match. Never infers legacy birth.
@@ -287,10 +385,10 @@ class VisibleHandoffs:
         Returns ``verified`` or ``unverified``; raises on a proven different process.
         """
         pids = (binding.expected_pid, binding.agent_pid)
-        recorded = self.recorded_generations(binding)
+        recorded = self.recorded_generations(binding, target)
         fresh = (
-            before is not None
-            and after is not None
+            isinstance(before, dict)
+            and isinstance(after, dict)
             and all(same_generation(before.get(p), after.get(p)) for p in pids)
         )
         if recorded is not None:
@@ -313,18 +411,9 @@ class VisibleHandoffs:
             return "verified"
         if not fresh:
             return "unverified"
-        with self.store.transaction():
-            self.store.db.execute(
-                "INSERT OR IGNORE INTO binding_generations VALUES(?,?,?,?,?,?)",
-                (
-                    binding.pane_id,
-                    binding.expected_pid,
-                    binding.agent_pid,
-                    target,
-                    canonical({str(p): after[p] for p in pids}),
-                    time.time(),
-                ),
-            )
+        # Bootstrap of an exactly matched legacy triple: what holds it now is, by the
+        # existing binding definition, the bound process. Never back-dated.
+        self._store_generation(target, binding, after, "exact_match_bootstrap")
         return "verified"
 
     def record_presence(self, principal, target, state, binding, evidence):
@@ -1003,7 +1092,7 @@ class VisibleHandoffs:
                 }
             raise
 
-    async def refreshed_binding(self, principal, target, binding):
+    async def refreshed_binding(self, principal, target, binding, *, only_candidate=None):
         """Use the saved binding while its process lives. Replace only a dead unique agent.
 
         The returned session list is the catalog snapshot that proved the replacement.
@@ -1025,6 +1114,7 @@ class VisibleHandoffs:
         if selected is not None and self.sessions.binding_matches(selected, binding, target):
             self.record_presence(principal, target, "available", binding, {"reason": "matched"})
             return binding, None
+        lifecycle = self._lifecycle_change(target, binding, selected, selection_reason)
         try:
             catalog = await self.sessions.catalog(principal)
         except BridgeError as error:
@@ -1038,6 +1128,12 @@ class VisibleHandoffs:
             )
             return binding, None
         sessions = catalog.get("sessions") or []
+        if selected is None and only_candidate is None:
+            moved = self._same_process_moved(target, binding, sessions)
+            if moved is not None:
+                rehomed = await self._rehome(principal, target, binding, moved)
+                if rehomed is not None:
+                    return rehomed, None
         try:
             await self.sessions.prove_original_target_gone(principal, binding.model_dump())
         except BridgeError as error:
@@ -1052,9 +1148,10 @@ class VisibleHandoffs:
                 {
                     "reason": error.code,
                     "selection_reason": selection_reason,
+                    "lifecycle": lifecycle,
                     "identity": (
                         "generation_recorded"
-                        if self.recorded_generations(binding) is not None
+                        if self.recorded_generations(binding, target) is not None
                         else "unverified_legacy"
                     ),
                     "remedy": "new_exact_assignment_required",
@@ -1062,6 +1159,16 @@ class VisibleHandoffs:
             )
             return binding, None
         updated = replacement_binding(target, binding, sessions)
+        if (
+            updated is not None
+            and only_candidate is not None
+            and (
+                (updated.pane_id, updated.expected_pid, updated.agent_pid) != tuple(only_candidate)
+            )
+        ):
+            # A launch-driven refresh may adopt only the handle that launch started,
+            # never a different live same-CLI session.
+            updated = None
         if updated is None:
             # The catalog is complete and the configured pane is proven gone;
             # retain that snapshot even without a replacement so an orphaned
@@ -1116,6 +1223,350 @@ class VisibleHandoffs:
         )
         return updated, sessions
 
+    def _lifecycle_change(self, target, binding, selected, selection_reason):
+        """Name what changed in the bound tab; reporting only, never a rebind."""
+        if selected is None:
+            return {
+                "expected_pid_changed": "shell_restarted_or_replaced",
+                "window_changed": "tty_in_other_window",
+                "pane_missing": "window_closed_or_moved",
+            }.get(selection_reason, "unobserved")
+        agents, _ = self.sessions.agent_registry()
+        names = {p.get("name") for p in selected.get("processes", []) if p.get("name") in agents}
+        if any(
+            p.get("pid") == binding.agent_pid and p.get("name") != target
+            for p in selected.get("processes", [])
+        ):
+            return "agent_pid_now_other_program"
+        if target in names:
+            return "agent_restarted_new_process"
+        if names:
+            return "agent_switched"
+        return "agent_exited"
+
+    @staticmethod
+    def _exact_row(row, target, pane_id, shell, agent):
+        """One native, unambiguous row for exactly this pane/TTY/shell/agent handle."""
+        try:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(pane_id, str)
+                or not isinstance(row.get("processes"), list)
+                or type(shell) is not int
+                or type(agent) is not int
+                or shell <= 0
+                or agent <= 0
+                or shell == agent
+            ):
+                return False
+            tty = pane_id.rsplit(":", 1)[-1]
+            processes = row["processes"]
+            if not all(isinstance(p, dict) for p in processes):
+                return False
+            return (
+                bool(re.fullmatch(r"terminal:[1-9][0-9]*:ttys[0-9]+", pane_id))
+                and row.get("pane_id") == pane_id
+                and row.get("expected_pid") == shell
+                and row.get("transport") == "terminal_app"
+                and row.get("identity_ambiguous") is not True
+                and not row.get("selection_ambiguous")
+                and row.get("tty") == "/dev/" + tty
+                and sum(p.get("pid") == agent for p in processes) == 1
+                and sum(p.get("pid") == agent and p.get("name") == target for p in processes) == 1
+            )
+        except (TypeError, AttributeError, ValueError):
+            return False
+
+    def _same_process_moved(self, target, binding, sessions):
+        """The same kernel processes now appear in exactly one other native tab.
+
+        Requires a recorded lineage, a well-formed complete catalog, one row per old
+        shell PID / old TTY / old agent PID that is the same exact row, and equal fresh
+        generations. Name/geometry never count; a corrupted observation is None.
+        """
+        recorded = self.recorded_generations(binding, target)
+        pids = (binding.expected_pid, binding.agent_pid)
+        if not recorded or not all(p in recorded for p in pids):
+            return None
+        try:
+            if not isinstance(sessions, list) or not all(
+                isinstance(r, dict)
+                and isinstance(r.get("processes", []), list)
+                and all(isinstance(p, dict) for p in r.get("processes", []))
+                for r in sessions
+            ):
+                return None  # any malformed row makes the whole observation untrusted
+            if any(r.get("pane_id") == binding.pane_id for r in sessions):
+                return None
+            tty = "/dev/" + binding.pane_id.rsplit(":", 1)[1]
+            by_shell = [
+                r
+                for r in sessions
+                if binding.expected_pid in {r.get("expected_pid"), r.get("legacy_expected_pid")}
+            ]
+            by_tty = [r for r in sessions if r.get("tty") == tty]
+            by_agent = [
+                r
+                for r in sessions
+                if isinstance(r.get("processes"), list)
+                and any(
+                    isinstance(p, dict) and p.get("pid") == binding.agent_pid
+                    for p in r["processes"]
+                )
+            ]
+        except (TypeError, AttributeError, ValueError):
+            return None
+        if not (len(by_shell) == len(by_tty) == len(by_agent) == 1):
+            return None
+        row = by_shell[0]
+        if row is not by_tty[0] or row is not by_agent[0]:
+            return None
+        pane_id = row.get("pane_id")
+        if not self._exact_row(row, target, pane_id, binding.expected_pid, binding.agent_pid):
+            return None
+        if not pane_id.endswith(":" + binding.pane_id.rsplit(":", 1)[1]):
+            return None
+        current = self.fresh_pair(binding)
+        if current is None or not all(
+            same_generation(recorded.get(p), current.get(p)) for p in pids
+        ):
+            return None
+        return binding.model_copy(update={"pane_id": pane_id})
+
+    def _persist_assignment(self, target, previous, updated, generations, source):
+        """Ledger, then overlay, then RAM. Returns a refusal reason or None.
+
+        A ledger row without an overlay is inert evidence: no mapping refers to it.
+        An existing lineage row for the new triple must be identical (same target,
+        source and generations); it is never silently overwritten or reinterpreted.
+        """
+        import sqlite3
+
+        pids = (updated.expected_pid, updated.agent_pid)
+        try:
+            existing = self.store.db.execute(
+                "SELECT target,source,generations FROM binding_generations "
+                "WHERE pane_id=? AND expected_pid=? AND agent_pid=?",
+                (updated.pane_id, updated.expected_pid, updated.agent_pid),
+            ).fetchone()
+            if existing is not None:
+                saved = self.recorded_generations(updated, target) or {}
+                if (
+                    existing["target"] != target
+                    or existing["source"] != source
+                    or not all(same_generation(saved.get(p), generations.get(p)) for p in pids)
+                ):
+                    return "lineage_conflict"
+            else:
+                self._store_generation(target, updated, generations, source)
+        except (sqlite3.Error, ValueError, TypeError):
+            return "lineage_write_failed"
+        try:
+            save_refresh(self.config, target, previous, updated)
+        except OSError:
+            return "overlay_write_failed"
+        self.config.visible_handoffs.bindings[target] = updated
+        return None
+
+    async def _rehome(self, principal, target, binding, moved):
+        """Same processes, new window id: carry lineage; reservations keep their locks.
+
+        Re-selects the new pane after the catalog and requires both recorded
+        generations before and after that read, then compare-and-sets the mapping.
+        Returns None (no change) on any doubt.
+        """
+        recorded = self.recorded_generations(binding, target)
+        source = self.generation_source(binding, target)
+        pids = (moved.expected_pid, moved.agent_pid)
+        before = self.fresh_pair(moved)
+        try:
+            row = await self.sessions.selected(principal, moved.pane_id, moved.expected_pid)
+        except BridgeError:
+            return None
+        after = self.fresh_pair(moved)
+        if (
+            not recorded
+            or source is None
+            or before is None
+            or after is None
+            or not self._exact_row(row, target, moved.pane_id, *pids)
+            or not all(
+                same_generation(recorded.get(p), before.get(p))
+                and same_generation(recorded.get(p), after.get(p))
+                for p in pids
+            )
+            or self.config.visible_handoffs.bindings.get(target) != binding
+        ):
+            return None
+        if self._persist_assignment(target, binding, moved, after, source) is not None:
+            return None
+        self.record_presence(
+            principal,
+            target,
+            "rehomed",
+            moved,
+            {"reason": "same_generation_new_window", "previous_pane_id": binding.pane_id},
+        )
+        self.store.audit(
+            "visible_binding_rehomed",
+            principal,
+            None,
+            {
+                "target": target,
+                "previous_pane_id": binding.pane_id,
+                "pane_id": moved.pane_id,
+                "expected_pid": moved.expected_pid,
+                "agent_pid": moved.agent_pid,
+                "lineage_source": source,
+                "automatic_retry": False,
+            },
+        )
+        return moved
+
+    async def _owner_assignment(self, principal, target, binding, started, current):
+        """Bind exactly the handle the local owner's launch started, as a new lineage.
+
+        Only ``OWNER_PRINCIPAL`` may do this. Refusals keep the unchanged ``unresolved``
+        result and audit their reason. After every await the exact candidate is
+        resolved again with a stable kernel pair; immediately before persisting, a
+        synchronous compare-and-set re-validates authority, the original mapping,
+        active reservations and handle ownership. Old messages, reservations and
+        history are never touched or re-sent.
+        """
+
+        def refused(reason):
+            self.store.audit(
+                "visible_binding_assignment_refused",
+                principal,
+                None,
+                {"target": target, "reason": reason, "automatic_retry": False},
+            )
+            return {"state": "unresolved", "target": target}
+
+        def authorized():
+            if principal != self.OWNER_PRINCIPAL:
+                return False
+            try:
+                for capability in ("session.open", "terminal.execute"):
+                    self.security.principal(principal, capability)
+            except BridgeError:
+                return False
+            return True
+
+        def active_reservation():
+            return self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs WHERE target=? AND state IN ('planned',"
+                "'inserting','inserted','submitting','return_sent','sent','confirmed') LIMIT 1",
+                (target,),
+            ).fetchone()
+
+        if not authorized():
+            return refused("owner_authority_required")
+        pane, shell, agent = (
+            started.get("pane_id"),
+            started.get("expected_pid"),
+            started.get("agent_pid"),
+        )
+        if not self._exact_row(current, target, pane, shell, agent):
+            return refused("started_handle_not_exact")
+        if active_reservation():
+            return refused("active_reservation")
+        updated = binding.model_copy(
+            update={
+                "pane_id": pane,
+                "expected_pid": shell,
+                "agent_pid": agent,
+                "codex_thread_id": None,
+                "codex_rollout_path": None,
+            }
+        )
+        pids = (shell, agent)
+        before = self.fresh_pair(updated)
+        if before is None:
+            return refused("generation_unverifiable")
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except BridgeError:
+            return refused("catalog_unavailable")
+        sessions = catalog.get("sessions") if isinstance(catalog, dict) else None
+        if (
+            not catalog_can_replace(catalog)
+            or not isinstance(sessions, list)
+            or not all(isinstance(r, dict) for r in sessions)
+        ):
+            return refused("catalog_incomplete")
+        if (
+            sum(self._exact_row(r, target, pane, shell, agent) for r in sessions) != 1
+            or sum(r.get("pane_id") == pane for r in sessions) != 1
+        ):
+            return refused("candidate_not_in_catalog")
+        if binding_still_present(binding, sessions):
+            return refused("old_target_still_present")
+        try:
+            final = await self.sessions.selected(principal, pane, shell)
+        except BridgeError:
+            return refused("candidate_changed")
+        if not self._exact_row(final, target, pane, shell, agent):
+            return refused("candidate_changed")
+        after = self.fresh_pair(updated)
+        if after is None or not all(same_generation(before.get(p), after.get(p)) for p in pids):
+            return refused("generation_changed")
+        # Compare-and-set: no await from here until the mapping is published.
+        if not authorized():
+            return refused("owner_authority_required")
+        if self.config.visible_handoffs.bindings.get(target) != binding:
+            return refused("binding_changed")
+        if active_reservation():
+            return refused("active_reservation")
+        handle = {pane, shell, agent}
+        if any(
+            other != target and handle & {item.pane_id, item.expected_pid, item.agent_pid}
+            for other, item in self.config.visible_handoffs.bindings.items()
+        ):
+            return refused("handle_assigned_to_other_target")
+        previous_source = self.generation_source(binding, target)
+        failure = self._persist_assignment(
+            target, binding, updated, after, "owner_started_assignment"
+        )
+        if failure is not None:
+            return refused(failure)
+        self.record_presence(
+            principal,
+            target,
+            "replaced",
+            updated,
+            {
+                "reason": "owner_started_assignment",
+                "previous_pane_id": binding.pane_id,
+                "previous_identity": previous_source or "unverified_legacy",
+                "provider_context": "not_carried",
+            },
+        )
+        self.store.audit(
+            "visible_binding_assigned",
+            principal,
+            None,
+            {
+                "target": target,
+                "mode": "owner_started_assignment",
+                "previous_pane_id": binding.pane_id,
+                "previous_expected_pid": binding.expected_pid,
+                "previous_agent_pid": binding.agent_pid,
+                "pane_id": updated.pane_id,
+                "expected_pid": updated.expected_pid,
+                "agent_pid": updated.agent_pid,
+                "automatic_retry": False,
+            },
+        )
+        return {
+            "state": "bound",
+            "target": target,
+            "pane_id": updated.pane_id,
+            "expected_pid": updated.expected_pid,
+            "agent_pid": updated.agent_pid,
+            "mode": "owner_started_assignment",
+        }
+
     async def started_binding(self, principal, target, started):
         """Bind a newly started CLI only after its exact live process is observed.
 
@@ -1138,7 +1589,19 @@ class VisibleHandoffs:
             return {"state": "unresolved", "target": target}
         if self.sessions.binding_matches(current, binding, target):
             return {"state": "unchanged", "target": target}
-        updated, _ = await self.refreshed_binding(principal, target, binding)
+        if principal == self.OWNER_PRINCIPAL:
+            # The local owner's own launch: bind exactly this started handle as a new
+            # lineage (e.g. #581). No generic refresh runs first, so no other live
+            # same-CLI session can be adopted on the way.
+            return await self._owner_assignment(principal, target, binding, started, current)
+        # Unchanged compatibility path for other principals: the strict proven-dead
+        # refresh, restricted to this launch's own handle. No new override.
+        updated, _ = await self.refreshed_binding(
+            principal,
+            target,
+            binding,
+            only_candidate=(started["pane_id"], started["expected_pid"], started.get("agent_pid")),
+        )
         if updated == binding:
             return {"state": "unresolved", "target": target}
         if (
@@ -1223,7 +1686,10 @@ class VisibleHandoffs:
 
     async def check_target(self, principal, target, binding, *, ready=False):
         pids = (binding.expected_pid, binding.agent_pid)
-        before = self.generation_observer(pids)
+        try:
+            before = self.generation_observer(pids)
+        except Exception:  # noqa: BLE001 - unverifiable, never "same"
+            before = None
         row = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
         with self.sessions.observation_scope(principal, row):
             matches = [
@@ -1237,8 +1703,26 @@ class VisibleHandoffs:
                 )
             if row.get("transport") == "terminal_app" and row.get("expected_pid") == pids[0]:
                 # Only a real native row is an authorized exact OS observation.
-                after = self.generation_observer(pids)
-                self.verify_generation(target, binding, before, after)
+                try:
+                    after = self.generation_observer(pids)
+                except Exception:  # noqa: BLE001
+                    after = None
+                try:
+                    self.verify_generation(target, binding, before, after)
+                except BridgeError as error:
+                    # A previously persisted "available" must not survive this.
+                    self.record_presence(
+                        principal,
+                        target,
+                        "stale",
+                        binding,
+                        {
+                            "reason": (getattr(error, "observation", None) or {}).get(
+                                "reason", error.code
+                            )
+                        },
+                    )
+                    raise
             output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
             if ready:
                 observation = await self.binding_readiness(
@@ -1572,6 +2056,8 @@ class VisibleHandoffs:
 
             async def before_paste():
                 nonlocal input_attempted, local_reply
+                # Effect point: the recorded lineage (if any) must still hold now.
+                self.effect_generation_guard(target, binding)
                 if adapter_for(target).capabilities.bound_reply and args.wait_for_reply:
                     selection = self.sessions.current_selection()
                     expected_identity = (

@@ -1126,7 +1126,19 @@ class Bridge:
             return []
         try:
             catalog = await self.sessions.catalog(principal)
-        except Exception:  # noqa: BLE001 - an unavailable Terminal is retried next round
+        except Exception as error:  # noqa: BLE001 - an unavailable Terminal is retried next round
+            # A failed probe must not leave an older "available" standing.
+            for target, binding in bindings.items():
+                try:
+                    self.visible_handoffs.record_presence(
+                        principal,
+                        target,
+                        "unknown",
+                        binding,
+                        {"reason": "catalog_" + getattr(error, "code", "unavailable")},
+                    )
+                except Exception:  # noqa: BLE001 - reporting never stops the sweep
+                    pass
             return []
         sessions = catalog.get("sessions") or []
         replaced = []

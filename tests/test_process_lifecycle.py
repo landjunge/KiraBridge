@@ -28,11 +28,15 @@ from kirabridge.visible_handoff import PRESENCE_FRESH_SECONDS, peer_route_status
 NATIVE_OS = sys.platform == "darwin" or sys.platform.startswith("linux")
 
 
-def gen(pid, birth, boot="boot-a"):
+BOOT_A = "6f1c2a9e-0000-4000-8000-00000000000a"
+BOOT_B = "6f1c2a9e-0000-4000-8000-00000000000b"
+
+
+def gen(pid, birth, boot=BOOT_A):
     return {"boot": boot, "pid": pid, "birth": birth, "ppid": 1, "pgid": pid, "uid": 501}
 
 
-def gens(shell_birth="100.000001", agent_birth="200.000002", boot="boot-a"):
+def gens(shell_birth="100.000001", agent_birth="200.000002", boot=BOOT_A):
     return {123: gen(123, shell_birth, boot), 456: gen(456, agent_birth, boot)}
 
 
@@ -42,10 +46,32 @@ def gens(shell_birth="100.000001", agent_birth="200.000002", boot="boot-a"):
 def test_generation_equality_uses_only_immutable_kernel_facts():
     assert same_generation(gen(1, "5.000001"), {**gen(1, "5.000001"), "ppid": 9, "pgid": 3})
     assert not same_generation(gen(1, "5.000001"), gen(1, "5.000002"))
-    assert not same_generation(gen(1, "5.000001"), gen(1, "5.000001", boot="boot-b"))
+    assert not same_generation(gen(1, "5.000001"), gen(1, "5.000001", boot=BOOT_B))
     assert not same_generation(gen(1, "5.000001"), gen(2, "5.000001"))
     assert not same_generation(None, gen(1, "5"))
     assert not same_generation({"pid": 1, "birth": "5", "boot": None}, gen(1, "5"))
+    assert same_generation(gen(1, "5"), gen(1, "5"))  # Linux: integer clock ticks
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"pid": True},
+        {"pid": "1"},
+        {"pid": 0},
+        {"birth": 5},
+        {"birth": "0"},
+        {"birth": "0.000000"},
+        {"birth": "5.1"},
+        {"birth": "-5"},
+        {"boot": "short"},
+        {"boot": "x" * 65},
+        {"boot": None},
+    ],
+)
+def test_structurally_invalid_generation_never_compares_equal(broken):
+    value = {**gen(1, "5.000001"), **broken}
+    assert not same_generation(value, value)
 
 
 @pytest.mark.skipif(not NATIVE_OS, reason="no trusted kernel adapter on this platform")
@@ -82,7 +108,7 @@ def test_first_fresh_match_records_then_requires_equality(visible):
     assert handoffs.verify_generation("grok", binding, gens(), gens()) == "verified"
     with pytest.raises(BridgeError) as error:
         handoffs.verify_generation(
-            "grok", binding, gens(shell_birth="900.0"), gens(shell_birth="900.0")
+            "grok", binding, gens(shell_birth="900.000000"), gens(shell_birth="900.000000")
         )
     assert error.value.code == "visible_target_changed"
     assert error.value.observation["reason"] == "process_generation_changed"
@@ -106,7 +132,7 @@ def test_wall_clock_step_keeps_recorded_generation_verified(visible, monkeypatch
 def test_legacy_or_unfresh_observation_is_unverified_and_not_recorded(visible, case):
     bridge, _ = visible
     binding = bridge.config.visible_handoffs.bindings["grok"]
-    before, after = (None, None) if case == "unobservable" else (gens(), gens("101.0"))
+    before, after = (None, None) if case == "unobservable" else (gens(), gens("101.000000"))
     assert bridge.visible_handoffs.verify_generation("grok", binding, before, after) == (
         "unverified"
     )

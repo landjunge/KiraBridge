@@ -16,6 +16,7 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import os
+import re
 import sys
 
 PROC_PIDTBSDINFO = 3
@@ -151,13 +152,30 @@ def process_generation(pid, boot=None) -> dict | None:
     return {"boot": boot, "pid": pid, **observed}
 
 
+_BIRTH = re.compile(r"^[0-9]{1,20}(?:\.[0-9]{6})?$")
+_BOOT = re.compile(r"^[0-9A-Za-z-]{8,64}$")
+
+
+def valid_generation(value) -> bool:
+    """Structurally exact generation: boot id string, positive int PID, kernel birth."""
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("boot"), str)
+        and bool(_BOOT.fullmatch(value["boot"]))
+        and type(value.get("pid")) is int
+        and value["pid"] > 0
+        and isinstance(value.get("birth"), str)
+        and bool(_BIRTH.fullmatch(value["birth"]))
+        and value["birth"].strip("0.") != ""
+    )
+
+
 def same_generation(recorded, observed) -> bool:
     """Equality of immutable kernel facts only; ppid/pgid/tty may legitimately change."""
     return (
-        isinstance(recorded, dict)
-        and isinstance(observed, dict)
-        and all(recorded.get(key) == observed.get(key) for key in ("boot", "pid", "birth"))
-        and recorded.get("boot") is not None
+        valid_generation(recorded)
+        and valid_generation(observed)
+        and all(recorded[key] == observed[key] for key in ("boot", "pid", "birth"))
     )
 
 
