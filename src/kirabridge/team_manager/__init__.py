@@ -2302,17 +2302,22 @@ class TeamManager:
                 body=_bounded_text(body, self.config.team.max_body_bytes // 2),
                 idempotency_key="resume-" + digest(notice["id"])[:40],
             )
+            if review is None:
+                try:
+                    resume = self.delegate(principal, request)
+                except BridgeError:
+                    continue  # Unchanged: a replay uses the same sealed request.
             with self.store.transaction():
                 if not self.store.db.execute(
                     "SELECT 1 FROM team_coordinator_resumes WHERE notice_id=?", (notice["id"],)
                 ).fetchone():
-                    try:
-                        if review and self.continuation.role(done["team_id"]) != review:
-                            continue
-                        resume = self.delegate(principal, request)
-                    except BridgeError:
-                        continue  # Unsatisfied execution prerequisites leave the notice pending.
                     if review:
+                        try:
+                            if self.continuation.role(done["team_id"]) != review:
+                                continue
+                            resume = self.delegate(principal, request)
+                        except BridgeError:
+                            continue  # Role or execution changed before the new review.
                         self.store.db.execute(
                             "INSERT INTO team_operations VALUES(?,?,?,?,?,?)",
                             (
