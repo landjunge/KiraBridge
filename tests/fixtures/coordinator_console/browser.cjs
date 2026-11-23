@@ -54,6 +54,8 @@ let post = null;
 let resolvePost = null;
 let loseResponse = false;
 let operations = 0;
+let observedTerminals = [{agent_candidate: "claude", agent_pid: 110, expected_pid: 14,
+  pane_id: "terminal:3:ttys003"}];
 const context = {
   $: id => element[id],
   names: {claude: "Claude"},
@@ -69,8 +71,7 @@ const context = {
   api: async (route, options) => {
     if (route === "/api/team") return {teams: [{id: "kirabridge-team", name: "KiraBridge"}]};
     if (route === "/api/control/terminals") {
-      return {sessions: [{agent_candidate: "claude", agent_pid: 110, expected_pid: 14,
-        pane_id: "terminal:3:ttys003"}]};
+      return {sessions: observedTerminals};
     }
     if (route === "/api/team/kirabridge-team/coordinator") return structuredClone(data);
     if (route === "/api/team/kirabridge-team/coordinator/handoff") {
@@ -137,8 +138,12 @@ async function run() {
   assert.equal(button(cards()[1]), undefined);
 
   data.can_manage = false;
+  data.inventory[0] = {...first, role: "worker", state: "failed"};
+  observedTerminals = [];
   context.window.listeners["np-kirabridge-status"]();
   await settle();
+  assert.equal(cards().length, 3);
+  assert.match(cards()[0].text, /Fehlgeschlagen/);
   assert.equal(button(cards()[0]), undefined);
 }
 

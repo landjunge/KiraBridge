@@ -7,6 +7,8 @@ from pathlib import Path
 import httpx
 import pytest
 from test_team_console import KEY, headers, new_team, team_bridge  # noqa: F401
+from test_team_coordinator_roles import TEAM, finish, handoff, record, setup_team
+from test_team_manager import domain  # noqa: F401
 
 from kirabridge.approval_console import ASSETS, ORIGIN, ApprovalConsole
 from kirabridge.operator_application import operator_application
@@ -49,3 +51,33 @@ async def test_coordinator_console_retains_auth_and_local_origin(team_bridge):  
     transport = httpx.ASGITransport(app=app, client=("203.0.113.4", 4321))
     async with httpx.AsyncClient(transport=transport, base_url=ORIGIN) as remote:
         assert (await remote.get(ROUTE, headers=headers())).status_code == 403
+
+
+async def test_coordinator_route_accepts_an_exact_local_handover(bridge, domain):  # noqa: F811
+    setup_team(domain, coordinator="codex")
+    record(domain, "codex")
+    record(domain, "grok")
+    payload = handoff(domain).model_dump(exclude={"team_id"})
+    app = ApprovalConsole(operator_application(bridge), KEY)
+    transport = httpx.ASGITransport(app=app)
+    status_route = f"/api/team/{TEAM}/coordinator"
+    async with httpx.AsyncClient(transport=transport, base_url=ORIGIN) as client:
+        initial = await client.get(status_route, headers=headers())
+        assert initial.json()["coordinator"] == "codex"
+        for injected in ({"actor": "grok"}, {"team_id": "test-team"}):
+            malformed = await client.post(
+                status_route + "/handoff", headers=headers(), json={**payload, **injected}
+            )
+            assert malformed.status_code == 400
+        response = await client.post(status_route + "/handoff", headers=headers(), json=payload)
+        assert response.status_code == 200
+        transfer = response.json()
+        assert transfer["state"] == "pending"
+        waiting = (await client.get(status_route, headers=headers())).json()
+        assert waiting["coordinator"] == "codex"
+        assert waiting["pending"]["session_id"] == "grok-session"
+        finish(domain, transfer)
+        confirmed = (await client.get(status_route, headers=headers())).json()
+        assert confirmed["coordinator"] == "grok"
+        assert confirmed["last_handoff"]["id"] == transfer["id"]
+        assert confirmed["last_handoff"]["state"] == "accepted"
