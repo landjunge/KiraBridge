@@ -325,6 +325,91 @@ async def test_readiness_leaves_unprobed_transports_unknown_without_database_or_
         assert json.loads(record["metadata"])["outcome"] == "unknown"
 
 
+async def test_headless_linux_readiness_separates_native_capability_from_permission(
+    bridge, monkeypatch
+):
+    from kirabridge.platform_adapters.linux.provider import LinuxProvider
+    from kirabridge.platform_adapters.macos.capabilities import CapabilityProbe
+
+    monkeypatch.setattr(
+        "kirabridge.readiness.current_platform", lambda: SimpleNamespace(name="linux")
+    )
+    facts = {
+        "platform": "linux",
+        "os_version": "",
+        "os_build": "",
+        "architecture": "x86_64",
+        "process": {"pid": 1, "executable": "/usr/bin/python3"},
+    }
+    bridge.macos = LinuxProvider(
+        terminal_app=bridge.sessions.terminal_app,
+        clipboard=bridge.clipboard,
+        files=bridge.filesystem,
+        processes=bridge.processes,
+        capabilities=CapabilityProbe(facts=facts),
+        system_modules=bridge.system_modules,
+        system_reports=bridge.terminal,
+        owned_terminal=bridge.sessions.linux,
+    )
+    policy = bridge.config.principals["local"]
+    policy.approval_mode = "automatic"
+    policy.capabilities.extend(
+        capability
+        for capability in (
+            "app.focus",
+            "apps.list",
+            "keyboard.sequence",
+            "keyboard.execute",
+            "keyboard.inspect",
+            "system.report",
+            "session.inspect",
+        )
+        if capability not in policy.capabilities
+    )
+
+    async with bridge:
+        value = readiness(
+            bridge,
+            "local",
+            ReadinessInput(
+                operations=["app.focus", "keyboard.sequence", "system.report", "session.read"]
+            ),
+        )
+
+    checks = {item["operation"]: item for item in value["operation_checks"]}
+    for name in ("app.focus", "keyboard.sequence", "system.report"):
+        assert checks[name]["authorized"] is True
+        assert checks[name]["automatic"] is True
+        assert checks[name]["ok"] is False
+        assert checks[name]["code"] == "unsupported_platform"
+    assert checks["session.read"]["authorized"] is True
+    assert checks["session.read"]["ok"] is None
+    assert checks["session.read"]["code"] == "transport_not_probed"
+
+
+async def test_readiness_does_not_apply_linux_platform_gate_on_macos(bridge, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.readiness.current_platform", lambda: SimpleNamespace(name="macos")
+    )
+    policy = bridge.config.principals["local"]
+    policy.approval_mode = "automatic"
+    policy.capabilities.extend(
+        capability
+        for capability in (
+            "app.focus",
+            "apps.list",
+            "keyboard.sequence",
+            "keyboard.execute",
+            "keyboard.inspect",
+        )
+        if capability not in policy.capabilities
+    )
+    value = readiness(
+        bridge, "local", ReadinessInput(operations=["app.focus", "keyboard.sequence"])
+    )
+    assert all(item["authorized"] and item["ok"] for item in value["operation_checks"])
+
+
 def test_readiness_separates_empty_executable_allowlist_from_operation_permission(bridge):
     policy = bridge.config.principals["local"]
     executable = policy.executables[0]

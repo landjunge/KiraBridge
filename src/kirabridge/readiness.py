@@ -22,7 +22,10 @@ from kirabridge.permissions import (
     visible_execution,
 )
 from kirabridge.platform_adapters import current_platform
+from kirabridge.system_operations import SYSTEM_LEAVES
 from kirabridge.terminal_manager import check_executable
+
+_LINUX_UNAVAILABLE_NATIVE_LEAVES = frozenset(SYSTEM_LEAVES.values()) | {"system_reports"}
 
 
 class ReadinessInput(Input):
@@ -130,12 +133,20 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         if name not in INPUTS:
             raise BridgeError("unknown_operation", "Unknown operation")
         bridge.security.authorize(principal, name)
+        platform_name = current_platform().name
+        if platform_name == "linux":
+            descriptor = getattr(bridge.macos, "descriptors", {}).get(name)
+            if descriptor and descriptor.leaf in _LINUX_UNAVAILABLE_NATIVE_LEAVES:
+                raise BridgeError(
+                    "unsupported_platform",
+                    "This native desktop operation is unavailable on Linux",
+                )
         if name == "workflow.stop":
             bridge.security.principal(principal, "task.cancel")
             bridge.security.principal(principal, "process.terminate")
         if name.startswith(("threaddesk.", "handoff.")) and name != "handoff.status":
             bridge.threaddesk.check_configuration()
-        linux_direct = current_platform().name == "linux" and name != "admin.execute"
+        linux_direct = platform_name == "linux" and name != "admin.execute"
         if visible_route(name) and not linux_direct and not bridge.sessions.terminal_app.available:
             raise BridgeError("unsupported_platform", "Visible Terminal.app requires macOS")
         if name in {"terminal.execute", "terminal.visible", "admin.execute"} and not (
