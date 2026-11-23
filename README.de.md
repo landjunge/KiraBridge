@@ -133,6 +133,9 @@ Die tatsächlich auf deinem Rechner laufende Version siehst du in der App oder
 mit `kirabridge status`. Quellcommit, erfolgreicher Build und installierte
 Version sind unterschiedliche Nachweise.
 
+Im macOS-Entwicklungsstand zeigt das Infofenster den Commit der App als
+**App-Build** neben der Paketversion an.
+
 **Frühere Windows-Entwicklungsvorschauen:** Der [RC33-Paketbericht](docs/RC33-DELIVERY-20261104.md)
 und der [Windows-Einrichtungsbericht](docs/WINDOWS-SETUP-20261104.md) beschreiben
 deren begrenzte Tastatur-, Shortcut- und abgesicherte Fenstersteuerung. Sie belegen
