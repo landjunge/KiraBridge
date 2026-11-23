@@ -155,7 +155,7 @@ def completion_payload(task, event_seq, *, source="task"):
     if state == "completed" and result.get("scope") == "local_agent_turn":
         payload.update(
             completion_scope="local_agent_turn",
-            reply_source="bound_local_codex_rollout",
+            reply_source=result.get("reply_source", "bound_local_codex_rollout"),
             agent_confirmed=False,
             agent_turn_completed=True,
             agent_work_completion_verified=False,

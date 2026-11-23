@@ -58,6 +58,7 @@ class Protocol:
         self.on_input = None
         self.failure = None
         self.sockets = []
+        self.reply_turns = []
 
     def response(self, request):
         method, params = request["method"], request.get("params", {})
@@ -76,7 +77,11 @@ class Protocol:
             assert params == {"threadId": ROOT, "includeTurns": False}
             return {"thread": self.thread}
         if method == "thread/turns/list":
-            assert params["threadId"] == ROOT and params["limit"] == 1
+            assert params["threadId"] == ROOT
+            if params["limit"] == 8:
+                assert params["itemsView"] == "full"
+                return {"data": self.reply_turns}
+            assert params["limit"] == 1
             active = self.thread["status"]["type"] == "active"
             return {"data": [{"id": self.turn, "status": "inProgress"}] if active else []}
         assert method in {"turn/steer", "turn/start"}
@@ -317,7 +322,8 @@ async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(d
     await settled(direct)
     outcome = job(bridge, sent)
     original = bridge.messages.get("chatgpt", sent["id"])
-    assert outcome["state"] == "completed"
+    assert outcome["state"] == "unknown"
+    assert outcome["error"] == "native_codex_steer_reply_unverified"
     assert outcome["evidence"]["completion_scope"] == "native_input_delivery"
     assert original["processing_route"] == "existing_native_codex_root"
     assert outcome["completion_scope"] == "native_input_delivery"
@@ -430,6 +436,31 @@ async def test_restart_preserves_original_native_attempt_and_never_replays(deliv
         assert outcome["evidence"]["last_observation"] == evidence
         assert not direct.submit("chatgpt", sent["id"])
         assert not p.calls and not transport["calls"]
+    finally:
+        await bridge.message_receiver.stop()
+
+
+async def test_shutdown_during_reply_observation_preserves_accepted_turn(delivery, binding):
+    bridge, transport, direct, _, _ = delivery
+    p = Protocol(binding)
+    p.thread["status"] = {"type": "idle"}
+    bridge.config.visible_handoffs.native_codex = binding
+    direct.codex_host = p.host()
+    sent = new_message(bridge, key="native-shutdown-with-unfinished-reply", recipient="codex")
+    assert sent["request_reply"] is True
+    assert direct.submit("chatgpt", sent["id"])
+    await direct.wait_delivery(sent["id"])
+    assert job(bridge, sent)["state"] == "running"
+    assert job(bridge, sent)["evidence"]["turn_id"] == "new-root-turn"
+    await direct.stop()
+    result = job(bridge, sent)
+    assert result["state"] == "unknown" and result["error"] == "receiver_interrupted"
+    assert result["evidence"]["turn_id"] == "new-root-turn"
+    await bridge.message_receiver.start()
+    try:
+        assert job(bridge, sent)["error"] == "receiver_interrupted"
+        assert not direct.submit("chatgpt", sent["id"])
+        assert len(p.inputs()) == 1 and not transport["calls"]
     finally:
         await bridge.message_receiver.stop()
 

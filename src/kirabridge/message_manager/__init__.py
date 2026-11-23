@@ -190,7 +190,9 @@ class MessageManager:
                 local = result["processing"]["evidence"].pop("local_reply_result", None)
                 result["processing"].update(
                     completion_scope="local_agent_turn",
-                    reply_source="bound_local_codex_rollout",
+                    reply_source=result["processing"]["evidence"].get(
+                        "reply_source", "bound_local_codex_rollout"
+                    ),
                     agent_confirmed=False,
                     request_reply_satisfied=True,
                     agent_work_completion_verified=False,

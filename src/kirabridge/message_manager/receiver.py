@@ -198,9 +198,17 @@ class MessageReceiver:
                 "message": "No active delivery attempt for this record; inspect without replay",
             }
         elif job["state"] in {"failed", "blocked", "cancelled", "unknown"}:
+            delivery_confirmed = job["evidence"].get("completion_scope") in {
+                "visible_input_delivery",
+                "native_input_delivery",
+            }
             result["error"] = {
                 "code": job["error"] or job["evidence"].get("reason", "delivery_not_admitted"),
-                "message": "Message delivery unconfirmed; inspect this message ID, never replay",
+                "message": (
+                    "Input submitted but reply unconfirmed; inspect this message ID, never replay"
+                    if delivery_confirmed
+                    else "Message delivery unconfirmed; inspect this message ID, never replay"
+                ),
             }
         return result
 
@@ -634,14 +642,18 @@ class MessageReceiver:
 
         message_id = job["message_id"]
         now = time.time()
+        row = self.bridge.store.db.execute(
+            "SELECT * FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        delivery_scope = evidence.get("completion_scope")
+        delivery_only = delivery_scope in {"visible_input_delivery", "native_input_delivery"}
+        if state == "completed" and row["request_reply"] and delivery_only:
+            state, error = "unknown", "message_reply_unverified"
         self.bridge.store.db.execute(
             "UPDATE message_jobs SET state=?,finished=?,evidence=?,error=?,reply_id=? "
             "WHERE message_id=?",
             (state, now, canonical(evidence), error, reply_id, message_id),
         )
-        row = self.bridge.store.db.execute(
-            "SELECT * FROM messages WHERE id=?", (message_id,)
-        ).fetchone()
         self.messages._event(
             message_id,
             "message.processing_" + state,
@@ -663,8 +675,6 @@ class MessageReceiver:
             "finished": now,
             "result": {"text": evidence.get("response_preview", "")},
         }
-        delivery_scope = evidence.get("completion_scope")
-        delivery_only = delivery_scope in {"visible_input_delivery", "native_input_delivery"}
         if delivery_only:
             task["operation"] = "message." + delivery_scope
             task["result"] = {

@@ -514,15 +514,77 @@ class DirectDelivery:
             binding, prepared, identifier, message["body"], before_send
         )
         evidence.update(run_id=run_id, session_scope="existing_native_codex_root")
+        observe_reply = message["request_reply"] and prepared["operation"] == "turn/start"
+        reply_error = (
+            "native_codex_steer_reply_unverified"
+            if message["request_reply"] and not observe_reply
+            else None
+        )
         with bridge.store.transaction():
             row = bridge.store.db.execute(
                 "SELECT state,run_id FROM message_jobs WHERE message_id=?", (identifier,)
             ).fetchone()
             if row and row["state"] == "running" and row["run_id"] == run_id:
                 bridge.messages._event(identifier, "message.native_submitted", principal, evidence)
-                self.receiver._finish(identifier, "completed", evidence)
-        # Acceptance is transport evidence; never fabricate recipient fetch, ACK or reply.
+                bridge.store.db.execute(
+                    "UPDATE message_jobs SET evidence=? WHERE message_id=? AND run_id=?",
+                    (canonical(evidence), identifier, run_id),
+                )
+                if not observe_reply:
+                    self.receiver._finish(
+                        identifier,
+                        "unknown" if reply_error else "completed",
+                        evidence,
+                        reply_error,
+                    )
+            else:
+                return
+        # Wake the caller on submitted input while reply observation continues.
         event.set()
+        if observe_reply:
+            await self._observe_native_reply(message, binding, evidence)
+
+    async def _observe_native_reply(self, message, binding, evidence):
+        bridge = self.receiver.bridge
+        identifier = message["id"]
+        timeout = bridge.config.messaging.receivers["codex"].timeout
+        try:
+            text = await self.codex_host.wait_reply(
+                binding, evidence["turn_id"], message["body"], timeout
+            )
+        except TimeoutError:
+            error = "native_codex_reply_timeout"
+        except BridgeError as failure:
+            error = failure.code
+        else:
+            error = None
+            evidence = {
+                **evidence,
+                "completion_scope": "local_agent_turn",
+                "reply_source": "bound_native_codex_turn",
+                "agent_turn_completed": True,
+                "request_reply_satisfied": True,
+                "response_sha256": digest(text),
+                "response_preview": text[:320],
+                "local_reply_result": {
+                    "scope": "local_agent_turn",
+                    "reply_source": "bound_native_codex_turn",
+                    "message_id": identifier,
+                    "thread_id": evidence["thread_id"],
+                    "turn_id": evidence["turn_id"],
+                    "text": text,
+                    "agent_confirmed": False,
+                    "request_reply_satisfied": True,
+                },
+            }
+        with bridge.store.transaction():
+            row = bridge.store.db.execute(
+                "SELECT state,run_id FROM message_jobs WHERE message_id=?", (identifier,)
+            ).fetchone()
+            if row and row["state"] == "running" and row["run_id"] == evidence["run_id"]:
+                self.receiver._finish(
+                    identifier, "unknown" if error else "completed", evidence, error
+                )
 
     async def stop(self):
         """Cancel only this instance's attempts; preserve delivered reply waiters."""

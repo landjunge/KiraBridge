@@ -1,6 +1,6 @@
 """Bounded RPC to an assigned root on the existing Codex 0.169/0.171 Unix WebSocket.
 
-No host start/resume, discovery by title/CWD, terminal input or retry. Assignment
+No host start, discovery by title/CWD, terminal input or input retry. Assignment
 is configuration authority; host responses prove its current local continuity.
 """
 
@@ -25,6 +25,7 @@ from kirabridge import __version__
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, digest
 
 MAX_RESPONSE = 1048576
+MAX_ANSWER_BYTES = 262144
 
 
 def refused(code="native_codex_binding_changed"):
@@ -264,23 +265,60 @@ class CodexHost:
             if raw is not None:
                 raw.close()
 
-    async def observe(self, rpc, generation, binding):
+    async def read_bound_thread(self, rpc, binding, *, cwd=None):
         result = await rpc.call(
             "thread/read", {"threadId": binding.thread_id, "includeTurns": False}
         )
         thread = result.get("thread", {})
+        self._verify_thread(thread, binding, cwd)
+        return thread
+
+    @staticmethod
+    def _verify_thread(thread, binding, cwd):
+        thread_cwd = thread.get("cwd") if isinstance(thread, dict) else None
         if (
-            thread.get("id") != binding.thread_id
+            not isinstance(thread, dict)
+            or thread.get("id") != binding.thread_id
             or thread.get("sessionId") != binding.session_id
             or thread.get("source") != binding.source
             or "parentThreadId" not in thread
             or "attachedToThreadId" not in thread
             or thread.get("parentThreadId") is not None
             or thread.get("attachedToThreadId") is not None
-            or thread.get("canAcceptDirectInput") is not True
+            or (
+                cwd is not None
+                and (
+                    not isinstance(thread_cwd, str)
+                    or not Path(thread_cwd).is_absolute()
+                    or Path(thread_cwd).resolve() != Path(cwd).resolve()
+                )
+            )
         ):
             raise refused()
+
+    async def observe(self, rpc, generation, binding, *, cwd=None, resume=False):
+        thread = await self.read_bound_thread(rpc, binding, cwd=cwd)
         status = thread.get("status", {})
+        if not isinstance(status, dict):
+            raise refused("native_codex_target_not_ready")
+        if (
+            resume
+            and binding.protocol_version == "0.171.0"
+            and status.get("type") == "notLoaded"
+            and thread.get("ephemeral") is False
+        ):
+            # Restore from Codex's own persisted history. Do not supply a path,
+            # alternate history, or overrides that could change the resumed thread.
+            restored = await rpc.call(
+                "thread/resume", {"threadId": binding.thread_id, "excludeTurns": True}
+            )
+            self._verify_thread(restored.get("thread"), binding, cwd)
+            thread = await self.read_bound_thread(rpc, binding, cwd=cwd)
+            status = thread.get("status", {})
+        if thread.get("canAcceptDirectInput") is not True:
+            raise refused()
+        if not isinstance(status, dict):
+            raise refused("native_codex_target_not_ready")
         if status.get("type") not in {"active", "idle"} or status.get("activeFlags"):
             raise refused("native_codex_target_not_ready")
         if status["type"] == "active" and status.get("activeFlags") != []:
@@ -311,13 +349,13 @@ class CodexHost:
             "operation": "turn/steer" if active else "turn/start",
         }
 
-    async def prepare(self, binding):
+    async def prepare(self, binding, *, cwd=None):
         async with self.connection(binding) as (rpc, generation):
-            return await self.observe(rpc, generation, binding)
+            return await self.observe(rpc, generation, binding, cwd=cwd, resume=True)
 
-    async def deliver(self, binding, prepared, message_id, body, before_send):
+    async def deliver(self, binding, prepared, message_id, body, before_send, *, cwd=None):
         async with self.connection(binding) as (rpc, generation):
-            current = await self.observe(rpc, generation, binding)
+            current = await self.observe(rpc, generation, binding, cwd=cwd)
             # A host restart may refresh physical generation; a different turn
             # never changes a claimed steering attempt into another operation.
             for key in (
@@ -369,6 +407,59 @@ class CodexHost:
                 "request_reply_satisfied": False,
                 "automatic_retry": False,
             }
+
+    async def wait_reply(self, binding, turn_id, body, timeout, *, cwd=None):
+        """Observe the exact submitted turn and return its unambiguous final text."""
+        async with asyncio.timeout(timeout):
+            async with self.connection(binding) as (rpc, _):
+                await self.read_bound_thread(rpc, binding, cwd=cwd)
+                while True:
+                    turns = await rpc.call(
+                        "thread/turns/list",
+                        {
+                            "threadId": binding.thread_id,
+                            "limit": 8,
+                            "sortDirection": "desc",
+                            "itemsView": "full",
+                        },
+                    )
+                    turn = next(
+                        (row for row in turns.get("data", []) if row.get("id") == turn_id),
+                        None,
+                    )
+                    if turn is not None and turn.get("status") != "inProgress":
+                        return _verified_answer(turn, body)
+                    await asyncio.sleep(1)
+
+
+def _verified_answer(turn, body):
+    items = turn.get("items", [])
+    if isinstance(items, list) and all(isinstance(item, dict) for item in items):
+        users = [index for index, item in enumerate(items) if item.get("type") == "userMessage"]
+        finals = [
+            index
+            for index, item in enumerate(items)
+            if item.get("type") == "agentMessage" and item.get("phase") == "final_answer"
+        ]
+        if turn.get("status") == "completed" and len(users) == len(finals) == 1:
+            content = items[users[0]].get("content")
+            text = items[finals[0]].get("text")
+            if (
+                users[0] < finals[0]
+                and isinstance(content, list)
+                and len(content) == 1
+                and isinstance(content[0], dict)
+                and content[0].get("type") == "text"
+                and content[0].get("text") == body
+                and not content[0].get("text_elements")
+                and isinstance(text, str)
+                and text.strip()
+                and len(text.encode("utf-8")) <= MAX_ANSWER_BYTES
+            ):
+                return text
+    raise UncertainExecution(
+        "native_codex_turn_unverified", "The native turn has no exact verified answer"
+    )
 
 
 class _RPC:

@@ -24,11 +24,11 @@ OTHER = "01a1daf2-f415-7d82-9d87-eca8fc8b5678"
 
 def template(tmp_path):
     return NativeCodexBinding(
-        thread_id=OTHER,
-        session_id=OTHER,
+        thread_id=ROOT,
+        session_id=ROOT,
         codex_home=str(tmp_path),
         host_executable=str(tmp_path / "codex"),
-        source="vscode",
+        source="cli",
     )
 
 
@@ -64,7 +64,8 @@ class FakeApp:
         if method == "thread/loaded/list":
             return {"data": self.threads}
         if method == "thread/read":
-            return {"thread": self.thread(params["threadId"])}
+            identifier = params["threadId"]
+            return {"thread": self.thread(identifier)} if identifier in self.threads else {}
         if method == "thread/turns/list":
             if self.body is None:
                 rows = [{"id": "old", "status": "inProgress"}] if self.active else []
@@ -104,25 +105,25 @@ async def execute(app, tmp_path, timeout=5):
     )
 
 
-async def test_the_one_loaded_root_in_the_cwd_gets_the_turn_and_its_exact_answer_returns(
-    app, tmp_path
-):
+async def test_the_assigned_root_gets_the_turn_and_its_exact_answer_returns(app, tmp_path):
     result = await execute(app, tmp_path)
     assert result["final_message"] == "ANSWER" and result["thread_id"] == ROOT
     assert app.sent == ["turn/start"] and result["terminal_input_attempted"] is False
 
 
-async def test_no_pin_needed_a_restarted_codex_is_found_by_cwd(app, tmp_path):
-    app.threads = ["01a1ffff-0000-7000-8000-000000000001"]  # a different thread than any config
-    assert (await execute(app, tmp_path))["thread_id"] == app.threads[0]
+async def test_two_matching_roots_select_only_the_persisted_assignment(app, tmp_path):
+    app.threads = [OTHER, ROOT]
+    assert (await execute(app, tmp_path))["thread_id"] == ROOT
+    assert app.sent == ["turn/start"]
+    assert "thread/loaded/list" not in app.calls
 
 
-@pytest.mark.parametrize("threads", [[], [ROOT, OTHER]])
-async def test_zero_or_two_candidates_never_receive_input(app, tmp_path, threads):
+@pytest.mark.parametrize("threads", [[], [OTHER]])
+async def test_no_fallback_when_the_assignment_cannot_be_verified(app, tmp_path, threads):
     app.threads = threads
     with pytest.raises(BridgeError) as error:
         await execute(app, tmp_path)
-    assert error.value.code == "native_codex_root_not_unique" and app.sent == []
+    assert error.value.code == "native_codex_binding_changed" and app.sent == []
 
 
 async def test_other_cwd_is_not_a_candidate(app, tmp_path):
@@ -143,7 +144,7 @@ async def test_relative_thread_cwd_is_never_chosen(app, tmp_path):
             5,
             noop,
         )
-    assert error.value.code == "native_codex_root_not_unique" and app.sent == []
+    assert error.value.code == "native_codex_binding_changed" and app.sent == []
 
 
 async def test_final_answer_before_the_user_message_is_not_verified(app, tmp_path):
