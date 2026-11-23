@@ -53,6 +53,12 @@ class TeamConsole:
             Route("/api/team", self.create, methods=["POST"]),
             Route("/api/team/{team_id}", self.get),
             Route("/api/team/{team_id}/roles", self.set_role, methods=["POST"]),
+            Route("/api/team/{team_id}/coordinator", self.coordinator),
+            Route(
+                "/api/team/{team_id}/coordinator/handoff",
+                self.coordinator_handoff,
+                methods=["POST"],
+            ),
             Route("/api/team/{team_id}/messages", self.messages, methods=["GET"]),
             Route("/api/team/{team_id}/messages", self.send, methods=["POST"]),
             Route("/api/team/{team_id}/messages/{message_id}/ack", self.ack, methods=["POST"]),
@@ -178,6 +184,19 @@ class TeamConsole:
         value = await self._model(request, TeamRoleSet)
         return JSONResponse(self.teams.set_role(principal, value))
 
+    async def coordinator(self, request: Request):
+        principal = self._principal(request)
+        return JSONResponse(
+            self.teams.coordinator_status(principal, request.path_params["team_id"])
+        )
+
+    async def coordinator_handoff(self, request: Request):
+        principal = self._principal(request)
+        from kirabridge.team_manager.models import TeamCoordinatorHandoff
+
+        value = await self._model(request, TeamCoordinatorHandoff)
+        return JSONResponse(self.teams.request_coordinator_handoff(principal, value))
+
     async def messages(self, request: Request):
         principal = self._principal(request)
         after, limit = self._page(request)
@@ -275,7 +294,7 @@ HTML = r"""<!doctype html>
         <input id="new-name" name="name" required maxlength="120" value="KiraBridge Team">
         <fieldset><legend data-t="members">Mitglieder</legend><div id="new-members"></div></fieldset>
         <label for="new-coordinator" data-t="coordinator">Koordinator</label>
-        <select id="new-coordinator" required></select>
+        <select id="new-coordinator"></select>
         <button class="np-button" data-variant="primary" type="submit" data-t="create">Team anlegen</button>
       </form>
     </details>
@@ -349,6 +368,7 @@ const words = {
     autoRefresh: "Sichtbare Seite alle 5 Sekunden aktualisieren",
     teamId: "Teamkennung", teamName: "Teamname", members: "Mitglieder",
     coordinator: "Koordinator", create: "Team anlegen", roles: "Mitglieder und Rollen",
+    automaticCoordinator: "Erste geeignete Sitzung", coordinatorAddress: "Koordinatorrolle",
     chooseCoordinator: "Koordinator wählen", saveCoordinator: "Koordinator festlegen",
     sendTitle: "Nachricht senden", recipient: "An", kind: "Art", body: "Inhalt",
     replyTo: "Antwort auf Nachrichten-ID (optional)", send: "Nachricht senden",
@@ -406,6 +426,7 @@ const words = {
     autoRefresh: "Refresh the visible page every 5 seconds",
     teamId: "Team ID", teamName: "Team name", members: "Members",
     coordinator: "Coordinator", create: "Create team", roles: "Members and roles",
+    automaticCoordinator: "First eligible session", coordinatorAddress: "Coordinator role",
     chooseCoordinator: "Choose coordinator", saveCoordinator: "Set coordinator",
     sendTitle: "Send message", recipient: "To", kind: "Kind", body: "Body",
     replyTo: "Reply to message ID (optional)", send: "Send message",
@@ -469,6 +490,7 @@ const node = (tag, value, cls) => {
   return result;
 };
 let catalog = null, current = null, busy = false, uncertain = false;
+let coordinatorLifecycle = null;
 const uncertainControls = new Map();
 let pendingIntents = {};
 try {
@@ -579,7 +601,8 @@ function renderCatalog() {
 function renderCreateCoordinator() {
   const chosen = Array.from($("new-members").querySelectorAll("input:checked"))
     .map(input => ({id: input.value}));
-  selectOptions($("new-coordinator"), chosen, $("new-coordinator").value || catalog.principal);
+  const automatic = {id: "", label: t("automaticCoordinator")};
+  selectOptions($("new-coordinator"), [automatic, ...chosen]);
 }
 function renderTeam() {
   $("team-view").hidden = false;
@@ -587,6 +610,7 @@ function renderTeam() {
   $("team-meta").textContent = t("owner") + ": " + current.owner + " · " +
     t("revision") + ": " + current.revision;
   const roster = new Map(catalog.roster.map(value => [value.principal, value]));
+  const legacyCoordinatorControls = coordinatorLifecycle === false;
   const active = [];
   const container = $("members"); container.replaceChildren();
   const present = new Set(members().map(memberId));
@@ -602,12 +626,14 @@ function renderTeam() {
     const form = node("form", undefined, "np-actions");
     const role = node("select"); role.setAttribute("aria-label", id + " · " + t("roles"));
     selectOptions(role, Object.entries(words[language].rolesMap)
+      .filter(([value]) => legacyCoordinatorControls || value !== "coordinator" || member.role === value)
       .map(([value, label]) => ({id: value, label})), member.role);
     const label = node("label", undefined, "inline"), enabled = node("input");
     enabled.type = "checkbox"; enabled.checked = isActive(member);
     label.append(enabled, node("span", t("active")));
     const save = node("button", t("save"), "np-button"); save.type = "submit";
-    role.disabled = enabled.disabled = save.disabled = !canManage();
+    role.disabled = enabled.disabled = save.disabled =
+      !canManage() || (!legacyCoordinatorControls && member.role === "coordinator");
     form.append(role, label, save); row.append(form); container.append(row);
     form.addEventListener("submit", event => {
       event.preventDefault();
@@ -615,10 +641,14 @@ function renderTeam() {
         active: enabled.checked, expected_revision: current.revision, idempotency_key: key()});
     });
   }
-  $("change-coordinator").hidden = !canManage();
+  $("change-coordinator").hidden = !canManage() || !legacyCoordinatorControls;
   selectOptions($("coordinator-select"), active, current.coordinator);
   const others = active.filter(value => value.id !== catalog.principal);
-  selectOptions($("message-recipient"), others);
+  const recipients = coordinatorLifecycle === true && current.coordinator &&
+    current.coordinator !== catalog.principal ?
+    [{id: "coordinator", label: t("coordinatorAddress")}, ...others.filter(value =>
+      value.id !== current.coordinator && value.id !== "coordinator")] : others;
+  selectOptions($("message-recipient"), recipients);
   selectOptions($("work-assignee"), active);
   for (const id of ["send-message", "delegate-work"]) {
     for (const control of $(id).elements) control.disabled = !canWrite();
@@ -713,7 +743,12 @@ async function loadSelected() {
   if (!id) {
     current = null; $("team-view").hidden = true; notice(t("noTeam")); return;
   }
-  current = await api("/api/team/" + encodeURIComponent(id));
+  const endpoint = "/api/team/" + encodeURIComponent(id);
+  const [team, coordinator] = await Promise.all([
+    api(endpoint), api(endpoint + "/coordinator").catch(() => null)
+  ]);
+  current = team;
+  coordinatorLifecycle = coordinator?.lifecycle_enabled ?? null;
   await pages();
   const events = await api(base() + "/events");
   $("events").textContent = JSON.stringify(events, null, 2);
@@ -782,7 +817,7 @@ async function mutate(source, path, payload, created = false) {
 $("create-team").addEventListener("submit", event => {
   event.preventDefault();
   const selected = Array.from($("new-members").querySelectorAll("input:checked"));
-  const coordinator = $("new-coordinator").value;
+  const coordinator = $("new-coordinator").value || null;
   const roles = Object.fromEntries(selected.map(input =>
     [input.value, input.value === coordinator ? "coordinator" : "worker"]));
   mutate(event.currentTarget, "/api/team", {team_id: $("new-id").value,
@@ -790,6 +825,7 @@ $("create-team").addEventListener("submit", event => {
 });
 $("change-coordinator").addEventListener("submit", event => {
   event.preventDefault();
+  if (coordinatorLifecycle !== false) return;
   mutate(event.currentTarget, base() + "/roles", {member: $("coordinator-select").value,
     role: "coordinator", active: true, expected_revision: current.revision, idempotency_key: key()});
 });
