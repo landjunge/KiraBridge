@@ -4,6 +4,7 @@
 import asyncio
 import json
 import sqlite3
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -140,18 +141,19 @@ def drain_reopened(config):
 def hold_worker_turn(config, principal, title):
     executable = Path(config.agents[principal].executable)
     code = executable.read_text()
-    writer = " print(json.dumps(event),flush=True)"
-    assert writer in code
-    executable.write_text(
-        code.replace(
-            writer,
-            f" if subject == {title!r} and event['type'] == 'item.completed':\n"
-            "  import time\n"
-            "  deadline=time.monotonic()+8\n"
-            "  while not Path('finish-followup').exists() and time.monotonic()<deadline:\n"
-            "   time.sleep(0.03)\n" + writer,
-        )
+    writer = next(line for line in code.splitlines() if "print(json.dumps(event)" in line)
+    indentation = writer[: len(writer) - len(writer.lstrip())]
+    gate = textwrap.indent(
+        f"if subject == {title!r} and event['type'] == 'item.completed':\n"
+        "    import time\n"
+        "    deadline = time.monotonic() + 8\n"
+        "    while not Path('finish-followup').exists() and time.monotonic() < deadline:\n"
+        "        time.sleep(0.03)\n",
+        indentation,
     )
+    script = code.replace(writer, gate + writer)
+    compile(script, str(executable), "exec")
+    executable.write_text(script)
     config.team.workers[principal].timeout = 15
 
 
@@ -191,6 +193,7 @@ async def test_review_status_survives_restart_and_role_change_without_duplicate_
     http_bridge, config, tmp_path, monkeypatch, owner_workspace
 ):
     bridge, endpoint = http_bridge
+    config.team.concurrency = 1
     root = configure_workers(bridge, config, tmp_path, monkeypatch)
     chatgpt_identity(config, monkeypatch)
     first_card = card("status-first")
@@ -404,8 +407,8 @@ async def test_technical_completion_blockage_and_unknown_have_distinct_status(
         await wait_for_messages(
             clients,
             lambda _: all(
-                any(event["subject"] == "terminal" for event in published(bridge, work_id))
-                for work_id in expected
+                any(event["subject"] == state for event in published(bridge, work_id))
+                for work_id, state in expected.items()
             ),
         )
         await bridge.team_dispatcher.stop()
