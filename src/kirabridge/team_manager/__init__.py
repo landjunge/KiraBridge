@@ -14,6 +14,7 @@ from pathlib import Path
 
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TaskRequest, canonical, digest
 from kirabridge.permissions import automatic_for
+from kirabridge.team_manager.continuation import REVIEW, TeamContinuation
 from kirabridge.team_manager.coordinator_roles import SCHEMA as COORDINATOR_SCHEMA
 from kirabridge.team_manager.coordinator_roles import CoordinatorRoles
 from kirabridge.team_manager.models import (
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS team_operations (
  idem TEXT NOT NULL, request_hash TEXT NOT NULL, object_id TEXT NOT NULL,
  PRIMARY KEY(team_id,principal,operation,idem)
 );
+CREATE INDEX IF NOT EXISTS team_operation_objects ON team_operations(operation,object_id);
 CREATE TABLE IF NOT EXISTS team_messages (
  seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL,
  team_id TEXT NOT NULL REFERENCES teams(id), sender TEXT NOT NULL, recipient TEXT NOT NULL,
@@ -237,6 +239,7 @@ class TeamManager:
             if "session_generation" not in work_columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN session_generation INTEGER")
         self.coordinator_roles = CoordinatorRoles(self)
+        self.continuation = TeamContinuation(self)
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -1760,6 +1763,9 @@ class TeamManager:
                 return None
             try:
                 self._execution_allowed(work)
+                self.continuation.check_execution(work)
+                if not self.continuation.review_ready(work):
+                    return None
                 linked = self.coordinator_roles.linked_work(work_id)
                 if linked and self.coordinator_roles.check_work(work, linked)["state"] != "idle":
                     return None
@@ -1918,6 +1924,7 @@ class TeamManager:
             return
         work = self._work(row["id"])
         worker = self._execution_allowed(work)
+        self.continuation.check_execution(work, claimed=True)
         args = core_task.get("args", {})
         if (
             core_task.get("principal") != work["assignee"]
@@ -2106,6 +2113,21 @@ class TeamManager:
             ):
                 sanitized["core_result_sha256"] = core_result_hash
             self._size(canonical(sanitized), self.config.team.max_result_bytes)
+            if self.continuation.operation(work_id, REVIEW):
+                try:
+                    self.continuation.check_execution(work, claimed=True)
+                    binding = self.coordinator_roles.binding(work["team_id"])
+                    native = work["evidence"].get("native_evidence", {})
+                    if (
+                        native.get("session_id") != binding["session_id"]
+                        or "core_result_sha256" not in work["evidence"]
+                    ):
+                        raise BridgeError(
+                            "continuation_review_unconfirmed", "Review lacks native result proof"
+                        )
+                except BridgeError as exc:
+                    self._fail(work, "failed", exc.code, {"model_turn_completed": True})
+                    return self._work(work_id)
             linked = self.coordinator_roles.linked_work(work_id)
             if linked and linked["purpose"] == "handoff":
                 self.coordinator_roles.finish_handoff(work, linked, result)
@@ -2176,6 +2198,7 @@ class TeamManager:
             (work["team_id"], work_id),
         ).fetchone()
         failed = work["state"] != "completed"
+        selection = self.continuation.operation(work_id)
         from kirabridge.completion_manager import record_notice
 
         record_notice(
@@ -2203,6 +2226,7 @@ class TeamManager:
                 "project_completion_verified": False,
                 "automatic_retry": False,
                 "event_seq": event_seq,
+                **({"continuation": True} if selection else {}),
             },
         )
 
@@ -2224,7 +2248,7 @@ class TeamManager:
         # never starves the others; at most `limit` resumes start per pass.
         rows = self.store.db.execute(
             "SELECT * FROM completion_notices n WHERE source='team' AND acknowledged IS NULL "
-            f"AND principal IN ({marks}) "
+            f"AND (principal IN ({marks}) OR json_extract(payload,'$.continuation')=1) "
             "AND NOT EXISTS (SELECT 1 FROM team_coordinator_resumes r WHERE r.notice_id=n.id) "
             "ORDER BY seq LIMIT 256",
             agents,
@@ -2239,6 +2263,28 @@ class TeamManager:
                 done = self._work(payload["work_id"])
             except (json.JSONDecodeError, KeyError, TypeError, BridgeError):
                 continue
+            review = None
+            if payload.get("continuation") is True:
+                policy = self.continuation.policy
+                if (
+                    policy is None
+                    or policy.team_id != done["team_id"]
+                    or done["state"] != "completed"
+                    or payload.get("state") != "completed"
+                    or not done["core_task_id"]
+                    or payload.get("core_task_id") != done["core_task_id"]
+                    or payload.get("result_sha256") != digest(done["result"])
+                    or notice["target"] != "team:" + done["team_id"]
+                    or self.continuation.operation(done["id"]) is None
+                ):
+                    continue
+                try:
+                    review = self.continuation.role(done["team_id"])
+                except BridgeError:
+                    continue
+                if review is None:
+                    continue
+                principal = review[0]
             # Only immutable notice fields: a retry after a crash must hash identically.
             body = (
                 f"KiraBridge meldet: Auftrag {payload['work_id']} ({done['title']}) von "
@@ -2256,14 +2302,28 @@ class TeamManager:
                 body=_bounded_text(body, self.config.team.max_body_bytes // 2),
                 idempotency_key="resume-" + digest(notice["id"])[:40],
             )
-            try:
-                resume = self.delegate(principal, request)
-            except BridgeError:
-                continue  # queue/budget/permission limits: the notice stays pending
             with self.store.transaction():
                 if not self.store.db.execute(
                     "SELECT 1 FROM team_coordinator_resumes WHERE notice_id=?", (notice["id"],)
                 ).fetchone():
+                    try:
+                        if review and self.continuation.role(done["team_id"]) != review:
+                            continue
+                        resume = self.delegate(principal, request)
+                    except BridgeError:
+                        continue  # Unsatisfied execution prerequisites leave the notice pending.
+                    if review:
+                        self.store.db.execute(
+                            "INSERT INTO team_operations VALUES(?,?,?,?,?,?)",
+                            (
+                                done["team_id"],
+                                review[1],
+                                REVIEW,
+                                notice["id"],
+                                digest(review),
+                                resume["id"],
+                            ),
+                        )
                     self.store.db.execute(
                         "INSERT INTO team_coordinator_resumes VALUES(?,?,?,?)",
                         (notice["id"], done["id"], resume["id"], time.time()),

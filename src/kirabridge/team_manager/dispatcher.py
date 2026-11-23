@@ -21,6 +21,7 @@ from kirabridge.bridge_core.models import BridgeError, Input, TaskRequest, canon
 from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
 from kirabridge.platform_adapters.codex_host import CodexHost
+from kirabridge.team_manager.continuation import REVIEW
 
 
 class MessageAction(Input):
@@ -135,6 +136,10 @@ class TeamDispatcher:
         self._ping_defer: dict[str, float] = {}
         self.codex_host = CodexHost()
 
+    @property
+    def continuation(self):
+        return getattr(self.teams, "continuation", None)
+
     async def start(self):
         if self.workers or not self.bridge.config.team.enabled:
             return
@@ -194,6 +199,12 @@ class TeamDispatcher:
             except (BridgeError, sqlite3.Error):
                 pass  # notices stay pending and are retried on the next pass
             selected = self._next()
+            if selected is None and self.continuation is not None:
+                try:
+                    if await self.continuation.select() is not None:
+                        selected = self._next()
+                except (BridgeError, sqlite3.Error):
+                    pass  # A missing or unavailable owner source never admits work.
             if selected is None:
                 try:
                     await asyncio.wait_for(self.teams.wake.wait(), 2)
@@ -622,6 +633,19 @@ class TeamDispatcher:
             return
         if not existing and await self._defer_active_native_resume(work, worker):
             return
+        if not existing and self.continuation is not None:
+            try:
+                if not self.continuation.review_ready(work):
+                    self._defer[work["id"]] = time.monotonic() + _NATIVE_BUSY_RECHECK_SECONDS
+                    return
+                await self.continuation.preflight(work)
+            except BridgeError as exc:
+                if exc.code in {"continuation_source_unverified", "continuation_scope_changed"}:
+                    self.teams.fail(
+                        work["id"], "blocked", exc.code, {"native_input_attempted": False}
+                    )
+                    return
+                raise
         linked = self.teams.coordinator_roles.linked_work(work["id"])
         if (
             not existing
@@ -754,6 +778,10 @@ class TeamDispatcher:
                 return
 
     async def _prompt(self, pool, work):
+        if self.continuation is not None:
+            review = self.continuation.review_prompt(work)
+            if review is not None:
+                return review
         linked = self.teams.coordinator_roles.linked_work(work["id"])
         if linked:
             return self.teams.coordinator_roles.prompt(work, linked)
@@ -903,6 +931,15 @@ class TeamDispatcher:
         limits = self.bridge.config.team
         result = core.get("result") or {}
         text = result.get("text", result.get("final_message", ""))
+        if self.continuation is not None and self.continuation.operation(work["id"], REVIEW):
+            if result.get("success", True) is True and isinstance(text, str):
+                bounded = text.encode()[: limits.max_result_bytes].decode("utf-8", "ignore")
+                self.teams.finish(work["id"], bounded, {"model_turn_completed": True})
+            else:
+                self.teams.fail(
+                    work["id"], "failed", "continuation_review_unconfirmed", {"actions_applied": 0}
+                )
+            return
         linked = self.teams.coordinator_roles.linked_work(work["id"])
         if linked:
             if result.get("success", True) is True and isinstance(text, str):

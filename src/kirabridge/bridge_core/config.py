@@ -125,6 +125,39 @@ class TeamWorkerConfig(BaseModel):
         return self
 
 
+class TeamContinuationSource(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    board_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    entry_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    task_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+    content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    assignee: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,79}$")
+    cwd: str = Field(min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def exact_directory(self):
+        if not Path(self.cwd).is_absolute():
+            raise ValueError("Continuation requires the fixed, absolute worker cwd")
+        return self
+
+
+class TeamContinuationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    team_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    workspace_id: str = Field(min_length=1, max_length=128)
+    board_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    authority_ref: str = Field(min_length=1, max_length=512)
+    sources: list[TeamContinuationSource] = Field(min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def unique_sources(self):
+        if len({source.task_id for source in self.sources}) != len(self.sources) or len(
+            {(source.board_id or self.board_id, source.entry_id) for source in self.sources}
+        ) != len(self.sources):
+            raise ValueError("Continuation must name unique tasks and original board entries")
+        return self
+
+
 class TeamConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
@@ -143,6 +176,7 @@ class TeamConfig(BaseModel):
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
     # Opt-in: a finished delegated work wakes its automated delegator exactly once.
     coordinator_resume: bool = False
+    continuation: TeamContinuationConfig | None = None
 
     @model_serializer(mode="wrap")
     def routing_opt_out(self, handler):
@@ -151,6 +185,8 @@ class TeamConfig(BaseModel):
             value.pop("routing", None)
         if not self.coordinator_resume:
             value.pop("coordinator_resume", None)
+        if self.continuation is None:
+            value.pop("continuation", None)
         return value
 
     @model_validator(mode="after")
