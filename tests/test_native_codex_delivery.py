@@ -338,6 +338,60 @@ async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(d
     assert len(p.inputs()) == 1
 
 
+async def test_direct_cold_host_retries_only_prepare_for_the_original(
+    delivery, binding, monkeypatch
+):
+    bridge, transport, direct, _, _ = delivery
+    protocol = Protocol(binding)
+    host = protocol.host()
+    prepare = host.prepare
+    checked = []
+
+    async def cold_then_ready(candidate):
+        checked.append(candidate.thread_id)
+        if len(checked) == 1:
+            raise BridgeError("native_codex_host_unavailable", "Host is starting")
+        return await prepare(candidate)
+
+    monkeypatch.setattr(host, "prepare", cold_then_ready)
+    monkeypatch.setattr(direct, "native_host_prepare_delays", (0,))
+    direct.codex_host = host
+    bridge.config.visible_handoffs.native_codex = binding
+    sent = new_message(bridge, key="direct-cold-host", recipient="codex")
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    assert checked == [ROOT, ROOT]
+    assert len(protocol.inputs()) == 1 and not transport["calls"]
+    assert job(bridge, sent)["evidence"]["completion_scope"] == "native_input_delivery"
+    assert bridge.messages.get("chatgpt", sent["id"])["acknowledged"] is None
+    assert not direct.submit("chatgpt", sent["id"])
+
+
+async def test_direct_cold_host_watchdog_does_not_fall_back_to_terminal(
+    delivery, binding, monkeypatch
+):
+    bridge, transport, direct, _, _ = delivery
+    protocol = Protocol(binding)
+    host = protocol.host()
+
+    async def unavailable(_):
+        raise BridgeError("native_codex_host_unavailable", "Host is starting")
+
+    monkeypatch.setattr(host, "prepare", unavailable)
+    monkeypatch.setattr(direct, "delivery_timeout", 0.03)
+    direct.codex_host = host
+    bridge.config.visible_handoffs.native_codex = binding
+    sent = new_message(bridge, key="direct-cold-host-timeout", recipient="codex")
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    result = job(bridge, sent)
+    assert result["state"] == "failed" and result["error"] == "delivery_timeout"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert not protocol.inputs() and not transport["calls"]
+
+
 @pytest.mark.parametrize(
     "change",
     [

@@ -19,6 +19,7 @@ from kirabridge.mcp_gateway.client import MCPClientPool
 
 class DirectDelivery:
     delivery_timeout = 30.0
+    native_host_prepare_delays = (2, 4, 8)
     PREINPUT_CODES = {
         "session_selection_changed",
         "session_busy",
@@ -369,8 +370,14 @@ class DirectDelivery:
                 }
             if observation:
                 evidence["observation"] = observation
+            assigned_native = (
+                row["recipient"] == "codex"
+                and bridge.config.visible_handoffs.native_codex is not None
+                and bridge.messages.interim_target(message_id) is None
+            )
             if (
                 not possible
+                and not assigned_native
                 and code in self.receiver.DEFER_UNSENT
                 and row["state"] == "queued"
                 and owned_run is None
@@ -504,7 +511,23 @@ class DirectDelivery:
             raise BridgeError("agent_denied", "Codex is not granted to this identity")
         for capability in ("session.inspect", "session.input"):
             bridge.security.principal(principal, capability)
-        prepared = await self.codex_host.prepare(binding)
+        for delay in (*self.native_host_prepare_delays, None):
+            try:
+                prepared = await self.codex_host.prepare(binding)
+                break
+            except BridgeError as error:
+                if error.code != "native_codex_host_unavailable" or delay is None:
+                    raise
+                # This observation ran before a job claim or native input. Keep
+                # the original new-record admission and its watchdog deadline.
+                await asyncio.sleep(delay)
+                if not self._unclaimed(identifier):
+                    return
+                current = bridge.config.visible_handoffs.native_codex
+                if current != binding:
+                    raise BridgeError(
+                        "native_codex_scope_changed", "Native Codex binding changed"
+                    ) from error
         if (
             prepared["operation"] == "turn/steer"
             and not bridge.config.visible_handoffs.allow_interim_messages

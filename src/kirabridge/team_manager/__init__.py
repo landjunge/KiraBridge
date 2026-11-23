@@ -85,6 +85,10 @@ CREATE INDEX IF NOT EXISTS team_native_ping_outcomes ON team_events(team_id,obje
  WHERE kind IN ('team.message_native_ping_idle_pending','team.message_native_ping_denied',
  'team.message_native_ping_failed','team.message_native_ping_submitting',
  'team.message_native_ping_submitted','team.message_native_ping_unknown');
+CREATE INDEX IF NOT EXISTS team_native_ping_defers ON team_events(team_id,object_id,seq)
+ WHERE kind='team.message_native_ping_pre_attempt_deferred';
+CREATE INDEX IF NOT EXISTS team_native_ping_exhausted ON team_events(team_id,object_id)
+ WHERE kind='team.message_native_ping_pre_attempt_exhausted';
 CREATE TABLE IF NOT EXISTS team_coordinator_resumes (
  notice_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES team_work(id),
  resume_work_id TEXT UNIQUE NOT NULL REFERENCES team_work(id), created REAL NOT NULL
@@ -109,6 +113,7 @@ SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 # persisted session store, so they are excluded.
 RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http", "opencode_http_v2", "qwen_acp"}
 TRACKED_SESSION_ADAPTERS = RESUME_ADAPTERS | {"qwen_acp"}
+NATIVE_PING_MAX_PRE_ATTEMPT_FAILURES = 4
 
 
 def _bounded_text(text, limit):
@@ -1081,20 +1086,151 @@ class TeamManager:
         }
 
     def pending_native_pings(self, limit=16):
-        """Return only newly enrolled messages with no recorded attempt outcome."""
+        """Return queued pings and only due, explicitly scheduled pre-attempt retries."""
         rows = self.store.db.execute(
             "SELECT e.team_id,e.object_id,m.sender,m.recipient FROM team_events e "
             "JOIN team_messages m ON m.team_id=e.team_id AND m.id=e.object_id "
-            "WHERE e.kind='team.message_native_ping_queued' AND NOT EXISTS ("
-            "SELECT 1 FROM team_events done WHERE done.team_id=e.team_id "
+            "WHERE e.kind='team.message_native_ping_queued' AND m.acknowledged IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM team_events done WHERE done.team_id=e.team_id "
             "AND done.object_id=e.object_id AND done.kind IN ("
             "'team.message_native_ping_idle_pending','team.message_native_ping_denied',"
             "'team.message_native_ping_failed','team.message_native_ping_submitting',"
             "'team.message_native_ping_submitted','team.message_native_ping_unknown')) "
+            "AND NOT EXISTS (SELECT 1 FROM team_events exhausted "
+            "WHERE exhausted.team_id=e.team_id AND exhausted.object_id=e.object_id "
+            "AND exhausted.kind='team.message_native_ping_pre_attempt_exhausted') "
+            "AND (NOT EXISTS (SELECT 1 FROM team_events prior WHERE prior.team_id=e.team_id "
+            "AND prior.object_id=e.object_id "
+            "AND prior.kind='team.message_native_ping_pre_attempt_deferred') "
+            "OR EXISTS (SELECT 1 FROM team_events deferred WHERE deferred.team_id=e.team_id "
+            "AND deferred.object_id=e.object_id "
+            "AND deferred.kind='team.message_native_ping_pre_attempt_deferred' "
+            "AND deferred.seq=(SELECT MAX(latest.seq) FROM team_events latest "
+            "WHERE latest.team_id=e.team_id AND latest.object_id=e.object_id "
+            "AND latest.kind='team.message_native_ping_pre_attempt_deferred') "
+            "AND CASE WHEN json_valid(deferred.metadata) THEN ("
+            "json_extract(deferred.metadata,'$.error_code')='native_codex_host_unavailable' "
+            "AND json_extract(deferred.metadata,'$.stage') IN ('host_prepare','host_deliver') "
+            "AND json_type(deferred.metadata,'$.native_input_attempted')='false' "
+            "AND json_type(deferred.metadata,'$.retry_scheduled')='true' "
+            "AND json_type(deferred.metadata,'$.retry_count')='integer' "
+            "AND json_extract(deferred.metadata,'$.retry_count') BETWEEN 1 AND ? "
+            "AND json_type(deferred.metadata,'$.delay_seconds')='integer' "
+            "AND json_extract(deferred.metadata,'$.delay_seconds')="
+            "min(1 << json_extract(deferred.metadata,'$.retry_count'),8) "
+            "AND json_type(deferred.metadata,'$.binding_sha256')='text' "
+            "AND length(json_extract(deferred.metadata,'$.binding_sha256'))=64 "
+            "AND json_extract(deferred.metadata,'$.binding_sha256') NOT GLOB '*[^0-9a-f]*' "
+            "AND json_type(deferred.metadata,'$.retry_after') IN ('integer','real') "
+            "AND json_extract(deferred.metadata,'$.retry_after')<=?) ELSE 0 END)) "
             "ORDER BY e.seq LIMIT ?",
-            (limit,),
+            (NATIVE_PING_MAX_PRE_ATTEMPT_FAILURES - 1, time.time(), limit),
         ).fetchall()
         return [dict(row) for row in rows]
+
+    @staticmethod
+    def _native_ping_pre_attempt_defer_state(metadata):
+        """Parse an explicit scheduled defer; malformed or terminal metadata fails closed."""
+        try:
+            value = json.loads(metadata) if isinstance(metadata, str) else metadata
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(value, dict):
+            return None
+        retry_count, retry_after = value.get("retry_count"), value.get("retry_after")
+        delay_seconds = value.get("delay_seconds")
+        binding_sha256 = value.get("binding_sha256")
+        if (
+            value.get("error_code") != "native_codex_host_unavailable"
+            or value.get("stage") not in {"host_prepare", "host_deliver"}
+            or value.get("native_input_attempted") is not False
+            or value.get("retry_scheduled") is not True
+            or type(retry_count) is not int
+            or not 1 <= retry_count < NATIVE_PING_MAX_PRE_ATTEMPT_FAILURES
+            or type(retry_after) not in (int, float)
+            or not math.isfinite(retry_after)
+            or type(delay_seconds) is not int
+            or delay_seconds != min(2**retry_count, 8)
+            or not isinstance(binding_sha256, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", binding_sha256)
+        ):
+            return None
+        return {
+            "retry_count": retry_count,
+            "retry_after": retry_after,
+            "binding_sha256": binding_sha256,
+        }
+
+    def defer_native_ping_before_attempt(self, team_id, principal, message_id, stage):
+        """Durably schedule a bounded retry only while no attempt/outcome exists."""
+        binding = self.config.visible_handoffs.native_codex
+        if binding is None or stage not in {"host_prepare", "host_deliver"}:
+            return False
+        binding_sha256 = digest(binding.model_dump())
+        now = time.time()
+        with self.store.transaction():
+            message = self.store.db.execute(
+                "SELECT recipient,acknowledged FROM team_messages WHERE team_id=? AND id=?",
+                (team_id, message_id),
+            ).fetchone()
+            if message is None or message["recipient"] != "codex" or message["acknowledged"]:
+                return False
+            outcomes = self.store.db.execute(
+                "SELECT seq,kind,metadata FROM team_events WHERE team_id=? AND object_id=? "
+                "AND kind IN ('team.message_native_ping_idle_pending',"
+                "'team.message_native_ping_denied','team.message_native_ping_failed',"
+                "'team.message_native_ping_submitting','team.message_native_ping_submitted',"
+                "'team.message_native_ping_unknown','team.message_native_ping_pre_attempt_exhausted',"
+                "'team.message_native_ping_pre_attempt_deferred') ORDER BY seq",
+                (team_id, message_id),
+            ).fetchall()
+            if any(
+                row["kind"] != "team.message_native_ping_pre_attempt_deferred" for row in outcomes
+            ):
+                return False
+            prior = (
+                self._native_ping_pre_attempt_defer_state(outcomes[-1]["metadata"])
+                if outcomes
+                else None
+            )
+            if outcomes and (
+                prior is None
+                or prior["retry_after"] > now
+                or prior["binding_sha256"] != binding_sha256
+            ):
+                return False
+            retry_count = prior["retry_count"] + 1 if prior else 1
+            metadata = {
+                "error_code": "native_codex_host_unavailable",
+                "stage": stage,
+                "native_input_attempted": False,
+                "retry_count": retry_count,
+                "binding_sha256": binding_sha256,
+            }
+            if retry_count >= NATIVE_PING_MAX_PRE_ATTEMPT_FAILURES:
+                self._event(
+                    team_id,
+                    principal,
+                    "team.message_native_ping_pre_attempt_exhausted",
+                    message_id,
+                    **metadata,
+                    retry_scheduled=False,
+                    automatic_retry=False,
+                )
+                return False
+            delay_seconds = min(2**retry_count, 8)
+            self._event(
+                team_id,
+                principal,
+                "team.message_native_ping_pre_attempt_deferred",
+                message_id,
+                **metadata,
+                retry_scheduled=True,
+                retry_after=now + delay_seconds,
+                delay_seconds=delay_seconds,
+                automatic_retry=True,
+            )
+            return True
 
     def ack(self, principal, team_id, message_id):
         with self.store.transaction():

@@ -16,6 +16,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, TypeAdapter, ValidationError
 
+from kirabridge.bridge_core.config import TeamWorkerConfig
 from kirabridge.bridge_core.models import BridgeError, Input, TaskRequest, canonical, digest
 from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
@@ -242,7 +243,12 @@ class TeamDispatcher:
                     self._ping_defer.pop(item["object_id"], None)
                     await self._run_native_ping(item)
                     continue
-                await self.ping_wake.wait()
+                # Persisted host-unavailable deadlines survive a restart. Poll
+                # this indexed inbox on the same bounded cadence as team work.
+                try:
+                    await asyncio.wait_for(self.ping_wake.wait(), 2)
+                except TimeoutError:
+                    pass
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -266,18 +272,30 @@ class TeamDispatcher:
 
         def record(kind, **metadata):
             with bridge.store.transaction():
-                if (
-                    kind != "team.message_native_ping_submitting"
-                    and bridge.store.db.execute(
-                        "SELECT 1 FROM team_events WHERE team_id=? AND object_id=? AND kind IN ("
-                        "'team.message_native_ping_idle_pending','team.message_native_ping_denied',"
-                        "'team.message_native_ping_failed','team.message_native_ping_submitted',"
-                        "'team.message_native_ping_unknown') LIMIT 1",
+                if kind != "team.message_native_ping_submitting":
+                    outcomes = bridge.store.db.execute(
+                        "SELECT kind,metadata FROM team_events WHERE team_id=? AND object_id=? "
+                        "AND kind IN ('team.message_native_ping_idle_pending',"
+                        "'team.message_native_ping_denied','team.message_native_ping_failed',"
+                        "'team.message_native_ping_submitted','team.message_native_ping_unknown',"
+                        "'team.message_native_ping_pre_attempt_exhausted')",
                         (team_id, message_id),
-                    ).fetchone()
-                ):
-                    return
+                    ).fetchall()
+                    if outcomes:
+                        return
                 self.teams._event(team_id, sender, kind, message_id, **metadata)
+
+        def defer_pre_attempt_host_unavailable(exc):
+            if (
+                not attempt_started
+                and isinstance(exc, BridgeError)
+                and exc.code == "native_codex_host_unavailable"
+                and stage in {"host_prepare", "host_deliver"}
+            ):
+                self.teams.defer_native_ping_before_attempt(team_id, sender, message_id, stage)
+                self.ping_wake.set()
+                return True
+            return False
 
         try:
             if binding is None:
@@ -373,6 +391,8 @@ class TeamDispatcher:
                     )
                 raise
             except Exception as exc:
+                if defer_pre_attempt_host_unavailable(exc):
+                    return
                 if isinstance(exc, BridgeError) and exc.code == "service_maintenance":
                     self._ping_defer[message_id] = time.monotonic() + 2
                     return
@@ -410,6 +430,8 @@ class TeamDispatcher:
             # No native attempt boundary was crossed; retain the original inbox
             # item. If the boundary exists, persist uncertainty and never replay.
             code = exc.code if isinstance(exc, BridgeError) else "native_ping_failed"
+            if defer_pre_attempt_host_unavailable(exc):
+                return
             if isinstance(exc, BridgeError) and exc.code == "service_maintenance":
                 self._ping_defer[message_id] = time.monotonic() + 2
                 return
@@ -443,7 +465,8 @@ class TeamDispatcher:
             "SELECT coordinator FROM teams WHERE id=?", (team_id,)
         ).fetchone()
         row = self.bridge.store.db.execute(
-            "SELECT sender,recipient,acknowledged FROM team_messages WHERE id=? AND team_id=?",
+            "SELECT sender,recipient,acknowledged,created FROM team_messages "
+            "WHERE id=? AND team_id=?",
             (message_id, team_id),
         ).fetchone()
         queued = self.bridge.store.db.execute(
@@ -466,16 +489,32 @@ class TeamDispatcher:
             or held is not None
         ):
             raise BridgeError("native_codex_scope_changed", "Team message scope changed")
-        if self.bridge.store.db.execute(
-            "SELECT 1 FROM team_events WHERE team_id=? AND object_id=? AND kind IN ("
+        outcomes = self.bridge.store.db.execute(
+            "SELECT kind,metadata FROM team_events WHERE team_id=? AND object_id=? AND kind IN ("
             "'team.message_native_ping_submitting','team.message_native_ping_idle_pending',"
             "'team.message_native_ping_denied','team.message_native_ping_failed',"
-            "'team.message_native_ping_submitted','team.message_native_ping_unknown') LIMIT 1",
+            "'team.message_native_ping_submitted','team.message_native_ping_unknown',"
+            "'team.message_native_ping_pre_attempt_exhausted',"
+            "'team.message_native_ping_pre_attempt_deferred') ORDER BY seq",
             (team_id, message_id),
-        ).fetchone():
+        ).fetchall()
+        if any(row["kind"] != "team.message_native_ping_pre_attempt_deferred" for row in outcomes):
             raise BridgeError(
                 "native_codex_ping_already_attempted", "Native ping was already attempted"
             )
+        if outcomes:
+            deferred = self.teams._native_ping_pre_attempt_defer_state(outcomes[-1]["metadata"])
+            now = time.time()
+            if deferred is None or deferred["retry_after"] > now:
+                raise BridgeError(
+                    "native_codex_ping_already_attempted", "Native ping retry is not due"
+                )
+            binding = self.bridge.config.visible_handoffs.native_codex
+            if binding is None or digest(binding.model_dump()) != deferred["binding_sha256"]:
+                raise BridgeError("native_codex_scope_changed", "Native ping binding changed")
+            worker = self.bridge.config.team.workers.get("codex") or TeamWorkerConfig()
+            if now - row["created"] >= worker.timeout:
+                raise BridgeError("native_codex_ping_expired", "Deferred native ping expired")
         sender_policy = self.bridge.security.principal(sender, "message.send")
         target_policy = self.bridge.security.principal("codex", "message.read")
         if (
