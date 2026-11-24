@@ -588,6 +588,10 @@ class DirectDelivery:
         self._claimed[identifier] = run_id
 
         async def before_send(observation):
+            # Host preparation includes awaited RPCs. Revalidate the dynamic
+            # coordinator route at the native transport's final pre-send hook,
+            # after those observations and before recording/issuing the turn.
+            self._verify_coordinator_route(message)
             with bridge.store.transaction():
                 current = bridge.config.visible_handoffs.native_codex
                 receiver = bridge.config.messaging.receivers.get("codex")

@@ -518,6 +518,56 @@ async def test_role_routed_delivery_refuses_a_coordinator_change_before_any_inpu
     assert not protocol.inputs() and not transport["calls"] and not connected
 
 
+async def test_role_handoff_during_native_revalidation_is_refused_at_send_boundary(
+    delivery, binding
+):
+    """A role change during awaited host observation must be caught before RPC input."""
+    from kirabridge.message_manager import MessageSend
+
+    bridge, transport, direct, connected, _ = delivery
+    protocol = Protocol(binding)
+    direct.codex_host = protocol.host()
+    bridge.config.visible_handoffs.native_codex = binding
+    current = {
+        "principal": "codex",
+        "session": {"principal": "codex", "session_id": ROOT},
+        "team_id": "team-one",
+        "revision": 4,
+    }
+    bridge.messages.coordinator_resolver = lambda: current
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="coordinator",
+            conversation_id="coordinator-final-boundary-race",
+            idempotency_key="coordinator-final-boundary-race",
+            body="Must stop if the role changes during final host observation",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+
+    def handoff_during_delivery_observation(host):
+        if host.reads == 2:
+            current.update(
+                principal="grok",
+                session={"principal": "grok", "session_id": "grok-new"},
+                revision=5,
+            )
+
+    protocol.read_hook = handoff_during_delivery_observation
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed"
+    assert result["error"] == "coordinator_route_changed"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert stored["delivered"] is stored["receipt"] is stored["acknowledged"] is None
+    assert not protocol.inputs() and not transport["calls"] and not connected
+
+
 @pytest.mark.parametrize(
     "change",
     [

@@ -1279,6 +1279,13 @@ class MessageReceiver:
                 )
 
         async def running(evidence):
+            # For role-addressed visible messages this is the last
+            # application-level check before SessionManager starts its input
+            # path. Terminal.app still performs asynchronous native checks
+            # afterward, so this narrows the race but cannot serialize an
+            # external role writer with the physical paste.
+            if delivery_event is not None:
+                self.direct._verify_coordinator_route(message)
             with self.bridge.store.transaction():
                 self.bridge.store.db.execute(
                     "UPDATE message_jobs SET started=COALESCE(started,?) WHERE message_id=?",
