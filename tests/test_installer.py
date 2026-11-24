@@ -1,7 +1,13 @@
 import contextlib
 import importlib.util
 import json
+import os
 import plistlib
+import select
+import shlex
+import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,6 +33,495 @@ def test_busy_guard_prevents_switch_without_touching_tasks(installer, bridge, co
         with installer.idle_guard(path):
             pytest.fail("must not enter activation")
     assert bridge.store.get(value.task_id, "local")["state"] == "created"
+
+
+def _idle_guard_fixture(
+    tmp_path,
+    *,
+    other_task=False,
+    other_task_state="queued",
+    other_task_operation="file.list",
+    receiver=False,
+    team_work=False,
+):
+    state = tmp_path / "state"
+    state.mkdir()
+    db = sqlite3.connect(state / "bridge.sqlite3")
+    db.executescript(
+        "CREATE TABLE tasks(id TEXT PRIMARY KEY, principal TEXT, operation TEXT, state TEXT, "
+        "args TEXT, evidence TEXT, lease_owner TEXT, lease_until REAL);"
+        "CREATE TABLE events(seq INTEGER PRIMARY KEY, task_id TEXT, state TEXT, evidence TEXT);"
+        "CREATE TABLE message_jobs(message_id TEXT PRIMARY KEY, state TEXT);"
+        "CREATE TABLE queue_holds(queue_id TEXT, item_id TEXT);"
+        "CREATE TABLE team_work(id TEXT PRIMARY KEY, state TEXT);"
+    )
+    task_id = "visible-install-attempt"
+    evidence = {
+        "execution_route": "visible_terminal",
+        "pane_id": "terminal:42:ttys001",
+        "expected_pid": 222,
+        "tty": "/dev/ttys001",
+    }
+    db.execute(
+        "INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?)",
+        (
+            task_id,
+            "codex",
+            "terminal.visible",
+            "running",
+            json.dumps({"pane_id": evidence["pane_id"], "expected_pid": 222}),
+            json.dumps(evidence),
+            "core-owner",
+            4_000_000_000,
+        ),
+    )
+    db.execute(
+        "INSERT INTO events(task_id,state,evidence) VALUES(?,?,?)",
+        (task_id, "running", json.dumps(evidence)),
+    )
+    if other_task:
+        db.execute(
+            "INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?)",
+            (
+                "unrelated-task",
+                "codex",
+                other_task_operation,
+                other_task_state,
+                "{}",
+                "{}",
+                None,
+                None,
+            ),
+        )
+    if receiver:
+        db.execute("INSERT INTO message_jobs VALUES('receiver-job','queued')")
+    if team_work:
+        db.execute("INSERT INTO team_work VALUES('team-job','processing_result')")
+    db.commit()
+    db.close()
+    config = tmp_path / "config.toml"
+    config.write_text("data_dir = " + json.dumps(str(state)))
+    return config, task_id
+
+
+def _authorize_current_terminal_task(installer, monkeypatch, task_id):
+    monkeypatch.setenv(installer.ACTIVE_TERMINAL_TASK_ENV, task_id)
+    monkeypatch.setenv(installer.ACTIVE_TERMINAL_PRINCIPAL_ENV, "codex")
+    monkeypatch.setattr(installer, "_current_tty", lambda: "/dev/ttys001")
+    monkeypatch.setattr(installer, "_process_ancestry", lambda: {111, 222, 333})
+
+
+def test_idle_guard_excludes_only_the_exact_live_visible_terminal_task(
+    installer, monkeypatch, tmp_path
+):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    _authorize_current_terminal_task(installer, monkeypatch, task_id)
+    with installer.idle_guard(config):
+        pass
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "malformed-env",
+        "wrong-principal",
+        "wrong-operation",
+        "rollback-operation",
+        "expired-lease",
+        "nan-lease",
+        "wrong-tty",
+        "wrong-pid",
+        "wrong-session",
+        "blank-principal",
+        "event-mismatch",
+    ],
+)
+def test_idle_guard_never_excludes_unproven_or_stale_terminal_task(
+    installer, monkeypatch, tmp_path, mutation
+):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    db_path = tmp_path / "state/bridge.sqlite3"
+    db = sqlite3.connect(db_path)
+    if mutation == "wrong-operation":
+        db.execute("UPDATE tasks SET operation='file.list' WHERE id=?", (task_id,))
+    elif mutation == "rollback-operation":
+        db.execute("UPDATE tasks SET operation='installer.rollback' WHERE id=?", (task_id,))
+    elif mutation == "expired-lease":
+        db.execute("UPDATE tasks SET lease_until=1 WHERE id=?", (task_id,))
+    elif mutation == "nan-lease":
+        db.execute("UPDATE tasks SET lease_until=? WHERE id=?", (float("nan"), task_id))
+    elif mutation == "wrong-session":
+        args = json.dumps({"pane_id": "terminal:9:ttys009"})
+        db.execute("UPDATE tasks SET args=? WHERE id=?", (args, task_id))
+    elif mutation == "blank-principal":
+        db.execute("UPDATE tasks SET principal='' WHERE id=?", (task_id,))
+    elif mutation == "event-mismatch":
+        db.execute("UPDATE events SET evidence='{}' WHERE task_id=?", (task_id,))
+    db.commit()
+    db.close()
+    task_env_id = "missing" if mutation == "missing" else task_id
+    _authorize_current_terminal_task(installer, monkeypatch, task_env_id)
+    if mutation == "malformed-env":
+        monkeypatch.setenv(installer.ACTIVE_TERMINAL_TASK_ENV, task_id + "\n")
+    if mutation == "wrong-principal":
+        monkeypatch.setenv(installer.ACTIVE_TERMINAL_PRINCIPAL_ENV, "grok")
+    if mutation == "wrong-tty":
+        monkeypatch.setattr(installer, "_current_tty", lambda: "/dev/ttys099")
+    elif mutation == "wrong-pid":
+        monkeypatch.setattr(installer, "_process_ancestry", lambda: {111, 333})
+    with pytest.raises(RuntimeError, match="BUSY: 1 tasks"):
+        with installer.idle_guard(config):
+            pytest.fail("unverified task must remain busy")
+
+
+@pytest.mark.parametrize(
+    ("other_task", "receiver", "team_work", "expected"),
+    [
+        (True, False, False, "BUSY: 1 tasks"),
+        (False, True, False, "BUSY: 0 tasks, 1 receiver jobs"),
+        (False, False, True, "BUSY: 0 tasks, 0 receiver jobs, 1 team jobs"),
+    ],
+)
+def test_idle_guard_still_blocks_every_other_active_work_item(
+    installer, monkeypatch, tmp_path, other_task, receiver, team_work, expected
+):
+    config, task_id = _idle_guard_fixture(
+        tmp_path, other_task=other_task, receiver=receiver, team_work=team_work
+    )
+    _authorize_current_terminal_task(installer, monkeypatch, task_id)
+    with pytest.raises(RuntimeError, match=expected):
+        with installer.idle_guard(config):
+            pytest.fail("other active work must block activation")
+
+
+async def test_task_manager_running_event_is_accepted_by_installer_idle_guard(
+    installer, bridge, config, monkeypatch, tmp_path
+):
+    task_id = "real-store-visible-installer-task"
+    pid = installer.os.getpid()
+    pane_id = "terminal:42:ttys001"
+    tty = "/dev/ttys001"
+    config.principals["local"].capabilities.append("session.inspect")
+    request_value = request(
+        "terminal.visible",
+        {
+            "argv": ["python3", "-c", "pass"],
+            "cwd": config.principals["local"].roots[0],
+            "pane_id": pane_id,
+            "expected_pid": pid,
+        },
+        task_id=task_id,
+    )
+    bridge.prepare("local", request_value)
+    bridge.tasks.approve(task_id)
+    claimed = bridge.store.claim_exact(bridge.tasks.owner, 30, task_id)
+    assert claimed is not None
+    config_path = tmp_path / "installer.toml"
+    config_path.write_text("data_dir = " + json.dumps(str(config.state_path)))
+    monkeypatch.setenv(installer.ACTIVE_TERMINAL_TASK_ENV, task_id)
+    monkeypatch.setenv(installer.ACTIVE_TERMINAL_PRINCIPAL_ENV, "local")
+    monkeypatch.setattr(installer, "_current_tty", lambda: tty)
+    monkeypatch.setattr(installer, "_process_ancestry", lambda: {pid})
+
+    async def execute(task, running, progress):
+        evidence = {
+            "execution_route": "visible_terminal",
+            "pane_id": pane_id,
+            "expected_pid": pid,
+            "tty": tty,
+        }
+        await running(evidence)
+        with installer.idle_guard(config_path):
+            pass
+        return {"success": True}
+
+    bridge.tasks.preflight = None
+    bridge.tasks.executor = execute
+    await bridge.tasks._execute(claimed)
+    assert bridge.store.get(task_id)["state"] == "completed"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="PTY and process ancestry require POSIX")
+def test_process_ancestry_reads_real_pty_and_live_parent_chain(installer):
+    import pty
+
+    master, slave = pty.openpty()
+    tty = os.ttyname(slave)
+    source = Path(installer.__file__).resolve()
+    code = (
+        "import importlib.util,json,os\n"
+        "p=" + repr(str(source)) + "\n"
+        "s=importlib.util.spec_from_file_location('install_probe',p)\n"
+        "m=importlib.util.module_from_spec(s)\n"
+        "s.loader.exec_module(m)\n"
+        "print(json.dumps({'pid':os.getpid(),'tty':m._current_tty(),'parents':sorted(m._process_ancestry())}))\n"
+    )
+    child = subprocess.Popen(
+        [sys.executable, "-c", code],
+        stdin=slave,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    os.close(slave)
+    try:
+        stdout, stderr = child.communicate(timeout=10)
+    finally:
+        os.close(master)
+    assert child.returncode == 0, stderr
+    observed = json.loads(stdout)
+    assert observed["tty"] == tty
+    assert child.pid == observed["pid"] and child.pid in observed["parents"]
+    assert os.getpid() in observed["parents"]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="PTY process start gate requires POSIX")
+async def test_owned_process_start_gate_waits_until_running_evidence_commit(tmp_path):
+    import pty
+
+    from kirabridge.platform_adapters import reap_process, spawn_process
+
+    master, slave = pty.openpty()
+    directory_fd = os.open(tmp_path, os.O_RDONLY)
+    process = None
+    try:
+        process = await spawn_process(
+            [sys.executable, "-c", "print('GATED_EXEC_STARTED')"],
+            directory_fd,
+            {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            start_gated=True,
+        )
+        os.close(directory_fd)
+        directory_fd = -1
+        assert process.returncode is None
+        assert not select.select([master], [], [], 0.1)[0]
+        gate_fd = process._kirabridge_start_gate_fd
+        os.close(gate_fd)
+        process._kirabridge_start_gate_fd = None
+        await process.wait()
+        output = bytearray()
+        while select.select([master], [], [], 0.05)[0]:
+            try:
+                output.extend(os.read(master, 4096))
+            except OSError:
+                break
+        assert process.returncode == 0
+        assert b"GATED_EXEC_STARTED" in output
+    finally:
+        if process is not None and process.returncode is None:
+            await reap_process(process)
+            gate_fd = getattr(process, "_kirabridge_start_gate_fd", None)
+            if gate_fd is not None:
+                os.close(gate_fd)
+        if directory_fd != -1:
+            os.close(directory_fd)
+        os.close(master)
+        os.close(slave)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="owned PTY process trees require POSIX")
+async def test_owned_process_running_failure_never_releases_start_gate(tmp_path):
+    from kirabridge.platform_adapters.linux.owned_terminal import LinuxOwnedTerminal
+
+    marker = tmp_path / "must-not-run"
+    directory_fd = os.open(tmp_path, os.O_RDONLY)
+    terminal = LinuxOwnedTerminal()
+
+    async def reject_running(_evidence):
+        raise RuntimeError("running evidence was not committed")
+
+    try:
+        with pytest.raises(RuntimeError, match="running evidence"):
+            await terminal.execute_argv(
+                [
+                    sys.executable,
+                    "-c",
+                    "from pathlib import Path; Path(" + repr(str(marker)) + ").write_text('bad')",
+                ],
+                directory_fd,
+                {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
+                timeout=5,
+                max_output=1024,
+                running=reject_running,
+            )
+    finally:
+        os.close(directory_fd)
+    assert not marker.exists()
+
+
+def test_installer_with_missing_stdin_tty_reports_busy(installer, tmp_path):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    code = (
+        "import importlib.util,pathlib\n"
+        "p=" + repr(str(Path(installer.__file__).resolve())) + "\n"
+        "s=importlib.util.spec_from_file_location('install_probe',p)\n"
+        "m=importlib.util.module_from_spec(s)\n"
+        "s.loader.exec_module(m)\n"
+        "with m.idle_guard(pathlib.Path(" + repr(str(config)) + ")): print('UNSAFE')\n"
+    )
+    environment = os.environ.copy()
+    environment[installer.ACTIVE_TERMINAL_TASK_ENV] = task_id
+    environment[installer.ACTIVE_TERMINAL_PRINCIPAL_ENV] = "codex"
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=environment,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "BUSY: 1 tasks" in result.stderr
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="visible-terminal pane identity is macOS-only")
+def test_missing_ps_command_keeps_real_shell_task_busy(installer, tmp_path):
+    import pty
+
+    config, task_id = _idle_guard_fixture(tmp_path)
+    master, slave = pty.openpty()
+    tty = os.ttyname(slave)
+    pane_id = "terminal:42:" + os.path.basename(tty)
+    code = (
+        "import importlib.util,pathlib,sys,os\n"
+        "p=" + repr(str(Path(installer.__file__).resolve())) + "\n"
+        "s=importlib.util.spec_from_file_location('install_probe',p)\n"
+        "m=importlib.util.module_from_spec(s)\n"
+        "s.loader.exec_module(m)\n"
+        "print('READY',flush=True)\n"
+        "os.read(0,1)\n"
+        "try:\n"
+        "    with m.idle_guard(pathlib.Path(" + repr(str(config)) + ")): print('UNSAFE')\n"
+        "except RuntimeError as e:\n"
+        "    print(str(e),flush=True)\n"
+        "    sys.exit(4)\n"
+    )
+    environment = os.environ.copy()
+    environment["PATH"] = ""
+    environment[installer.ACTIVE_TERMINAL_TASK_ENV] = task_id
+    environment[installer.ACTIVE_TERMINAL_PRINCIPAL_ENV] = "codex"
+    command = shlex.quote(sys.executable) + " -c " + shlex.quote(code) + "; /bin/sleep 0.1"
+    shell = subprocess.Popen(
+        ["/bin/sh", "-c", command],
+        stdin=slave,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=environment,
+        cwd=tmp_path,
+    )
+    try:
+        assert shell.stdout.readline().strip() == "READY"
+        evidence = {
+            "execution_route": "visible_terminal",
+            "pane_id": pane_id,
+            "expected_pid": shell.pid,
+            "tty": tty,
+        }
+        db = sqlite3.connect(tmp_path / "state/bridge.sqlite3")
+        db.execute(
+            "UPDATE tasks SET args=?,evidence=?,lease_until=? WHERE id=?",
+            (
+                json.dumps({"pane_id": pane_id, "expected_pid": shell.pid}),
+                json.dumps(evidence),
+                4_000_000_000,
+                task_id,
+            ),
+        )
+        db.execute(
+            "UPDATE events SET evidence=? WHERE task_id=? AND state='running'",
+            (json.dumps(evidence), task_id),
+        )
+        db.commit()
+        db.close()
+        os.write(master, b"x\n")
+        stdout, stderr = shell.communicate(timeout=10)
+    finally:
+        if shell.poll() is None:
+            shell.kill()
+            shell.wait(timeout=5)
+        os.close(master)
+        os.close(slave)
+    assert "UNSAFE" not in stdout, (stdout, stderr)
+    assert "BUSY: 1 tasks" in stdout
+
+
+@pytest.mark.parametrize(
+    ("state", "operation"),
+    [("queued", "terminal.visible"), ("accepted", "terminal.visible"), ("running", "file.list")],
+)
+def test_second_active_task_always_blocks_even_when_current_task_is_verified(
+    installer, monkeypatch, tmp_path, state, operation
+):
+    config, task_id = _idle_guard_fixture(
+        tmp_path,
+        other_task=True,
+        other_task_state=state,
+        other_task_operation=operation,
+    )
+    _authorize_current_terminal_task(installer, monkeypatch, task_id)
+    with pytest.raises(RuntimeError, match="BUSY: 1 tasks"):
+        with installer.idle_guard(config):
+            pytest.fail("the verified task cannot hide a second active task")
+
+
+@pytest.mark.parametrize("missing", ["ps", "stdin"])
+def test_missing_process_or_tty_proof_keeps_current_task_busy(
+    installer, monkeypatch, tmp_path, missing
+):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    monkeypatch.setenv(installer.ACTIVE_TERMINAL_TASK_ENV, task_id)
+    monkeypatch.setenv(installer.ACTIVE_TERMINAL_PRINCIPAL_ENV, "codex")
+    tty = None if missing == "stdin" else "/dev/ttys001"
+    monkeypatch.setattr(installer, "_current_tty", lambda: tty)
+    if missing == "ps":
+        monkeypatch.setattr(
+            installer.subprocess,
+            "run",
+            lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("ps unavailable")),
+        )
+    with pytest.raises(RuntimeError, match="BUSY: 1 tasks"):
+        with installer.idle_guard(config):
+            pytest.fail("missing provenance must fail closed")
+
+
+def test_rollback_function_keeps_its_idle_guard(installer, monkeypatch, tmp_path):
+    state_root = tmp_path / "state-root"
+    state_root.mkdir()
+    config, _ = _idle_guard_fixture(state_root, other_task=True)
+    root = tmp_path / "install-root"
+    root.mkdir()
+    current = root / "current.json"
+    previous = {
+        "config": str(config),
+        "launcher": str(root / "launcher"),
+        "plist": str(root / "plist"),
+        "service": "none",
+        "backup": str(root / "unused-backup"),
+        "had_wrapper": False,
+        "had_plist": False,
+        "was_loaded": False,
+        "rollback_core_restored": False,
+    }
+    current.write_text(json.dumps(previous))
+    original = current.read_bytes()
+    args = SimpleNamespace(
+        prefix=root,
+        config=config,
+        launcher=root / "launcher",
+        plist=root / "plist",
+        service="none",
+    )
+    monkeypatch.setattr(installer, "validate_service_owner", lambda _args: None)
+    with pytest.raises(RuntimeError, match="BUSY: 2 tasks"):
+        installer.rollback(args, _compensating=True)
+    assert current.read_bytes() == original
 
 
 def test_private_atomic_write_rejects_symlink_and_preserves_original(installer, tmp_path):

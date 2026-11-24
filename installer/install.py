@@ -9,6 +9,7 @@ import fcntl
 import hashlib
 import io
 import json
+import math
 import os
 import platform
 import plistlib
@@ -31,6 +32,8 @@ from pathlib import Path
 LABEL = "com.kirabridge.bridge"
 PRESENTER = None
 OUTPUT_TARGET = None
+ACTIVE_TERMINAL_TASK_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID"
+ACTIVE_TERMINAL_PRINCIPAL_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_PRINCIPAL"
 
 
 class NonBlockingOutput:
@@ -397,6 +400,158 @@ def state_file(config):
     return Path(settings(config)["data_dir"]).expanduser() / "bridge.sqlite3"
 
 
+def _process_ancestry(pid=None):
+    """Return the live caller and parent PIDs; fail closed if native ancestry is unreadable."""
+    current = os.getpid() if pid is None else pid
+    chain = set()
+    for _ in range(64):
+        if type(current) is not int or current <= 1 or current in chain:
+            break
+        chain.add(current)
+        try:
+            result = subprocess.run(
+                ["ps", "-o", "ppid=", "-p", str(current)],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            break
+        if result.returncode != 0:
+            break
+        try:
+            parent = int(result.stdout.strip())
+        except ValueError:
+            break
+        if parent <= 1 or parent == current:
+            break
+        current = parent
+    return chain
+
+
+def _current_tty():
+    try:
+        return os.ttyname(0)
+    except (OSError, ValueError):
+        return None
+
+
+def _verified_terminal_task_id(
+    db, *, environ=None, tty=None, process_ids=None, now=None
+):
+    """Authenticate the one active visible-terminal task running this installer process.
+
+    The ID is carried only by the Core-generated one-shot terminal runner. It is not
+    sufficient by itself: the current durable task row, lease, RUNNING event, exact
+    terminal pane/PID/TTY, and live OS process ancestry must all agree.
+    """
+    environ = os.environ if environ is None else environ
+    task_id = environ.get(ACTIVE_TERMINAL_TASK_ENV)
+    task_principal = environ.get(ACTIVE_TERMINAL_PRINCIPAL_ENV)
+    if not isinstance(task_id, str) or not task_id or len(task_id) > 128:
+        return None
+    if not isinstance(task_principal, str) or not task_principal or len(task_principal) > 128:
+        return None
+    if any(character in task_id or character in task_principal for character in "\x00\r\n"):
+        return None
+    if tty is None:
+        tty = _current_tty()
+        if tty is None:
+            return None
+    if process_ids is None:
+        process_ids = _process_ancestry()
+    if now is None:
+        now = time.time()
+    try:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(tasks)")}
+        required = {
+            "id",
+            "principal",
+            "operation",
+            "state",
+            "args",
+            "evidence",
+            "lease_owner",
+            "lease_until",
+        }
+        if not required.issubset(columns):
+            return None
+        row = db.execute(
+            "SELECT id,principal,operation,state,args,evidence,lease_owner,lease_until "
+            "FROM tasks WHERE id=?",
+            (task_id,),
+        ).fetchone()
+        if (
+            row is None
+            or row[0] != task_id
+            or row[1] != task_principal
+            or row[2] != "terminal.visible"
+            or row[3] != "running"
+            or not isinstance(row[6], str)
+            or not row[6]
+            or type(row[7]) not in {int, float}
+            or not math.isfinite(row[7])
+            or row[7] <= now
+        ):
+            return None
+        args, evidence = json.loads(row[4]), json.loads(row[5])
+        if not isinstance(args, dict) or not isinstance(evidence, dict):
+            return None
+        pane_id, expected_pid, expected_tty = (
+            evidence.get("pane_id"),
+            evidence.get("expected_pid"),
+            evidence.get("tty"),
+        )
+        route = evidence.get("execution_route")
+        mac_pane_match = (
+            re.fullmatch(r"terminal:[0-9]+:(ttys[0-9]+)", pane_id)
+            if isinstance(pane_id, str)
+            else None
+        )
+        linux_pane_match = (
+            re.fullmatch(r"linux:([0-9]+)", pane_id) if isinstance(pane_id, str) else None
+        )
+        expected_pid_valid = type(expected_pid) is int and expected_pid > 1
+        mac_identity = (
+            route == "visible_terminal"
+            and expected_pid_valid
+            and mac_pane_match is not None
+            and isinstance(expected_tty, str)
+            and os.path.basename(expected_tty) == mac_pane_match.group(1)
+            and expected_pid in process_ids
+        )
+        linux_identity = (
+            route == "linux_owned_pty"
+            and expected_pid_valid
+            and linux_pane_match is not None
+            and int(linux_pane_match.group(1)) == expected_pid
+            and expected_pid == os.getpid()
+            and expected_pid in process_ids
+            and isinstance(expected_tty, str)
+            and re.fullmatch(r"/dev/pts/[0-9]+", expected_tty) is not None
+        )
+        if (
+            not expected_pid_valid
+            or not isinstance(expected_tty, str)
+            or tty != expected_tty
+            or not (mac_identity or linux_identity)
+            or args.get("pane_id") not in (None, pane_id)
+            or args.get("expected_pid") not in (None, expected_pid)
+        ):
+            return None
+        event = db.execute(
+            "SELECT evidence FROM events WHERE task_id=? AND state='running' "
+            "ORDER BY seq DESC LIMIT 1",
+            (task_id,),
+        ).fetchone()
+        if event is None or json.loads(event[0]) != evidence:
+            return None
+    except (sqlite3.Error, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return task_id
+
+
 @contextlib.contextmanager
 def idle_guard(config):
     path = state_file(config)
@@ -407,10 +562,13 @@ def idle_guard(config):
     try:
         db.execute("BEGIN IMMEDIATE")
         tables = {r[0] for r in db.execute("select name from sqlite_master where type='table'")}
+        current_task_id = _verified_terminal_task_id(db)
         tasks = (
             db.execute(
                 "select count(*) from tasks "
                 "where state in ('created','queued','accepted','running')"
+                + (" and id<>?" if current_task_id else ""),
+                (current_task_id,) if current_task_id else (),
             ).fetchone()[0]
             if "tasks" in tables
             else 0

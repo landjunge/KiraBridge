@@ -68,7 +68,13 @@ class LinuxOwnedTerminal:
             nonblocking = True
             loop.add_reader(master, drain)
             process = await spawn_process(
-                argv, cwd_fd, env, stdin=slave, stdout=slave, stderr=slave
+                argv,
+                cwd_fd,
+                env,
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                start_gated=True,
             )
             os.close(slave)
             slave = -1
@@ -81,6 +87,11 @@ class LinuxOwnedTerminal:
                 "transport": "linux",
             }
             await running({**identity, "evidence_type": "local_process_spawned"})
+            start_gate_fd = getattr(process, "_kirabridge_start_gate_fd", None)
+            if start_gate_fd is None:
+                raise BridgeError("spawn_failed", "Owned PTY start gate is missing")
+            os.close(start_gate_fd)
+            process._kirabridge_start_gate_fd = None
             try:
                 async with asyncio.timeout(timeout):
                     await asyncio.shield(process.wait())
@@ -92,6 +103,10 @@ class LinuxOwnedTerminal:
                     # Also reap owned descendants after a successful leader exit.
                     # Cancellation and a failed running callback take this same path.
                     await reap_process(process)
+                    start_gate_fd = getattr(process, "_kirabridge_start_gate_fd", None)
+                    if start_gate_fd is not None:
+                        os.close(start_gate_fd)
+                        process._kirabridge_start_gate_fd = None
             finally:
                 if nonblocking:
                     loop.remove_reader(master)

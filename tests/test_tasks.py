@@ -87,6 +87,41 @@ def test_restart_preserves_queue_and_never_reexecutes_unknown(bridge, config):
         reopened.store.close()
 
 
+def test_restart_mid_visible_install_keeps_unknown_and_never_replays(bridge, config):
+    config.principals["local"].capabilities.append("session.inspect")
+    value = request(
+        "terminal.visible",
+        {
+            "argv": [sys.executable, "-c", "pass"],
+            "cwd": config.principals["local"].roots[0],
+        },
+        task_id="restart-mid-visible-install",
+    )
+    submit(bridge, value)
+    claimed = bridge.store.claim_exact(bridge.tasks.owner, 30, value.task_id)
+    assert claimed is not None
+    evidence = {
+        "execution_route": "visible_terminal",
+        "pane_id": "terminal:42:ttys001",
+        "expected_pid": 222,
+        "tty": "/dev/ttys001",
+    }
+    bridge.store.transition(value.task_id, State.RUNNING, evidence, owner=bridge.tasks.owner)
+    bridge.store.close()
+
+    reopened = Bridge(config)
+    try:
+        assert reopened.store.recover() == 1
+        unknown = reopened.store.get(value.task_id)
+        assert unknown["state"] == "unknown"
+        assert unknown["evidence"].get("automatic_retry", False) is False
+        assert unknown["evidence"]["last_observation"] == evidence
+        assert reopened.store.recover() == 0
+        assert reopened.store.claim("new-worker", 30) is None
+    finally:
+        reopened.store.close()
+
+
 async def test_exclusive_dispatcher_lock(bridge, config):
     second = Bridge(config)
     try:

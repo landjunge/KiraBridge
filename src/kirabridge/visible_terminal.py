@@ -47,6 +47,8 @@ class VisibleTerminalInput(TerminalInput):
 _VOLATILE = {"ui_window_count", "tab_selected", "visual_window_id", "tab_index", "tab_count"}
 # A candidate that vanished or became ambiguous between catalog and read is skipped, not fatal.
 _SKIPPABLE = {"session_selection_changed", "visible_target_ambiguous", "visible_target_changed"}
+_ACTIVE_TASK_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID"
+_ACTIVE_PRINCIPAL_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_PRINCIPAL"
 
 
 def _same_target(left, right):
@@ -66,7 +68,9 @@ def _unsuitable_code(row):
     return "session_busy", "Selected window is not a confirmed empty shell"
 
 
-def build_command_script(tty, cwd, argv, nonce, folder, result_path):
+def build_command_script(
+    tty, cwd, argv, nonce, folder, result_path, *, task_id=None, task_principal=None
+):
     """The one-shot zsh script typed into the visible window (never run by KiraBridge itself)."""
     ok = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
     setup_failed = json.dumps({"nonce": nonce, "exit_code": 125, "phase": "setup"})
@@ -77,6 +81,16 @@ def build_command_script(tty, cwd, argv, nonce, folder, result_path):
     # window/cwd check or an interrupt is reported at once instead of after the timeout.
     script = (
         "#!/bin/zsh -f\numask 077\n"
+        + (
+            "export " + _ACTIVE_TASK_ENV + "=" + shlex.quote(task_id) + "\n"
+            if isinstance(task_id, str) and task_id
+            else ""
+        )
+        + (
+            "export " + _ACTIVE_PRINCIPAL_ENV + "=" + shlex.quote(task_principal) + "\n"
+            if isinstance(task_principal, str) and task_principal
+            else ""
+        )
         + "kb_done() { printf "
         + shlex.quote("%s\n")
         + ' "$1" > '
@@ -229,10 +243,13 @@ class VisibleTerminal:
             # Opening the directory is read-only and descriptor-bound. No session or
             # executable is created by readiness or before authorization above.
             with scope.directory(cwd) as cwd_fd:
+                task_environment = dict(self.environment)
+                task_environment[_ACTIVE_TASK_ENV] = task["id"]
+                task_environment[_ACTIVE_PRINCIPAL_ENV] = task["principal"]
                 result = await self.sessions.linux.execute_argv(
                     argv,
                     cwd_fd,
-                    self.environment,
+                    task_environment,
                     timeout=args.timeout,
                     max_output=args.max_output,
                     running=running,
@@ -374,7 +391,16 @@ class VisibleTerminal:
         # same final revalidation, adding a native roundtrip without authority.
         # A one-shot script in this window inherits its real TTY. No subprocess
         # daemon, tmux pane, detached session or provider adapter executes the command.
-        script = build_command_script(row["tty"], cwd, argv, nonce, folder, result_path)
+        script = build_command_script(
+            row["tty"],
+            cwd,
+            argv,
+            nonce,
+            folder,
+            result_path,
+            task_id=task["id"],
+            task_principal=task["principal"],
+        )
         write_private(script_path, script)
         async with bridge.sessions.lock:
             current = await bridge.sessions.selected(

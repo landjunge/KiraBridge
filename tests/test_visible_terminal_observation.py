@@ -512,7 +512,16 @@ async def test_the_command_folder_is_removed_once_the_receipt_is_read(command):
     assert not [child for child in root.iterdir() if child.is_dir()]
 
 
-def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_after=None):
+def _run_script(
+    tmp_path,
+    *,
+    tty_override=None,
+    cwd=None,
+    argv=None,
+    interrupt_after=None,
+    task_id=None,
+    task_principal=None,
+):
     """Run the generated script with the real /bin/zsh on a pseudo-terminal."""
     import os
     import pty
@@ -534,6 +543,8 @@ def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_a
         "n0nce",
         folder,
         result,
+        task_id=task_id,
+        task_principal=task_principal,
     )
     path = folder / "command.zsh"
     path.write_text(script)
@@ -582,6 +593,26 @@ def test_script_receipts_an_interrupt(tmp_path):
     code, receipt = _run_script(tmp_path, argv=["/bin/sleep", "30"], interrupt_after=1.0)
     assert code == 130
     assert receipt == {"nonce": "n0nce", "exit_code": 130, "phase": "interrupted"}
+
+
+@needs_zsh
+def test_script_transports_the_exact_active_task_id(tmp_path):
+    marker = tmp_path / "task-id"
+    code, receipt = _run_script(
+        tmp_path,
+        argv=[
+            "/usr/bin/python3",
+            "-c",
+            "import os, pathlib; "
+            "pathlib.Path(" + repr(str(marker)) + ").write_text("
+            "os.environ['KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID'] + '|' + "
+            "os.environ['KIRABRIDGE_ACTIVE_TERMINAL_PRINCIPAL'])",
+        ],
+        task_id="stable-task-id-123",
+        task_principal="codex",
+    )
+    assert code == 0 and receipt["exit_code"] == 0
+    assert marker.read_text() == "stable-task-id-123|codex"
 
 
 @pytest.mark.parametrize(
