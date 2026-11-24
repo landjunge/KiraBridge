@@ -52,6 +52,7 @@ class DirectDelivery:
         "native_codex_target_changed",
         "native_codex_rpc_rejected",
         "native_codex_scope_changed",
+        "coordinator_route_changed",
     }
 
     def __init__(self, receiver):
@@ -256,6 +257,39 @@ class DirectDelivery:
         ).fetchone()
         return self._pristine(message_id, row)
 
+    def _verify_coordinator_route(self, message):
+        bridge = self.receiver.bridge
+        queued = bridge.store.db.execute(
+            "SELECT evidence FROM message_events WHERE message_id=? AND kind='message.queued' "
+            "ORDER BY seq LIMIT 1",
+            (message["id"],),
+        ).fetchone()
+        try:
+            metadata = json.loads(queued["evidence"]) if queued else {}
+        except (ValueError, TypeError):
+            metadata = {}
+        if metadata.get("recipient_role") != "coordinator":
+            return
+        resolver = bridge.messages.coordinator_resolver
+        if resolver is None:
+            raise BridgeError("coordinator_route_changed", "Coordinator routing is unavailable")
+        try:
+            current = resolver()
+        except BridgeError:
+            raise BridgeError(
+                "coordinator_route_changed", "Coordinator route is no longer eligible"
+            ) from None
+        if (
+            current.get("principal") != message["recipient"]
+            or digest(current.get("session")) != metadata.get("coordinator_session_sha256")
+            or current.get("team_id") != metadata.get("coordinator_scope_team_id")
+            or current.get("revision") != metadata.get("coordinator_role_revision")
+        ):
+            raise BridgeError(
+                "coordinator_route_changed",
+                "The persisted coordinator changed after this message was addressed",
+            )
+
     async def wait_delivery(self, message_id):
         """Caller cancellation cancels its observation, never the delivery task."""
         event = self.ready.get(message_id)
@@ -434,6 +468,7 @@ class DirectDelivery:
             recipient = message["recipient"]
             if not self.accepting:
                 raise BridgeError("receiver_unavailable", "Direct receiver is not running")
+            self._verify_coordinator_route(message)
             interim = bridge.messages.interim_target(message_id)
             if interim is not None:
                 selected = await bridge.sessions.selected(

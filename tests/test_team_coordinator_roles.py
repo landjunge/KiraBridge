@@ -10,14 +10,15 @@ from test_team_manager import domain as imported_domain
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import AgentConfig, NativeCodexBinding, TeamWorkerConfig
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.team_manager.models import TeamCoordinatorHandoff
+from kirabridge.message_manager import MessageSend
+from kirabridge.team_manager.models import TeamCoordinatorHandoff, TeamSessionClear
 
 domain = imported_domain
 
 TEAM = "auto-coordinator"
 
 
-def setup_team(domain, coordinator=None):
+def setup_team(domain, coordinator=None, team_id=TEAM):
     root = domain.config.principals["local"].roots[0]
     for principal in ("codex", "grok"):
         domain.config.principals[principal].agents = [principal]
@@ -27,17 +28,17 @@ def setup_team(domain, coordinator=None):
     domain.create(
         "local",
         create(
-            team_id=TEAM,
+            team_id=team_id,
             coordinator=coordinator,
             members={"local": "worker", "grok": "worker", "codex": "worker"},
         ),
     )
 
 
-def record(domain, principal, *, session=None, state="completed", key=None):
+def record(domain, principal, *, session=None, state="completed", key=None, team_id=TEAM):
     session = session or principal + "-session"
     pending = domain.delegate(
-        "local", work(team_id=TEAM, assignee=principal, idempotency_key=key or session)
+        "local", work(team_id=team_id, assignee=principal, idempotency_key=key or session)
     )
     claimed = domain.claim(pending["id"])
     evidence = {"adapter": domain.config.agents[principal].kind, "session_id": session}
@@ -52,6 +53,15 @@ def record(domain, principal, *, session=None, state="completed", key=None):
 
 def status(domain, principal="local"):
     return domain.coordinator_status(principal, TEAM)
+
+
+def allow_direct_messages(domain):
+    for principal in ("chatgpt", "codex", "grok"):
+        policy = domain.config.principals[principal]
+        policy.capabilities = list(
+            set(policy.capabilities) | {"message.send", "message.read", "agent.execute"}
+        )
+        policy.message_peers = ["chatgpt", "codex", "grok", "local"]
 
 
 def handoff(domain, principal="grok", *, key="handoff"):
@@ -113,6 +123,172 @@ def test_first_eligible_session_is_elected_once_under_concurrent_start_and_persi
         assert status(reopened.teams)["session"] == observed["session"]
     finally:
         reopened.store.close()
+
+
+def test_direct_coordinator_alias_resolves_persisted_role_and_replay_stays_on_original(domain):
+    setup_team(domain)
+    allow_direct_messages(domain)
+    record(domain, "codex", session="codex-first")
+    record(domain, "grok", session="grok-worker")
+    request = MessageSend(
+        recipient="coordinator",
+        conversation_id="direct-current-coordinator",
+        idempotency_key="global-role-1",
+        body="Address the current coordinator role",
+        kind="question",
+        dispatch=False,
+    )
+    sent = domain.bridge.messages.send("chatgpt", request)
+    assert sent["recipient"] == status(domain)["coordinator"] == "codex"
+    event = domain.bridge.store.db.execute(
+        "SELECT evidence FROM message_events WHERE message_id=? AND kind='message.queued'",
+        (sent["id"],),
+    ).fetchone()
+    metadata = json.loads(event[0])
+    assert metadata["recipient_role"] == "coordinator"
+    assert metadata["coordinator_session_sha256"]
+
+    reply = domain.bridge.messages.send(
+        "codex",
+        MessageSend(
+            recipient="chatgpt",
+            conversation_id=request.conversation_id,
+            idempotency_key="global-role-reply-1",
+            body="Reply from the bound coordinator session",
+            kind="answer",
+            reply_to=sent["id"],
+        ),
+    )
+    assert reply["reply_to"] == sent["id"]
+
+    # A retry is the same immutable message, even if the role changes later.
+    transfer = domain.request_coordinator_handoff("local", handoff(domain))
+    during_handoff = domain.bridge.messages.send(
+        "chatgpt",
+        request.model_copy(update={"idempotency_key": "current-during-handoff"}),
+    )
+    assert during_handoff["recipient"] == "codex"
+    finish(domain, transfer)
+    assert status(domain)["coordinator"] == "grok"
+    conversation = domain.bridge.messages.conversation("grok", request.conversation_id)
+    assert [item["id"] for item in conversation["messages"]] == [
+        sent["id"],
+        reply["id"],
+        during_handoff["id"],
+    ]
+    assert domain.bridge.messages.send("chatgpt", request) == sent
+    next_message = domain.bridge.messages.send(
+        "chatgpt", request.model_copy(update={"idempotency_key": "global-role-2"})
+    )
+    assert next_message["recipient"] == "grok"
+    explicit = domain.bridge.messages.send(
+        "chatgpt",
+        request.model_copy(
+            update={
+                "recipient": "codex",
+                "conversation_id": "direct-explicit-peer",
+                "idempotency_key": "explicit-peer",
+            }
+        ),
+    )
+    assert explicit["recipient"] == "codex"
+
+
+def test_global_coordinator_alias_fails_closed_for_ambiguous_or_stale_roles(domain):
+    setup_team(domain, coordinator="codex")
+    allow_direct_messages(domain)
+    record(domain, "codex", session="codex-first")
+    record(domain, "grok", session="grok-worker")
+    setup_team(domain, coordinator="grok", team_id="another-team")
+    record(domain, "grok", session="grok-first", team_id="another-team")
+    # Distinct valid team coordinators cannot be collapsed into a global role.
+    request = MessageSend(
+        recipient="coordinator",
+        conversation_id="ambiguous-current-coordinator",
+        idempotency_key="ambiguous-role",
+        body="Must not guess between role scopes",
+    )
+    with pytest.raises(BridgeError) as ambiguous:
+        domain.bridge.messages.send("chatgpt", request)
+    assert ambiguous.value.code == "coordinator_ambiguous"
+    assert not domain.bridge.store.db.execute(
+        "SELECT 1 FROM messages WHERE idem=?", (request.idempotency_key,)
+    ).fetchone()
+
+
+def test_coordinator_session_refresh_survives_restart_but_pending_handoff_fences_it(domain):
+    setup_team(domain, coordinator="codex")
+    allow_direct_messages(domain)
+    record(domain, "codex", session="codex-before-restart")
+    record(domain, "grok", session="grok-worker")
+    before = status(domain)
+    domain.clear_session(
+        "local", TeamSessionClear(team_id=TEAM, member="codex", idempotency_key="clear-one")
+    )
+    record(domain, "codex", session="codex-after-restart")
+    refreshed = status(domain)
+    assert refreshed["coordinator"] == "codex"
+    assert refreshed["session"]["session_id"] == "codex-after-restart"
+    assert refreshed["revision"] == before["revision"] + 1
+    reopened = Bridge(domain.config)
+    try:
+        assert status(reopened.teams)["session"] == refreshed["session"]
+    finally:
+        reopened.store.close()
+
+    transfer = domain.request_coordinator_handoff("local", handoff(domain))
+    old_binding = domain.coordinator_roles.binding(TEAM)
+    domain.clear_session(
+        "local", TeamSessionClear(team_id=TEAM, member="codex", idempotency_key="clear-two")
+    )
+    stale_request = MessageSend(
+        recipient="coordinator",
+        conversation_id="stale-role-session",
+        idempotency_key="stale-role-session",
+        body="Must not route to an unbound/stale session",
+    )
+    with pytest.raises(BridgeError) as stale:
+        domain.bridge.messages.send("chatgpt", stale_request)
+    assert stale.value.code == "coordinator_session_unavailable"
+    record(domain, "codex", session="codex-during-handoff")
+    assert status(domain)["pending"]["id"] == transfer["id"]
+    assert domain.coordinator_roles.binding(TEAM) == old_binding
+
+
+def test_direct_coordinator_route_rechecks_role_before_message_commit(domain):
+    setup_team(domain, coordinator="codex")
+    allow_direct_messages(domain)
+    record(domain, "codex", session="codex-route-race")
+    record(domain, "grok", session="grok-route-race")
+    resolver = domain.coordinator_roles.resolve_global
+    calls = 0
+
+    def changed_between_resolution_and_commit():
+        nonlocal calls
+        calls += 1
+        current = resolver()
+        if calls == 1:
+            return current
+        return {
+            **current,
+            "principal": "grok",
+            "session": {**current["session"], "principal": "grok", "session_id": "new-grok"},
+            "revision": current["revision"] + 1,
+        }
+
+    domain.bridge.messages.coordinator_resolver = changed_between_resolution_and_commit
+    request = MessageSend(
+        recipient="coordinator",
+        conversation_id="role-race",
+        idempotency_key="role-race",
+        body="Do not commit to a coordinator that changed during admission",
+    )
+    with pytest.raises(BridgeError) as changed:
+        domain.bridge.messages.send("chatgpt", request)
+    assert changed.value.code == "coordinator_route_changed"
+    assert not domain.store.db.execute(
+        "SELECT 1 FROM messages WHERE idem=?", (request.idempotency_key,)
+    ).fetchone()
 
 
 def test_confirmed_handoff_restarts_without_promoting_then_changes_role_route(domain):

@@ -61,6 +61,61 @@ class CoordinatorRoles:
         ).fetchone()
         return json.loads(row["session"]) if row else None
 
+    def resolve_global(self):
+        """Resolve a direct `coordinator` address through persisted role bindings.
+
+        Team coordinator records remain the only role source. A direct message has
+        no team scope, so it is routable only when the live eligible bindings
+        collapse to one exact principal/session identity. Multiple distinct live
+        coordinators or a stale role fail closed instead of guessing. During a
+        handoff, the old role remains current until the new session accepts.
+        """
+        teams = self.db.execute(
+            "SELECT id,coordinator,revision FROM teams WHERE coordinator<>'' ORDER BY created,id"
+        ).fetchall()
+        candidates = {}
+        configured_roles = bool(teams)
+        for team in teams:
+            principal = team["coordinator"]
+            binding = self.binding(team["id"])
+            row = self._eligible(team["id"], principal)
+            if row is None:
+                # Teams without a current eligible coordinator session do not
+                # contribute a live role candidate (e.g. an unstarted roster).
+                continue
+            if row is not None and (binding is None or binding != self._reference(row)):
+                self.observe_session(team["id"], principal)
+                binding = self.binding(team["id"])
+                row = self._eligible(team["id"], principal)
+            if row is None or binding != self._reference(row):
+                continue
+            ref = self._reference(row)
+            current_team = self._current(team["id"])
+            if current_team is None or current_team["coordinator"] != principal:
+                continue
+            candidates.setdefault(
+                (principal, canonical(ref)),
+                {
+                    "principal": principal,
+                    "session": ref,
+                    "team_id": team["id"],
+                    "revision": current_team["revision"],
+                },
+            )
+        if not candidates:
+            code = (
+                "coordinator_session_unavailable"
+                if configured_roles
+                else "coordinator_unassigned"
+            )
+            raise BridgeError(code, "No current coordinator has an eligible bound session")
+        if len(candidates) != 1:
+            raise BridgeError(
+                "coordinator_ambiguous",
+                "More than one distinct team coordinator is active; direct role routing is unsafe",
+            )
+        return next(iter(candidates.values()))
+
     def native_ping_matches(self, team_id):
         expected = self.binding(team_id)
         row = self._eligible(team_id, "codex")
@@ -140,24 +195,85 @@ class CoordinatorRoles:
         )
 
     def observe_session(self, team_id, principal):
-        """Install the first eligible binding in the same transaction as its session record."""
+        """Bind the first eligible session or refresh its persisted session identity.
+
+        Refreshes are limited to the already elected principal, require the newly
+        recorded session to pass the same eligibility checks as election, and are
+        fenced by the role revision and previous exact binding. A pending handoff
+        owns the role transition and therefore suppresses implicit refresh.
+        """
         row = self._eligible(team_id, principal)
         team = self._current(team_id)
-        if (
-            row is None
-            or team is None
-            or team["coordinator"] not in {"", principal}
-            or self.binding(team_id) is not None
-        ):
+        if row is None or team is None:
             return
         session = self._reference(row)
-        if team["coordinator"]:
-            self._store_binding(team_id, principal, session)
-        else:
-            self._assign(team_id, principal, session)
-        self.manager._event(
-            team_id, principal, "team.coordinator_bound", session_sha256=digest(session)
-        )
+        current_binding = self.binding(team_id)
+        if current_binding is None:
+            if team["coordinator"] not in {"", principal}:
+                return
+            if team["coordinator"]:
+                self._store_binding(team_id, principal, session)
+            else:
+                self._assign(team_id, principal, session)
+            self.manager._event(
+                team_id, principal, "team.coordinator_bound", session_sha256=digest(session)
+            )
+            return
+        if (
+            team["coordinator"] != principal
+            or current_binding == session
+        ):
+            return
+        current_handoff = self._handoff_view(self._latest(team_id))
+        if current_handoff and current_handoff["state"] == "pending":
+            return
+        # Session observation and this update normally share the enclosing work
+        # transaction. Keep an explicit CAS as protection for direct/recovery
+        # callers and future concurrent observation paths.
+        with self.manager.store.transaction():
+            latest_team = self._current(team_id)
+            latest_binding = self.binding(team_id)
+            pending = self._handoff_view(self._latest(team_id))
+            latest_row = self._eligible(team_id, principal)
+            if (
+                latest_team is None
+                or latest_team["coordinator"] != principal
+                or latest_team["revision"] != team["revision"]
+                or latest_binding != current_binding
+                or (pending and pending["state"] == "pending")
+                or latest_row is None
+                or self._reference(latest_row) != session
+            ):
+                return
+            cursor = self.db.execute(
+                "UPDATE team_coordinator_bindings SET session_id=?,generation=?,session=? "
+                "WHERE team_id=? AND principal=? AND session=?",
+                (
+                    session["session_id"],
+                    session["generation"],
+                    canonical(session),
+                    team_id,
+                    principal,
+                    canonical(current_binding),
+                ),
+            )
+            if cursor.rowcount != 1:
+                return
+            updated_team = self.db.execute(
+                "UPDATE teams SET revision=revision+1 WHERE id=? AND coordinator=? AND revision=?",
+                (team_id, principal, team["revision"]),
+            )
+            if updated_team.rowcount != 1:
+                raise BridgeError(
+                    "team_revision_conflict", "Coordinator changed during session refresh"
+                )
+            self.manager._event(
+                team_id,
+                principal,
+                "team.coordinator_session_refreshed",
+                session_sha256=digest(session),
+                previous_session_sha256=digest(current_binding),
+            )
 
     def lifecycle_enabled(self, team_id, team):
         return (

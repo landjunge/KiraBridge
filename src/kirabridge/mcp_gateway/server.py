@@ -1455,6 +1455,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         exact same message. Work/questions to CLI agents use their assigned visible terminal
         even with dispatch=false. One bounded visible attempt is observed before returning;
         busy/missing/changed targets fail without a waiting backlog or hidden fallback.
+        Set recipient='coordinator' to address the currently bound coordinator role. The
+        resolver uses persisted team-role/session records and requires one exact eligible
+        current identity; stale, changing or ambiguous roles fail closed. During handoff,
+        the current coordinator remains the route until acceptance is verified.
+        A concrete recipient such as 'codex' or 'grok' remains an explicit peer override.
+        The message keeps its original role target on idempotent replay; new messages resolve
+        the role again. A reply to a role-addressed message stays in that logical conversation.
         For an addressed message to the assigned native Codex, use dispatch=true only
         when the sender has the existing message-peer, agent.execute, session.inspect
         and session.input grants. The verified native route steers the exact active turn

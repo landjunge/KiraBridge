@@ -437,6 +437,87 @@ async def test_direct_cold_host_watchdog_does_not_fall_back_to_terminal(
     assert not protocol.inputs() and not transport["calls"]
 
 
+async def test_unverified_native_host_fails_without_fallback_or_ack(
+    delivery, binding, monkeypatch
+):
+    bridge, transport, direct, connected, _ = delivery
+    attempts = []
+
+    async def reject_unverified(_binding):
+        attempts.append("prepare")
+        raise BridgeError("native_codex_host_unverified", "Identity did not verify")
+
+    monkeypatch.setattr(direct.codex_host, "prepare", reject_unverified)
+    bridge.config.visible_handoffs.native_codex = binding
+    sent = new_message(bridge, key="native-unverified-no-fallback", recipient="codex")
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed"
+    assert result["error"] == "native_codex_host_unverified"
+    assert result["evidence"]["phase"] == "native_direct_delivery"
+    assert result["evidence"]["native_input_attempted"] is False
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert result["evidence"]["automatic_retry"] is False
+    assert stored["delivered"] is stored["receipt"] is stored["acknowledged"] is None
+    assert not bridge.store.db.execute(
+        "SELECT 1 FROM message_events WHERE message_id=? AND kind='message.acknowledged'",
+        (sent["id"],),
+    ).fetchone()
+    assert attempts == ["prepare"]
+    assert not transport["calls"] and not connected
+    assert not direct.submit("chatgpt", sent["id"])
+
+
+async def test_role_routed_delivery_refuses_a_coordinator_change_before_any_input(
+    delivery, binding
+):
+    from kirabridge.message_manager import MessageSend
+
+    bridge, transport, direct, connected, _ = delivery
+    protocol = Protocol(binding)
+    direct.codex_host = protocol.host()
+    bridge.config.visible_handoffs.native_codex = binding
+    current = {
+        "principal": "codex",
+        "session": {"principal": "codex", "session_id": ROOT},
+        "team_id": "team-one",
+        "revision": 4,
+    }
+    bridge.messages.coordinator_resolver = lambda: current
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="coordinator",
+            conversation_id="coordinator-route-change",
+            idempotency_key="coordinator-route-change",
+            body="This must not reach a replaced coordinator",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+    assert sent["recipient"] == "codex"
+    current.update(
+        {
+            "principal": "grok",
+            "session": {"principal": "grok", "session_id": "grok-new"},
+            "team_id": "team-one",
+            "revision": 5,
+        }
+    )
+
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed" and result["error"] == "coordinator_route_changed"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert stored["delivered"] is stored["receipt"] is stored["acknowledged"] is None
+    assert not protocol.inputs() and not transport["calls"] and not connected
+
+
 @pytest.mark.parametrize(
     "change",
     [
