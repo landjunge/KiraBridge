@@ -662,7 +662,12 @@ async def test_rc59_generic_overlay_is_reconciled_against_live_original_and_dest
     )
     _write_rc59_overlay(bridge.config, "grok", original, replacement)
     unresolved = load_refresh(bridge.config)
-    assert unresolved == {"grok": "legacy_overlay_unverified"}
+    assert unresolved["grok"]["state"] == "legacy_overlay_unverified"
+    assert unresolved["grok"]["destination"] == {
+        "pane_id": NEW_PANE,
+        "expected_pid": NEW_SHELL,
+        "agent_pid": NEW_AGENT,
+    }
     assert bridge.config.visible_handoffs.bindings["grok"] == original
     bridge.visible_handoffs.refresh_ambiguities = unresolved
     install_catalog(monkeypatch, bridge, [new_session()])
@@ -826,5 +831,146 @@ def test_manual_protocol_only_edit_takes_precedence_over_a_fingerprinted_overlay
 
     unresolved = load_refresh(bridge.config)
 
-    assert unresolved == {"codex": "manual_protocol_binding_precedence"}
+    assert unresolved["codex"]["state"] == "manual_protocol_binding_precedence"
     assert bridge.config.visible_handoffs.bindings["codex"] == manual
+
+
+def _codex_session(binding):
+    tty = binding.pane_id.rsplit(":", 1)[-1]
+    return {
+        "pane_id": binding.pane_id,
+        "expected_pid": binding.expected_pid,
+        "agent_pid": binding.agent_pid,
+        "agent_candidate": "codex",
+        "identity_ambiguous": False,
+        "transport": "terminal_app",
+        "tty": "/dev/" + tty,
+        "processes": [
+            {"pid": binding.expected_pid, "ppid": 1, "name": "-zsh", "image": "/bin/zsh"},
+            {
+                "pid": binding.agent_pid,
+                "ppid": binding.expected_pid,
+                "name": "codex",
+                "image": "/bin/codex",
+            },
+        ],
+    }
+
+
+async def test_rc59_codex_overlay_never_adopts_unrelated_owner_session(visible, monkeypatch):
+    bridge, _ = visible
+    original = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "codex_thread_id": "01234567-0123-4567-89ab-0123456789ab",
+            "codex_rollout_path": "/tmp/original-rollout.jsonl",
+        }
+    )
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    destination = original.model_copy(
+        update={
+            "pane_id": NEW_PANE,
+            "expected_pid": NEW_SHELL,
+            "agent_pid": NEW_AGENT,
+            "codex_thread_id": None,
+            "codex_rollout_path": None,
+        }
+    )
+    _write_rc59_overlay(bridge.config, "codex", original, destination)
+    unrelated = original.model_copy(
+        update={
+            "pane_id": "terminal:303:ttys303",
+            "expected_pid": 30300,
+            "agent_pid": 30301,
+        }
+    )
+    install_catalog(monkeypatch, bridge, [_codex_session(unrelated)])
+    bridge.visible_handoffs._store_generation(
+        "codex",
+        unrelated,
+        bridge.visible_handoffs.fresh_pair(unrelated),
+        "owner_started_assignment",
+    )
+    bridge.visible_handoffs.refresh_ambiguities = load_refresh(bridge.config)
+
+    with pytest.raises(BridgeError) as exc:
+        await bridge.visible_handoffs.refreshed_binding("chatgpt", "codex", original)
+
+    assert exc.value.code == "session_selection_changed"
+    assert bridge.config.visible_handoffs.bindings["codex"] == original
+
+
+async def test_rc59_codex_exact_owner_destination_allows_parallel_codex(visible, monkeypatch):
+    bridge, _ = visible
+    original = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "codex_thread_id": "01234567-0123-4567-89ab-0123456789ab",
+            "codex_rollout_path": "/tmp/original-rollout.jsonl",
+        }
+    )
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    destination = original.model_copy(
+        update={
+            "pane_id": NEW_PANE,
+            "expected_pid": NEW_SHELL,
+            "agent_pid": NEW_AGENT,
+            "codex_thread_id": None,
+            "codex_rollout_path": None,
+        }
+    )
+    _write_rc59_overlay(bridge.config, "codex", original, destination)
+    parallel = original.model_copy(
+        update={
+            "pane_id": "terminal:303:ttys303",
+            "expected_pid": 30300,
+            "agent_pid": 30301,
+        }
+    )
+    install_catalog(monkeypatch, bridge, [_codex_session(destination), _codex_session(parallel)])
+    bridge.visible_handoffs._store_generation(
+        "codex",
+        destination,
+        bridge.visible_handoffs.fresh_pair(destination),
+        "owner_started_assignment",
+    )
+    bridge.visible_handoffs.refresh_ambiguities = load_refresh(bridge.config)
+
+    updated, _ = await bridge.visible_handoffs.refreshed_binding("chatgpt", "codex", original)
+
+    assert (updated.pane_id, updated.expected_pid, updated.agent_pid) == (
+        NEW_PANE,
+        NEW_SHELL,
+        NEW_AGENT,
+    )
+    assert updated.codex_thread_id is None and updated.codex_rollout_path is None
+    assert bridge.visible_handoffs.generation_source(updated, "codex") == (
+        "owner_started_assignment"
+    )
+
+
+async def test_rc59_overlay_preserves_exact_live_manual_original(visible, monkeypatch):
+    bridge, _ = visible
+    original = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "codex_thread_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "codex_rollout_path": "/tmp/manual-rollout.jsonl",
+        }
+    )
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    destination = original.model_copy(
+        update={"pane_id": NEW_PANE, "expected_pid": NEW_SHELL, "agent_pid": NEW_AGENT}
+    )
+    _write_rc59_overlay(bridge.config, "codex", original, destination)
+    install_catalog(monkeypatch, bridge, [_codex_session(original)])
+    bridge.visible_handoffs._store_generation(
+        "codex", original, bridge.visible_handoffs.fresh_pair(original), "exact_match_bootstrap"
+    )
+    bridge.visible_handoffs.refresh_ambiguities = load_refresh(bridge.config)
+
+    updated, snapshot = await bridge.visible_handoffs.refreshed_binding(
+        "chatgpt", "codex", original
+    )
+
+    assert updated == original
+    assert snapshot is None
+    assert not overlay_path(bridge.config).exists()
+    assert bridge.visible_handoffs.refresh_ambiguities == {}

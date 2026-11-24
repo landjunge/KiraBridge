@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from pathlib import Path
 
 from kirabridge.bridge_core.config import VisibleTerminalBinding
@@ -190,6 +191,19 @@ def _with_saved_identity(binding, item, *, keep_protocol=False):
     )
 
 
+def refresh_state(value):
+    return value.get("state") if isinstance(value, dict) else value
+
+
+def refresh_destination(value):
+    if not isinstance(value, dict):
+        return None
+    destination = value.get("destination")
+    if not isinstance(destination, dict) or set(destination) != set(IDENTITY_FIELDS):
+        return None
+    return destination
+
+
 def load_refresh(config, *, same_live_generation=None) -> dict[str, str]:
     """Apply a proven refresh; return matching rows that need live reconciliation."""
     path = overlay_path(config)
@@ -212,10 +226,26 @@ def load_refresh(config, *, same_live_generation=None) -> dict[str, str]:
         if not isinstance(anchor_protocol, str) or not re.fullmatch(
             r"[0-9a-f]{64}", anchor_protocol
         ):
-            unresolved[target] = "legacy_overlay_unverified"
+            try:
+                destination = _with_saved_identity(binding, item)
+            except (KeyError, ValueError, TypeError):
+                unresolved[target] = {"state": "legacy_overlay_unverified"}
+            else:
+                unresolved[target] = {
+                    "state": "legacy_overlay_unverified",
+                    "destination": {key: getattr(destination, key) for key in IDENTITY_FIELDS},
+                }
             continue
         if anchor_protocol != _protocol_digest(binding):
-            unresolved[target] = "manual_protocol_binding_precedence"
+            try:
+                destination = _with_saved_identity(binding, item)
+            except (KeyError, ValueError, TypeError):
+                unresolved[target] = {"state": "manual_protocol_binding_precedence"}
+            else:
+                unresolved[target] = {
+                    "state": "manual_protocol_binding_precedence",
+                    "destination": {key: getattr(destination, key) for key in IDENTITY_FIELDS},
+                }
             continue
         try:
             keep_protocol = item.get("preserve_codex_protocol", False)
@@ -301,3 +331,40 @@ def save_refresh(
     temporary.write_text(json.dumps(current))
     os.chmod(temporary, 0o600)
     os.replace(temporary, path)
+
+
+def clear_refresh(config, target):
+    """Remove one disproved legacy overlay while preserving other targets."""
+    path = overlay_path(config)
+    if not path.is_file():
+        return True
+    try:
+        current = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return False
+    if not isinstance(current, dict):
+        return False
+    if target not in current:
+        return True
+    current.pop(target)
+    if not current:
+        try:
+            path.unlink()
+        except OSError:
+            return False
+        return True
+    fd, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump(current, stream, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    except OSError:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        return False
+    return True

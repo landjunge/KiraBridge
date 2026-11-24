@@ -14,8 +14,11 @@ from kirabridge.session_manager import RECEIVER_OWNER, SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
     catalog_can_replace,
+    clear_refresh,
     distinct_window_processes,
     load_refresh,
+    refresh_destination,
+    refresh_state,
     replacement_binding,
     save_refresh,
 )
@@ -475,7 +478,7 @@ class VisibleHandoffs:
     def presence(self, target):
         import json
 
-        unresolved = self.refresh_ambiguities.get(target)
+        unresolved = refresh_state(self.refresh_ambiguities.get(target))
         if unresolved is not None:
             return {
                 "target": target,
@@ -1193,7 +1196,9 @@ class VisibleHandoffs:
         returns no snapshot, so an unrelated reservation keeps its existing lock.
         Every outcome is recorded as receiver presence; none of them sends input.
         """
-        unresolved_refresh = self.refresh_ambiguities.get(target)
+        refresh_record = self.refresh_ambiguities.get(target)
+        unresolved_refresh = refresh_state(refresh_record)
+        legacy_destination = refresh_destination(refresh_record)
         selection_reason = None
         try:
             selected = await self.sessions.selected(
@@ -1208,22 +1213,8 @@ class VisibleHandoffs:
         selected_matches = selected is not None and self.sessions.binding_matches(
             selected, binding, target
         )
-        if unresolved_refresh == "manual_protocol_binding_precedence":
-            if selected_matches:
-                self.refresh_ambiguities.pop(target, None)
-                self.record_presence(
-                    principal,
-                    target,
-                    "available",
-                    binding,
-                    {"reason": "manual_binding_verified_after_overlay_conflict"},
-                )
-                return binding, None
+        if unresolved_refresh == "manual_protocol_binding_precedence" and not selected_matches:
             self._refuse_unresolved_refresh(principal, target, binding, unresolved_refresh)
-        if unresolved_refresh == "legacy_overlay_unverified" and selected_matches:
-            self._refuse_unresolved_refresh(
-                principal, target, binding, "legacy_protocol_binding_ambiguous"
-            )
         if selected_matches and unresolved_refresh is None:
             self.record_presence(principal, target, "available", binding, {"reason": "matched"})
             return binding, None
@@ -1232,6 +1223,13 @@ class VisibleHandoffs:
             # absence/generation proof below. Never trust its persisted pane/PIDs alone.
             pass
         lifecycle = self._lifecycle_change(target, binding, selected, selection_reason)
+        original_generation_before_catalog = (
+            self.fresh_pair(binding)
+            if unresolved_refresh
+            in {"legacy_overlay_unverified", "manual_protocol_binding_precedence"}
+            and selected_matches
+            else None
+        )
         try:
             catalog = await self.sessions.catalog(principal)
         except BridgeError as error:
@@ -1245,17 +1243,99 @@ class VisibleHandoffs:
             )
             return binding, None
         sessions = catalog.get("sessions") or []
-        if unresolved_refresh == "legacy_overlay_unverified" and binding_still_present(
-            binding, sessions
-        ):
+        if unresolved_refresh in {
+            "legacy_overlay_unverified",
+            "manual_protocol_binding_precedence",
+        } and binding_still_present(binding, sessions):
+            exact_original = (
+                selected_matches
+                and sum(
+                    self._exact_row(
+                        row,
+                        target,
+                        binding.pane_id,
+                        binding.expected_pid,
+                        binding.agent_pid,
+                    )
+                    for row in sessions
+                )
+                == 1
+            )
+            before = original_generation_before_catalog if exact_original else None
+            after = self.fresh_pair(binding) if exact_original else None
+            if (
+                exact_original
+                and before is not None
+                and after is not None
+                and all(
+                    same_generation(before.get(pid), after.get(pid))
+                    for pid in (binding.expected_pid, binding.agent_pid)
+                )
+            ):
+                self.verify_generation(target, binding, before, after)
+                if not clear_refresh(self.config, target):
+                    self._refuse_unresolved_refresh(
+                        principal, target, binding, "legacy_overlay_clear_failed"
+                    )
+                self.refresh_ambiguities.pop(target, None)
+                self.record_presence(
+                    principal,
+                    target,
+                    "available",
+                    binding,
+                    {"reason": "overlay_disproved_by_exact_live_original"},
+                )
+                return binding, None
             self._refuse_unresolved_refresh(
                 principal, target, binding, "legacy_original_still_present"
             )
-        if selected is None and only_candidate is None:
+        elif unresolved_refresh == "manual_protocol_binding_precedence":
+            self._refuse_unresolved_refresh(
+                principal, target, binding, "manual_binding_original_unavailable"
+            )
+        if selected is None and only_candidate is None and unresolved_refresh is None:
             rehomed = await self.rehome_binding(principal, target, binding, catalog)
             if rehomed is not None:
                 return rehomed, None
         updated = replacement_binding(target, binding, sessions)
+        if unresolved_refresh == "legacy_overlay_unverified":
+            if legacy_destination is None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_destination_invalid"
+                )
+            destination_matches = [
+                row
+                for row in sessions
+                if self._unique_exact_catalog_row(
+                    sessions,
+                    target,
+                    legacy_destination["pane_id"],
+                    legacy_destination["expected_pid"],
+                    legacy_destination["agent_pid"],
+                )
+                and row.get("pane_id") == legacy_destination["pane_id"]
+                and self._exact_row(
+                    row, target, legacy_destination["pane_id"],
+                    legacy_destination["expected_pid"], legacy_destination["agent_pid"]
+                )
+            ]
+            if len(destination_matches) != 1:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_destination_not_exactly_live"
+                )
+            try:
+                updated = VisibleTerminalBinding.model_validate(
+                    {
+                        **binding.model_dump(),
+                        **legacy_destination,
+                        "codex_thread_id": None,
+                        "codex_rollout_path": None,
+                    }
+                )
+            except ValueError:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_destination_invalid"
+                )
         if (
             updated is not None
             and only_candidate is not None
@@ -1342,7 +1422,14 @@ class VisibleHandoffs:
                 )
             return binding, sessions
         sessions, failure = await self._confirm_replacement(
-            principal, target, binding, updated, before
+            principal,
+            target,
+            binding,
+            updated,
+            before,
+            legacy_destination=legacy_destination
+            if unresolved_refresh == "legacy_overlay_unverified"
+            else None,
         )
         if failure is not None:
             current = self.config.visible_handoffs.bindings.get(target)
@@ -1390,7 +1477,9 @@ class VisibleHandoffs:
         error.observation = {"state": "ambiguous", "target": target, **evidence}
         raise error
 
-    async def _confirm_replacement(self, principal, target, binding, updated, before):
+    async def _confirm_replacement(
+        self, principal, target, binding, updated, before, *, legacy_destination=None
+    ):
         """Re-observe the unique candidate after the asynchronous absence proof."""
         if before is None:
             return None, "replacement_generation_unverifiable"
@@ -1402,19 +1491,52 @@ class VisibleHandoffs:
             return None, "replacement_catalog_incomplete"
         sessions = catalog.get("sessions") or []
         pids = (updated.expected_pid, updated.agent_pid)
+        exact_rows = [
+            row
+            for row in sessions
+            if self._unique_exact_catalog_row(
+                rowset=sessions,
+                target=target,
+                pane_id=updated.pane_id,
+                shell=updated.expected_pid,
+                agent=updated.agent_pid,
+            )
+            and row.get("pane_id") == updated.pane_id
+            and self._exact_row(row, target, updated.pane_id, *pids)
+        ]
+        destination_matches = legacy_destination == {
+            "pane_id": updated.pane_id,
+            "expected_pid": updated.expected_pid,
+            "agent_pid": updated.agent_pid,
+        }
         if (
-            replacement_binding(target, binding, sessions) != updated
-            or sum(self._exact_row(row, target, updated.pane_id, *pids) for row in sessions) != 1
+            len(exact_rows) != 1
+            or (
+                replacement_binding(target, binding, sessions) != updated
+                if legacy_destination is None
+                else not destination_matches
+            )
         ):
             return None, "replacement_candidate_changed"
         after = self.fresh_pair(updated) or {}
         if not all(same_generation(before.get(pid), after.get(pid)) for pid in pids):
             return None, "replacement_generation_changed_or_unverifiable"
+        if legacy_destination is not None and binding.codex_thread_id is not None:
+            recorded = self.recorded_generations(updated, target) or {}
+            if (
+                self.generation_source(updated, target) != "owner_started_assignment"
+                or not all(same_generation(recorded.get(pid), after.get(pid)) for pid in pids)
+            ):
+                return None, "legacy_destination_lineage_changed"
         if self.config.visible_handoffs.bindings.get(target) != binding:
             return None, "binding_changed"
-        failure = self._persist_assignment(
-            target, binding, updated, after, "strict_dead_replacement"
+        source = (
+            "owner_started_assignment"
+            if legacy_destination is not None
+            and self.generation_source(updated, target) == "owner_started_assignment"
+            else "strict_dead_replacement"
         )
+        failure = self._persist_assignment(target, binding, updated, after, source)
         return sessions, failure
 
     def _lifecycle_change(self, target, binding, selected, selection_reason):
@@ -1438,6 +1560,33 @@ class VisibleHandoffs:
         if names:
             return "agent_switched"
         return "agent_exited"
+
+    @staticmethod
+    def _unique_exact_catalog_row(rowset, target, pane_id, shell, agent):
+        """Require one row across every independent destination identity axis."""
+        if not isinstance(rowset, list) or not all(
+            isinstance(row, dict) and isinstance(row.get("processes", []), list)
+            for row in rowset
+        ):
+            return False
+        tty = "/dev/" + pane_id.rsplit(":", 1)[-1]
+        by_pane = [row for row in rowset if row.get("pane_id") == pane_id]
+        by_tty = [row for row in rowset if row.get("tty") == tty]
+        by_shell = [
+            row
+            for row in rowset
+            if shell in {row.get("expected_pid"), row.get("legacy_expected_pid")}
+        ]
+        by_agent = [
+            row
+            for row in rowset
+            if any(isinstance(proc, dict) and proc.get("pid") == agent for proc in row["processes"])
+        ]
+        return (
+            len(by_pane) == len(by_tty) == len(by_shell) == len(by_agent) == 1
+            and by_pane[0] is by_tty[0] is by_shell[0] is by_agent[0]
+            and VisibleHandoffs._exact_row(by_pane[0], target, pane_id, shell, agent)
+        )
 
     @staticmethod
     def _exact_row(row, target, pane_id, shell, agent):
@@ -1915,7 +2064,7 @@ class VisibleHandoffs:
             )
 
     async def check_target(self, principal, target, binding, *, ready=False):
-        unresolved = self.refresh_ambiguities.get(target)
+        unresolved = refresh_state(self.refresh_ambiguities.get(target))
         if unresolved is not None:
             self._refuse_unresolved_refresh(principal, target, binding, unresolved)
         pids = (binding.expected_pid, binding.agent_pid)
