@@ -14,6 +14,7 @@ from kirabridge.bridge_core.models import AgentInput, BridgeError, canonical
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.visible_binding import load_refresh, overlay_path, save_refresh
+from kirabridge.visible_handoff import VisibleReadinessError
 from kirabridge.visible_readiness import assess
 
 OLD = ("terminal:100:ttys001", 123, 456)
@@ -897,6 +898,68 @@ async def test_rc59_codex_overlay_never_adopts_unrelated_owner_session(visible, 
 
     assert exc.value.code == "session_selection_changed"
     assert bridge.config.visible_handoffs.bindings["codex"] == original
+
+
+async def test_codex_142_to_83_rehome_persists_across_reopen_without_stale_input(
+    visible, monkeypatch
+):
+    bridge, transport = visible
+    original = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "pane_id": "terminal:142:ttys000",
+            "expected_pid": 973,
+            "agent_pid": 1270,
+            "codex_thread_id": "01234567-0123-4567-89ab-0123456789ab",
+            "codex_rollout_path": "/tmp/stale-codex-rollout.jsonl",
+        }
+    )
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    destination = original.model_copy(
+        update={
+            "pane_id": "terminal:83:ttys000",
+            "expected_pid": 783,
+            "agent_pid": 1073,
+            "codex_thread_id": None,
+            "codex_rollout_path": None,
+        }
+    )
+    _write_rc59_overlay(bridge.config, "codex", original, destination)
+    live = _codex_session(destination)
+    install_catalog(monkeypatch, bridge, [live])
+    bridge.visible_handoffs._store_generation(
+        "codex",
+        destination,
+        bridge.visible_handoffs.fresh_pair(destination),
+        "owner_started_assignment",
+    )
+    bridge.visible_handoffs.refresh_ambiguities = load_refresh(bridge.config)
+
+    updated, _ = await bridge.visible_handoffs.refreshed_binding("chatgpt", "codex", original)
+    assert (updated.pane_id, updated.expected_pid, updated.agent_pid) == (
+        "terminal:83:ttys000",
+        783,
+        1073,
+    )
+    assert updated.codex_thread_id is None and updated.codex_rollout_path is None
+
+    # Dispatch revalidates the newly bound live generation. There is no pending work,
+    # and the previous pane/PID pair is never used as an input destination.
+    with pytest.raises(VisibleReadinessError):
+        await bridge.visible_handoffs.dispatch_ready("chatgpt", "codex")
+    assert not transport["calls"]
+
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    reopened = Bridge(bridge.config)
+    try:
+        restored = reopened.config.visible_handoffs.bindings["codex"]
+        assert (restored.pane_id, restored.expected_pid, restored.agent_pid) == (
+            "terminal:83:ttys000",
+            783,
+            1073,
+        )
+        assert restored.codex_thread_id is None and restored.codex_rollout_path is None
+    finally:
+        reopened.store.close()
 
 
 async def test_rc59_codex_exact_owner_destination_allows_parallel_codex(visible, monkeypatch):
