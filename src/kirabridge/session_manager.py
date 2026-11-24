@@ -169,6 +169,7 @@ class SessionManager:
         )
         self.linux = linux if linux is not None else LinuxOwnedTerminal()
         self.desktop = self.terminal_app.desktop
+        self.zle_readiness = None
 
     def direct(self, principal):
         return (
@@ -1033,25 +1034,41 @@ class SessionManager:
         launched_agent = self._started_agent(argv)
         command_submitted = False
         command = "cd -- " + shlex.quote(cwd)
+        zle_shell = None
         if args.controlled_shell:
             if argv:
                 raise BridgeError(
                     "invalid_arguments", "Controlled shell setup takes no initial command"
                 )
-            command += (
-                " && exec /usr/bin/env PS1="
-                + shlex.quote("KiraBridge visible %% ")
-                + " /bin/zsh -f"
-            )
+            if sys.platform != "darwin" or self.zle_readiness is None:
+                command += (
+                    " && exec /usr/bin/env PS1="
+                    + shlex.quote("KiraBridge visible %% ")
+                    + " /bin/zsh -f"
+                )
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
             if sys.platform.startswith("linux"):
                 return await self._open_owned_linux(principal, task_id, cwd, argv)
+            if args.controlled_shell and sys.platform == "darwin":
+                zle_shell = await self.zle_readiness.create()
+                env = {
+                    "ZDOTDIR": zle_shell["zdotdir"],
+                    "PS1": "KiraBridge visible %% ",
+                }
+                command += " && exec /usr/bin/env " + " ".join(
+                    shlex.quote(f"{name}={value}") for name, value in env.items()
+                ) + " /bin/zsh -d -i"
             try:
                 result = await self.terminal_app.open(
-                    command, on_created=on_created, principal=principal
+                    command,
+                    on_created=on_created,
+                    principal=principal,
+                    custom_title=(zle_shell["tag"] if zle_shell else None),
                 )
             except BaseException:
+                if zle_shell is not None:
+                    await self.zle_readiness.close_session(zle_shell["generation"])
                 self.authorization.window_outcome(principal, task_id, "unknown")
                 raise
             self.authorization.window_outcome(principal, task_id, "opened")
@@ -1066,6 +1083,8 @@ class SessionManager:
                         )
                     selected = matches[0] if matches else None
                     if selected:
+                        if zle_shell is not None:
+                            await self.zle_readiness.bind(zle_shell, selected)
                         if argv:
                             from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
@@ -1194,6 +1213,8 @@ class SessionManager:
                     raise UncertainExecution(
                         "session_open_pending", "Window opened; argv was not dispatched"
                     )
+                if zle_shell is not None:
+                    await self.zle_readiness.close_session(zle_shell["generation"])
                 return {**result, "session_handle_pending": True, "agent_processed": False}
             except Exception as cause:
                 error = UncertainExecution(

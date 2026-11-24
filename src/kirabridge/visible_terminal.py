@@ -202,7 +202,14 @@ class VisibleTerminal:
         # final selection and native dispatch still verify input authority anew.
         with self.sessions.observation_scope(principal, row):
             output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
-        if not empty_shell_prompt(output["text"]):
+        if row.get("controlled_shell") is True:
+            readiness = getattr(self.sessions, "zle_readiness", None)
+            if readiness is None:
+                raise BridgeError(
+                    "zle_session_stale", "Controlled shell ZLE channel is unavailable"
+                )
+            await readiness.probe(row)
+        elif not empty_shell_prompt(output["text"]):
             error = BridgeError(
                 "visible_input_unknown",
                 "Selected process is an idle shell, but empty input is not confirmed; preserve it",

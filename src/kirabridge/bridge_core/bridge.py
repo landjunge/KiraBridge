@@ -248,6 +248,11 @@ class Bridge:
                 ),
             )
         )
+        if sys.platform == "darwin":
+            from kirabridge.platform_adapters.macos.zle_readiness import ZLEReadiness
+
+            self.sessions.zle_readiness = ZLEReadiness(self.sessions.terminal_app)
+            self.sessions.terminal_app.zle_readiness = self.sessions.zle_readiness
         self.visible_terminal = VisibleTerminal(
             config, self.security, self.sessions, self.terminal.environment
         )

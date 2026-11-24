@@ -344,7 +344,9 @@ class TerminalAppTransport:
       miniaturized:w.miniaturized(),
       bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
       script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
-      tty:t.tty(), busy:t.busy(), selected:t.selected()
+      tty:t.tty(), busy:t.busy(), selected:t.selected(),
+      controlled_shell:t.titleDisplaysCustomTitle()===true&&
+       /^KiraBridge_ZLE_[0-9a-f]{48}$/.test(t.customTitle())
      }));
     }) : []);""")
             rows = attach_visual_windows(rows if isinstance(rows, list) else [])
@@ -581,13 +583,29 @@ class TerminalAppTransport:
             raise BridgeError(
                 "visible_window_unconfirmed", "Focused Terminal window evidence is incomplete"
             )
-        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
-
-        if expected_screen is not None and not empty_shell_prompt(surface["screen"]):
-            raise BridgeError(
-                "visible_input_changed", "Terminal input changed before physical proof"
-            )
+        if expected_screen is not None:
+            await self.verify_shell_readiness(row, surface["screen"])
         return await self.prove_existing_target(row, surface["surface"], principal=principal)
+
+    async def verify_shell_readiness(self, row, screen=None):
+        """Use ZLE proof for KiraBridge-owned shells, text parsing for other shells."""
+        if row.get("controlled_shell") is True:
+            readiness = getattr(self, "zle_readiness", None)
+            if readiness is None:
+                raise BridgeError(
+                    "zle_session_stale", "Controlled shell ZLE channel is unavailable"
+                )
+            await readiness.probe(row)
+            return True
+        if screen is not None:
+            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+            if not empty_shell_prompt(screen):
+                raise BridgeError(
+                    "visible_input_not_empty",
+                    "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
+                )
+        return True
 
     @staticmethod
     def native_identity_guard(identities):
@@ -742,8 +760,6 @@ class TerminalAppTransport:
             await reap_process(child, process_group=False)
 
     async def prepare_shell_paste(self, row):
-        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
-
         if row.get("busy", True) or not row.get("processes"):
             raise BridgeError("session_busy", "Selected shell must be positively idle")
         snapshot = await self.shell_process_snapshot(row["tty"])
@@ -782,11 +798,7 @@ class TerminalAppTransport:
         ):
             raise BridgeError("session_busy", "Other processes exist on selected TTY")
         screen = await self.read(row["pane_id"])
-        if not empty_shell_prompt(screen):
-            raise BridgeError(
-                "visible_input_not_empty",
-                "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
-            )
+        await self.verify_shell_readiness(row, screen)
         return {
             "identities": {pid: data[3] for pid, data in records.items()},
             "screen": screen,
@@ -1133,14 +1145,20 @@ entries[0].click();JSON.stringify({detached:true});
         if result.get("detached") is not True:
             raise UncertainExecution("session_open_unknown", "Detach result unknown; never replay")
 
-    async def open(self, command, *, on_created=None, principal="session_open"):
+    async def open(
+        self, command, *, on_created=None, principal="session_open", custom_title=None
+    ):
         from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
 
         proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)
         await proof.prepare()
         receipt = None
         try:
-            source = self.native_open_source(command, "KiraBridge_" + secrets.token_hex(16), proof)
+            source = self.native_open_source(
+                command,
+                custom_title or "KiraBridge_" + secrets.token_hex(16),
+                proof,
+            )
             receipt = await self.native(source, mutation=True)
             if on_created is not None:
                 await on_created(dict(receipt))
@@ -1306,14 +1324,8 @@ entries[0].click();JSON.stringify({detached:true});
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
         if identity.split()[1] != Path(row["tty"]).name:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
-        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
-
         screen = await self.read(row["pane_id"])
-        if not empty_shell_prompt(screen):
-            raise BridgeError(
-                "visible_input_not_empty",
-                "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
-            )
+        await self.verify_shell_readiness(row, screen)
         detailed = len(identity.split(None, 8)) == 9
         if expected_cwd is not None:
             if not detailed or any(ord(c) < 32 or ord(c) == 127 for c in str(expected_cwd)):
@@ -1390,10 +1402,12 @@ entries[0].click();JSON.stringify({detached:true});
         # only the fresh history tail read AFTER that transition in the same
         # focus call. Compare it byte-for-byte later, without another selection
         # or activation in the dispatch.
-        if not empty_shell_prompt(screen):
-            raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
+        await self.verify_shell_readiness(row, screen)
         if before_transport is not None and require_physical_visibility:
             await before_transport()
+        # Fresh challenge after focus and screen checks, immediately before
+        # the native Paste script is launched.
+        await self.verify_shell_readiness(row, screen)
         return await self.native(
             target
             + identity_guard
