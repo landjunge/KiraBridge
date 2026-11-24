@@ -24,6 +24,36 @@ from kirabridge.session_ports import SessionPorts, SessionTransport, TerminalApp
 from kirabridge.terminal_manager import check_executable
 from kirabridge.timing import timed_async
 
+# The only receiver-management owner: the local operator identity (see VisibleHandoffs).
+RECEIVER_OWNER = "local"
+
+
+def launch_command(principal, launched_agent, argv):
+    """Exact shell line for an owned launch; owner-launched known CLIs get their
+    adapter's process-local environment as POSIX assignment prefixes only."""
+    line = shlex.join(argv)
+    if principal != RECEIVER_OWNER or not launched_agent:
+        return line
+    from kirabridge.cli_adapters import adapter_for
+
+    try:
+        environment = getattr(adapter_for(launched_agent), "launch_environment", None)
+    except (KeyError, LookupError, BridgeError):
+        environment = None
+    if not isinstance(environment, dict) or not environment:
+        return line
+    assignments = []
+    for key, value in sorted(environment.items()):
+        if not (
+            isinstance(key, str)
+            and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key)
+            and isinstance(value, str)
+            and re.fullmatch(r"[A-Za-z0-9_.-]{0,64}", value)
+        ):
+            raise BridgeError("invalid_arguments", "Adapter launch environment is not literal")
+        assignments.append(f"{key}={shlex.quote(value)}")
+    return " ".join([*assignments, line])
+
 
 class SessionReference(Input):
     pane_id: str = Field(pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+|linux:[1-9][0-9]*)$")
@@ -1056,7 +1086,7 @@ class SessionManager:
                                 continue
                             await self.terminal_app.send_confirmed(
                                 selected,
-                                shlex.join(argv),
+                                launch_command(principal, launched_agent, argv),
                                 identity,
                                 expected_cwd=cwd,
                                 before_transport=lambda: self.terminal_app.verify_opened(

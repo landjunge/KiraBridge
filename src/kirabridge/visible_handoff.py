@@ -9,7 +9,7 @@ from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canon
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.process_lifecycle import fresh_generations, same_generation, valid_generation
-from kirabridge.session_manager import SessionInput
+from kirabridge.session_manager import RECEIVER_OWNER, SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
     catalog_can_replace,
@@ -270,7 +270,7 @@ class VisibleHandoffs:
     # The only receiver-management owner: the local operator identity. Capabilities
     # such as session.open/terminal.execute are granted to remote callers too and
     # are not authority to replace a persistent assignment.
-    OWNER_PRINCIPAL = "local"
+    OWNER_PRINCIPAL = RECEIVER_OWNER
     # Lineage: a legacy triple first matched exactly, or a fresh owner assignment.
     GENERATION_SOURCES = frozenset({"exact_match_bootstrap", "owner_started_assignment"})
 
@@ -470,13 +470,29 @@ class VisibleHandoffs:
         }
 
     def status(self, principal, identifier):
+        """Public read: requires task.read and the handoff's sender or target."""
         self.security.principal(principal, "task.read")
         row = self.store.db.execute(
             "SELECT * FROM visible_handoffs WHERE id=? AND (principal=? OR target=?)",
             (identifier, principal, principal),
         ).fetchone()
-        if not row:
+        if row is None:
             raise BridgeError("not_found", "Visible handoff not found")
+        return self._status_record(row)
+
+    def _owned_status(self, identifier, sender, target, message_id):
+        """Read the exact original handoff for trusted execution bookkeeping."""
+        row = self.store.db.execute(
+            "SELECT * FROM visible_handoffs "
+            "WHERE id=? AND principal=? AND target=? AND message_id=?",
+            (identifier, sender, target, message_id),
+        ).fetchone()
+        if row is None:
+            raise BridgeError("not_found", "Visible handoff not found")
+        return self._status_record(row)
+
+    def _status_record(self, row):
+        identifier = row["id"]
         import json
 
         result = dict(row)
@@ -495,14 +511,53 @@ class VisibleHandoffs:
         return result
 
     def reconcile(self, principal, identifier):
-        """Read authenticated evidence after an uncertain outcome; never send input."""
+        """Read authenticated evidence after an uncertain outcome; never send input.
+
+        Public path: task.read, handoff scope and message.read are enforced unchanged.
+        """
         status = self.status(principal, identifier)
         message = self.messages.get(principal, status["message_id"])
+        self._apply_reconcile(identifier, status, message["acknowledged"])
+        return self.status(principal, identifier)
+
+    def _message_acknowledged(self, message_id, sender, target):
+        row = self.store.db.execute(
+            "SELECT acknowledged FROM messages WHERE id=? AND sender=? AND recipient=?",
+            (message_id, sender, target),
+        ).fetchone()
+        return row["acknowledged"] if row else None
+
+    def _recovery_task_read(self, identifier, sender, target, message_id):
+        """Preserve revoked grants while admitting originally send-only task scopes."""
+        try:
+            self.security.principal(sender, "task.read")
+        except BridgeError as exc:
+            if exc.code != "forbidden":
+                raise
+            self.security.principal(sender)
+            if not self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs h JOIN visible_handoff_events e ON e.id=h.id "
+                "WHERE h.id=? AND h.principal=? AND h.target=? AND h.message_id=? "
+                "AND e.state='planned' AND CASE WHEN json_valid(e.evidence) "
+                "THEN json_type(e.evidence, '$.task_read_at_admission')='false' ELSE 0 END",
+                (identifier, sender, target, message_id),
+            ).fetchone():
+                raise
+
+    def _reconcile_owned(self, identifier, sender, target, message_id):
+        """Observe this execution's durable ACK/reply facts without public read scope."""
+        status = self._owned_status(identifier, sender, target, message_id)
+        self._apply_reconcile(
+            identifier, status, self._message_acknowledged(message_id, sender, target)
+        )
+        return self._owned_status(identifier, sender, target, message_id)
+
+    def _apply_reconcile(self, identifier, status, acknowledged):
         idle_reply_pending = (
             status["state"] == "unknown"
             and status["evidence"].get("reason") == "target_idle_reply_unconfirmed"
         ) or self.body_only_input_released(status)
-        if message["acknowledged"] and status["state"] not in {"completed", "interrupted"}:
+        if acknowledged and status["state"] not in {"completed", "interrupted"}:
             evidence = {
                 "authenticated_principal": status["target"],
                 "message_id": status["message_id"],
@@ -521,7 +576,6 @@ class VisibleHandoffs:
             ).fetchone()
             if reply:
                 self.transition(identifier, "completed", {**evidence, "reply_id": reply["id"]})
-        return self.status(principal, identifier)
 
     async def reconcile_observed(self, principal, identifier):
         """Reconcile a manually completed Codex turn from its original pre-paste cursor.
@@ -848,7 +902,7 @@ class VisibleHandoffs:
                     "visible_selection_required", "Return requires task-owned native identities"
                 )
         active = self.store.db.execute(
-            "SELECT id,principal,state,binding FROM visible_handoffs WHERE target=? "
+            "SELECT id,principal,state,binding,message_id FROM visible_handoffs WHERE target=? "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='handoffs' AND h.item_id=visible_handoffs.id) AND state IN "
             "('planned','inserting','inserted','submitting',"
@@ -890,7 +944,11 @@ class VisibleHandoffs:
                 principal, target, row, binding, observed_sessions
             ):
                 continue  # Dead pane stays recorded. It does not lock the replacement.
-            status = self.reconcile(row["principal"], row["id"])
+            owner = row["principal"]
+            message_id = row["message_id"]
+            self._recovery_task_read(row["id"], owner, target, message_id)
+            self.security.principal(owner, "message.read")
+            status = self._reconcile_owned(row["id"], owner, target, message_id)
             if status["state"] in {"completed", "interrupted"}:
                 continue
             if (
@@ -960,7 +1018,7 @@ class VisibleHandoffs:
                     },
                 )
                 continue
-            message = self.messages.get(row["principal"], status["message_id"])
+            acknowledged = self._message_acknowledged(message_id, owner, target)
             reply = self.store.db.execute(
                 "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
                 "AND kind IN ('answer','result') LIMIT 1",
@@ -969,7 +1027,7 @@ class VisibleHandoffs:
             if (
                 adapter_for(target).has_bound_protocol(binding)
                 and status["state"] in {"sent", "confirmed", "unknown"}
-                and message["acknowledged"]
+                and acknowledged
                 and not reply
             ):
                 # The accepted turn has finished, but its answer may still be missing.
@@ -1029,16 +1087,19 @@ class VisibleHandoffs:
                     )
                 continue  # The old message stays unknown and is never sent again.
             error = BridgeError("visible_target_busy", busy_message)
-            last = status["events"][-1] if status["events"] else None
-            error.observation = {
-                "state": "reserved",
-                "handoff_id": row["id"],
-                "handoff_state": status["state"],
-                "message_id": message["id"],
-                "acknowledged": message["acknowledged"],
-                "last_event": {key: last[key] for key in ("state", "at")} if last else None,
-                "next_step": "Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
-            }
+            error.observation = {"state": "reserved"}
+            if principal in {owner, target} and {"task.read", "message.read"}.issubset(
+                self.security.principal(principal).capabilities
+            ):
+                last = status["events"][-1] if status["events"] else None
+                error.observation.update(
+                    handoff_id=row["id"],
+                    handoff_state=status["state"],
+                    message_id=message_id,
+                    acknowledged=acknowledged,
+                    last_event={key: last[key] for key in ("state", "at")} if last else None,
+                    next_step="Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
+                )
             raise error
 
     @staticmethod
@@ -1943,7 +2004,9 @@ class VisibleHandoffs:
                 raise BridgeError(
                     "handoff_conflict", "Original visible handoff and target are immutable"
                 )
-            reconciled = self.reconcile(principal, identifier)
+            # request_hash includes this principal: the existing row is its own.
+            message_id = existing["message_id"]
+            reconciled = self._reconcile_owned(identifier, principal, target, message_id)
             local_reply = next(
                 (
                     event["evidence"]["local_reply_observer"]
@@ -1962,7 +2025,6 @@ class VisibleHandoffs:
                     "visible_handoff_unknown",
                     "Prior input must be reconciled; never repeat automatically",
                 )
-            message_id = existing["message_id"]
         else:
             before = await self.check_target(principal, target, binding, ready=True)
             await self.reconcile_target_reservations(
@@ -2052,6 +2114,12 @@ class VisibleHandoffs:
                         canonical({"agent_confirmed": False}),
                     ),
                 )
+                if "task.read" not in self.security.principal(principal).capabilities:
+                    self.transition(
+                        identifier,
+                        "planned",
+                        {"agent_confirmed": False, "task_read_at_admission": False},
+                    )
             input_attempted = False
 
             async def before_paste():
@@ -2187,6 +2255,10 @@ class VisibleHandoffs:
                         },
                     )
                     raise  # Only a pre-input readiness error may be deferred by the receiver.
+                detail = getattr(exc, "provider_error", None)
+                paste_observation = (
+                    detail.get("paste_observation") if isinstance(detail, dict) else None
+                )
                 self.transition(
                     identifier,
                     "unknown",
@@ -2194,15 +2266,22 @@ class VisibleHandoffs:
                         "reason": getattr(exc, "code", "interrupted"),
                         "agent_confirmed": False,
                         "automatic_retry": False,
+                        # Content-free echo facts only (lengths/booleans), never text.
+                        **(
+                            {"paste_observation": paste_observation}
+                            if isinstance(paste_observation, dict)
+                            else {}
+                        ),
                     },
                 )
                 raise UncertainExecution(
                     "visible_handoff_unknown",
                     "Input outcome requires reconciliation; no automatic resend",
                 ) from exc
-        current = self.reconcile(principal, identifier)
+        # Post-effect bookkeeping of this execution's own handoff: no public read scope.
+        current = self._reconcile_owned(identifier, principal, target, message_id)
         cached_local = current["evidence"].get("local_reply_result")
-        original = self.messages.get(principal, message_id)
+        original = {"acknowledged": self._message_acknowledged(message_id, principal, target)}
         replied = self.store.db.execute(
             "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
             "AND kind IN ('answer','result') LIMIT 1",
@@ -2249,8 +2328,10 @@ class VisibleHandoffs:
             async with asyncio.timeout(args.timeout):
                 confirmed = False
                 while True:
-                    message = self.messages.get(principal, message_id)
-                    current = self.reconcile(principal, identifier)
+                    message = {
+                        "acknowledged": self._message_acknowledged(message_id, principal, target)
+                    }
+                    current = self._reconcile_owned(identifier, principal, target, message_id)
                     if current["state"] == "interrupted":
                         raise UncertainExecution(
                             "agent_turn_interrupted", "Interrupted turn must not be repeated"
@@ -2324,7 +2405,11 @@ class VisibleHandoffs:
                                 await self.check_target(principal, principal, reply_binding)
                             # A genuine mailbox return can arrive while the local
                             # descriptor is checked. It retains its existing priority.
-                            original = self.messages.get(principal, message_id)
+                            original = {
+                                "acknowledged": self._message_acknowledged(
+                                    message_id, principal, target
+                                )
+                            }
                             authenticated_reply = self.store.db.execute(
                                 "SELECT 1 FROM messages WHERE reply_to=? AND sender=? "
                                 "AND recipient=? AND kind IN ('answer','result') LIMIT 1",
@@ -2377,7 +2462,7 @@ class VisibleHandoffs:
             # Cancellation during input is still handled as uncertain input.
             raise
         except BaseException as exc:
-            current = self.status(principal, identifier)
+            current = self._owned_status(identifier, principal, target, message_id)
             evidence = (
                 {
                     **current["evidence"],

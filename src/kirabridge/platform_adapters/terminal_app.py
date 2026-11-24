@@ -17,6 +17,38 @@ from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 from kirabridge.timing import timed, timed_async
 
+_PASTE_DIAG_INTS = (
+    "before_field",
+    "after_field",
+    "expected",
+    "common_prefix",
+    "after_rows",
+    "tail_delta",
+)
+_PASTE_DIAG_BOOLS = ("tail_changed", "marker")
+
+
+def paste_observation(detail):
+    """Content-free echo-check facts from a failed native paste, or None.
+
+    Only the known integer/boolean keys survive; any text, extra key or malformed
+    value drops the whole diagnostic. Never evidence of input, only of observation.
+    """
+    match = re.search(r"; diag=(\{[^{}\n]{1,512}\})", detail or "")
+    if not match:
+        return None
+    try:
+        value = json.loads(match.group(1))
+    except ValueError:
+        return None
+    if not isinstance(value, dict) or set(value) != set(_PASTE_DIAG_INTS + _PASTE_DIAG_BOOLS):
+        return None
+    if any(type(value[key]) is not int or abs(value[key]) > 10**7 for key in _PASTE_DIAG_INTS):
+        return None
+    if any(type(value[key]) is not bool for key in _PASTE_DIAG_BOOLS):
+        return None
+    return {key: value[key] for key in (*_PASTE_DIAG_INTS, *_PASTE_DIAG_BOOLS)}
+
 
 def _process_observation_timeout(phase):
     error = BridgeError(
@@ -204,7 +236,12 @@ class TerminalAppTransport:
                     if "Selected terminal is busy" in detail
                     else "session_transport_unavailable"
                 )
-                raise BridgeError(code, detail or "Terminal.app automation failed")
+                failure = BridgeError(code, detail or "Terminal.app automation failed")
+                if code == "visible_paste_unconfirmed":
+                    observation = paste_observation(detail)
+                    if observation is not None:
+                        failure.provider_error = {"paste_observation": observation}
+                raise failure
             if len(stdout) > 1048576:
                 raise BridgeError("output_limit", "Terminal.app response too large")
             return json.loads(stdout)
@@ -866,7 +903,9 @@ class TerminalAppTransport:
                     + self.native_input_tail(65536)
                     + """,Number(tab.numberOfColumns()))) { echoed=true; break; }
         }
-        if(!echoed) throw Error("Paste not observed; no Return sent");
+        if(!echoed) throw Error("Paste not observed; no Return sent"
+          +(typeof __pasteDiag!=='undefined'&&__pasteDiag
+            ?"; diag="+JSON.stringify(__pasteDiag):""));
         JSON.stringify({paste_event_sent:true,return_sent:false});""",
                     mutation=True,
                 )
@@ -1021,10 +1060,12 @@ class TerminalAppTransport:
         if require_tag:
             source += (
                 "function receiptTagMatches(){const matches=app.windows().flatMap(w=>w.tabs())"
-                ".filter(t=>t.customTitle()===" + json.dumps(receipt["nonce"])
+                ".filter(t=>t.customTitle()==="
+                + json.dumps(receipt["nonce"])
                 + "&&t.titleDisplaysCustomTitle()===true);return matches.length===1&&"
                 "matches[0].tty()===" + json.dumps(receipt["tty"]) + "&&"
-                "tab.customTitle()===" + json.dumps(receipt["nonce"])
+                "tab.customTitle()==="
+                + json.dumps(receipt["nonce"])
                 + "&&tab.titleDisplaysCustomTitle()===true;}"
                 "if(!receiptTagMatches())throw Error('Created terminal tag changed');"
             )
@@ -1033,7 +1074,9 @@ class TerminalAppTransport:
     def tag_created_tab(self, receipt):
         return (
             self.created_tab_guard(receipt)
-            + "\nconst nonce=" + json.dumps(receipt["nonce"]) + ";"
+            + "\nconst nonce="
+            + json.dumps(receipt["nonce"])
+            + ";"
             + "if(app.windows().flatMap(w=>w.tabs()).some(t=>t.tty()!=="
             + json.dumps(receipt["tty"])
             + "&&t.customTitle()===nonce&&t.titleDisplaysCustomTitle()===true))"
@@ -1043,7 +1086,9 @@ class TerminalAppTransport:
             + "const titleMatches=app.windows().flatMap(w=>w.tabs()).filter(t=>"
             "t.customTitle()===nonce&&t.titleDisplaysCustomTitle()===true);"
             + "if(getterTitle!==nonce||getterDisplay!==true||titleMatches.length!==1||"
-            "titleMatches[0].tty()!==" + json.dumps(receipt["tty"]) + ")"
+            "titleMatches[0].tty()!=="
+            + json.dumps(receipt["tty"])
+            + ")"
             + "throw Error('Created terminal tag readback failed');"
             + "JSON.stringify({tagged:true,tty:tab.tty(),window_id:targetWindow.id(),"
             "custom_title_readback:getterTitle,title_display_readback:getterDisplay});"
@@ -1301,9 +1346,9 @@ entries[0].click();JSON.stringify({detached:true});
         if before_transport is not None and not require_physical_visibility:
             await before_transport()
         target = self.native_target(row["pane_id"])
-        focused = self.native_focus(
-            row["pane_id"], include_surface=require_physical_visibility
-        )[len(target) :]
+        focused = self.native_focus(row["pane_id"], include_surface=require_physical_visibility)[
+            len(target) :
+        ]
         if not require_physical_visibility:
             focused += "\ncheckFocus(); JSON.stringify(" + self.native_input_tail(65536) + ");"
         identity_check = (

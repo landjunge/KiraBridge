@@ -226,7 +226,7 @@ class MessageReceiver:
         except (TypeError, ValueError):
             return False
         handoff_id = evidence.get("handoff_id") if isinstance(evidence, dict) else None
-        if not handoff_id:
+        if not handoff_id or handoff_id != row["run_id"]:
             return False
         handoff = self.bridge.store.db.execute(
             "SELECT h.state FROM visible_handoffs h JOIN messages m ON m.id=h.message_id "
@@ -418,7 +418,9 @@ class MessageReceiver:
                         # shape of an optional local cache. This handoff is already
                         # terminal; retain the existing principal read check.
                         try:
-                            self.bridge.security.principal(row["sender"], "task.read")
+                            self.bridge.visible_handoffs._recovery_task_read(
+                                row["run_id"], row["sender"], row["recipient"], message_id
+                            )
                         except BridgeError as exc:
                             if exc.code != "forbidden":
                                 raise
@@ -473,17 +475,21 @@ class MessageReceiver:
                         self._finish(message_id, "completed", local)
                         self.recovered_handoffs.discard(message_id)
                         continue
-                if not reply_id:
+                if not reply_id or local_handoff is None:
                     continue
                 evidence = json.loads(row["evidence"])
                 try:
-                    handoff = self.bridge.visible_handoffs.reconcile(
-                        row["sender"], evidence["handoff_id"]
+                    self.bridge.visible_handoffs._recovery_task_read(
+                        row["run_id"], row["sender"], row["recipient"], message_id
                     )
+                    self.bridge.security.principal(row["sender"], "message.read")
                 except BridgeError as exc:
                     if exc.code != "forbidden":
                         raise
                     continue  # Revoked historical access must not stop other receiver work.
+                handoff = self.bridge.visible_handoffs._reconcile_owned(
+                    row["run_id"], row["sender"], row["recipient"], message_id
+                )
                 if handoff["state"] != "completed":
                     continue
                 self._finish(
@@ -1414,7 +1420,7 @@ class MessageReceiver:
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
                 job = self.bridge.store.db.execute(
-                    "SELECT message_id,evidence FROM message_jobs WHERE message_id=?",
+                    "SELECT message_id,run_id,evidence FROM message_jobs WHERE message_id=?",
                     (message_id,),
                 ).fetchone()
                 if (

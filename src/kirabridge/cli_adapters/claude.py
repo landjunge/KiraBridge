@@ -74,6 +74,11 @@ def typed(rows):
 class ClaudeCodeAdapter:
     name = "claude"
     capabilities = Capabilities(text=True)
+    # Process-local for a fresh owner launch only. A startup prompt suggestion renders
+    # as text in the composer, which the readiness guard correctly treats as a draft
+    # (input_not_empty). Disabling it yields a genuinely empty composer; it never
+    # touches an existing session or weakens the draft guard (M4 live evidence).
+    launch_environment = {"CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}
 
     def input_view(self, raw):
         text, unknown = legacy.display_text(raw)
@@ -146,7 +151,11 @@ class ClaudeCodeAdapter:
     def paste_source(self, text):
         # Fresh-echo check: only the CURRENT input field, before and after. Empty before,
         # exactly the text (whitespace-free, wrapped rows) or its folded marker after.
+        # __pasteDiag keeps only lengths/booleans of the LAST evaluation (never text),
+        # so an unconfirmed paste can be classified without reading the terminal.
+        # The verdict logic below is unchanged.
         return (
+            "\nvar __pasteDiag=null;"
             "\nfunction observedPaste(before, after) {"
             "const c=s=>s.replace(/[\\s\\u00a0]+/g,''), p=c(" + json.dumps(text) + ");"
             "const counts=" + json.dumps(sorted(_folded_counts(text))) + ";"
@@ -158,6 +167,14 @@ class ClaudeCodeAdapter:
             "return [l[i].trimStart().slice(1),...l.slice(i+1,e)].join('\\n');}}"
             "return null;}}return null;};"
             "const old=field(before), now=field(after);"
+            "const seen=now===null?null:c(now); let common=0;"
+            "if(seen!==null){while(common<seen.length&&common<p.length"
+            "&&seen[common]===p[common])common++;}"
+            "__pasteDiag={before_field:old===null?-1:c(old).length,"
+            "after_field:seen===null?-1:seen.length,expected:p.length,common_prefix:common,"
+            "after_rows:now===null?-1:now.split('\\n').length,"
+            "tail_changed:before!==after,tail_delta:after.length-before.length,"
+            "marker:seen!==null&&/^\\[Pastedtext#/.test(seen)};"
             "if(!p.length||old===null||now===null||c(old).length) return false;"
             "const cur=c(now); if(cur===p) return true;"
             r"const m=/^\[Pastedtext#\d+(?:\+(\d+)lines?)?\]$/.exec(cur);"
