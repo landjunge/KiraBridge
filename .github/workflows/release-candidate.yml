@@ -21,6 +21,18 @@ jobs:
       UV_PYTHON: '3.11'
     timeout-minutes: 15
     steps:
+      - name: Prepare Linux packaging scratch on runner storage
+        if: ${{ matrix.runner == 'kirabridge-linux-smoke' }}
+        shell: bash
+        run: |
+          test -d "$RUNNER_TEMP"
+          filesystem=$(findmnt -n -o FSTYPE --target "$RUNNER_TEMP")
+          case "$filesystem" in
+            tmpfs|ramfs|devtmpfs|hugetlbfs) echo "Linux release scratch requires disk-backed runner storage." >&2; exit 2 ;;
+          esac
+          umask 077
+          scratch=$(mktemp -d "$RUNNER_TEMP/kb-release.XXXXXXXX")
+          printf 'TMPDIR=%s\n' "$scratch" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         if: ${{ matrix.runner != 'kirabridge-linux-smoke' }}
