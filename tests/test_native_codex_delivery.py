@@ -197,6 +197,51 @@ async def test_0171_protocol_rejects_a_different_patch_user_agent(binding):
     assert [call["method"] for call in p.calls] == ["initialize"]
 
 
+async def test_0172_protocol_prepares_assigned_active_turn_without_broadening_identity(binding):
+    binding.protocol_version = "0.172.0"
+    p = Protocol(binding)
+    prepared = await p.host().prepare(binding)
+    assert prepared["operation"] == "turn/steer"
+    assert prepared["expected_turn_id"] == p.turn
+    assert [call["method"] for call in p.calls] == [
+        "initialize",
+        "initialized",
+        "thread/read",
+        "thread/turns/list",
+    ]
+
+
+async def test_0172_protocol_rejects_a_different_assigned_root_without_input(binding):
+    binding.protocol_version = "0.172.0"
+    p = Protocol(binding)
+    p.thread["id"] = OTHER
+    with pytest.raises(BridgeError):
+        await p.host().prepare(binding)
+    assert not p.inputs()
+
+
+@pytest.mark.parametrize(
+    "user_agent",
+    ["codex-tui/0.172.1 fixture", "kirabridge/0.172.0 fixture", "codex-tui/0.173.0 fixture"],
+)
+async def test_0172_protocol_rejects_unexpected_user_agent(binding, user_agent):
+    binding.protocol_version = "0.172.0"
+    p = Protocol(binding)
+    response = p.response
+
+    def changed_user_agent(request):
+        result = response(request)
+        if request["method"] == "initialize":
+            result["userAgent"] = user_agent
+        return result
+
+    p.response = changed_user_agent
+    with pytest.raises(BridgeError) as exc:
+        await p.host().prepare(binding)
+    assert exc.value.code == "native_codex_host_unverified"
+    assert [call["method"] for call in p.calls] == ["initialize"]
+
+
 @pytest.mark.parametrize(
     "patch",
     [

@@ -119,10 +119,12 @@ def _same_host_line(binding, actual):
     """Verify the pinned managed install with its version-specific compatibility rule.
 
     Never trusts a path outside CODEX_HOME/packages/app-server-daemon/releases/<v>/bin/codex.
-    The established 0.169 line remains patch-tolerant; the new 0.171 pin is exact.
+    The established 0.169 line remains patch-tolerant; 0.171 and 0.172 pins are exact.
     """
-    if binding.protocol_version == "0.171.0":
-        return actual == binding.host_executable and _is_exact_0171_release(binding, actual)
+    if binding.protocol_version in {"0.171.0", "0.172.0"}:
+        return actual == binding.host_executable and _is_exact_pinned_release(
+            binding, actual, binding.protocol_version
+        )
     if actual == binding.host_executable:
         return True
     releases = Path(binding.codex_home) / "packages" / "app-server-daemon" / "releases"
@@ -143,7 +145,7 @@ def _same_host_line(binding, actual):
     return bool(left and right and left.group(1, 2, 4) == right.group(1, 2, 4))
 
 
-def _is_exact_0171_release(binding, path):
+def _is_exact_pinned_release(binding, path, version):
     candidate = Path(path)
     releases = Path(binding.codex_home) / "packages" / "app-server-daemon" / "releases"
     try:
@@ -157,7 +159,8 @@ def _is_exact_0171_release(binding, path):
         match = _RELEASE.match(candidate.parent.parent.name)
     except OSError:
         return False
-    return bool(match and match.group(1, 2, 3) == ("0", "171", "0"))
+    expected = tuple(version.split("."))
+    return bool(match and match.group(1, 2, 3) == expected)
 
 
 def _process_path(pid):
@@ -251,7 +254,7 @@ class CodexHost:
                     initialized.get("codexHome") != binding.codex_home
                     or agent is None
                     or list(agent.groups()[:2]) != wanted
-                    or binding.protocol_version == "0.171.0"
+                    or binding.protocol_version in {"0.171.0", "0.172.0"}
                     and ".".join(agent.groups()) != binding.protocol_version
                 ):
                     raise refused("native_codex_host_unverified")

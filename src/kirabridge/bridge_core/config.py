@@ -551,7 +551,7 @@ class NativeCodexBinding(BaseModel):
     # Same minor line only: a patch update of the installed host keeps the assignment.
     protocol_version: str = Field(
         default="0.169.0",
-        pattern=r"^(?:0\.169\.[0-9]{1,3}|0\.171\.0)$",
+        pattern=r"^(?:0\.169\.[0-9]{1,3}|0\.171\.0|0\.172\.0)$",
     )
 
     @model_validator(mode="after")

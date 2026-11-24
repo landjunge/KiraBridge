@@ -201,8 +201,8 @@ def test_host_patch_update_keeps_the_assignment_but_nothing_else_does(tmp_path):
     assert not _same_host_line(binding, str(home / "packages" / "missing" / "bin" / "codex"))
 
 
-@pytest.mark.parametrize("protocol_version", ["0.169.0", "0.169.999", "0.171.0"])
-def test_native_binding_accepts_only_existing_0169_or_explicit_0171_protocol_pins(
+@pytest.mark.parametrize("protocol_version", ["0.169.0", "0.169.999", "0.171.0", "0.172.0"])
+def test_native_binding_accepts_only_existing_0169_or_explicit_0171_0172_protocol_pins(
     tmp_path, protocol_version
 ):
     home = tmp_path.resolve() / ".codex"
@@ -212,7 +212,9 @@ def test_native_binding_accepts_only_existing_0169_or_explicit_0171_protocol_pin
     assert binding.source == "vscode"
 
 
-@pytest.mark.parametrize("protocol_version", ["0.170.0", "0.171.1", "0.172.0", "0.169.1000"])
+@pytest.mark.parametrize(
+    "protocol_version", ["0.170.0", "0.171.1", "0.172.1", "0.173.0", "0.169.1000"]
+)
 def test_native_binding_rejects_unlisted_protocol_pins(tmp_path, protocol_version):
     from pydantic import ValidationError
 
@@ -232,3 +234,20 @@ def test_0171_patch_host_uses_only_the_pinned_0171_minor_line(tmp_path):
     assert not _same_host_line(binding, _release(home, "0.171.1"))
     assert not _same_host_line(binding, _release(home, "0.170.9"))
     assert not _same_host_line(binding, _release(home, "0.172.0"))
+
+
+def test_0172_host_uses_only_the_exact_pinned_release_and_architecture(tmp_path):
+    from kirabridge.platform_adapters.codex_host import _same_host_line
+
+    home = tmp_path.resolve() / ".codex"
+    pinned = _release(home, "0.172.0", "x86_64-apple-darwin")
+    binding = _binding(home, pinned, "0.172.0")
+    assert _same_host_line(binding, pinned)
+    assert not _same_host_line(binding, _release(home, "0.172.1", "x86_64-apple-darwin"))
+    assert not _same_host_line(binding, _release(home, "0.173.0", "x86_64-apple-darwin"))
+    assert not _same_host_line(binding, _release(home, "0.171.0", "x86_64-apple-darwin"))
+    assert not _same_host_line(binding, _release(home, "0.172.0", "aarch64-apple-darwin"))
+    outside = tmp_path.resolve() / "outside" / "bin"
+    outside.mkdir(parents=True)
+    (outside / "codex").write_text("")
+    assert not _same_host_line(binding, str(outside / "codex"))
