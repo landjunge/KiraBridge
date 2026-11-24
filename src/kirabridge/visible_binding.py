@@ -190,17 +190,18 @@ def _with_saved_identity(binding, item, *, keep_protocol=False):
     )
 
 
-def load_refresh(config, *, same_live_generation=None) -> None:
-    """Apply a previously proven refresh after restart. Ignore a newer manual binding."""
+def load_refresh(config, *, same_live_generation=None) -> dict[str, str]:
+    """Apply a proven refresh; return matching rows that need live reconciliation."""
     path = overlay_path(config)
     if not path.is_file():
-        return
+        return {}
     try:
         saved = json.loads(path.read_text())
     except (OSError, ValueError):
-        return
+        return {}
     if not isinstance(saved, dict):
-        return
+        return {}
+    unresolved = {}
     for target, item in saved.items():
         binding = config.visible_handoffs.bindings.get(target)
         if binding is None or not isinstance(item, dict):
@@ -208,9 +209,13 @@ def load_refresh(config, *, same_live_generation=None) -> None:
         if any(getattr(binding, key) != item.get("replaced_" + key) for key in IDENTITY_FIELDS):
             continue
         anchor_protocol = item.get("replaced_protocol_sha256")
-        if anchor_protocol != _protocol_digest(binding) and (
-            "replaced_protocol_sha256" in item or binding.codex_thread_id is not None
+        if not isinstance(anchor_protocol, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", anchor_protocol
         ):
+            unresolved[target] = "legacy_overlay_unverified"
+            continue
+        if anchor_protocol != _protocol_digest(binding):
+            unresolved[target] = "manual_protocol_binding_precedence"
             continue
         try:
             keep_protocol = item.get("preserve_codex_protocol", False)
@@ -228,6 +233,7 @@ def load_refresh(config, *, same_live_generation=None) -> None:
             config.visible_handoffs.bindings[target] = updated
         except (KeyError, ValueError, TypeError):
             continue
+    return unresolved
 
 
 def save_refresh(

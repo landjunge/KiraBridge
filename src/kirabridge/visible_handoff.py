@@ -263,7 +263,9 @@ class VisibleHandoffs:
                 "target TEXT PRIMARY KEY,state TEXT NOT NULL,binding TEXT NOT NULL,"
                 "evidence TEXT NOT NULL,observed_at REAL NOT NULL)"
             )
-        load_refresh(config, same_live_generation=self._same_live_rehome_generation)
+        self.refresh_ambiguities = load_refresh(
+            config, same_live_generation=self._same_live_rehome_generation
+        )
 
     PRESENCE_STATES = frozenset(
         {"available", "stale", "absent", "ambiguous", "replaced", "rehomed", "unknown"}
@@ -473,6 +475,17 @@ class VisibleHandoffs:
     def presence(self, target):
         import json
 
+        unresolved = self.refresh_ambiguities.get(target)
+        if unresolved is not None:
+            return {
+                "target": target,
+                "state": "ambiguous",
+                "reason": unresolved,
+                "evidence": {"remedy": "new_exact_assignment_required"},
+                "binding": self.config.visible_handoffs.bindings.get(target).model_dump()
+                if self.config.visible_handoffs.bindings.get(target)
+                else None,
+            }
         row = self.store.db.execute(
             "SELECT * FROM receiver_presence WHERE target=?", (target,)
         ).fetchone()
@@ -1180,6 +1193,7 @@ class VisibleHandoffs:
         returns no snapshot, so an unrelated reservation keeps its existing lock.
         Every outcome is recorded as receiver presence; none of them sends input.
         """
+        unresolved_refresh = self.refresh_ambiguities.get(target)
         selection_reason = None
         try:
             selected = await self.sessions.selected(
@@ -1191,9 +1205,32 @@ class VisibleHandoffs:
             selection_reason = (
                 detail.get("reason") if isinstance(detail, dict) else None
             ) or error.code
-        if selected is not None and self.sessions.binding_matches(selected, binding, target):
+        selected_matches = selected is not None and self.sessions.binding_matches(
+            selected, binding, target
+        )
+        if unresolved_refresh == "manual_protocol_binding_precedence":
+            if selected_matches:
+                self.refresh_ambiguities.pop(target, None)
+                self.record_presence(
+                    principal,
+                    target,
+                    "available",
+                    binding,
+                    {"reason": "manual_binding_verified_after_overlay_conflict"},
+                )
+                return binding, None
+            self._refuse_unresolved_refresh(principal, target, binding, unresolved_refresh)
+        if unresolved_refresh == "legacy_overlay_unverified" and selected_matches:
+            self._refuse_unresolved_refresh(
+                principal, target, binding, "legacy_protocol_binding_ambiguous"
+            )
+        if selected_matches and unresolved_refresh is None:
             self.record_presence(principal, target, "available", binding, {"reason": "matched"})
             return binding, None
+        if unresolved_refresh == "legacy_overlay_unverified":
+            # The legacy destination is usable only after a new catalog and native
+            # absence/generation proof below. Never trust its persisted pane/PIDs alone.
+            pass
         lifecycle = self._lifecycle_change(target, binding, selected, selection_reason)
         try:
             catalog = await self.sessions.catalog(principal)
@@ -1208,6 +1245,12 @@ class VisibleHandoffs:
             )
             return binding, None
         sessions = catalog.get("sessions") or []
+        if unresolved_refresh == "legacy_overlay_unverified" and binding_still_present(
+            binding, sessions
+        ):
+            self._refuse_unresolved_refresh(
+                principal, target, binding, "legacy_original_still_present"
+            )
         if selected is None and only_candidate is None:
             rehomed = await self.rehome_binding(principal, target, binding, catalog)
             if rehomed is not None:
@@ -1221,6 +1264,24 @@ class VisibleHandoffs:
             # An owner launch must never adopt a different live same-CLI session.
             updated = None
         before = self.fresh_pair(updated) if updated is not None else None
+        if (
+            unresolved_refresh == "legacy_overlay_unverified"
+            and binding.codex_thread_id is not None
+        ):
+            recorded = self.recorded_generations(updated, target) or {} if updated else {}
+            owner_destination_confirmed = (
+                updated is not None
+                and self.generation_source(updated, target) == "owner_started_assignment"
+                and before is not None
+                and all(
+                    same_generation(recorded.get(pid), before.get(pid))
+                    for pid in (updated.expected_pid, updated.agent_pid)
+                )
+            )
+            if not owner_destination_confirmed:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_codex_destination_unproven"
+                )
         try:
             await self.sessions.prove_original_target_gone(principal, binding.model_dump())
         except BridgeError as error:
@@ -1244,6 +1305,10 @@ class VisibleHandoffs:
                     "remedy": "new_exact_assignment_required",
                 },
             )
+            if unresolved_refresh is not None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_original_absence_unproven"
+                )
             return binding, None
         if updated is None:
             # The catalog is complete and the configured pane is proven gone;
@@ -1271,6 +1336,10 @@ class VisibleHandoffs:
                     "remedy": "new_exact_assignment_required",
                 },
             )
+            if unresolved_refresh is not None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_replacement_unverified"
+                )
             return binding, sessions
         sessions, failure = await self._confirm_replacement(
             principal, target, binding, updated, before
@@ -1281,6 +1350,10 @@ class VisibleHandoffs:
                 raise BridgeError("visible_target_missing", "The receiver assignment was removed")
             if current == binding:
                 self.record_presence(principal, target, "stale", binding, {"reason": failure})
+            if unresolved_refresh is not None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_replacement_unverified"
+                )
             return current, None
         self.record_presence(
             principal,
@@ -1306,6 +1379,16 @@ class VisibleHandoffs:
             },
         )
         return updated, sessions
+
+    def _refuse_unresolved_refresh(self, principal, target, binding, reason):
+        evidence = {"reason": reason, "remedy": "new_exact_assignment_required"}
+        self.record_presence(principal, target, "ambiguous", binding, evidence)
+        error = BridgeError(
+            "session_selection_changed",
+            "Legacy receiver refresh has no verified destination; assign the receiver exactly",
+        )
+        error.observation = {"state": "ambiguous", "target": target, **evidence}
+        raise error
 
     async def _confirm_replacement(self, principal, target, binding, updated, before):
         """Re-observe the unique candidate after the asynchronous absence proof."""
@@ -1478,10 +1561,18 @@ class VisibleHandoffs:
             ).fetchone()
             if existing is not None:
                 saved = self.recorded_generations(updated, target) or {}
+                lineage_matches = all(
+                    same_generation(saved.get(p), generations.get(p)) for p in pids
+                )
+                owner_assignment_is_verified = (
+                    source == "strict_dead_replacement"
+                    and existing["source"] == "owner_started_assignment"
+                    and lineage_matches
+                )
                 if (
                     existing["target"] != target
-                    or existing["source"] != source
-                    or not all(same_generation(saved.get(p), generations.get(p)) for p in pids)
+                    or (existing["source"] != source and not owner_assignment_is_verified)
+                    or not lineage_matches
                 ):
                     return "lineage_conflict"
             else:
@@ -1501,6 +1592,7 @@ class VisibleHandoffs:
         except ValueError:
             return "overlay_binding_invalid"
         self.config.visible_handoffs.bindings[target] = updated
+        self.refresh_ambiguities.pop(target, None)
         return None
 
     async def _rehome(self, principal, target, binding, moved):
@@ -1823,6 +1915,9 @@ class VisibleHandoffs:
             )
 
     async def check_target(self, principal, target, binding, *, ready=False):
+        unresolved = self.refresh_ambiguities.get(target)
+        if unresolved is not None:
+            self._refuse_unresolved_refresh(principal, target, binding, unresolved)
         pids = (binding.expected_pid, binding.agent_pid)
         try:
             before = self.generation_observer(pids)
