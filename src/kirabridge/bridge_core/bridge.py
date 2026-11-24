@@ -1113,11 +1113,9 @@ class Bridge:
     async def refresh_agent_bindings_once(self, principal="local"):
         """Re-check the configured agent windows against one fresh catalogue.
 
-        Read-only. Only a binding that is no longer in the catalogue goes through the
-        existing proven-absence and unique-live-agent replacement (refreshed_binding), so a
-        restart of KiraBridge, Terminal.app or an agent never leaves a dead binding behind.
-        Returns the targets that were replaced. Every evaluated target's outcome is
-        persisted as receiver presence by refreshed_binding; nothing is sent.
+        Rehome a moved tab only when the recorded process generations still match.
+        An absent binding can be replaced only after fresh proven absence and a unique
+        live candidate. Returns changed targets. No terminal input is sent.
         """
         from kirabridge.visible_binding import binding_still_present
 
@@ -1144,10 +1142,18 @@ class Bridge:
         replaced = []
         for target, binding in bindings.items():
             if binding_still_present(binding, sessions):
-                # Unchanged skip rule. Report, but never call an exact match "ready":
-                # readiness and identity are re-validated at the effect point.
                 exact = any(self.sessions.binding_matches(r, binding, target) for r in sessions)
                 try:
+                    if not exact:
+                        moved = await self.visible_handoffs.rehome_binding(
+                            principal, target, binding, catalog
+                        )
+                        if moved is not None:
+                            replaced.append(target)
+                            continue
+                    if self.config.visible_handoffs.bindings.get(target) != binding:
+                        continue
+                    # Readiness and identity are re-validated at the effect point.
                     self.visible_handoffs.record_presence(
                         principal,
                         target,

@@ -41,9 +41,11 @@ def new_session():
         "agent_pid": NEW_AGENT,
         "agent_candidate": "grok",
         "identity_ambiguous": False,
+        "transport": "terminal_app",
+        "tty": "/dev/ttys000",
         "processes": [
-            {"pid": NEW_SHELL, "ppid": 1, "name": "-zsh"},
-            {"pid": NEW_AGENT, "ppid": NEW_SHELL, "name": "grok"},
+            {"pid": NEW_SHELL, "ppid": 1, "name": "-zsh", "image": "/bin/zsh"},
+            {"pid": NEW_AGENT, "ppid": NEW_SHELL, "name": "grok", "image": "/bin/grok"},
         ],
     }
 
@@ -62,9 +64,19 @@ def install_catalog(monkeypatch, bridge, sessions):
     async def prove(principal, original):
         return {"original_pids_gone": True, "native_window_absent": True}
 
+    async def identity(pid, **kwargs):
+        row = next(row for row in sessions if any(p["pid"] == pid for p in row["processes"]))
+        process = next(p for p in row["processes"] if p["pid"] == pid)
+        tty = row["pane_id"].rsplit(":", 1)[1]
+        return f"501 {tty} Fri Oct 30 20:26:00 2026 {process['ppid']} {process['image']}"
+
     monkeypatch.setattr(bridge.sessions, "selected", selected)
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
     monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", prove)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "process_identity", identity)
+    bridge.visible_handoffs.generation_observer = lambda pids: {
+        pid: {"boot": "test-boot", "pid": pid, "birth": str(pid)} for pid in pids
+    }
 
 
 def remember(bridge, binding, state="unknown"):

@@ -6,6 +6,7 @@ from copy import deepcopy
 
 import pytest
 from conftest import request
+from test_process_lifecycle import gen
 from test_visible_handoff import callback, visible  # noqa: F401
 
 from kirabridge.bridge_core.bridge import Bridge
@@ -182,6 +183,9 @@ def install_native_model(monkeypatch, bridge, model):
     monkeypatch.setattr(bridge.sessions, "read", read)
     monkeypatch.setattr(bridge.sessions, "insert", insert)
     monkeypatch.setattr(bridge.sessions, "press_return", submit)
+    bridge.visible_handoffs.generation_observer = lambda pids: {
+        pid: gen(pid, f"{pid}.000001") for pid in pids
+    }
 
 
 def input_task(row, identifier="fresh-after-close"):

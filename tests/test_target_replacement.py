@@ -10,12 +10,14 @@ import json
 import sqlite3
 
 import pytest
+from test_closed_terminal_reuse import retain_unknown, successor
 from test_process_lifecycle import catalog_only, gen, gens, native
 from test_visible_binding_refresh import remember
 from test_visible_handoff import callback, visible  # noqa: F401
 
 import kirabridge.visible_handoff as visible_module
 from kirabridge.bridge_core.bridge import Bridge
+from kirabridge.bridge_core.config import VisibleTerminalBinding
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.visible_binding import overlay_path
 from kirabridge.visible_handoff import peer_route_status
@@ -404,6 +406,156 @@ async def test_moved_tab_with_equal_generation_is_rehomed_and_reservation_stays_
         )
     assert error.value.code == "visible_target_busy"
     assert history(bridge) == before
+
+
+def bind_codex_protocol(bridge):
+    bindings = bridge.config.visible_handoffs.bindings
+    binding = VisibleTerminalBinding.model_validate(
+        {
+            **bindings["codex"].model_dump(),
+            "codex_thread_id": "01234567-0123-4567-89ab-0123456789ab",
+            "codex_rollout_path": "/tmp/synthetic-codex-rollout.jsonl",
+        }
+    )
+    bindings["codex"] = binding
+    return binding
+
+
+@pytest.mark.parametrize("windows", [(555,), (555, 556)])
+async def test_codex_rehome_survives_core_reopen_with_same_live_generation(
+    visible, monkeypatch, windows
+):
+    bridge, transport = visible
+    original = bind_codex_protocol(bridge)
+    del bridge.config.visible_handoffs.bindings["grok"]
+    base_config = bridge.config.model_copy(deep=True)
+    _, message_id = retain_unknown(bridge, original)
+    before = history(bridge)
+    handoffs = bridge.visible_handoffs
+    births = {}
+
+    def observe(pids):
+        return {pid: gen(pid, births.get(pid, f"{pid}.000001")) for pid in pids}
+
+    monkeypatch.setattr(type(handoffs), "generation_observer", staticmethod(observe))
+    pids = (original.expected_pid, original.agent_pid)
+    handoffs._store_generation("codex", original, observe(pids), "exact_match_bootstrap")
+    parallel = successor(window=900, shell=3000, agent=3001)
+    parallel.update(pane_id="terminal:900:ttys003", tty="/dev/ttys003")
+    updated = original
+    for window in windows:
+        moved = successor(window, *pids)
+        catalog_only(monkeypatch, bridge, [moved, parallel])
+        if len(windows) == 2 and window == windows[0]:
+            assert await bridge.refresh_agent_bindings_once("chatgpt") == ["codex"]
+            updated = bridge.config.visible_handoffs.bindings["codex"]
+        else:
+            updated, snapshot = await handoffs.refreshed_binding("chatgpt", "codex", updated)
+            assert snapshot is None
+        assert updated.pane_id == moved["pane_id"]
+        assert updated.codex_thread_id == original.codex_thread_id
+        assert updated.codex_rollout_path == original.codex_rollout_path
+    saved = json.loads(overlay_path(bridge.config).read_text())["codex"]
+    assert saved["replaced_pane_id"] == original.pane_id
+    assert original.codex_rollout_path not in json.dumps(saved)
+
+    reopened = Bridge(base_config.model_copy(deep=True))
+    try:
+        assert reopened.config.visible_handoffs.bindings["codex"] == updated
+        assert reopened.visible_handoffs.effect_generation_guard("codex", updated) == "verified"
+        assert history(reopened) == before
+        assert reopened.messages.get("chatgpt", message_id)["acknowledged"] is None
+    finally:
+        reopened.store.close()
+
+    manual_config = base_config.model_copy(deep=True)
+    manual = original.model_copy(update={"codex_rollout_path": "/tmp/manual-codex-rollout.jsonl"})
+    manual_config.visible_handoffs.bindings["codex"] = manual
+    manually_reopened = Bridge(manual_config)
+    try:
+        assert manually_reopened.config.visible_handoffs.bindings["codex"] == manual
+    finally:
+        manually_reopened.store.close()
+
+    # The same PID numbers after relaunch do not carry the old Codex protocol.
+    births[original.agent_pid] = "999.000001"
+    reused = Bridge(base_config)
+    try:
+        assert reused.config.visible_handoffs.bindings["codex"] == original
+        with pytest.raises(BridgeError) as error:
+            reused.visible_handoffs.effect_generation_guard("codex", original)
+        assert error.value.code == "visible_target_changed"
+        assert history(reused) == before and not transport["calls"]
+    finally:
+        reused.store.close()
+
+
+@pytest.mark.parametrize(
+    ("case", "refusal"),
+    [
+        ("parallel", "replacement_candidate_changed"),
+        ("generation", "replacement_generation_changed_or_unverifiable"),
+        ("manual_binding", None),
+        ("overlay_failure", "overlay_write_failed"),
+        ("stable", None),
+    ],
+)
+async def test_codex_reused_tty_is_a_fresh_assignment_with_before_and_after_checks(
+    visible, monkeypatch, case, refusal
+):
+    bridge, transport = visible
+    original = bind_codex_protocol(bridge)
+    base_config = bridge.config.model_copy(deep=True)
+    _, message_id = retain_unknown(bridge, original)
+    before = history(bridge)
+    handoffs = bridge.visible_handoffs
+    row = successor()
+    rows = [row]
+    births = {}
+    kernel(bridge, births)
+    catalog_only(monkeypatch, bridge, rows)
+    manual = original.model_copy(update={"codex_rollout_path": "/tmp/manual-codex-rollout.jsonl"})
+
+    async def absence(principal, observed):
+        assert observed == original.model_dump()
+        if case == "parallel":
+            rows.append(successor(window=900, shell=3000, agent=3001))
+        if case == "generation":
+            births[row["agent_pid"]] = "999.000001"
+        if case == "manual_binding":
+            bridge.config.visible_handoffs.bindings["codex"] = manual
+        return {"original_pids_gone": True, "native_window_absent": True}
+
+    monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", absence)
+    if case == "overlay_failure":
+
+        def fail(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(visible_module, "save_refresh", fail)
+
+    updated, snapshot = await handoffs.refreshed_binding("chatgpt", "codex", original)
+    if case == "stable":
+        assert updated.pane_id == row["pane_id"]
+        assert updated.codex_thread_id is updated.codex_rollout_path is None
+        assert snapshot == rows
+        reopened = Bridge(base_config)
+        try:
+            assert reopened.config.visible_handoffs.bindings["codex"] == updated
+            assert reopened.visible_handoffs.generation_source(updated, "codex") == (
+                "strict_dead_replacement"
+            )
+        finally:
+            reopened.store.close()
+    else:
+        expected = manual if case == "manual_binding" else original
+        assert snapshot is None and updated == expected
+        assert bridge.config.visible_handoffs.bindings["codex"] == expected
+        assert not overlay_path(bridge.config).exists()
+        if refusal is not None:
+            assert handoffs.presence("codex")["reason"] == refusal
+    assert history(bridge) == before and not transport["calls"]
+    assert bridge.messages.get("chatgpt", message_id)["acknowledged"] is None
 
 
 @pytest.mark.parametrize(

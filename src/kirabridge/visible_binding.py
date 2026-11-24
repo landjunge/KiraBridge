@@ -14,8 +14,11 @@ import re
 from pathlib import Path
 
 from kirabridge.bridge_core.config import VisibleTerminalBinding
+from kirabridge.bridge_core.models import digest
 
 OVERLAY_NAME = "visible-binding-refresh.json"
+IDENTITY_FIELDS = ("pane_id", "expected_pid", "agent_pid")
+PROTOCOL_FIELDS = ("codex_thread_id", "codex_rollout_path")
 
 
 def overlay_path(config) -> Path:
@@ -145,23 +148,49 @@ def foreign_dead_reservation(original, current, sessions) -> bool:
 
 def replacement_binding(target, configured, sessions):
     """Return an updated binding, or None when the configured one must stay."""
+    if not isinstance(sessions, list) or not all(
+        isinstance(row, dict)
+        and isinstance(row.get("processes", []), list)
+        and all(isinstance(process, dict) for process in row.get("processes", []))
+        for row in sessions
+    ):
+        return None
     if binding_still_present(configured, sessions):
         return None
     row = unique_live_agent(target, sessions)
     if row is None or row["pane_id"] == configured.pane_id:
         return None
-    return configured.model_copy(
-        update={
-            "pane_id": row["pane_id"],
-            "expected_pid": row["expected_pid"],
-            "agent_pid": row["agent_pid"],
-            "codex_thread_id": None,
-            "codex_rollout_path": None,
+    try:
+        return _with_saved_identity(configured, row)
+    except ValueError:
+        return None
+
+
+def _protocol_digest(binding) -> str:
+    return digest([getattr(binding, key) for key in PROTOCOL_FIELDS])
+
+
+def _same_process_handle(previous, updated) -> bool:
+    return (
+        previous.expected_pid == updated.expected_pid
+        and previous.agent_pid == updated.agent_pid
+        and previous.pane_id.rsplit(":", 1)[-1] == updated.pane_id.rsplit(":", 1)[-1]
+    )
+
+
+def _with_saved_identity(binding, item, *, keep_protocol=False):
+    if any(type(item.get(key)) is not int for key in IDENTITY_FIELDS[1:]):
+        raise ValueError("Saved binding PIDs must be integers")
+    return VisibleTerminalBinding.model_validate(
+        {
+            **binding.model_dump(),
+            **{key: item[key] for key in IDENTITY_FIELDS},
+            **({} if keep_protocol else dict.fromkeys(PROTOCOL_FIELDS)),
         }
     )
 
 
-def load_refresh(config) -> None:
+def load_refresh(config, *, same_live_generation=None) -> None:
     """Apply a previously proven refresh after restart. Ignore a newer manual binding."""
     path = overlay_path(config)
     if not path.is_file():
@@ -176,27 +205,46 @@ def load_refresh(config) -> None:
         binding = config.visible_handoffs.bindings.get(target)
         if binding is None or not isinstance(item, dict):
             continue
-        if (
-            binding.pane_id != item.get("replaced_pane_id")
-            or binding.expected_pid != item.get("replaced_expected_pid")
-            or binding.agent_pid != item.get("replaced_agent_pid")
+        if any(getattr(binding, key) != item.get("replaced_" + key) for key in IDENTITY_FIELDS):
+            continue
+        anchor_protocol = item.get("replaced_protocol_sha256")
+        if anchor_protocol != _protocol_digest(binding) and (
+            "replaced_protocol_sha256" in item or binding.codex_thread_id is not None
         ):
             continue
         try:
-            config.visible_handoffs.bindings[target] = binding.model_copy(
-                update={
-                    "pane_id": item["pane_id"],
-                    "expected_pid": item["expected_pid"],
-                    "agent_pid": item["agent_pid"],
-                    "codex_thread_id": None,
-                    "codex_rollout_path": None,
-                }
-            )
+            keep_protocol = item.get("preserve_codex_protocol", False)
+            if type(keep_protocol) is not bool:
+                continue
+            updated = _with_saved_identity(binding, item, keep_protocol=keep_protocol)
+            if keep_protocol and (
+                target != "codex"
+                or binding.codex_thread_id is None
+                or not _same_process_handle(binding, updated)
+                or same_live_generation is None
+                or not same_live_generation(target, binding, updated)
+            ):
+                continue
+            config.visible_handoffs.bindings[target] = updated
         except (KeyError, ValueError, TypeError):
             continue
 
 
-def save_refresh(config, target, previous: VisibleTerminalBinding, updated: VisibleTerminalBinding):
+def save_refresh(
+    config,
+    target,
+    previous: VisibleTerminalBinding,
+    updated: VisibleTerminalBinding,
+    *,
+    preserve_codex_protocol=False,
+):
+    if updated.codex_thread_id is not None and (
+        not preserve_codex_protocol
+        or target != "codex"
+        or not _same_process_handle(previous, updated)
+        or _protocol_digest(previous) != _protocol_digest(updated)
+    ):
+        raise ValueError("Only a verified same-process rehome can carry the Codex protocol")
     path = overlay_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
     current = {}
@@ -210,30 +258,38 @@ def save_refresh(config, target, previous: VisibleTerminalBinding, updated: Visi
     # Keep the on-disk configuration as the anchor across A -> B -> C refreshes.
     # Otherwise a restart with the original configured A would not restore C.
     # A manual binding that does not match the saved B starts its own chain.
-    anchor = previous
+    anchor_identity = {key: getattr(previous, key) for key in IDENTITY_FIELDS}
+    anchor_protocol = _protocol_digest(previous)
     saved = current.get(target)
     if isinstance(saved, dict) and all(
-        saved.get(key) == getattr(previous, key) for key in ("pane_id", "expected_pid", "agent_pid")
+        saved.get(key) == getattr(previous, key) for key in IDENTITY_FIELDS
     ):
         try:
-            anchor = VisibleTerminalBinding.model_validate(
-                {
-                    **previous.model_dump(),
-                    **{
-                        key: saved["replaced_" + key]
-                        for key in ("pane_id", "expected_pid", "agent_pid")
-                    },
-                }
+            saved_anchor = _with_saved_identity(
+                previous, {key: saved["replaced_" + key] for key in IDENTITY_FIELDS}
             )
+            saved_protocol = saved.get("replaced_protocol_sha256", digest([None, None]))
+            saved_preserve = saved.get("preserve_codex_protocol", False)
+            previous_protocol_matches = (
+                saved_protocol == anchor_protocol
+                if saved_preserve
+                else previous.codex_thread_id is None
+            )
+            if (
+                isinstance(saved_protocol, str)
+                and re.fullmatch(r"[0-9a-f]{64}", saved_protocol)
+                and type(saved_preserve) is bool
+                and previous_protocol_matches
+            ):
+                anchor_identity = {key: getattr(saved_anchor, key) for key in IDENTITY_FIELDS}
+                anchor_protocol = saved_protocol
         except (KeyError, TypeError, ValueError):
-            anchor = previous
+            pass
     current[target] = {
-        "replaced_pane_id": anchor.pane_id,
-        "replaced_expected_pid": anchor.expected_pid,
-        "replaced_agent_pid": anchor.agent_pid,
-        "pane_id": updated.pane_id,
-        "expected_pid": updated.expected_pid,
-        "agent_pid": updated.agent_pid,
+        **{"replaced_" + key: value for key, value in anchor_identity.items()},
+        "replaced_protocol_sha256": anchor_protocol,
+        "preserve_codex_protocol": updated.codex_thread_id is not None,
+        **{key: getattr(updated, key) for key in IDENTITY_FIELDS},
     }
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(current))

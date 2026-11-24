@@ -5,6 +5,7 @@ import hashlib
 import re
 import time
 
+from kirabridge.bridge_core.config import VisibleTerminalBinding
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
@@ -226,7 +227,6 @@ class VisibleHandoffs:
 
         self.codex_state = CodexTurnState()
         self.codex_reply = CodexReplyObserver()
-        load_refresh(config)
         with store.transaction():
             store.db.execute(
                 "CREATE TABLE IF NOT EXISTS visible_handoffs ("
@@ -263,6 +263,7 @@ class VisibleHandoffs:
                 "target TEXT PRIMARY KEY,state TEXT NOT NULL,binding TEXT NOT NULL,"
                 "evidence TEXT NOT NULL,observed_at REAL NOT NULL)"
             )
+        load_refresh(config, same_live_generation=self._same_live_rehome_generation)
 
     PRESENCE_STATES = frozenset(
         {"available", "stale", "absent", "ambiguous", "replaced", "rehomed", "unknown"}
@@ -271,8 +272,10 @@ class VisibleHandoffs:
     # such as session.open/terminal.execute are granted to remote callers too and
     # are not authority to replace a persistent assignment.
     OWNER_PRINCIPAL = RECEIVER_OWNER
-    # Lineage: a legacy triple first matched exactly, or a fresh owner assignment.
-    GENERATION_SOURCES = frozenset({"exact_match_bootstrap", "owner_started_assignment"})
+    # Lineage is recorded at an exact match, owner launch, or proven replacement.
+    GENERATION_SOURCES = frozenset(
+        {"exact_match_bootstrap", "owner_started_assignment", "strict_dead_replacement"}
+    )
 
     # Injectable for tests: (pids) -> {pid: generation} or None when unverifiable.
     generation_observer = staticmethod(fresh_generations)
@@ -347,6 +350,22 @@ class VisibleHandoffs:
         ):
             return None
         return second
+
+    def _same_live_rehome_generation(self, target, original, updated):
+        source = self.generation_source(original, target)
+        if (
+            source not in self.GENERATION_SOURCES
+            or self.generation_source(updated, target) != source
+        ):
+            return False
+        original_pair = self.recorded_generations(original, target) or {}
+        updated_pair = self.recorded_generations(updated, target) or {}
+        current = self.fresh_pair(updated) or {}
+        return all(
+            same_generation(original_pair.get(pid), updated_pair.get(pid))
+            and same_generation(updated_pair.get(pid), current.get(pid))
+            for pid in (updated.expected_pid, updated.agent_pid)
+        )
 
     def effect_generation_guard(self, target, binding):
         """Immediately before transport: a recorded lineage must still be the same.
@@ -1190,11 +1209,18 @@ class VisibleHandoffs:
             return binding, None
         sessions = catalog.get("sessions") or []
         if selected is None and only_candidate is None:
-            moved = self._same_process_moved(target, binding, sessions)
-            if moved is not None:
-                rehomed = await self._rehome(principal, target, binding, moved)
-                if rehomed is not None:
-                    return rehomed, None
+            rehomed = await self.rehome_binding(principal, target, binding, catalog)
+            if rehomed is not None:
+                return rehomed, None
+        updated = replacement_binding(target, binding, sessions)
+        if (
+            updated is not None
+            and only_candidate is not None
+            and (updated.pane_id, updated.expected_pid, updated.agent_pid) != tuple(only_candidate)
+        ):
+            # An owner launch must never adopt a different live same-CLI session.
+            updated = None
+        before = self.fresh_pair(updated) if updated is not None else None
         try:
             await self.sessions.prove_original_target_gone(principal, binding.model_dump())
         except BridgeError as error:
@@ -1219,17 +1245,6 @@ class VisibleHandoffs:
                 },
             )
             return binding, None
-        updated = replacement_binding(target, binding, sessions)
-        if (
-            updated is not None
-            and only_candidate is not None
-            and (
-                (updated.pane_id, updated.expected_pid, updated.agent_pid) != tuple(only_candidate)
-            )
-        ):
-            # A launch-driven refresh may adopt only the handle that launch started,
-            # never a different live same-CLI session.
-            updated = None
         if updated is None:
             # The catalog is complete and the configured pane is proven gone;
             # retain that snapshot even without a replacement so an orphaned
@@ -1257,8 +1272,16 @@ class VisibleHandoffs:
                 },
             )
             return binding, sessions
-        self.config.visible_handoffs.bindings[target] = updated
-        save_refresh(self.config, target, binding, updated)
+        sessions, failure = await self._confirm_replacement(
+            principal, target, binding, updated, before
+        )
+        if failure is not None:
+            current = self.config.visible_handoffs.bindings.get(target)
+            if current is None:
+                raise BridgeError("visible_target_missing", "The receiver assignment was removed")
+            if current == binding:
+                self.record_presence(principal, target, "stale", binding, {"reason": failure})
+            return current, None
         self.record_presence(
             principal,
             target,
@@ -1284,11 +1307,39 @@ class VisibleHandoffs:
         )
         return updated, sessions
 
+    async def _confirm_replacement(self, principal, target, binding, updated, before):
+        """Re-observe the unique candidate after the asynchronous absence proof."""
+        if before is None:
+            return None, "replacement_generation_unverifiable"
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except BridgeError:
+            return None, "replacement_catalog_unavailable"
+        if not catalog_can_replace(catalog):
+            return None, "replacement_catalog_incomplete"
+        sessions = catalog.get("sessions") or []
+        pids = (updated.expected_pid, updated.agent_pid)
+        if (
+            replacement_binding(target, binding, sessions) != updated
+            or sum(self._exact_row(row, target, updated.pane_id, *pids) for row in sessions) != 1
+        ):
+            return None, "replacement_candidate_changed"
+        after = self.fresh_pair(updated) or {}
+        if not all(same_generation(before.get(pid), after.get(pid)) for pid in pids):
+            return None, "replacement_generation_changed_or_unverifiable"
+        if self.config.visible_handoffs.bindings.get(target) != binding:
+            return None, "binding_changed"
+        failure = self._persist_assignment(
+            target, binding, updated, after, "strict_dead_replacement"
+        )
+        return sessions, failure
+
     def _lifecycle_change(self, target, binding, selected, selection_reason):
         """Name what changed in the bound tab; reporting only, never a rebind."""
         if selected is None:
             return {
                 "expected_pid_changed": "shell_restarted_or_replaced",
+                "tty_reused": "tty_in_other_window_with_different_shell",
                 "window_changed": "tty_in_other_window",
                 "pane_missing": "window_closed_or_moved",
             }.get(selection_reason, "unobserved")
@@ -1392,9 +1443,24 @@ class VisibleHandoffs:
             same_generation(recorded.get(p), current.get(p)) for p in pids
         ):
             return None
-        return binding.model_copy(update={"pane_id": pane_id})
+        try:
+            return VisibleTerminalBinding.model_validate(
+                {**binding.model_dump(), "pane_id": pane_id}
+            )
+        except ValueError:
+            return None
 
-    def _persist_assignment(self, target, previous, updated, generations, source):
+    async def rehome_binding(self, principal, target, binding, catalog):
+        if not catalog_can_replace(catalog):
+            return None
+        moved = self._same_process_moved(target, binding, catalog.get("sessions") or [])
+        if moved is None:
+            return None
+        return await self._rehome(principal, target, binding, moved)
+
+    def _persist_assignment(
+        self, target, previous, updated, generations, source, *, preserve_codex_protocol=False
+    ):
         """Ledger, then overlay, then RAM. Returns a refusal reason or None.
 
         A ledger row without an overlay is inert evidence: no mapping refers to it.
@@ -1423,9 +1489,17 @@ class VisibleHandoffs:
         except (sqlite3.Error, ValueError, TypeError):
             return "lineage_write_failed"
         try:
-            save_refresh(self.config, target, previous, updated)
+            save_refresh(
+                self.config,
+                target,
+                previous,
+                updated,
+                preserve_codex_protocol=preserve_codex_protocol,
+            )
         except OSError:
             return "overlay_write_failed"
+        except ValueError:
+            return "overlay_binding_invalid"
         self.config.visible_handoffs.bindings[target] = updated
         return None
 
@@ -1459,7 +1533,10 @@ class VisibleHandoffs:
             or self.config.visible_handoffs.bindings.get(target) != binding
         ):
             return None
-        if self._persist_assignment(target, binding, moved, after, source) is not None:
+        failure = self._persist_assignment(
+            target, binding, moved, after, source, preserve_codex_protocol=True
+        )
+        if failure is not None:
             return None
         self.record_presence(
             principal,

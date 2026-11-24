@@ -810,13 +810,16 @@ class SessionManager:
             for row in catalog["sessions"]
             if pane_id.rsplit(":", 1)[-1] == str(row.get("tty", "")).rsplit("/", 1)[-1]
         ]
-        reason = (
-            "expected_pid_changed"
-            if same_pane
-            else "window_changed"
-            if same_tty
-            else "pane_missing"
-        )
+        if same_pane:
+            reason = "expected_pid_changed"
+        elif same_tty:
+            shell_found = any(
+                expected_pid in {row["expected_pid"], row.get("legacy_expected_pid")}
+                for row in same_tty
+            )
+            reason = "window_changed" if shell_found else "tty_reused"
+        else:
+            reason = "pane_missing"
         failure = BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
