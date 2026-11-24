@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import time
 import uuid
@@ -10,7 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
-from kirabridge.agent_manager import AgentManager
+from kirabridge.agent_manager import AgentManager, codex_output_schema
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -939,6 +940,14 @@ class Bridge:
                     raise BridgeError("native_codex_unsupported", "Native route is Codex only")
                 from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
 
+                schema_path = codex_output_schema(self.config.agents[worker.agent], team_turn=True)
+                try:
+                    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+                    if not isinstance(schema, dict):
+                        raise ValueError()
+                except (ValueError, OSError) as exc:
+                    raise BridgeError("agent_schema", "Codex output schema is invalid") from exc
+
                 note = await self.agents.budget_note(worker.agent)
                 await running({"evidence_type": "native_codex_turn_dispatch"})
                 result = await NativeCodexTurns().execute(
@@ -947,10 +956,17 @@ class Bridge:
                     args.prompt,
                     min(args.timeout, worker.timeout),
                     progress,
+                    output_schema=schema,
                 )
                 return self.agents.with_budget_note(result, note, create=True)
             return await self.agents.execute(
-                task, args, policy, running, progress, separate_managed=managed
+                task,
+                args,
+                policy,
+                running,
+                progress,
+                separate_managed=managed,
+                team_turn=worker is not None,
             )
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)

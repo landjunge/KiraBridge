@@ -289,13 +289,18 @@ def configure_team(bridge, config, tmp_path, monkeypatch, *, answer=None):
         }
     )
     codex_body = f"""import json,sys
+from pathlib import Path
 prompt=sys.stdin.read()
 assert 'KiraBridge team turn' in prompt
 open('team-codex-invocations','a').write('1\\n')
 open('team-codex-argv','a').write(json.dumps(sys.argv[1:])+'\\n')
+output = Path(sys.argv[sys.argv.index('--output-last-message')+1])
+schema = json.loads(Path(sys.argv[sys.argv.index('--output-schema')+1]).read_text())
+assert schema['required']==['kirabridge_team','result','actions']
+output.write_text({answer!r}, encoding='utf-8')
 for event in [{{'type':'thread.started','thread_id':'01a1ce14-57d2-75f3-85c9-7208392ce422'}},
  {{'type':'turn.started'}},
- {{'type':'item.completed','item':{{'type':'agent_message','text':{answer!r}}}}},
+ {{'type':'item.completed','item':{{'type':'agent_message','text':'Untrusted progress preview'}}}},
  {{'type':'turn.completed'}}]:
  print(json.dumps(event),flush=True)
 """

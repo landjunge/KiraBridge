@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import stat
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Protocol
@@ -68,6 +70,39 @@ def agent_environment(config: AgentConfig, terminal: TerminalManager | None = No
     return env
 
 
+def codex_output_schema(config, *, team_turn=False, handoff_reply=False):
+    if team_turn:
+        return Path(__file__).with_name("team_turn.schema.json")
+    if config.output_schema:
+        schema = Path(config.output_schema)
+        if not schema.is_absolute() or not schema.is_file():
+            raise BridgeError("agent_schema", "Explicit output schema is unavailable")
+        return schema
+    if handoff_reply:
+        return Path(__file__).with_name("handoff_reply.schema.json")
+    return None
+
+
+def _read_codex_team_result(output: Path) -> str:
+    def open_result(path, flags):
+        return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+
+    try:
+        if not stat.S_ISREG(output.lstat().st_mode):
+            raise OSError("Expected a regular output file")
+        with open(output, "rb", opener=open_result) as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise OSError("Expected a regular output file")
+            data = stream.read(262145)
+        if len(data) > 262144:
+            raise BridgeError("team_payload_limit", "Team response exceeds its byte limit")
+        if not data.strip():
+            raise OSError("Empty output file")
+        return data.decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise BridgeError("team_agent_no_text", "Codex final response is unavailable") from exc
+
+
 class CodexAdapter:
     interface_version = "1"
 
@@ -86,6 +121,7 @@ class CodexAdapter:
         *,
         owned_resume_session=None,
         handoff_reply=False,
+        team_turn=False,
         before_spawn=None,
     ) -> dict:
         if not config.executable:
@@ -151,7 +187,7 @@ class CodexAdapter:
                 completed = True
             elif kind == "turn.failed":
                 failed = True
-            elif kind == "item.completed":
+            elif kind == "item.completed" and not team_turn:
                 item = value.get("item", {})
                 if item.get("type") == "agent_message" and isinstance(item.get("text"), str):
                     data = item["text"].encode()[: max(0, 65536 - message_bytes)]
@@ -184,37 +220,43 @@ class CodexAdapter:
             command += ["-c", "mcp_servers.kirabridge.args=" + json.dumps(spec["args"])]
         if owned_resume_session is not None:
             command += ["resume", "--json", "--ignore-user-config", "--skip-git-repo-check"]
-        if handoff_reply:
-            command += [
-                "--output-schema",
-                str(Path(__file__).with_name("handoff_reply.schema.json")),
-            ]
         if config.model:
             command += ["--model", config.model]
-        if config.output_schema:
-            schema = Path(config.output_schema)
-            if not schema.is_absolute() or not schema.is_file():
-                raise BridgeError("agent_schema", "Explicit output schema is unavailable")
+        schema = codex_output_schema(config, team_turn=team_turn, handoff_reply=handoff_reply)
+        if schema is not None:
             command += ["--output-schema", str(schema)]
         if owned_resume_session is not None:
             command += [owned_resume_session]
-        command += ["-"]
 
         async def spawned(evidence):
             await progress({"agent": args.agent, **evidence})
 
-        result = await self.terminal.execute(
-            task["id"],
-            task["principal"],
-            TerminalInput(argv=command, cwd=args.cwd, timeout=args.timeout),
-            roots,
-            [config.executable],
-            spawned,
-            env=agent_environment(config, self.terminal),
-            stdin=args.prompt.encode(),
-            line_callback=event,
-            **({"before_spawn": before_spawn} if before_spawn is not None else {}),
-        )
+        async def run(output_path=None):
+            output_args = ["--output-last-message", str(output_path)] if output_path else []
+            # Resume expects its session ID before the prompt.
+            return await self.terminal.execute(
+                task["id"],
+                task["principal"],
+                TerminalInput(
+                    argv=[*command, *output_args, "-"], cwd=args.cwd, timeout=args.timeout
+                ),
+                roots,
+                [config.executable],
+                spawned,
+                env=agent_environment(config, self.terminal),
+                stdin=args.prompt.encode(),
+                line_callback=event,
+                **({"before_spawn": before_spawn} if before_spawn is not None else {}),
+            )
+
+        if team_turn:
+            with tempfile.TemporaryDirectory(prefix="kirabridge-codex-") as directory:
+                output = Path(directory) / "final-message"
+                result = await run(output)
+                if completed and not failed and result["exit_code"] == 0:
+                    messages.append(_read_codex_team_result(output))
+        else:
+            result = await run()
         evidence = {
             "agent": args.agent,
             "adapter": "codex",
@@ -675,6 +717,7 @@ class AgentManager:
         owned_resume_session=None,
         handoff_reply=False,
         separate_managed=False,
+        team_turn=False,
         visible_binding=None,
     ):
         if args.agent not in principal.agents:
@@ -755,6 +798,8 @@ class AgentManager:
             extra.update(
                 {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
             )
+        if team_turn and config.kind == "codex":
+            extra["team_turn"] = True
         if resume_session is not None and config.kind in {
             "grok_acp",
             "opencode_acp",

@@ -12,7 +12,7 @@ from kirabridge.platform_adapters.codex_host import CodexHost, refused
 
 
 class NativeCodexTurns(CodexHost):
-    async def execute(self, binding, message_id, body, timeout, running):
+    async def execute(self, binding, message_id, body, timeout, running, *, output_schema=None):
         if binding is None:
             raise BridgeError("native_codex_unconfigured", "Native Codex host is not configured")
         prepared = await self.prepare(binding)
@@ -31,7 +31,8 @@ class NativeCodexTurns(CodexHost):
                 }
             )
 
-        sent = await self.deliver(binding, prepared, message_id, body, before_send)
+        options = {"output_schema": output_schema} if output_schema is not None else {}
+        sent = await self.deliver(binding, prepared, message_id, body, before_send, **options)
         try:
             text = await self.wait_reply(
                 binding, sent["turn_id"], body, timeout, cwd=sent["thread_cwd"]

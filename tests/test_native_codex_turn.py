@@ -38,7 +38,7 @@ class FakeApp:
     def __init__(self, cwd, *, threads=None, active=False, answer="ANSWER", finish=True):
         self.cwd, self.active, self.answer, self.finish = cwd, active, answer, finish
         self.threads = threads if threads is not None else [ROOT]
-        self.sent, self.body, self.calls = [], None, []
+        self.sent, self.body, self.calls, self.sent_params = [], None, [], []
 
     def thread(self, thread_id):
         return {
@@ -73,6 +73,7 @@ class FakeApp:
             return {"data": [self.turn("completed" if self.finish else "inProgress")]}
         if method in {"turn/start", "turn/steer"}:
             self.sent.append(method)
+            self.sent_params.append(params)
             self.body = params["input"][0]["text"]
             return {"turn": {"id": "turn-1"}} if method == "turn/start" else {"turnId": "old"}
         raise AssertionError(method)
@@ -108,6 +109,7 @@ async def test_the_assigned_root_gets_the_turn_and_its_exact_answer_returns(app,
     result = await execute(app, tmp_path)
     assert result["final_message"] == "ANSWER" and result["thread_id"] == ROOT
     assert app.sent == ["turn/start"] and result["terminal_input_attempted"] is False
+    assert "outputSchema" not in app.sent_params[0]
 
 
 async def test_two_matching_roots_select_only_the_persisted_assignment(app, tmp_path):
@@ -199,7 +201,9 @@ async def test_team_chain_runs_on_the_native_root_without_any_terminal(
     root = configure_team(bridge, config, tmp_path, monkeypatch)
     config.team.workers["codex"].execution_scope = "existing_native_codex_root"
     config.visible_handoffs.native_codex = template(tmp_path)
-    state = FakeApp(root, answer=json.dumps({"kirabridge_team": "1", "result": "NATIVE_DONE"}))
+    state = FakeApp(
+        root, answer=json.dumps({"kirabridge_team": "1", "result": "NATIVE_DONE", "actions": []})
+    )
 
     @asynccontextmanager
     async def connection(self, binding):
@@ -235,4 +239,10 @@ async def test_team_chain_runs_on_the_native_root_without_any_terminal(
     assert listed[0]["state"] == "completed", listed[0]
     assert listed[0]["result"] == "NATIVE_DONE"
     assert state.sent == ["turn/start"] and "KiraBridge team turn" in state.body
+    assert "exactly one JSON object matching the output schema" in state.body
+    assert state.sent_params[0]["outputSchema"]["required"] == [
+        "kirabridge_team",
+        "result",
+        "actions",
+    ]
     assert not (Path(root) / "team-codex-invocations").exists()  # no CLI/terminal ran

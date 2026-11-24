@@ -356,7 +356,9 @@ class CodexHost:
         async with self.connection(binding) as (rpc, generation):
             return await self.observe(rpc, generation, binding, resume=True)
 
-    async def deliver(self, binding, prepared, message_id, body, before_send):
+    async def deliver(
+        self, binding, prepared, message_id, body, before_send, *, output_schema=None
+    ):
         async with self.connection(binding) as (rpc, generation):
             current = await self.observe(rpc, generation, binding)
             # A host restart may refresh physical generation; a different turn
@@ -378,6 +380,8 @@ class CodexHost:
             }
             if current["expected_turn_id"] is not None:
                 params["expectedTurnId"] = current["expected_turn_id"]
+            if output_schema is not None and current["operation"] == "turn/start":
+                params["outputSchema"] = output_schema
             await before_send(current)
             try:
                 result = await rpc.call(current["operation"], params)

@@ -1,0 +1,107 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kirabridge_team",
+    "result",
+    "actions"
+  ],
+  "properties": {
+    "kirabridge_team": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "result": {
+      "type": "string",
+      "maxLength": 262144
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "recipient",
+              "body",
+              "kind",
+              "reply_to"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "message"
+                ]
+              },
+              "recipient": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,40}$"
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 65536
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "question",
+                  "answer",
+                  "work",
+                  "note",
+                  "result"
+                ]
+              },
+              "reply_to": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "assignee",
+              "title",
+              "body"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "task"
+                ]
+              },
+              "assignee": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,40}$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 65536
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

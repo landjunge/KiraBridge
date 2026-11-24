@@ -136,6 +136,7 @@ else:
     answer="FIXTURE_DONE "+subject
 with Path("verified-worker-invocations.jsonl").open("a") as ledger:
     ledger.write(json.dumps({{"principal":{principal!r},"subject":subject,"result":answer}})+"\\n")
+Path(sys.argv[sys.argv.index("--output-last-message")+1]).write_text(answer, encoding="utf-8")
 for event in [
     {{"type":"thread.started","thread_id":{SESSION[principal]!r}}},
     {{"type":"turn.started"}},
