@@ -26,6 +26,17 @@ def overlay_path(config) -> Path:
     return Path(config.data_dir) / OVERLAY_NAME
 
 
+def refresh_entry(config, target):
+    """Read a detached copy of one persisted overlay row for compare-and-set."""
+    path = overlay_path(config)
+    try:
+        saved = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    item = saved.get(target) if isinstance(saved, dict) else None
+    return json.loads(json.dumps(item)) if isinstance(item, dict) else None
+
+
 def binding_still_present(binding, sessions) -> bool:
     """True when this pane or either saved PID is still in the fresh catalog."""
     pids = {binding.expected_pid, binding.agent_pid}
@@ -333,7 +344,7 @@ def save_refresh(
     os.replace(temporary, path)
 
 
-def clear_refresh(config, target):
+def clear_refresh(config, target, *, expected_entry=None):
     """Remove one disproved legacy overlay while preserving other targets."""
     path = overlay_path(config)
     if not path.is_file():
@@ -346,6 +357,8 @@ def clear_refresh(config, target):
         return False
     if target not in current:
         return True
+    if expected_entry is not None and current[target] != expected_entry:
+        return False
     current.pop(target)
     if not current:
         try:

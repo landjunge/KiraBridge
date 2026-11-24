@@ -18,6 +18,7 @@ from kirabridge.visible_binding import (
     distinct_window_processes,
     load_refresh,
     refresh_destination,
+    refresh_entry,
     refresh_state,
     replacement_binding,
     save_refresh,
@@ -1199,6 +1200,12 @@ class VisibleHandoffs:
         refresh_record = self.refresh_ambiguities.get(target)
         unresolved_refresh = refresh_state(refresh_record)
         legacy_destination = refresh_destination(refresh_record)
+        expected_overlay_entry = (
+            refresh_entry(self.config, target)
+            if unresolved_refresh
+            in {"legacy_overlay_unverified", "manual_protocol_binding_precedence"}
+            else None
+        )
         selection_reason = None
         try:
             selected = await self.sessions.selected(
@@ -1272,8 +1279,22 @@ class VisibleHandoffs:
                     for pid in (binding.expected_pid, binding.agent_pid)
                 )
             ):
+                current_binding = self.config.visible_handoffs.bindings.get(target)
+                current_entry = refresh_entry(self.config, target)
+                if (
+                    current_binding != binding
+                    or expected_overlay_entry is None
+                    or current_entry != expected_overlay_entry
+                ):
+                    return current_binding or binding, None
                 self.verify_generation(target, binding, before, after)
-                if not clear_refresh(self.config, target):
+                if not clear_refresh(
+                    self.config, target, expected_entry=expected_overlay_entry
+                ):
+                    current_binding = self.config.visible_handoffs.bindings.get(target)
+                    current_entry = refresh_entry(self.config, target)
+                    if current_binding != binding or current_entry != expected_overlay_entry:
+                        return current_binding or binding, None
                     self._refuse_unresolved_refresh(
                         principal, target, binding, "legacy_overlay_clear_failed"
                     )
@@ -1518,6 +1539,8 @@ class VisibleHandoffs:
             )
         ):
             return None, "replacement_candidate_changed"
+        if legacy_destination is not None and binding_still_present(binding, sessions):
+            return None, "legacy_original_reappeared"
         after = self.fresh_pair(updated) or {}
         if not all(same_generation(before.get(pid), after.get(pid)) for pid in pids):
             return None, "replacement_generation_changed_or_unverifiable"

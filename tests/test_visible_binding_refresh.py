@@ -974,3 +974,104 @@ async def test_rc59_overlay_preserves_exact_live_manual_original(visible, monkey
     assert snapshot is None
     assert not overlay_path(bridge.config).exists()
     assert bridge.visible_handoffs.refresh_ambiguities == {}
+
+
+async def test_rc59_live_original_retention_does_not_clear_concurrent_assignment(
+    visible, monkeypatch
+):
+    bridge, _ = visible
+    original = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "codex_thread_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "codex_rollout_path": "/tmp/manual-rollout.jsonl",
+        }
+    )
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    old_destination = original.model_copy(
+        update={"pane_id": NEW_PANE, "expected_pid": NEW_SHELL, "agent_pid": NEW_AGENT}
+    )
+    _write_rc59_overlay(bridge.config, "codex", original, old_destination)
+    install_catalog(monkeypatch, bridge, [_codex_session(original)])
+    bridge.visible_handoffs._store_generation(
+        "codex", original, bridge.visible_handoffs.fresh_pair(original), "exact_match_bootstrap"
+    )
+    bridge.visible_handoffs.refresh_ambiguities = load_refresh(bridge.config)
+    newer = original.model_copy(
+        update={
+            "pane_id": "terminal:404:ttys404",
+            "expected_pid": 40400,
+            "agent_pid": 40401,
+            "codex_thread_id": None,
+            "codex_rollout_path": None,
+        }
+    )
+
+    async def catalog_with_concurrent_assignment(principal):
+        bridge.config.visible_handoffs.bindings["codex"] = newer
+        save_refresh(bridge.config, "codex", original, newer)
+        return {"status": "available", "sessions": [_codex_session(original)]}
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog_with_concurrent_assignment)
+
+    updated, snapshot = await bridge.visible_handoffs.refreshed_binding(
+        "chatgpt", "codex", original
+    )
+
+    assert updated == newer
+    assert snapshot is None
+    saved = json.loads(overlay_path(bridge.config).read_text())["codex"]
+    assert saved["pane_id"] == newer.pane_id
+    assert bridge.visible_handoffs.refresh_ambiguities["codex"]["state"] == (
+        "legacy_overlay_unverified"
+    )
+
+
+async def test_rc59_destination_is_not_committed_if_original_reappears_finally(
+    visible, monkeypatch
+):
+    bridge, _ = visible
+    original = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "codex_thread_id": "01234567-0123-4567-89ab-0123456789ab",
+            "codex_rollout_path": "/tmp/original-rollout.jsonl",
+        }
+    )
+    bridge.config.visible_handoffs.bindings["codex"] = original
+    destination = original.model_copy(
+        update={
+            "pane_id": NEW_PANE,
+            "expected_pid": NEW_SHELL,
+            "agent_pid": NEW_AGENT,
+            "codex_thread_id": None,
+            "codex_rollout_path": None,
+        }
+    )
+    _write_rc59_overlay(bridge.config, "codex", original, destination)
+    destination_session = _codex_session(destination)
+    original_session = _codex_session(original)
+    install_catalog(monkeypatch, bridge, [destination_session])
+    bridge.visible_handoffs._store_generation(
+        "codex",
+        destination,
+        bridge.visible_handoffs.fresh_pair(destination),
+        "owner_started_assignment",
+    )
+    bridge.visible_handoffs.refresh_ambiguities = load_refresh(bridge.config)
+    calls = 0
+
+    async def original_reappears_in_final_catalog(principal):
+        nonlocal calls
+        calls += 1
+        rows = [destination_session]
+        if calls == 2:
+            rows.append(original_session)
+        return {"status": "available", "sessions": rows}
+
+    monkeypatch.setattr(bridge.sessions, "catalog", original_reappears_in_final_catalog)
+
+    with pytest.raises(BridgeError) as exc:
+        await bridge.visible_handoffs.refreshed_binding("chatgpt", "codex", original)
+
+    assert exc.value.code == "session_selection_changed"
+    assert bridge.config.visible_handoffs.bindings["codex"] == original
+    assert bridge.visible_handoffs.presence("codex")["state"] == "ambiguous"
