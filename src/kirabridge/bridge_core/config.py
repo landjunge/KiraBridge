@@ -169,6 +169,9 @@ class TeamConfig(BaseModel):
     max_hops: int = Field(default=6, ge=1, le=16)
     max_work_per_root: int = Field(default=32, ge=1, le=256)
     max_pending_per_member: int = Field(default=32, ge=1, le=1000)
+    # Principals whose messages always go to the coordinator and nowhere else (operator rule:
+    # ChatGPT writes only to the coordinator, who distributes). Empty = no restriction.
+    coordinator_only_senders: list[str] = Field(default_factory=list, max_length=16)
     max_total_work: int = Field(default=10000, ge=1, le=1000000)
     max_messages: int = Field(default=10000, ge=1, le=1000000)
     max_body_bytes: int = Field(default=16384, ge=256, le=65536)

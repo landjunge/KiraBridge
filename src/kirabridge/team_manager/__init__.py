@@ -253,7 +253,16 @@ class TeamManager:
             raise BridgeError("not_found", "Team not found")
         return self.security.principal(principal, capability)
 
-    def _team(self, principal, team_id, capability="team.read", write=False, manage=False):
+    def _may_claim(self, principal):
+        try:
+            self._principal(principal, "team.manage")
+        except BridgeError:
+            return False
+        return True
+
+    def _team(
+        self, principal, team_id, capability="team.read", write=False, manage=False, claim=None
+    ):
         self._principal(principal, capability)
         row = self.store.db.execute(
             "SELECT t.*,m.role,m.active FROM teams t JOIN team_members m ON m.team_id=t.id "
@@ -262,8 +271,16 @@ class TeamManager:
         ).fetchone()
         if row is None or not row["active"] or principal not in self.config.team.workers:
             raise BridgeError("not_found", "Team not found")
-        if manage and principal not in {row["owner"], row["coordinator"]}:
-            raise BridgeError("team_role_denied", "Only the owner or coordinator may manage roles")
+        if (
+            manage
+            and principal not in {row["owner"], row["coordinator"]}
+            and not (claim == principal and self._may_claim(principal))
+        ):
+            raise BridgeError(
+                "team_role_denied",
+                "Only the owner or coordinator may manage roles "
+                "(a member with team.manage may only claim the coordinator role for itself)",
+            )
         if write and row["role"] not in WRITERS:
             raise BridgeError("team_role_denied", "Observers may only read shared team data")
         return row
@@ -928,7 +945,13 @@ class TeamManager:
                 self._team(principal, request.team_id, "team.read")
                 return self._view_team(request.team_id)
             self._automatic(principal)
-            team = self._team(principal, request.team_id, "team.write", manage=True)
+            team = self._team(
+                principal,
+                request.team_id,
+                "team.write",
+                manage=True,
+                claim=request.member if request.role == "coordinator" else None,
+            )
             if team["revision"] != request.expected_revision:
                 raise BridgeError(
                     "team_revision_conflict", "Team roles changed; read the current revision"
@@ -1036,6 +1059,11 @@ class TeamManager:
 
     def _send(self, principal, request, *, message_id=None, validate_only=False):
         self._automatic(principal)
+        if (
+            principal in self.config.team.coordinator_only_senders
+            and request.recipient != "coordinator"
+        ):
+            request = request.model_copy(update={"recipient": "coordinator"})
         self._size(request.body, self.config.team.max_body_bytes)
         native_ping_enrolled = False
         with self.store.transaction():
