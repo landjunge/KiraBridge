@@ -516,6 +516,8 @@ async def execute(args) -> None:
         from kirabridge.mcp_gateway.client import MCPClientPool
 
         action = args.action
+        if action == "coordinator":
+            action, args.role, args.revision, args.disable = "role", "coordinator", None, False
         if action == "onboard":
             out = await _run_team_onboard(args, config)
             emit(out)
@@ -592,6 +594,14 @@ async def execute(args) -> None:
             arguments = {"request": arguments}
         async with MCPClientPool(call_timeout=20) as pool:
             await pool.connect(peer(config, args.principal))
+            if action == "role" and arguments["request"]["expected_revision"] is None:
+                current = await pool.call("daemon", "team_get", {"team_id": args.team_id})
+                current = current.structuredContent or {}
+                revision = (current.get("team") or current).get("revision")
+                if current.get("error") or type(revision) is not int:
+                    emit(current if current.get("error") else {"error": {"code": "team_revision"}})
+                    raise SystemExit(2)
+                arguments["request"]["expected_revision"] = revision
             if action == "work" and args.latest is not None and not args.work_id:
                 result = await _latest_team_work(pool, args.team_id, args.latest)
             else:
@@ -1130,8 +1140,18 @@ def main() -> None:
     role.add_argument("team_id")
     role.add_argument("member")
     role.add_argument("role", choices=["coordinator", "worker", "reviewer", "observer"])
-    role.add_argument("--revision", type=int, required=True)
+    role.add_argument(
+        "--revision",
+        type=int,
+        default=None,
+        help="Expected team revision (default: the current one, read right before the change)",
+    )
     role.add_argument("--disable", action="store_true")
+    coordinator = actions.add_parser(
+        "coordinator", help="Make a member the coordinator (reads the current revision itself)"
+    )
+    coordinator.add_argument("team_id")
+    coordinator.add_argument("member")
     onboard = actions.add_parser("onboard")
     onboard.add_argument("team_id")
     onboard.add_argument("identity")
@@ -1173,6 +1193,7 @@ def main() -> None:
         reprocess,
         create,
         role,
+        coordinator,
         send,
         assign,
         actions.choices["claim"],
