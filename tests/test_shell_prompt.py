@@ -5,6 +5,7 @@ The JS harness cannot access Terminal.app, clipboard, processes or operator stat
 
 import asyncio
 import json
+import re
 import shutil
 import sys
 from unittest.mock import AsyncMock
@@ -106,6 +107,19 @@ def direct_shell(bridge, config, monkeypatch):
     monkeypatch.setattr(bridge.sessions, "selected", AsyncMock(return_value=row))
     monkeypatch.setattr(terminal, "process_identity", AsyncMock(return_value=identity))
     monkeypatch.setattr(terminal, "read", AsyncMock(return_value="➜  ~ \n\n"))
+    # These tests cover the shell-prompt guards; the on-screen window proof has its own tests.
+    monkeypatch.setattr(
+        terminal,
+        "prove_existing_target",
+        AsyncMock(
+            return_value={
+                "terminal_window_id": 123,
+                "tty": "/dev/ttys004",
+                "title": "shell",
+                "bounds": {"x": 0, "y": 0, "width": 800, "height": 600},
+            }
+        ),
+    )
     # Executing this fallback would conceal a broken ChatGPT preflight path.
     monkeypatch.setattr(terminal, "send", AsyncMock(side_effect=AssertionError("raw send")))
     monkeypatch.setattr(terminal, "native", AsyncMock(side_effect=["➜  ~ \n\n", {"sent": True}]))
@@ -243,11 +257,17 @@ async def run_dispatch_js(source, state):
         command = ["/usr/bin/osascript", "-l", "JavaScript", "-"]
     else:
         pytest.skip("native dispatch JS requires node or macOS JavaScript runtime")
+    pid = re.search(r"unixId\(\)===(\d+)", source)
     harness = (
+        "const owner={frontmost:()=>true,unixId:()=>"
+        + (pid.group(1) if pid else "1")
+        + ",bundleIdentifier:()=>'com.apple.Terminal'};"
+        "const owners=()=>[owner]; owners.byName=()=>owner;"
         "const state=" + json.dumps(state) + "; const calls=[];"
         "const tab={tty:()=>'/dev/ttys004',busy:()=>state.busy,"
         "contents:()=>state.screen,history:()=>state.screen};"
-        "const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab};"
+        "const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab,name:()=>'shell',"
+        "bounds:()=>({x:0,y:0,width:800,height:600})};"
         "const windows=()=>[win]; windows.byId=()=>win;"
         "const app={running:()=>true,windows,activate:()=>{"
         "if(state.focusScreen!==undefined)state.screen=state.focusScreen;"
@@ -255,7 +275,7 @@ async def run_dispatch_js(source, state):
         "doScript:(text,target)=>{if(target.in!==tab)throw Error('wrong target');"
         "calls.push(text);}};"
         "const Application=name=>name==='System Events'?"
-        "{processes:{byName:()=>({frontmost:()=>true})}}:app;const delay=()=>{};"
+        "{processes:owners}:app;const delay=()=>{};"
         "Application.currentApplication=()=>({doShellScript:()=>state.identity});"
         "let result;try{result={value:JSON.parse(eval("
         + json.dumps(source)
