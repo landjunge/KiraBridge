@@ -742,6 +742,7 @@ class SessionManager:
                     submit=args.submit,
                     require_idle=args.require_idle,
                     **({"identity_guard": identities} if identities is not None else {}),
+                    **({"row": selected} if args.pane_id.startswith("terminal:") else {}),
                 )
             self.input_release.sent(principal, task_id)
         return {

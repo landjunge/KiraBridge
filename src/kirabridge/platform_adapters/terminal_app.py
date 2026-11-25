@@ -1487,17 +1487,23 @@ entries[0].click();JSON.stringify({detached:true});
             mutation=True,
         )
 
-    async def send(self, pane_id, text, *, submit, require_idle, identity_guard=None):
+    async def send(self, pane_id, text, *, submit, require_idle, identity_guard=None, row=None):
         if not submit:
             raise BridgeError("session_submit_required", "Terminal.app input submits a line")
         if not identity_guard:
             raise BridgeError(
                 "visible_selection_required", "Native submit requires a bound process identity"
             )
+        # doScript appends to whatever is already typed and then executes it. Read the
+        # input first, refuse unless it is an empty shell prompt, and freeze that exact
+        # screen in the same native call so a change between check and send is refused.
+        screen = await self.read(pane_id)
+        await self.verify_shell_readiness(row if row is not None else {"pane_id": pane_id}, screen)
         await self.native(
             self.native_target(pane_id)
             + ('\nif(tab.busy()) throw Error("Selected terminal is busy");' if require_idle else "")
             + self.native_identity_guard(identity_guard)
+            + self.native_screen_guard(screen)
             + "\napp.doScript("
             + json.dumps(text)
             + ", {in:tab}); JSON.stringify({sent:true});",
