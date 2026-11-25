@@ -1,4 +1,4 @@
-"""Direct terminal work in a freshly confirmed visible shell; never a hidden fallback."""
+"""Platform-native direct terminal work: macOS visible shell or Linux owned PTY."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import json
 import secrets
 import shlex
+import shutil
 import time
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.platform_adapters import current_platform
 from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 from kirabridge.private_files import private_json, write_private
 from kirabridge.session_manager import SessionOpen, SessionReference
@@ -23,13 +25,114 @@ from kirabridge.timing import timed
 class VisibleTerminalInput(TerminalInput):
     pane_id: str | None = Field(default=None, pattern=r"^terminal:[0-9]+:ttys[0-9]+$")
     expected_pid: int | None = Field(default=None, gt=0)
-    create_if_needed: bool = True
+    create_if_needed: bool = Field(
+        default=True,
+        description=(
+            "Allow a new visible macOS window. Linux direct argv always uses a fresh "
+            "short-lived owned PTY; this option does not select or create a persistent session."
+        ),
+    )
 
     @model_validator(mode="after")
     def exact_pair(self):
         if (self.pane_id is None) != (self.expected_pid is None):
             raise ValueError("pane_id and expected_pid must be supplied together")
         return self
+
+
+# Fields that identify a window and its process state. Layout fields (ui_window_count,
+# tab_selected, visual_window_id, tab_index, tab_count) change when any other window opens,
+# closes or is clicked and must not abort a dispatch that send_confirmed verifies natively.
+_VOLATILE = {"ui_window_count", "tab_selected", "visual_window_id", "tab_index", "tab_count"}
+# A candidate that vanished or became ambiguous between catalog and read is skipped, not fatal.
+_SKIPPABLE = {"session_selection_changed", "visible_target_ambiguous", "visible_target_changed"}
+
+
+def _same_target(left, right):
+    return {k: v for k, v in left.items() if k not in _VOLATILE} == {
+        k: v for k, v in right.items() if k not in _VOLATILE
+    }
+
+
+def _unsuitable_code(row):
+    """The real reason a window is not a typing target, instead of a blanket session_busy."""
+    if row.get("miniaturized"):
+        return "visible_target_minimized", "Selected window is minimized to the Dock"
+    if not row.get("processes"):
+        return "visible_target_not_shell", "Selected window has no live shell"
+    if row.get("busy", True):
+        return "session_busy", "Selected window is busy"
+    return "session_busy", "Selected window is not a confirmed empty shell"
+
+
+def build_command_script(tty, cwd, argv, nonce, folder, result_path):
+    """The one-shot zsh script typed into the visible window (never run by KiraBridge itself)."""
+    ok = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
+    setup_failed = json.dumps({"nonce": nonce, "exit_code": 125, "phase": "setup"})
+    interrupted = json.dumps({"nonce": nonce, "exit_code": 130, "phase": "interrupted"})
+    tmp_path = shlex.quote(str(folder / "result.tmp"))
+    final = shlex.quote(str(result_path))
+    # Every way out writes a receipt atomically (temp file, then rename): a failed
+    # window/cwd check or an interrupt is reported at once instead of after the timeout.
+    script = (
+        "#!/bin/zsh -f\numask 077\n"
+        + "kb_done() { printf "
+        + shlex.quote("%s\n")
+        + ' "$1" > '
+        + tmp_path
+        + " && /bin/mv -f "
+        + tmp_path
+        + " "
+        + final
+        + "; }\n"
+        + "kb_int() { kb_done "
+        + shlex.quote(interrupted)
+        + "; exit 130; }\n"
+        + "trap kb_int INT TERM HUP\n"
+        + '[[ "$(/usr/bin/tty)" == '
+        + shlex.quote(tty)
+        + " ]] || { kb_done "
+        + shlex.quote(setup_failed)
+        + "; exit 125; }\n"
+        + "cd -- "
+        + shlex.quote(cwd)
+        + " || { kb_done "
+        + shlex.quote(setup_failed)
+        + "; exit 125; }\n"
+        + shlex.join(argv)
+        + "\nkb_status=$?\n"
+        + 'kb_done "$(printf '
+        + shlex.quote(ok)
+        + ' "$kb_status")"\n'
+    )
+    return script
+
+
+COMMAND_FOLDER_MAX_AGE = 3 * 86400
+
+
+def prune_command_folders(root, *, now=None, max_age=COMMAND_FOLDER_MAX_AGE):
+    """Remove one-shot command folders (script with argv, receipt) older than ``max_age``.
+
+    Only direct children named like a 32-character hex token are touched, so nothing else in
+    the state directory is ever removed. Recent folders stay for late-receipt reconciliation.
+    """
+    removed, now = 0, time.time() if now is None else now
+    try:
+        children = list(Path(root).iterdir())
+    except OSError:
+        return removed
+    for child in children:
+        name = child.name
+        if len(name) != 32 or any(c not in "0123456789abcdef" for c in name):
+            continue
+        try:
+            if child.is_dir() and not child.is_symlink() and now - child.stat().st_mtime > max_age:
+                shutil.rmtree(child, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 class VisibleTerminal:
@@ -41,11 +144,13 @@ class VisibleTerminal:
             environment,
         )
 
-    async def suitable(self, principal, row):
+    async def suitable(self, principal, row, *, read_screen=True):
         if (
             row.get("transport") != "terminal_app"
             or row.get("busy", True)
             or not row.get("processes")
+            # A window minimized to the Dock cannot be brought front by the focus step.
+            or row.get("miniaturized")
         ):
             return False
         # Idle shell only: an interactive agent/editor is never an interchangeable shell.
@@ -57,6 +162,10 @@ class VisibleTerminal:
             raise BridgeError(
                 "visible_target_ambiguous", "Several live tabs report this tty; no input"
             )
+        if not read_screen:
+            # Row checks only. The native dispatch reads the screen and confirms the empty
+            # prompt itself in the same call (send_confirmed), so no second read is needed.
+            return True
         # The caller just observed this row. Scope only this fresh screen read;
         # final selection and native dispatch still verify input authority anew.
         with self.sessions.observation_scope(principal, row):
@@ -86,6 +195,31 @@ class VisibleTerminal:
             self.environment["PATH"],
         )
         argv = [executable, *args.argv[1:]]
+        if current_platform().name == "linux":
+            if args.pane_id is not None:
+                raise BridgeError(
+                    "unsupported_terminal_target",
+                    "Linux direct commands use a fresh owned PTY; "
+                    "use session.input for a selected session",
+                )
+            if privileged:
+                raise BridgeError(
+                    "unsupported_platform", "Privileged visible terminal execution requires macOS"
+                )
+            if any("\x00" in item for item in argv):
+                raise BridgeError("invalid_arguments", "NUL in command")
+            # Opening the directory is read-only and descriptor-bound. No session or
+            # executable is created by readiness or before authorization above.
+            with scope.directory(cwd) as cwd_fd:
+                result = await self.sessions.linux.execute_argv(
+                    argv,
+                    cwd_fd,
+                    self.environment,
+                    timeout=args.timeout,
+                    max_output=args.max_output,
+                    running=running,
+                )
+            return {**result, "cwd": cwd, "task_id": task["id"]}
         if privileged:
             self.security.principal(principal, "admin.execute")
             # Authorization stays in the confirmed visible TTY; the user types any
@@ -97,28 +231,32 @@ class VisibleTerminal:
             if args.pane_id:
                 row = await bridge.sessions.selected(principal, args.pane_id, args.expected_pid)
                 if not await self.suitable(principal, row):
-                    raise BridgeError(
-                        "session_busy", "Selected window is not a confirmed empty shell"
-                    )
+                    code, message = _unsuitable_code(row)
+                    raise BridgeError(code, message)
             else:
                 catalog = await bridge.sessions.catalog(principal)
                 error = catalog.get("transport_errors", {}).get("terminal_app")
                 if error:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
-                candidates, unconfirmed_input = [], None
-                for candidate in catalog["sessions"]:
+                row, unconfirmed_input, skipped = None, None, None
+                # The lowest pane id with fresh empty-shell evidence is used, so checking
+                # stops at the first suitable window instead of reading every idle shell.
+                for candidate in sorted(catalog["sessions"], key=lambda item: item["pane_id"]):
                     try:
                         if await self.suitable(principal, candidate):
-                            candidates.append(candidate)
+                            row = candidate
+                            break
                     except BridgeError as error:
+                        if error.code in _SKIPPABLE:
+                            skipped = skipped or error
+                            continue
                         if error.code != "visible_input_unknown":
                             raise
                         unconfirmed_input = error
-                # Every candidate has independent fresh empty-shell evidence.
-                row = (
-                    sorted(candidates, key=lambda item: item["pane_id"])[0] if candidates else None
-                )
                 if row is None:
+                    if unconfirmed_input is None and skipped is not None:
+                        # Nothing else was usable: name the real problem, never open a window.
+                        raise skipped
                     if unconfirmed_input is not None:
                         # An ambiguous existing shell is not evidence that more
                         # windows are needed. Preserve it and report input state.
@@ -192,6 +330,7 @@ class VisibleTerminal:
         from kirabridge.bridge_core.config import private_directory
 
         private_directory(root)
+        prune_command_folders(root)
         folder = root / secrets.token_hex(16)
         folder.mkdir(mode=0o700)
         result_path, script_path = folder / "result.json", folder / "command.zsh"
@@ -202,29 +341,15 @@ class VisibleTerminal:
         # same final revalidation, adding a native roundtrip without authority.
         # A one-shot script in this window inherits its real TTY. No subprocess
         # daemon, tmux pane, detached session or provider adapter executes the command.
-        result = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
-        script = (
-            "#!/bin/zsh -f\numask 077\n"
-            + '[[ "$(/usr/bin/tty)" == '
-            + shlex.quote(row["tty"])
-            + " ]] || exit 125\n"
-            + "cd -- "
-            + shlex.quote(cwd)
-            + " || exit 125\n"
-            + shlex.join(argv)
-            + "\nkb_status=$?\n"
-            + "printf "
-            + shlex.quote(result + "\n")
-            + ' "$kb_status" > '
-            + shlex.quote(str(result_path))
-            + "\n"
-        )
+        script = build_command_script(row["tty"], cwd, argv, nonce, folder, result_path)
         write_private(script_path, script)
         async with bridge.sessions.lock:
             current = await bridge.sessions.selected(
                 principal, reference.pane_id, reference.expected_pid
             )
-            if current != row or not await self.suitable(principal, current):
+            if not _same_target(current, row) or not await self.suitable(
+                principal, current, read_screen=False
+            ):
                 raise BridgeError(
                     "visible_target_changed", "Visible shell changed before dispatch; no input"
                 )
@@ -243,9 +368,26 @@ class VisibleTerminal:
                     raise UncertainExecution(
                         "visible_result_unknown", "Unexpected visible command receipt"
                     )
-                output = await bridge.sessions.read(
-                    principal, reference.pane_id, reference.expected_pid
-                )
+                if result.get("phase") == "setup":
+                    # The script refused to run: wrong terminal or unusable cwd. Nothing ran.
+                    shutil.rmtree(folder, ignore_errors=True)
+                    raise BridgeError(
+                        "visible_target_changed",
+                        "The window or directory changed before the command ran; nothing ran",
+                    )
+                if result.get("phase") == "interrupted":
+                    shutil.rmtree(folder, ignore_errors=True)
+                    raise BridgeError(
+                        "visible_command_interrupted", "The command was interrupted in the window"
+                    )
+                # Output is informational: reuse the row observed at dispatch instead of
+                # another full window catalogue just to return the screen.
+                with bridge.sessions.observation_scope(principal, current):
+                    output = await bridge.sessions.read(
+                        principal, reference.pane_id, reference.expected_pid
+                    )
+                # The receipt is read: the script (it holds the argv) is no longer needed.
+                shutil.rmtree(folder, ignore_errors=True)
                 return {
                     **reference.model_dump(),
                     "tty": row["tty"],

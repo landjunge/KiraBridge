@@ -47,13 +47,21 @@ func verifyPackage() throws -> [String: Any] {
         includingPropertiesForKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey]) else {
         throw InstallerFailure.invalid("Das Installationspaket ist nicht lesbar.")
     }
+    let canonicalResources = resources.resolvingSymlinksInPath().standardizedFileURL
+    let resourceComponents = canonicalResources.pathComponents
     for case let file as URL in enumerator {
         let value = try file.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey])
         guard value.isSymbolicLink != true else {
             throw InstallerFailure.invalid("Eine unerwartete Dateiverknüpfung wurde gefunden.")
         }
         if value.isRegularFile == true {
-            let name = String(file.path.dropFirst(resources.path.count + 1))
+            let canonicalFile = file.resolvingSymlinksInPath().standardizedFileURL
+            let fileComponents = canonicalFile.pathComponents
+            guard fileComponents.count > resourceComponents.count,
+                  fileComponents.starts(with: resourceComponents) else {
+                throw InstallerFailure.invalid("Eine Paketdatei liegt außerhalb des Installationspakets.")
+            }
+            let name = fileComponents.dropFirst(resourceComponents.count).joined(separator: "/")
             if name == "installer-package.json" { continue }
             guard let expectedHash = files[name],
                   let size = value.fileSize, size <= 64 * 1024 * 1024,

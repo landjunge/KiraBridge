@@ -172,3 +172,62 @@ pins are in the [PR73 integration evidence](evidence/kb-design-pr73-integration-
 Earlier RC40 evidence remains historical. Final regular PR checks and the actual
 merge are proved by [PR73](https://github.com/landjunge/KiraBridge/pull/73) and the
 coordinator handoff; success is not asserted before those steps finish.
+
+
+## Family header follow-up · 12 November 2026
+
+This section supersedes the earlier header dimensions/source-copy details for the
+current development candidate. It does not update an installed runtime.
+
+- Canonical ThreadDesk source: `3822f99952b28650e0850b4bf95fcc9f9434cd91`,
+  `src/threaddesk/ui/static/`, module **1.2.2**; the complete file list and hashes
+  are copied unchanged into `src/kirabridge/console_assets/`.
+- Bundle-manifest SHA-256:
+  `d2a09912cafeee79e331cc63bbe73c9d9d021434eabe399698f29cf29f28369e`;
+  SHA256SUMS-file SHA-256:
+  `689bf4c25bdcff41c095791c6f63128b46dc69785adef52b6ffc8c78fd82081e`.
+  All five original PNGs and the delayed dialog-close focus guard are retained.
+- Original `assets/design/wordmarks/KiraBridge-dark.svg` is served byte-for-byte
+  at `/kirabridge-wordmark.svg` with the correct image MIME. Kira is white and
+  Bridge uses its original magenta. The original ICNS is bundled through the
+  existing native builder; no substitute icon or logo is drawn.
+- Equal outer header columns center the five 44×44 px targets at desktop widths.
+  Original art is 32 px. Wordmark is left, DE/EN right; page actions occupy a
+  separate compact row. Decorative borders use a low-opacity neutral line;
+  form-control contrast and 2 px keyboard focus remain explicit. Below 760 px,
+  icons move to their own centered row. Four views remain available without
+  horizontal overflow, including 940×636 px web content (a compact native-window
+  acceptance viewport) and 320 px width.
+
+`integrations/desktop/FamilySwitchLogic.swift` is the pure Foundation boundary.
+Only exit zero plus a real JSON `success:true`, requested catalog target, no error
+field/unknown outcome, finite x/y/width/height, positive size and exactly one
+visible family window maps to `focused`. Malformed output, contradictory exit
+status or unknown outcome stays `uncertain`. Only a complete nonzero error receipt
+with `execution_outcome_unknown:false` is a known failure. Callback strings are
+array-wrapped for JSONSerialization, avoiding its fatal top-level-scalar exception.
+
+The WK handler admits only the exact main WKWebView and its controller, main
+frame and `http://127.0.0.1:8766` security origin. It checks the current console URL,
+rejects loading/foreign documents and binds replies to the same view/navigation
+generation. Only fixed catalog IDs cross into fixed argv with the native host's
+own PID; there is no shell or renderer-provided path/PID. Requests are not queued;
+an unknown effect blocks further native switches in that host. Reopen focuses the
+existing main window and does not bootstrap/reload an established login/view.
+
+DE/EN changes the family header and explicit presentation labels on the control
+and protocol pages. Team/connector keep their existing translations. This is not
+a claim of complete localization of all existing dynamic control/diagnostic text;
+backend evidence and user data are not rewritten. KBLive remains a separate,
+unstarted integration, not completed by this source work.
+
+Bounded validation: Foundation receipt/string/admission tests, existing bootstrap
+process guards, original-ICNS builder fixture and actual CSP/MIME routes. The
+`tests/family_header_browser_probe.py` loopback probe uses a temporary isolated
+store with no dispatcher or product commands. Layout checks cover four real page
+templates at three sizes; its late native callback is explicitly simulated and
+must not turn a peer status into connected. Browser screenshots are source UI
+fixtures, not installed WKWebView or real five-app runtime evidence. Local Intel
+candidate compilation/strict ad-hoc signing is an acceptance artifact only.
+Required CI, independent review, final main-pin bundles and installed switching
+remain separate coordinator gates. No installation, service restart or release.

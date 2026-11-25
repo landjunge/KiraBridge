@@ -51,6 +51,59 @@ def codex_input_footer_group(lines):
     )
 
 
+GROK_PLACEHOLDERS = ("Build anything",)
+
+# Rotating hint texts Codex shows in an EMPTY input. Only these exact, known strings count
+# as empty; an unknown text is treated as typed input.
+CODEX_PLACEHOLDERS = (
+    "Explain this codebase",
+    "Find and fix a bug in @filename",
+    "Write tests for @filename",
+    "Summarize recent commits",
+    "Implement {feature}",
+)
+
+
+def codex_placeholder(row):
+    """Whether this composer row is the prompt marker plus exactly one known placeholder."""
+    match = re.fullmatch(r"\s*›[ \u00a0]+(.*?)\s*", row)
+    return bool(match) and match.group(1) in CODEX_PLACEHOLDERS
+
+
+def grok_input_state(view):
+    """Whether the last complete Grok box holds an empty composer.
+
+    Return True for an empty/known-placeholder composer, False for a proven
+    nonempty draft, and None when this is not a recognizable box. Grok renders
+    its empty composer with the placeholder "Build anything"; requiring the
+    complete bordered box keeps that decoration distinct from typed text.
+    """
+    lines = view.splitlines()
+    if not lines or not re.fullmatch(r" *╭[^\n]*", lines[0]):
+        return None
+    end = next(
+        (index for index, line in enumerate(lines) if index and re.fullmatch(r" *╰[^\n]*", line)),
+        None,
+    )
+    if end is None or end < 2:
+        return None
+    rows = []
+    for line in lines[1:end]:
+        stripped = line.strip()
+        if not stripped.startswith(("│", "┃")) or not stripped.endswith(("│", "┃")):
+            return None
+        rows.append(stripped[1:-1])
+    if not rows:
+        return None
+    prompt = re.fullmatch(r"\s*❯ ?(.*?)\s*", rows[0])
+    if prompt is None:
+        return None
+    if any(row.strip() for row in rows[1:]):
+        return False
+    content = prompt.group(1)
+    return not content or content in GROK_PLACEHOLDERS
+
+
 def display_text(text):
     text = text.replace("\r\n", "\n")
     text = re.sub(r"\x1b\[[0-9;:]*m", "", text)
@@ -96,7 +149,7 @@ def assess(target, raw, binding, protocol=None):
         # The final input row, not any previous user prompt in visible output.
         queue_composer = first.startswith("»")
         candidate = "›" + first[1:] if queue_composer else first
-        empty = bool(re.fullmatch(binding.ready_pattern, candidate))
+        empty = bool(re.fullmatch(binding.ready_pattern, candidate)) or codex_placeholder(candidate)
         base["input_empty"] = empty
         prelude = text[: text.rfind(view)].rstrip()
         current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
@@ -148,18 +201,32 @@ def assess(target, raw, binding, protocol=None):
                 if protocol.get("state") == "idle"
                 else "bound_codex_state_unavailable",
             )
-        # Without a bound protocol, ambiguous work words are not an idle proof.
+        # Without a bound protocol, ambiguous work words directly above the input are
+        # not an idle proof. Older output further up (quotes, a past "esc to interrupt")
+        # is history, not current activity.
         activity_text = "\n".join(
-            line for line in text.splitlines() if not _codex_transcript_navigation(line)
+            line for line in current.splitlines() if not _codex_transcript_navigation(line)
         )
         if binding.busy_pattern and re.search(binding.busy_pattern, activity_text, re.I):
             return result("unknown", "unbound_ambiguous_activity_text")
         return result("ready", "current_empty_widget")
 
-    empty = bool(re.search(binding.ready_pattern, view))
-    base["input_empty"] = empty
-    if not empty:
-        return result("input_not_empty", "existing_input_or_unknown_widget")
+    if target == "grok":
+        # A current box with a typed draft blocks even if an older row still
+        # matches the ready pattern. An unrecognized frame is unknown, not
+        # evidence of queued text.
+        structural = grok_input_state(view)
+        if structural is False:
+            base["input_empty"] = False
+            return result("input_not_empty", "existing_input_must_not_be_overwritten")
+        empty = True if structural else bool(re.search(binding.ready_pattern, view))
+        if not empty:
+            return result("unknown", "unrecognized_grok_composer")
+    else:
+        empty = bool(re.search(binding.ready_pattern, view))
+        if not empty:
+            return result("input_not_empty", "existing_input_or_unknown_widget")
+    base["input_empty"] = True
     # The live status row sits directly above the composer. Older quotations
     # of Thinking or [stop] stay above that row and do not mean the turn is active.
     raw_prelude = text[: text.rfind("╭")].splitlines() if "╭" in text else []

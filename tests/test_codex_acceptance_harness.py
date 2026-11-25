@@ -91,6 +91,7 @@ def test_argv_does_not_change_home_auth_or_add_resume_prompt(harness, tmp_path):
     assert argv[argv.index("-s") + 1] == "read-only"
     assert argv[argv.index("-a") + 1] == "never"
     values = overrides[1::2]
+    assert "check_for_update_on_startup=false" in values
     assert "mcp_servers.kirabridge.enabled=false" in values
     assert "mcp_servers={}" not in values
     assert all(
@@ -704,3 +705,37 @@ def test_execute_missing_harness_commit_stops_before_any_run(harness, monkeypatc
         runpy.run_path(harness.__file__, run_name="__main__")
     assert not root.exists()
     run.assert_not_called()
+
+
+@pytest.mark.parametrize("version", ["codex-cli 0.166.0", "codex-cli 0.168.0", "unknown"])
+def test_native_candidate_requires_the_current_exact_codex_version(harness, monkeypatch, version):
+    monkeypatch.setattr(harness.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
+    assert harness.parser().parse_args([]).codex_version == "codex-cli 0.167.0"
+    with pytest.raises(RuntimeError, match="pins the 0.167 renderer"):
+        harness.validate_candidate(SimpleNamespace(codex_version=version))
+
+
+async def test_startup_tree_change_grants_no_readiness_and_next_read_is_fresh(harness):
+    from kirabridge.bridge_core.models import BridgeError
+
+    row = {"pane_id": "terminal:123:ttys004"}
+    current = AsyncMock(side_effect=[BridgeError("macos_tree_changed", "changed"), row])
+    assert await harness.read_startup_window(current) is None
+    assert current.await_count == 1
+    assert await harness.read_startup_window(current) is row
+    assert current.await_count == 2
+
+
+@pytest.mark.parametrize(
+    "code", ["macos_element_expired", "session_window_unconfirmed", "macos_permission_denied"]
+)
+async def test_startup_observation_propagates_identity_and_permission_failures(harness, code):
+    from kirabridge.bridge_core.models import BridgeError
+
+    error = BridgeError(code, "refused")
+    current = AsyncMock(side_effect=error)
+    with pytest.raises(BridgeError) as failure:
+        await harness.read_startup_window(current)
+    assert failure.value is error
+    assert current.await_count == 1

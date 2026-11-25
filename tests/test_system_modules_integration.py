@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from pydantic import ValidationError
 
 from kirabridge.bridge_core.bridge import INPUTS
@@ -76,6 +77,7 @@ SAMPLES = {
 def native(bridge):
     # These read operations were added after this fixture's original catalog.
     bridge.config.principals["local"].capabilities.append("keyboard.shortcuts.read")
+    bind_macos_provider(bridge)
     probe = bridge.macos.capability_probe
     probe.facts.update(platform="darwin", os_version="15.7.4")
     probe.native_metadata = lambda: {

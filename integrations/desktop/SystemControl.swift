@@ -59,10 +59,51 @@ enum SystemControl {
         if mutating && terminalBundles.contains(app.bundleIdentifier ?? "") {
             throw failure("macos_terminal_route_required", "Terminal input and lifecycle use the existing guarded session operations")
         }
-        if mutating { try protectLiveTerminalDescendants(app.processIdentifier) }
+        if mutating {
+            try protectLiveTerminalDescendants(app.processIdentifier,
+                targetBundlePath: app.bundleURL?.path ?? "",
+                targetExecutablePath: app.executableURL?.path ?? "")
+        }
         return app
     }
-    static func protectLiveTerminalDescendants(_ targetPID: pid_t) throws {
+    /// One canonical absolute form for bundle containment checks. A firmlink or
+    /// `..` segment cannot disguise a process outside the exact target bundle.
+    static func canonicalExecutablePath(_ path: String) -> String? {
+        guard path.hasPrefix("/") else { return nil }
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        let data = "/System/Volumes/Data/"
+        return resolved.hasPrefix(data) ? "/" + String(resolved.dropFirst(data.count)) : resolved
+    }
+    /// The target app's own helpers are its UI infrastructure, not a hosted
+    /// agent terminal. They must live inside the exact target bundle, have no
+    /// controlling terminal, and be the main executable or follow the app's
+    /// helper naming. Unknown paths never qualify.
+    static func isAppOwnedHelper(record: SystemServices.Record, targetBundlePath: String,
+                                 targetExecutablePath: String) -> Bool {
+        guard !record.tty, let bundle = canonicalExecutablePath(targetBundlePath),
+              bundle.hasSuffix(".app"),
+              let executable = record.path.flatMap(canonicalExecutablePath),
+              executable.hasPrefix(bundle + "/") else { return false }
+        if let main = canonicalExecutablePath(targetExecutablePath),
+           main.hasPrefix(bundle + "/"), executable == main { return true }
+        let pattern = " helper( \\([a-z]+\\))?$"
+        return [record.name.lowercased().trimmingCharacters(in: .whitespaces),
+                URL(fileURLWithPath: executable).lastPathComponent.lowercased()]
+            .contains { $0.range(of: pattern, options: .regularExpression) != nil }
+    }
+    /// A descendant that still requires the guarded terminal route. The broad
+    /// agent classification remains intact; only the exact target's own helpers
+    /// are exempted, and only with a complete no-TTY identity.
+    static func requiresGuardedRoute(_ record: SystemServices.Record, targetPID: pid_t,
+                                     targetBundlePath: String,
+                                     targetExecutablePath: String) -> Bool {
+        guard record.pid != targetPID,
+              SystemServices.knownProtected(record) || record.tty else { return false }
+        return !isAppOwnedHelper(record: record, targetBundlePath: targetBundlePath,
+            targetExecutablePath: targetExecutablePath)
+    }
+    static func protectLiveTerminalDescendants(_ targetPID: pid_t, targetBundlePath: String,
+                                               targetExecutablePath: String) throws {
         // Public process metadata only. Editors hosting shells/agents must use
         // their guarded terminal route rather than a generic AX write/quit.
         let observation = try SystemServices.guardedSnapshot(targetPID: targetPID,
@@ -81,9 +122,28 @@ enum SystemControl {
         guard complete else {
             throw failure("macos_process_limit", "Target descendant graph exceeds observation depth")
         }
-        if observation.records.contains(where: {
+        var blocking = observation.records.filter {
             $0.pid != targetPID && descendants.contains($0.pid)
                 && (SystemServices.knownProtected($0) || $0.tty)
+        }
+        guard blocking.count <= 128 else {
+            throw failure("macos_process_limit", "Target descendant agent candidates exceed observation budget")
+        }
+        // Electron helper processes are not AppKit applications, so the guarded
+        // snapshot leaves their public path unavailable. Bind each remaining
+        // candidate's executable identity once; a missing or changed path blocks.
+        for index in blocking.indices where blocking[index].path == nil && !blocking[index].tty {
+            let observed = try SystemServices.read(blocking[index].pid,
+                applications: [blocking[index].pid])
+            guard observed.pid == blocking[index].pid,
+                  observed.kernel == blocking[index].kernel else {
+                throw failure("macos_process_changed", "Descendant changed during its executable observation")
+            }
+            blocking[index] = observed
+        }
+        if blocking.contains(where: {
+            requiresGuardedRoute($0, targetPID: targetPID, targetBundlePath: targetBundlePath,
+                targetExecutablePath: targetExecutablePath)
         }) {
             throw failure("macos_agent_route_required", "Application hosts an active terminal/agent process; its guarded session route is required")
         }

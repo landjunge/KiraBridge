@@ -3,6 +3,7 @@
 import asyncio
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from test_macos_system_transport import CONTRACT, Child, response, transport
 
 from kirabridge.bridge_core.models import BridgeError
@@ -12,6 +13,7 @@ from kirabridge.read_query import ReadQuery, read_query_async
 
 def configure_native_read(bridge, worker):
     bridge.system_modules.transport = worker
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.config.principals["local"].permission_level = "full"
 

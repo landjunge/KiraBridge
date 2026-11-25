@@ -4,6 +4,7 @@ The durable session.input task owns this attempt. Agent work messages keep their
 separate receipt/reply protocol; literal input never creates such a message.
 """
 
+import itertools
 import re
 import unicodedata
 from pathlib import Path
@@ -67,6 +68,26 @@ def _same_hint_warning_footer(before, after):
     return bool(hint and warning and hint[2] == warning[2] and len(hint[1]) == len(warning[1]))
 
 
+def _same_inline_hint_warning_footer(before, after):
+    """Codex 0.167 hides this captured inline hint without moving its badge."""
+    old = _without_viewport_padding(before).split("\n")
+    new = _without_viewport_padding(after).split("\n")
+    if len(old) != len(new):
+        return False
+    changed = 0
+    for previous, current in zip(old, new, strict=True):
+        if previous == current:
+            continue
+        match = re.fullmatch(
+            r"([ ]*GPT-\S+[^\n]*?)( · ← f…[ ]+)(⚠ [1-9][0-9]* warnings? · f2 to view)",
+            previous,
+        )
+        if match is None or current != match[1] + " " * len(match[2]) + match[3]:
+            return False
+        changed += 1
+    return changed == 1
+
+
 def _cwd_footer(suffix):
     rows = _without_viewport_padding(suffix).split("\n")
     found = []
@@ -117,6 +138,10 @@ def _same_bound_cwd_footer(before, after, cwd, home):
     return _displays_cwd(old_path, cwd, home) and _displays_cwd(new_path, cwd, home)
 
 
+# Most full logical-line ends whose blank-row / extra-space renderings are all enumerated.
+MAX_FULL = 3
+
+
 def codex_wrap_words(text):
     """A bounded forward-rendering specification, preserving every logical row.
 
@@ -156,7 +181,7 @@ def codex_wrapped_renderings(text, columns):
     for width in (columns - 3, columns - 4):
         if any(len(word) >= width for words in words_by_line for word in words):
             continue
-        rows, wrapped = [], False
+        parts, wrapped = [], False
         for words in words_by_line:
             logical = [words[0]] if words else [""]
             for word in words[1:]:
@@ -165,8 +190,24 @@ def codex_wrapped_renderings(text, columns):
                 else:
                     logical.append(word)
                     wrapped = True
-            rows.extend(logical)
-        if wrapped:
+            parts.append(logical)
+        # A logical line whose last row fills the width exactly: Codex shows either an
+        # extra blank row or one extra ASCII space there, and its cell buffer cannot
+        # tell which. Both are harmless for the content, so both renderings match.
+        full = [i for i, logical in enumerate(parts) if len(logical[-1]) == width]
+        choices = itertools.product((0, 1, 2), repeat=len(full)) if len(full) <= MAX_FULL else ()
+        for choice in choices or [()]:
+            rows = []
+            for index, logical in enumerate(parts):
+                logical = list(logical)
+                code = choice[full.index(index)] if index in full and choice else 0
+                if code == 2:
+                    logical[-1] += " "
+                rows.extend(logical)
+                if code == 1:
+                    rows.append("")
+            if not wrapped and not any(choice):
+                continue
             results.append("\n  ".join(rows))
             if "" in rows[1:]:
                 results.append(
@@ -215,7 +256,32 @@ def codex_full_row_widths(text, columns):
     return tuple(ambiguous)
 
 
-async def check_codex_paste_geometry(sessions, target, binding, text, before):
+def codex_unverifiable_full_row_widths(text, columns):
+    """Full-row widths whose blank-row/extra-space renderings cannot all be enumerated."""
+    words_by_line = _codex_cursor_words(text)
+    widths = codex_full_row_widths(text, columns)
+    if not widths or words_by_line is None:
+        return ()
+    unverifiable = []
+    for width in widths:
+        full = 0
+        for words in words_by_line:
+            occupied = 0
+            for word in words:
+                if occupied and occupied + 1 + len(word) <= width:
+                    occupied += 1 + len(word)
+                else:
+                    occupied = len(word)
+            full += occupied == width
+        # codex_wrapped_renderings skips a width holding a word as wide as the row.
+        if full > MAX_FULL or any(len(word) >= width for w in words_by_line for word in w):
+            unverifiable.append(width)
+    return tuple(unverifiable)
+
+
+async def check_codex_paste_geometry(
+    sessions, target, binding, text, before, *, composer_only=False
+):
     """Refuse a known unprovable representation before input, without widening verification."""
     words = _codex_cursor_words(text) if target == "codex" else None
     if words is None or max(map(len, text.split("\n")), default=0) < 16:
@@ -224,9 +290,14 @@ async def check_codex_paste_geometry(sessions, target, binding, text, before):
     if not selection or not isinstance(selection[2], dict):
         return
     columns = await sessions.terminal_app.input_columns(
-        binding.pane_id, identity_guard=selection[2], expected_screen=before["text"]
+        binding.pane_id,
+        identity_guard=selection[2],
+        expected_screen=before["text"],
+        **({"composer_only": True} if composer_only else {}),
     )
-    widths = codex_full_row_widths(text, columns)
+    # A full logical-line end renders either as a blank row or as one extra space; both
+    # are accepted by the verifier. Refuse only when a width cannot be enumerated.
+    widths = codex_unverifiable_full_row_widths(text, columns)
     if widths:
         failure = BridgeError(
             "visible_input_geometry_ambiguous",
@@ -290,7 +361,9 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None, column
             actual_suffix = content[len(expected) :]
             if actual_suffix and not actual_suffix.startswith("\n"):
                 continue
-            if _same_hint_warning_footer(suffix, actual_suffix):
+            if _same_hint_warning_footer(suffix, actual_suffix) or _same_inline_hint_warning_footer(
+                suffix, actual_suffix
+            ):
                 return True
             rendered_after = _codex_renderer_suffix(actual_suffix)
             for before_variant in before_variants:

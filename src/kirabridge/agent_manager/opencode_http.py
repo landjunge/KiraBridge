@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
@@ -54,6 +55,12 @@ def _error_category(error: Any) -> str | None:
     return _ERROR_CATEGORIES.get(name, "provider") if isinstance(name, str) else "provider"
 
 
+def _with_http_status(exc, status: int):
+    """Record only the status code. Response bodies can hold credentials or prompts."""
+    exc.provider_error = {"http_status": status}
+    return exc
+
+
 def _completed(message: dict[str, Any]) -> bool:
     time = message.get("time")
     if not isinstance(time, dict):
@@ -97,17 +104,29 @@ class OpenCodeHTTPAdapter:
             ) from None
         status = response.status_code
         if status in {401, 403}:
-            raise BridgeError("agent_auth", "OpenCode server rejected the configured credentials")
+            raise _with_http_status(
+                BridgeError("agent_auth", "OpenCode server rejected the configured credentials"),
+                status,
+            )
         if status == 404:
-            raise UncertainExecution("session_unknown", "OpenCode session is no longer available")
+            raise _with_http_status(
+                UncertainExecution("session_unknown", "OpenCode session is no longer available"),
+                status,
+            )
         if status in _FAILED_STATUS or status >= 500:
             # Status only: response bodies can contain provider or authorization details.
-            raise UncertainExecution(
-                "server_unknown", f"OpenCode server outcome is unknown (HTTP {status})"
+            raise _with_http_status(
+                UncertainExecution(
+                    "server_unknown", f"OpenCode server outcome is unknown (HTTP {status})"
+                ),
+                status,
             )
         if status >= 400:
-            raise BridgeError(
-                "agent_rejected", f"OpenCode server rejected the request (HTTP {status})"
+            raise _with_http_status(
+                BridgeError(
+                    "agent_rejected", f"OpenCode server rejected the request (HTTP {status})"
+                ),
+                status,
             )
         return response
 
@@ -157,7 +176,9 @@ class OpenCodeHTTPAdapter:
                 return info, [part for part in parts or [] if isinstance(part, dict)]
         return None, []
 
-    async def execute(self, task, args, config, roots, running, progress, **extra) -> dict:
+    async def execute(
+        self, task, args, config, roots, running, progress, *, resume_session=None, **extra
+    ) -> dict:
         if not config.server_url:
             raise BridgeError("agent_config", "OpenCode HTTP requires a configured server URL")
         model = _model(config)
@@ -178,32 +199,60 @@ class OpenCodeHTTPAdapter:
             follow_redirects=False,
             transport=self._transport,
         ) as client:
-            response = await self._request(
-                client,
-                "POST",
-                "/session",
-                params={"directory": directory},
-                body={
-                    "title": "KiraBridge " + str(task["id"]),
-                    "model": {
-                        "providerID": model["providerID"],
-                        "id": model["modelID"],
+            if resume_session is not None:
+                session = bind_session(session, resume_session)
+                # Verify the exact session still exists in this directory before
+                # any prompt is admitted; a 404 is unknown, never a silent retry.
+                await self._request(
+                    client,
+                    "GET",
+                    f"/session/{session}",
+                    params={"directory": directory},
+                )
+                await progress(
+                    {"agent": args.agent, "session_id": session, "event": "session_resumed"}
+                )
+            else:
+                response = await self._request(
+                    client,
+                    "POST",
+                    "/session",
+                    params={"directory": directory},
+                    body={
+                        "title": "KiraBridge " + str(task["id"]),
+                        "model": {
+                            "providerID": model["providerID"],
+                            "id": model["modelID"],
+                        },
+                        "metadata": {"kirabridge_task_id": str(task["id"])},
+                        "permission": [
+                            {
+                                "permission": "*",
+                                "pattern": "*",
+                                "action": "allow" if args.local_tools else "deny",
+                            }
+                        ],
                     },
-                    "metadata": {"kirabridge_task_id": str(task["id"])},
-                    "permission": [
-                        {
-                            "permission": "*",
-                            "pattern": "*",
-                            "action": "allow" if args.local_tools else "deny",
-                        }
-                    ],
-                },
-            )
-            created = await self._json(response, "session")
-            if not isinstance(created, dict):
-                raise UncertainExecution("provider_protocol", "OpenCode session is not an object")
-            session = bind_session(session, created.get("id"))
-            await progress({"agent": args.agent, "session_id": session, "event": "session_created"})
+                )
+                created = await self._json(response, "session")
+                if not isinstance(created, dict):
+                    raise UncertainExecution(
+                        "provider_protocol", "OpenCode session is not an object"
+                    )
+                session = bind_session(session, created.get("id"))
+                await progress(
+                    {"agent": args.agent, "session_id": session, "event": "session_created"}
+                )
+
+            # Snapshot the newest assistant message before admitting our prompt. A
+            # genuine new turn must produce a new assistant message whose parentID
+            # is exactly the messageID we assign to our own prompt.
+            before = await self._messages(client, session, directory)
+            prior, _ = self._last_assistant(before)
+            prior_id = prior.get("id") if prior is not None else None
+            # V1 message ids must start with "msg" (MessageID schema); the exact
+            # id stays with this attempt and is matched by the assistant parentID.
+            message_id = "msg_" + uuid4().hex
 
             await self._request(
                 client,
@@ -211,6 +260,7 @@ class OpenCodeHTTPAdapter:
                 f"/session/{session}/prompt_async",
                 params={"directory": directory},
                 body={
+                    "messageID": message_id,
                     "model": model,
                     "parts": [{"type": "text", "text": args.prompt}],
                 },
@@ -238,10 +288,14 @@ class OpenCodeHTTPAdapter:
                 elif kind == "idle" and started:
                     break
                 elif kind == "idle":
-                    message, _ = self._last_assistant(
+                    candidate, _ = self._last_assistant(
                         await self._messages(client, session, directory)
                     )
-                    if message is not None and _completed(message):
+                    if (
+                        candidate is not None
+                        and _completed(candidate)
+                        and candidate.get("id") != prior_id
+                    ):
                         break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -251,6 +305,17 @@ class OpenCodeHTTPAdapter:
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
             message, parts = self._last_assistant(await self._messages(client, session, directory))
+            if (
+                message is None
+                or message.get("sessionID") != session
+                or message.get("id") == prior_id
+                or message.get("parentID") != message_id
+            ):
+                # Only a new assistant message for the bound session, whose parent
+                # is exactly our assigned prompt, is this turn's result.
+                raise UncertainExecution(
+                    "agent_unconfirmed", "No new OpenCode turn response observed"
+                )
 
         if message is None:
             raise UncertainExecution("agent_unconfirmed", "No OpenCode final response observed")
@@ -289,6 +354,7 @@ class OpenCodeHTTPAdapter:
                 "agent": args.agent,
                 "adapter": "opencode_http",
                 "session_id": session,
+                "session_resumed": resume_session is not None,
                 "session_directory": directory,
                 "model": config.model,
                 "status_events": statuses,

@@ -31,6 +31,10 @@ from kirabridge.session_manager import SessionInput
         "KiraBridge visible % ",
         "previous output\nKiraBridge visible % \n\n",
         "KiraBridge fixture % ",
+        # Terminal.app records zsh's PROMPT_SP marker and padding on the same
+        # row as an unfinished output line, followed by the real prompt.
+        "      --agent  agent to use  [string]%                   ➜  KiraBridge-Workspace ",
+        "unfinished output%    KiraBridge visible % ",
     ],
 )
 def test_known_empty_prompts(screen):
@@ -59,6 +63,12 @@ def test_known_empty_prompts(screen):
         "➜  \u009b ",
         "➜  " + "a" * 241 + " ",
         "host% typed text ",
+        # A prompt-like suffix inside typed text is not the live prompt. The
+        # first marker is the real one and the rest is pending input.
+        "➜  repo echo ➜  ~ ",
+        "➜  repo echo%    ➜  ~ ",
+        "[string]%                   ➜  KiraBridge-Workspace do not overwrite ",
+        "unfinished output%    KiraBridge visible % do not overwrite ",
         "",
     ],
 )
@@ -164,6 +174,31 @@ async def test_typed_prompt_suffix_never_enters_transport_or_intent(direct_shell
     intent.assert_not_awaited()
     terminal.native.assert_not_awaited()
     terminal.send.assert_not_awaited()
+
+
+async def test_prompt_sp_row_is_accepted_as_an_empty_shell(direct_shell):
+    bridge, row, _ = direct_shell
+    bridge.sessions.terminal_app.read.return_value = (
+        "      --agent  agent to use  [string]%                   ➜  KiraBridge-Workspace "
+    )
+    intent = AsyncMock()
+    result = await bridge.sessions.send("local", arguments(row), before_transport=intent)
+    assert result["submitted"] and result["input_handed_to_transport"]
+    intent.assert_awaited_once()
+    bridge.sessions.terminal_app.send.assert_not_awaited()
+
+
+async def test_prompt_sp_row_with_typed_suffix_stays_blocked(direct_shell):
+    bridge, row, _ = direct_shell
+    bridge.sessions.terminal_app.read.return_value = (
+        "[string]%                   ➜  KiraBridge-Workspace do not overwrite "
+    )
+    intent = AsyncMock()
+    with pytest.raises(BridgeError) as failure:
+        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+    assert failure.value.code == "visible_input_not_empty"
+    intent.assert_not_awaited()
+    bridge.sessions.terminal_app.native.assert_not_awaited()
 
 
 async def test_ambiguous_rendered_whitespace_preserves_input_before_intent(direct_shell):

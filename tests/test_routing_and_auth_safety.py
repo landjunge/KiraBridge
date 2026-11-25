@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 
 from kirabridge.bridge_core.models import BridgeError
 
@@ -20,6 +21,7 @@ from kirabridge.bridge_core.models import BridgeError
 def test_routing_uses_host_facts_without_discovery_io(
     bridge, monkeypatch, operation, arguments, expected
 ):
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts["platform"] = "darwin"
 
     def forbidden_snapshot():
@@ -30,6 +32,7 @@ def test_routing_uses_host_facts_without_discovery_io(
 
 
 async def test_fast_routing_still_requires_fresh_provider_check(bridge, monkeypatch):
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts["platform"] = "darwin"
     denied = BridgeError("macos_permission_denied", "isolated fresh provider denial")
     checks = []

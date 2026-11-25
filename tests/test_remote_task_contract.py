@@ -10,7 +10,6 @@ from jsonschema import ValidationError
 from jsonschema.validators import validator_for
 from pydantic import ValidationError as ModelValidationError
 
-from kirabridge.autonext.models import ReadyCard
 from kirabridge.bridge_core.models import (
     AgentInput,
     HandoffStartInput,
@@ -69,11 +68,11 @@ def test_requests_preserve_native_core_and_argument_contracts(name, arguments):
 
 def test_card_hash_is_original_utf8_bytes_and_not_canonical_object_digest():
     text = EXAMPLES["ready_card_text"]
-    card = ReadyCard.model_validate_json(text)
+    card_task_id = json.loads(text)["task_id"]
     intent = EXAMPLES["messages"]["card_binding"]
-    assert card.task_id == intent["source"]["card_task_id"]
+    assert card_task_id == intent["source"]["card_task_id"]
     assert intent["request"]["task_id"] == "team-" + intent["source"]["work_id"]
-    assert card.task_id != intent["request"]["task_id"]
+    assert card_task_id != intent["request"]["task_id"]
     assert hashlib.sha256(text.encode()).hexdigest() == intent["source"]["content_sha256"]
     assert digest(json.loads(text)) != intent["source"]["content_sha256"]
     assert text.endswith("\n")  # Same parsed object; different original entry bytes.

@@ -1,9 +1,9 @@
-# Install and update KiraBridge · 0.8.0rc36
+# Install and update KiraBridge · 0.8.0rc49
 
 [Deutsch](INSTALL-DE.md) · [README](../README.md)
 
-The [published Intel preview](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) is dated November 4, 2026.
-Its code is pinned to `d4aebdd89a206045731f2692a3f363fddaa15ee0`.
+The [published Intel preview](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc49)
+is pinned to `edc44290831b5b79e5d1f64238bcf09e4fe8b85a`.
 [Release and download verification](evidence/readme-current-20261107.json).
 This guide installs that published package. The separately installed local RC40
 runtime at `d12838a` is a later source build, with no published RC40 download.
@@ -21,14 +21,14 @@ Never put credentials in commands, logs or Git.
 
 ## Install or update
 
-1. Download and fully extract **KiraBridge-0.8.0rc36-Intel-Installer.zip** from the
+1. Download and fully extract **KiraBridge-macos.tar.gz** from the
    [README](../README.md). The release also provides `SHA256SUMS` for verification.
-2. Open `KiraBridge-Installer.app`, confirm and follow the visible Terminal
+2. Run the included `install.sh`, confirm and follow the visible Terminal
    installation. Do not use a working Codex/Grok session as the install window.
 3. The installer updates the service and desktop app together, with a rollback
    backup. After success, open `KiraBridge.app` in `~/Applications`.
 
-This ZIP includes the app/service payload; Python and uv remain prerequisites.
+This archive includes the app/service payload; Python and uv remain prerequisites.
 Provide Python 3.11 and uv 0.11.6 in Terminal first.
 The installer does not connect a ChatGPT account automatically. Only if that
 connection is missing, run `~/.local/bin/kirabridge chatgpt setup --language en`
@@ -37,7 +37,7 @@ in your local Terminal and follow the [connection guide](CHATGPT.md).
 For a Terminal installation of the same app and service, use the authenticated bootstrap:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc36 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --desktop --require-visible-terminal --language en)
+d=$(mktemp -d) && gh release download v0.8.0rc49 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --desktop --require-visible-terminal --language en)
 ```
 
 This downloads the installer to a file, checks it and then checks the pinned
@@ -67,6 +67,27 @@ restores exactly these two values unless someone changed them since.
 
 The launchd user service continues when Terminal/browser windows close; login,
 logout, sleep and shutdown are distinct. Presentation does not own the daemon.
+
+## DMG installer (source build, not yet published)
+
+For a conventional drag-and-drop install, a disk image can be built from the same
+exact release. It publishes and installs nothing. On the target Mac (same
+architecture as the release), with fully committed source (`build_release.py` creates `dist/release/KiraBridge-macos.tar.gz`;
+all outputs must be new, existing ones are never overwritten):
+
+```sh
+python3.11 scripts/build_release.py --out dist/release
+python3.11 scripts/build_installer_app.py --archive dist/release/KiraBridge-macos.tar.gz --out dist/KiraBridge-Installieren.app
+python3.11 scripts/build_installer_dmg.py --app dist/KiraBridge-Installieren.app --out dist/KiraBridge.dmg
+```
+
+Open the DMG, drag `KiraBridge.app` to `Applications` and launch it. First launch
+verifies the package and then runs the same visible Terminal installation as above
+(backup, idle check, rollback; configuration, credentials and data preserved; an
+existing approval service is moved to the new release). There is no second
+installer lifecycle. Python 3.11 and uv remain prerequisites. The app is ad-hoc
+signed, the DMG is unsigned and not notarized, so macOS may require right-click →
+Open on first launch.
 
 ## Status, errors and rollback
 

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from conftest import request
+from macos_provider_fixture import bind_macos_provider
 from test_mcp import http_bridge  # noqa: F401 -- shared authenticated HTTP fixture
 
 from kirabridge.bridge_core.models import BridgeError
@@ -12,6 +13,7 @@ from kirabridge.read_query import ReadQuery, read_query_async
 
 
 def native_facts(bridge):
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts["platform"] = "darwin"
     bridge.macos.capability_probe.facts["os_version"] = "15.7.4"
     bridge.macos.capability_probe.executable = lambda path: True

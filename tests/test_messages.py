@@ -11,7 +11,7 @@ from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.config import AgentConfig, ReceiverConfig
+from kirabridge.bridge_core.config import AgentConfig, Config, ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.message_manager import MessageSend
@@ -43,6 +43,20 @@ def message(**changes):
             **changes,
         }
     )
+
+
+def test_messaging_defaults_fit_a_normal_multi_round_handover():
+    config = Config()
+    assert config.messaging.max_runs_per_conversation == 16
+    assert config.messaging.max_conversation_messages == 64
+    # Eight request/answer rounds need 16 stored messages and 8 receiver runs,
+    # leaving headroom for retries and revisions within the same handover.
+    assert 2 * 8 <= config.messaging.max_conversation_messages
+    assert 8 <= config.messaging.max_runs_per_conversation
+    # Identity guards and queue ceilings stay unchanged.
+    assert config.messaging.max_reply_depth == 8
+    assert config.messaging.max_pending_per_recipient == 100
+    assert config.messaging.max_runs_per_hour == 24
 
 
 def test_ordered_roundtrip_receipts_idempotency_and_ownership(channel, bridge):
@@ -380,14 +394,62 @@ async def test_persisted_queue_is_resumed_by_new_receiver(
     assert (Path(config.principals["grok"].roots[0]) / "grok-invocations").read_text() == "1\n"
 
 
-def test_receiver_budget_blocks_extra_provider_turns(channel, bridge, config, tmp_path):
+async def test_receiver_recovers_persisted_jobs_without_configured_receivers(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    queued = channel.send("codex", message(dispatch=True))
+    held = channel.send("codex", message(idempotency_key="held", dispatch=True))
+    running = channel.send("codex", message(idempotency_key="interrupted", dispatch=True))
+    assert bridge.message_receiver._claim(running["id"])
+    with bridge.store.transaction():
+        bridge.queues._place_hold("codex", "messages", held["id"], "operator_hold")
+    config.messaging.receivers.clear()
+
+    await bridge.message_receiver.start()
+
+    queued_state = channel.get("codex", queued["id"])["processing"]
+    held_state = channel.get("codex", held["id"])["processing"]
+    running_state = channel.get("codex", running["id"])["processing"]
+    assert queued_state["state"] == "blocked"
+    assert queued_state["evidence"]["reason"] == "receiver_removed"
+    assert held_state["state"] == "queued"
+    assert bridge.store.db.execute(
+        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (held["id"],)
+    ).fetchone()
+    assert running_state["state"] == "unknown"
+    assert running_state["evidence"]["reason"] == "receiver_restart"
+    assert bridge.message_receiver.worker is None
+    assert bridge.messages.delivery_hook is None
+
+
+async def test_receiver_preserves_pre_cutoff_queue_without_configured_receivers(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    queued = channel.send("codex", message(dispatch=True))
+    config.messaging.receivers.clear()
+    config.messaging.separate_managed_after = queued["created"] + 1
+
+    await bridge.message_receiver.start()
+
+    assert channel.get("codex", queued["id"])["processing"]["state"] == "queued"
+    assert bridge.message_receiver.worker is None
+
+
+def test_receiver_budget_notes_extra_provider_turns_and_still_claims(
+    channel, bridge, config, tmp_path
+):
     configure_receivers(bridge, config, tmp_path)
     config.messaging.max_runs_per_conversation = 1
     first = channel.send("codex", message(dispatch=True))
     assert bridge.message_receiver._claim(first["id"])
     second = channel.send("codex", message(dispatch=True, idempotency_key="second"))
-    assert bridge.message_receiver._claim(second["id"]) is None
-    assert channel.get("codex", second["id"])["processing"]["state"] == "blocked"
+    assert bridge.message_receiver._claim(second["id"])
+    processing = channel.get("codex", second["id"])["processing"]
+    assert processing["state"] == "running"
+    assert processing["evidence"]["limit_notes"] == ["conversation_run_limit"]
+    assert processing["evidence"]["conversation_runs"] >= 1
 
 
 async def test_long_poll_is_bounded_and_wakes_on_delivery(channel):

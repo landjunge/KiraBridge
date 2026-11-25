@@ -649,6 +649,7 @@ class Store:
                 row[0],
                 State.UNKNOWN,
                 {"reason": "dispatcher_restart", "last_observation": previous},
+                error={"code": "dispatcher_restart"},
             )
         return len(rows)
 

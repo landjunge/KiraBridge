@@ -7,7 +7,7 @@ import shutil
 import pytest
 
 from kirabridge.cli_adapters.grok import GrokBuildAdapter
-from kirabridge.cli_adapters.grok_echo import insertion_observed, paste_source
+from kirabridge.cli_adapters.grok_echo import insertion_observed, paste_source, single_row_capacity
 from kirabridge.cli_adapters.rendering import insertion_observed as renderer_observed
 
 BEFORE = (
@@ -18,6 +18,26 @@ BEFORE = (
 )
 PAYLOAD = "A bounded literal message"
 AFTER = BEFORE.replace(" │ ❯ " + " " * 75, " │ ❯ " + PAYLOAD + " " * (75 - len(PAYLOAD)))
+
+
+def placeholder_frame(content):
+    """The empty Grok 1.0 composer captured on 11.11.2026."""
+    width = 55
+    row = " │ ❯ " + content + " " * (width - len(content)) + "│ "
+    return (
+        " ╭"
+        + "─" * 56
+        + "╮ \n"
+        + row
+        + "\n ╰"
+        + "─" * 19
+        + " Grok 4.7 (medium) · always-approve ─╯ \n"
+        + " \n Ctrl+x:shortcuts\n"
+    )
+
+
+BEFORE_PLACEHOLDER = placeholder_frame("Build anything")
+AFTER_PLACEHOLDER = placeholder_frame(PAYLOAD)
 
 
 def test_decorated_box_exact_single_row_payload_is_observed():
@@ -36,7 +56,6 @@ def test_decorated_box_exact_single_row_payload_is_observed():
         (AFTER.replace("\n ╰", "\n │   extra input │\n ╰"), PAYLOAD, BEFORE),
         (AFTER.replace(PAYLOAD, PAYLOAD.lower()), PAYLOAD, BEFORE),
         (AFTER, PAYLOAD, BEFORE.replace(" │ ❯ ", " │ ❯ q")),
-        (AFTER, PAYLOAD + " ", BEFORE),
         (AFTER, "A\nmessage", BEFORE),
         (AFTER, "é", BEFORE),
         (AFTER, "x" * 76, BEFORE),
@@ -82,7 +101,9 @@ def _wrapped(payload_rows):
         prefix = " │ ❯ " if index == 0 else " │   "
         body.append(prefix + row + " " * (width - len(prefix) - len(row) - 2) + "│ ")
     return (
-        "Earlier response\n ╭" + "─" * 78 + "╮ \n"
+        "Earlier response\n ╭"
+        + "─" * 78
+        + "╮ \n"
         + "\n".join(body)
         + "\n ╰"
         + "─" * 33
@@ -98,7 +119,7 @@ def test_multiline_box_payload_is_observed_only_inside_the_composer():
     assert insertion_observed(quoted, text, BEFORE) is False
 
 
-@pytest.mark.parametrize("text", [" trailing ", "lead ", "\x1b[31mred"])
+@pytest.mark.parametrize("text", ["\x1b[31mred", "\x00nul"])
 async def test_unverifiable_decorated_box_payload_refuses_before_paste(text):
     from kirabridge.bridge_core.models import BridgeError
 
@@ -115,3 +136,130 @@ async def test_exact_single_row_box_payload_passes_preflight():
 @pytest.mark.parametrize("text", ["x" * 76, "first\nsecond", "ä message"])
 async def test_longer_visible_payload_passes_preflight_when_the_box_is_empty(text):
     await GrokBuildAdapter().preflight_input(None, None, text, {"text": BEFORE})
+
+
+def test_real_grok_placeholder_empty_composer_is_paste_and_verification_ready():
+    assert single_row_capacity(BEFORE_PLACEHOLDER) == 55
+    assert insertion_observed(AFTER_PLACEHOLDER, PAYLOAD, BEFORE_PLACEHOLDER)
+    assert renderer_observed("grok", AFTER_PLACEHOLDER, PAYLOAD, BEFORE_PLACEHOLDER)
+    assert not insertion_observed(
+        AFTER_PLACEHOLDER.replace(PAYLOAD, PAYLOAD + "x"), PAYLOAD, BEFORE_PLACEHOLDER
+    )
+    # A real draft in the same cell layout is not an empty placeholder.
+    assert not insertion_observed(AFTER_PLACEHOLDER, PAYLOAD, placeholder_frame("do not overwrite"))
+
+
+async def test_real_grok_placeholder_paste_source_proves_the_exact_payload():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node required for isolated JavaScript echo replay")
+    source = paste_source(PAYLOAD) + "process.stdout.write(JSON.stringify(observedPaste("
+    source += json.dumps(BEFORE_PLACEHOLDER) + "," + json.dumps(AFTER_PLACEHOLDER) + ")));"
+    child = await asyncio.create_subprocess_exec(
+        node,
+        "-",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    async with asyncio.timeout(5):
+        out, err = await child.communicate(source.encode())
+    assert child.returncode == 0, err.decode()
+    assert json.loads(out) is True
+
+
+async def test_real_grok_placeholder_preflight_keeps_geometry_guard():
+    from kirabridge.bridge_core.models import BridgeError
+
+    await GrokBuildAdapter().preflight_input(None, None, PAYLOAD, {"text": BEFORE_PLACEHOLDER})
+    with pytest.raises(BridgeError) as error:
+        await GrokBuildAdapter().preflight_input(
+            None, None, PAYLOAD + "\x1b", {"text": BEFORE_PLACEHOLDER}
+        )
+    assert error.value.code == "visible_input_geometry_ambiguous"
+
+
+@pytest.mark.parametrize("text", [PAYLOAD, "First line\nSecond line"])
+async def test_unrecognized_box_does_not_block_existing_visible_input(text):
+    # Regression after PR143: every payload was refused before paste when the
+    # empty box lacked the decorated single-row form, so ordinary visible
+    # handoffs stopped at the input step. The exact post-paste observation
+    # remains the authority; an unread box is never itself accepted as proof.
+    await GrokBuildAdapter().preflight_input(None, None, text, {"text": "╭\n│ ❯ │\n╰"})
+
+
+def wrapped_frame(lines):
+    width = 55
+    rows = []
+    for index, line in enumerate(lines):
+        prefix = " │ ❯ " if index == 0 else " │   "
+        rows.append(prefix + line + " " * (width - len(line)) + "│ ")
+    return (
+        " ╭"
+        + "─" * 56
+        + "╮ \n"
+        + "\n".join(rows)
+        + "\n ╰"
+        + "─" * 19
+        + " Grok 4.7 (medium) · always-approve ─╯ \n"
+        + " \n Ctrl+x:shortcuts\n"
+    )
+
+
+@pytest.mark.parametrize("text", ["first\nsecond", "x" * 80])
+async def test_wrapped_or_long_paste_source_proves_the_box_content(text):
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node required for isolated JavaScript echo replay")
+    after = wrapped_frame(text.split("\n"))
+    source = paste_source(text) + "process.stdout.write(JSON.stringify(observedPaste("
+    source += json.dumps(BEFORE_PLACEHOLDER) + "," + json.dumps(after) + ")));"
+    child = await asyncio.create_subprocess_exec(
+        node,
+        "-",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    async with asyncio.timeout(5):
+        out, err = await child.communicate(source.encode())
+    assert child.returncode == 0, err.decode()
+    assert json.loads(out) is True
+    assert insertion_observed(after, text, BEFORE_PLACEHOLDER)
+    assert not insertion_observed(wrapped_frame(["other"]), text, BEFORE_PLACEHOLDER)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [" trailing ", "lead ", "    indented()\n  more", "def f():\n    return 1\n    "],
+)
+async def test_edge_spaces_are_verified_from_the_composer_cells_not_refused(text):
+    """Indented code must not be refused for good: the cells prove every visible character."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node required for isolated JavaScript echo replay")
+    await GrokBuildAdapter().preflight_input(None, None, text, {"text": BEFORE_PLACEHOLDER})
+    after = wrapped_frame(text.split("\n"))
+    assert insertion_observed(after, text, BEFORE_PLACEHOLDER)
+    assert not insertion_observed(wrapped_frame(["other"]), text, BEFORE_PLACEHOLDER)
+    assert not insertion_observed(after, text, placeholder_frame("do not overwrite"))
+    source = paste_source(text) + "process.stdout.write(JSON.stringify(observedPaste("
+    source += json.dumps(BEFORE_PLACEHOLDER) + "," + json.dumps(after) + ")));"
+    child = await asyncio.create_subprocess_exec(
+        node,
+        "-",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    async with asyncio.timeout(5):
+        out, err = await child.communicate(source.encode())
+    assert child.returncode == 0, err.decode()
+    assert json.loads(out) is True
+
+
+async def test_whitespace_only_payload_is_never_proved_by_an_unchanged_box():
+    text = "   \n  "
+    assert not insertion_observed(BEFORE_PLACEHOLDER, text, BEFORE_PLACEHOLDER)
+    with pytest.raises(Exception):  # noqa: B017 - refused before any paste
+        await GrokBuildAdapter().preflight_input(None, None, "   ", {"text": BEFORE})

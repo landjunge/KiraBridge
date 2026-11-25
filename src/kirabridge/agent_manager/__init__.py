@@ -9,13 +9,18 @@ from typing import Protocol
 
 import httpx
 
+from kirabridge.agent_manager.acp import ACPClient
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.agent_manager.cli_support import login_identity
+from kirabridge.agent_manager.codex_package import inspect_codex_package
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
 from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
 from kirabridge.agent_manager.opencode import OpenCodeAdapter
+from kirabridge.agent_manager.opencode_acp import OpenCodeACPAdapter
 from kirabridge.agent_manager.opencode_http import OpenCodeHTTPAdapter
+from kirabridge.agent_manager.opencode_http_v2 import OpenCodeHTTPV2Adapter
+from kirabridge.agent_manager.qwen_acp import QwenACPAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -342,7 +347,16 @@ class GrokACPAdapter:
         self.bridge_config = bridge_config
 
     async def execute(
-        self, task, args, config, roots, running, progress, *, before_spawn=None
+        self,
+        task,
+        args,
+        config,
+        roots,
+        running,
+        progress,
+        *,
+        before_spawn=None,
+        resume_session=None,
     ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be configured explicitly")
@@ -379,6 +393,8 @@ class GrokACPAdapter:
             command[1:1] = ["--allow", "Bash", "--allow", "Edit", "--allow", "Read"]
         else:
             command[1:1] = ["--deny", "Bash", "--deny", "Edit"]
+        if config.grok_reasoning_effort:
+            command[1:1] = ["--reasoning-effort", config.grok_reasoning_effort]
         if config.model:
             command[1:1] = ["--model", config.model]
         with PathScope(roots).directory(args.cwd) as fd:
@@ -393,114 +409,95 @@ class GrokACPAdapter:
                 stderr=asyncio.subprocess.DEVNULL,
                 limit=1048576,
             )
-        session, started, text, counter = None, False, bytearray(), 0
+        session = None
 
-        async def send(message):
-            process.stdin.write((json.dumps(message) + "\n").encode())
-            await process.stdin.drain()
+        async def on_activity(kind):
+            await running({"agent": args.agent, "session_id": session, "event": kind})
 
-        async def request(method, params):
-            nonlocal counter, started
-            counter += 1
-            identifier = counter
-            await send({"jsonrpc": "2.0", "id": identifier, "method": method, "params": params})
-            while line := await process.stdout.readline():
-                value = json.loads(line)
-                if value.get("method") == "session/update":
-                    params = value.get("params", {})
-                    if not session or params.get("sessionId") != session:
-                        raise UncertainExecution("agent_identity", "Unexpected Grok session update")
-                    update = params.get("update", {})
-                    kind = update.get("sessionUpdate")
-                    if kind in {"agent_message_chunk", "tool_call", "agent_thought_chunk"}:
-                        if not started:
-                            started = True
-                            await running(
-                                {"agent": args.agent, "session_id": session, "event": kind}
-                            )
-                        content = update.get("content", {})
-                        if kind == "agent_message_chunk" and content.get("type") == "text":
-                            text.extend(
-                                content.get("text", "").encode()[: max(0, 65536 - len(text))]
-                            )
-                elif "method" in value and "id" in value:
-                    if value["method"] == "session/request_permission":
-                        permission = value.get("params", {})
-                        bound_permission = (
-                            bool(session)
-                            and permission.get("sessionId") == session
-                            and permission.get("toolCall", {}).get("kind")
-                            in {"read", "edit", "delete", "move", "search", "execute"}
-                        )
-                        selected = next(
-                            (
-                                option.get("optionId")
-                                for option in value.get("params", {}).get("options", [])
-                                if isinstance(option, dict)
-                                and option.get("kind") == "allow_once"
-                                and isinstance(option.get("optionId"), str)
-                            ),
-                            None,
-                        )
-                        await send(
-                            {
-                                "jsonrpc": "2.0",
-                                "id": value["id"],
-                                "result": {
-                                    "outcome": {"outcome": "selected", "optionId": selected}
-                                    if local_tools and bound_permission and selected
-                                    else {"outcome": "cancelled"}
-                                },
-                            }
-                        )
-                    else:
-                        await send(
-                            {
-                                "jsonrpc": "2.0",
-                                "id": value["id"],
-                                "error": {"code": -32601, "message": "Capability not available"},
-                            }
-                        )
-                elif value.get("id") == identifier:
-                    if "error" in value:
-                        raise UncertainExecution("agent_rpc", "Grok ACP returned an error")
-                    return value.get("result", {})
-            raise UncertainExecution("agent_disconnected", "Grok ACP disconnected")
+        async def on_request(method, params):
+            if method != "session/request_permission":
+                return None
+            bound_permission = (
+                bool(session)
+                and params.get("sessionId") == session
+                and params.get("toolCall", {}).get("kind")
+                in {"read", "edit", "delete", "move", "search", "execute"}
+            )
+            selected = next(
+                (
+                    option.get("optionId")
+                    for option in params.get("options", [])
+                    if isinstance(option, dict)
+                    and option.get("kind") == "allow_once"
+                    and isinstance(option.get("optionId"), str)
+                ),
+                None,
+            )
+            return {
+                "outcome": {
+                    "outcome": "selected",
+                    "optionId": selected,
+                }
+                if local_tools and bound_permission and selected
+                else {"outcome": "cancelled"}
+            }
+
+        client = ACPClient(process)
+        client.on_activity = on_activity
+        client.on_request = on_request
+        client.start()
 
         try:
             async with asyncio.timeout(args.timeout):
                 await progress(
                     {"agent": args.agent, "pid": process.pid, "event": "process_spawned"}
                 )
-                init = await request("initialize", {"protocolVersion": 1, "clientCapabilities": {}})
+                init = await client.request(
+                    "initialize", {"protocolVersion": 1, "clientCapabilities": {}}, args.timeout
+                )
                 if init.get("protocolVersion") != 1:
                     raise BridgeError("agent_protocol", "Unsupported ACP version")
                 methods = {item["id"] for item in init.get("authMethods", [])}
                 method = "xai.api_key" if os.environ.get(config.api_key_env) else "cached_token"
                 if method not in methods:
                     raise BridgeError("agent_auth", "No supported Grok authentication available")
-                await request("authenticate", {"methodId": method, "_meta": {"headless": True}})
+                await client.request(
+                    "authenticate", {"methodId": method, "_meta": {"headless": True}}, args.timeout
+                )
                 servers = []
                 if bridge_enabled:
                     from kirabridge.agent_manager.full_access import bridge_server
 
                     spec = bridge_server(self.bridge_config._source_path, args.agent)
                     servers = [{"name": "kirabridge", **spec, "env": []}]
-                new = await request("session/new", {"cwd": args.cwd, "mcpServers": servers})
-                session = new.get("sessionId")
-                if not isinstance(session, str) or not session:
-                    raise BridgeError("agent_protocol", "No Grok session identity")
-                await progress(
-                    {"agent": args.agent, "session_id": session, "event": "session_created"}
-                )
-                result = await request(
+                if resume_session is not None:
+                    session = client.bind_session(resume_session)
+                    await client.request(
+                        "session/load",
+                        {"sessionId": session, "cwd": args.cwd, "mcpServers": servers},
+                        args.timeout,
+                    )
+                    client.reset_text()
+                    await progress(
+                        {"agent": args.agent, "session_id": session, "event": "session_resumed"}
+                    )
+                else:
+                    new = await client.request(
+                        "session/new", {"cwd": args.cwd, "mcpServers": servers}, args.timeout
+                    )
+                    session = client.bind_session(new.get("sessionId"))
+                    await progress(
+                        {"agent": args.agent, "session_id": session, "event": "session_created"}
+                    )
+                result = await client.request(
                     "session/prompt",
                     {"sessionId": session, "prompt": [{"type": "text", "text": args.prompt}]},
+                    args.timeout,
                 )
                 stop = result.get("stopReason")
                 if not stop:
                     raise UncertainExecution("agent_unconfirmed", "Grok returned no stop reason")
-                if not started:
+                if not client.started:
                     await running(
                         {
                             "agent": args.agent,
@@ -510,11 +507,12 @@ class GrokACPAdapter:
                     )
                 return {
                     "success": stop == "end_turn",
-                    "text": text.decode("utf-8", "replace"),
+                    "text": client.text,
                     "evidence": {
                         "agent": args.agent,
                         "adapter": "grok_acp",
                         "session_id": session,
+                        "session_resumed": resume_session is not None,
                         "stop_reason": stop,
                         "local_tools": local_tools,
                         "mcp_servers_enabled": bridge_enabled,
@@ -522,12 +520,18 @@ class GrokACPAdapter:
                     "scope": "agent_turn",
                     "project_completion_verified": False,
                 }
-        except (TimeoutError, ValueError, OSError) as exc:
+        except TimeoutError:
+            await client.cancel()
+            raise UncertainExecution(
+                "agent_interrupted", "Grok execution cannot be confirmed"
+            ) from None
+        except (ValueError, OSError) as exc:
             raise UncertainExecution(
                 "agent_interrupted", "Grok execution cannot be confirmed"
             ) from exc
         finally:
-            await reap_process(process)
+            await client.aclose()
+            await reap_process(process, census_timeout=2)
 
 
 class AgentManager:
@@ -537,13 +541,21 @@ class AgentManager:
             "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
             "grok_acp": GrokACPAdapter(terminal, config),
+            "qwen_acp": QwenACPAdapter(terminal, config),
             "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
+            "opencode_acp": OpenCodeACPAdapter(terminal),
             "opencode_http": OpenCodeHTTPAdapter(),
+            "opencode_http_v2": OpenCodeHTTPV2Adapter(),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
             "copilot_cli": CopilotCLIAdapter(terminal),
         }
+        host = getattr(config, "acp_pap_host", None)
+        if host is not None and host.enabled:
+            from kirabridge.agent_manager.acp_pap_host import ACPPAPHostAdapter
+
+            self.adapters["acp_pap"] = ACPPAPHostAdapter(terminal, config)
 
     def register(self, kind: str, adapter: AgentAdapter) -> None:
         if kind in self.adapters or adapter.interface_version != "1":
@@ -563,6 +575,7 @@ class AgentManager:
                             "sandbox_mode": config.sandbox_mode,
                             "project_rules_enabled": True,
                             "mcp_servers_enabled": config.bridge_tools,
+                            "runtime_package": inspect_codex_package(config.executable),
                         }
                         if config.kind == "codex"
                         else {}
@@ -584,6 +597,20 @@ class AgentManager:
                         in {"opencode", "opencode_http", "gemini_cli", "claude_code", "copilot_cli"}
                         else {}
                     ),
+                    **(
+                        {
+                            "execution_mode": "task_scoped_mcp"
+                            if config.bridge_tools
+                            else "isolated_text_only",
+                            "supports_local_tools": config.allow_local_tools
+                            and config.bridge_tools,
+                            "supports_owned_resume": True,
+                            "resume_scope": "sealed_idle_team_session",
+                            "mcp_tools": config.qwen_mcp_tools,
+                        }
+                        if config.kind == "qwen_acp"
+                        else {}
+                    ),
                     "executable_runnable": bool(
                         config.executable
                         and Path(config.executable).is_file()
@@ -599,7 +626,45 @@ class AgentManager:
             ]
         }
 
-    async def execute(
+    def tollgate_loader(self):
+        from kirabridge.agent_manager.tollgate_gate import load_pinned_agent_gate
+
+        return load_pinned_agent_gate(self.config.workflow_control)
+
+    async def budget_note(self, agent):
+        """The single TollGate gate per run; None when switched off.
+
+        Raises BridgeError("tollgate_budget_reached") only for a user-set limit.
+        """
+        if not self.config.workflow_control.budget:
+            return None
+        from kirabridge.agent_manager.tollgate_gate import check_budget
+
+        return await check_budget(self.tollgate_loader, agent)
+
+    @staticmethod
+    def with_budget_note(result, note, *, create=False):
+        """Attach the note to an existing evidence dict; ``create`` adds one (native Codex)."""
+        if note is None or not isinstance(result, dict):
+            return result
+        evidence = result.get("evidence")
+        if not isinstance(evidence, dict):
+            if not create:
+                return result
+            evidence = result["evidence"] = {}
+        evidence["tollgate"] = note
+        if note["decision"] == "unavailable":
+            evidence["tollgate_unavailable"] = True
+        return result
+
+    async def execute(self, task, args, principal, running, progress, **options):
+        note = None
+        if args.agent in principal.agents and args.agent in self.config.agents:
+            note = await self.budget_note(args.agent)
+        result = await self.run_agent(task, args, principal, running, progress, **options)
+        return self.with_budget_note(result, note)
+
+    async def run_agent(
         self,
         task,
         args,
@@ -617,14 +682,12 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
-        if guard := getattr(self, "worktree_guard", None):
-            guard(task, args)
         if (
             self.config.visible_handoffs.enabled
             and not separate_managed
-            and config.kind != "opencode_http"
+            and config.kind not in {"opencode_http", "opencode_http_v2"}
         ):
-            if owned_resume_session is not None or handoff_reply:
+            if owned_resume_session is not None or handoff_reply or args.resume_session:
                 raise BridgeError(
                     "visible_owned_resume_unsupported",
                     "A provider-owned managed resume cannot replace the assigned visible "
@@ -645,10 +708,10 @@ class AgentManager:
             and config.allow_local_tools
             and "agent.local_tools" in principal.capabilities
         )
-        if full_access and config.kind in {"grok_acp", "opencode_http"}:
+        if full_access and config.kind in {"grok_acp", "opencode_http", "opencode_http_v2"}:
             args = args.model_copy(update={"local_tools": True})
         if args.local_tools and (
-            (config.kind != "grok_acp" and not full_access)
+            (config.kind not in {"grok_acp", "qwen_acp"} and not full_access)
             or not config.allow_local_tools
             or "agent.local_tools" not in principal.capabilities
         ):
@@ -656,15 +719,51 @@ class AgentManager:
                 "agent_tools_denied",
                 "Local agent tools require explicit operator and principal permission",
             )
+        if args.resume_session and owned_resume_session is not None:
+            raise BridgeError(
+                "agent_resume_unsupported", "A turn cannot resume two different sessions"
+            )
+        resume_session = args.resume_session
+        qwen_proof = None
+        if resume_session is not None:
+            if config.kind == "codex":
+                owned_resume_session = resume_session
+            elif config.kind in {"grok_acp", "opencode_http", "opencode_http_v2"}:
+                pass
+            elif config.kind == "qwen_acp":
+                guard = getattr(self, "qwen_session_guard", None)
+                if not separate_managed or guard is None:
+                    raise BridgeError("team_task_required", "Qwen resume needs sealed team proof")
+                qwen_proof = guard(task, args)
+            elif config.kind in {"opencode", "opencode_acp"}:
+                raise BridgeError(
+                    "agent_resume_unsupported",
+                    "OpenCode CLI/ACP resume has no persisted session store in the "
+                    "isolated profile",
+                )
+            else:
+                raise BridgeError(
+                    "agent_resume_unsupported",
+                    "This adapter cannot resume a provider session",
+                )
         if (owned_resume_session is not None or handoff_reply) and config.kind != "codex":
             raise BridgeError(
                 "agent_resume_unsupported", "Owned workflow continuation requires Codex"
             )
-        extra = (
-            {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
-            if owned_resume_session is not None or handoff_reply
-            else {}
-        )
+        extra = {"owned_session_proof": qwen_proof} if qwen_proof else {}
+        if owned_resume_session is not None or handoff_reply:
+            extra.update(
+                {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
+            )
+        if resume_session is not None and config.kind in {
+            "grok_acp",
+            "opencode_acp",
+            "opencode",
+            "opencode_http",
+            "opencode_http_v2",
+            "qwen_acp",
+        }:
+            extra["resume_session"] = resume_session
         try:
             async with asyncio.timeout(args.timeout):
                 if full_access and config.kind in {
@@ -673,6 +772,11 @@ class AgentManager:
                     "claude_code",
                     "copilot_cli",
                 }:
+                    if resume_session is not None:
+                        raise BridgeError(
+                            "agent_resume_unsupported",
+                            "Full-access execution cannot resume a text session",
+                        )
                     from kirabridge.agent_manager.full_access import FullAccessAdapter
 
                     return await FullAccessAdapter(

@@ -1,14 +1,16 @@
-:root{color-scheme:dark;--np-canvas:#000;--np-text:#edf0f4;--np-muted:#afb6c1;--np-surface:#1a1c20;--np-hover:#25282e;--np-divider:#353940;--np-control-border:#808996;--np-focus:#edf0f4;--np-action:#edf0f4;--np-action-text:#121316;--muted:#afb6c1;--line:#353940;--panel:#1a1c20;--accent:#edf0f4;background:#000;color:#edf0f4}body{background:#000}.app-shell{grid-template-rows:auto 36px minmax(0,1fr) 28px}.topbar,.console-header{flex-wrap:wrap;gap:12px}.topbar .brand{order:-1;min-width:170px}.topbar .np-appbar-host{flex:none}.process-panel,.main-panel{border-radius:0;background:#1a1c20}.notice{border-radius:0;background:#1a1c20;color:#edf0f4}button{border-radius:0;background:#1a1c20;border-color:#808996}a{color:#edf0f4}@media(max-width:760px){.topbar .np-appbar-host{order:1;flex-basis:100%}.app-shell{padding:12px;height:auto;min-height:100dvh}.workspace{min-height:600px}}
-
-/* Shared header on the team, connector and protocol views as well as the control centre. */
-.console-header .np-appbar-host,.protocol-toolbar .np-appbar-host{flex:none}
-.protocol-toolbar{flex-wrap:wrap;gap:12px}
-@media(max-width:760px){.console-header .np-appbar-host,.protocol-toolbar .np-appbar-host{flex-basis:100%;order:1}}
-
-.topbar,.console-header,.protocol-toolbar{position:sticky;top:0;z-index:30;background:#000}
-
-/* ThreadDesk look (networkpunkt.css, square forms) with KiraBridge brand contours instead of white edges. */
-:root{--kb-brand:#fc63ad;--np-control-border:var(--kb-brand);--np-focus:var(--kb-brand)}
-button,select,input,textarea,pre,.card,.notice,.process-panel,.main-panel,.process-card,.connection-detail,.channel,.summary-row>div,.doctor-check,.permission-options label,.terminal-output,.approval,.protocol-entry,.keyboard-text,.keyboard-modifiers,.keyboard-editor,.keyboard-context,.version-tag,.avatar,.brand-mark{border-radius:0;border-color:var(--kb-brand)}
-button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--kb-brand);outline-offset:2px}
-.np-appbar-button:focus-visible{outline-color:var(--np-text)}
+/* KiraBridge host layout. The pinned family module and original artwork stay unchanged. */
+:root{color-scheme:dark;--kb-brand:#fc63ad;--np-canvas:#000;--np-text:#edf0f4;--np-muted:#afb6c1;--np-surface:#1a1c20;--np-hover:#25282e;--np-divider:rgba(180,190,205,.16);--np-control-border:#808996;--np-focus:#edf0f4;--np-action:#edf0f4;--np-action-text:#121316;--muted:#afb6c1;--line:var(--np-divider);--panel:#1a1c20;--accent:#edf0f4;background:#000;color:#edf0f4}
+body{background:#000;color:#edf0f4}.app-shell{grid-template-rows:auto 32px minmax(0,1fr) 24px;padding:8px 16px;gap:8px;min-height:0}
+.kb-product-header.topbar,.kb-product-header.console-header,.kb-product-header.protocol-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px 12px;position:sticky;top:0;z-index:30;background:#000;padding:4px 0 8px;border-bottom:1px solid var(--np-divider)}
+.kb-wordmark{grid-column:1;grid-row:1;justify-self:start;display:block;max-width:100%;min-width:0}.kb-wordmark img{display:block;max-width:100%;height:auto;object-fit:contain}
+.kb-product-header .np-appbar-host{grid-column:2;grid-row:1;justify-self:center;flex:none}
+.kb-language{grid-column:3;grid-row:1;justify-self:end;display:flex;gap:4px}.kb-language button{min-width:44px;min-height:44px;padding:4px;background:transparent;border:1px solid transparent;border-radius:0;color:var(--np-muted)}.kb-language button[aria-pressed=true]{background:var(--np-hover);color:var(--np-text)}
+.kb-header-actions{grid-column:1 / -1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}.kb-header-actions>p{margin:0;color:var(--np-muted);font-size:12px}.kb-header-actions .bridge-indicator{margin-left:auto}.kb-header-actions h1{font-size:var(--np-heading);margin:0;flex:1}
+.kb-page-intro{grid-column:1 / -1;grid-row:2;min-width:0}.kb-page-intro h1{font-size:var(--np-heading);margin:0}.kb-page-intro p{margin:0;color:var(--np-muted);font-size:12px}.kb-product-header>.np-actions{grid-column:1 / -1;grid-row:3;gap:8px;flex-wrap:wrap}
+.process-panel,.main-panel,.card,.notice,.process-card,.connection-detail,.channel,.summary-row>div,.doctor-check,.terminal-output,.approval,.protocol-entry,.keyboard-editor,.keyboard-context{border-radius:0;border-color:var(--np-divider)}
+.process-panel,.main-panel,.notice{background:var(--np-surface)}.process-panel,.main-panel{min-height:0}.notice{color:var(--np-text)}
+button,select,input,textarea,pre,.keyboard-text,.keyboard-modifiers,.permission-options label{border-radius:0}button,select,input,textarea{border-color:var(--np-control-border)}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--np-focus);outline-offset:2px}a{color:var(--np-text)}
+@media(max-width:960px){.workspace{grid-template-columns:232px minmax(0,1fr);gap:12px}.process-panel,.main-panel{padding:12px}}
+@media(max-width:760px){.kb-product-header.topbar,.kb-product-header.console-header,.kb-product-header.protocol-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:6px 8px}.kb-language{grid-column:2;grid-row:1}.kb-product-header .np-appbar-host{grid-column:1 / -1;grid-row:2}.kb-page-intro{grid-row:3}.kb-product-header>.np-actions{grid-row:4}.app-shell{height:auto;min-height:100dvh;padding:8px;grid-template-rows:auto auto minmax(0,1fr) auto}.workspace{min-height:0}.kb-header-actions .bridge-indicator{margin-left:0}}
+@media(forced-colors:active){.kb-product-header{border-color:CanvasText}.kb-language button{border-color:ButtonText}}

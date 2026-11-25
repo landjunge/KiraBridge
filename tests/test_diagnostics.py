@@ -271,7 +271,9 @@ async def test_workflow_rejection_report_reads_existing_bounded_evidence_code(br
     async with bridge:
         bridge.prepare("local", value)
         rejected = await bridge.tasks.wait("local", value.task_id)
-        assert rejected["state"] == "failed" and rejected["error"] is None
+        assert rejected["state"] == "failed"
+        # A returned failure now carries its normalized error at the task itself.
+        assert rejected["error"]["code"] == "handoff_not_found"
         report = bridge.task("local", value.task_id)["diagnostic"]
         assert report["error_code"] == "handoff_not_found"
         assert report["accepted"] and report["started"] and not report["completed"]

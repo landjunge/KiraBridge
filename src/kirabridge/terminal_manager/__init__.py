@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import codecs
 import os
 import shutil
 import sqlite3
@@ -27,6 +28,7 @@ class Session:
     total: int = 0
     timed_out: bool = False
     terminated: bool = False
+    decoders: dict = field(default_factory=dict)
 
 
 def minimal_environment() -> dict[str, str]:
@@ -55,9 +57,12 @@ def check_executable(
 
 
 class TerminalManager:
-    def __init__(self, settings: TerminalConfig | None = None, *, output_store=None):
+    def __init__(
+        self, settings: TerminalConfig | None = None, *, output_store=None, live_logs=None
+    ):
         self.sessions: dict[str, Session] = {}
         self.output_store = output_store
+        self.live_logs = live_logs
         self.environment = minimal_environment()
         if settings:
             for value in settings.search_path + ([settings.home] if settings.home else []):
@@ -67,6 +72,15 @@ class TerminalManager:
                 self.environment["PATH"] = os.pathsep.join(settings.search_path)
             if settings.home:
                 self.environment["HOME"] = settings.home
+
+    def _record_live_output(self, session: Session, stream: str, chunk: bytes, *, final=False):
+        """Incremental UTF-8 decoding keeps split multibyte characters intact."""
+        decoder = session.decoders.setdefault(
+            stream, codecs.getincrementaldecoder("utf-8")("replace")
+        )
+        text = decoder.decode(chunk, final)
+        if text:
+            self.live_logs.append(session.task_id, session.principal, stream, text)
 
     async def execute(
         self,
@@ -117,6 +131,8 @@ class TerminalManager:
                     )
                 session = Session(task_id, principal, process)
                 self.sessions[task_id] = session
+                if self.live_logs is not None:
+                    self.live_logs.open(task_id, principal, pid=process.pid)
         except BaseException:
             if process is not None:
                 cleanup = asyncio.create_task(reap_process(process))
@@ -137,6 +153,8 @@ class TerminalManager:
             pending = bytearray()
             while chunk := await reader.read(65536):
                 session.total += len(chunk)
+                if self.live_logs is not None:
+                    self._record_live_output(session, "stdout" if events else "stderr", chunk)
                 if self.output_store is not None:
                     try:
                         self.output_store.append(
@@ -165,6 +183,8 @@ class TerminalManager:
                         raise BridgeError("agent_protocol", "Agent event exceeds byte limit")
             if events and pending and line_callback:
                 await line_callback(pending.decode("utf-8", errors="replace"))
+            if self.live_logs is not None:
+                self._record_live_output(session, "stdout" if events else "stderr", b"", final=True)
 
         async def send_input():
             if process.stdin is not None:

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import errno
 import json
 import logging
 import os
+import signal
+import socket
 import sys
+import threading
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -15,11 +20,329 @@ from kirabridge import __version__
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
-from kirabridge.bridge_core.models import BridgeError, State, TaskRequest
+from kirabridge.bridge_core.models import BridgeError, State, TaskRequest, UncertainExecution
 
 
 def emit(value, *, stream=None):
     print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout, flush=True)
+
+
+def _integer_between(low, high):
+    def parse(value):
+        try:
+            number = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError("must be an integer") from None
+        if not low <= number <= high:
+            raise argparse.ArgumentTypeError(f"must be from {low} to {high}")
+        return number
+
+    return parse
+
+
+def _next_after(result, limit):
+    work = result.get("work")
+    if not isinstance(work, list) or len(work) != limit:
+        return result
+    sequences = [
+        item["seq"] for item in work if isinstance(item, dict) and isinstance(item.get("seq"), int)
+    ]
+    if work and len(sequences) == len(work):
+        result["next_after"] = max(sequences)
+    return result
+
+
+async def _latest_team_work(pool, team_id, count):
+    """Page forward to the end and keep the newest assignments in ascending order."""
+    after = 0
+    kept = []
+    while True:
+        response = await pool.call(
+            "daemon",
+            "team_work_list",
+            {"team_id": team_id, "after": after, "limit": 100},
+        )
+        page = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+        if page.get("error"):
+            return page
+        batch = page.get("work")
+        if not isinstance(batch, list) or not batch:
+            break
+        kept.extend(batch)
+        if len(kept) > count:
+            del kept[:-count]
+        if len(batch) < 100:
+            break
+        sequence = batch[-1].get("seq") if isinstance(batch[-1], dict) else None
+        if not isinstance(sequence, int) or sequence <= after:
+            break
+        after = sequence
+    cursor = kept[-1]["seq"] if kept and isinstance(kept[-1], dict) else after
+    return {"work": kept, "next_cursor": cursor}
+
+
+async def _onboard_call(config, principal, tool, arguments):
+    from kirabridge.local_runtime import peer
+    from kirabridge.mcp_gateway.client import MCPClientPool
+
+    async with MCPClientPool(call_timeout=30) as pool:
+        await pool.connect(peer(config, principal))
+        response = await pool.call("daemon", tool, arguments)
+        return response.structuredContent or {"error": {"code": "invalid_team_response"}}
+
+
+async def _run_team_onboard(args, config):
+    """One command: register (server), restart in an idle window, optional role, readback."""
+    out = {"identity": args.identity, "phases": []}
+    if args.dry_run:
+        out["phases"].append(
+            {
+                "phase": "dry-run",
+                "plan": ["team_onboard_register", "restart-if-needed", "team_set_role", "readback"],
+            }
+        )
+        return out
+    live_paths = config.credentials_file or str(Path.home() / ".config/kirabridge/credentials.json")
+    config_path = str(args.config or Path.home() / ".config/kirabridge/config.toml")
+    registered = await _onboard_call(
+        config,
+        args.principal,
+        "team_onboard_register",
+        {
+            "request": {
+                "identity": args.identity,
+                "config_path": config_path,
+                "credentials_path": live_paths,
+                "approval_mode": args.approval_mode,
+                "capabilities": args.capability or [],
+                "message_peers": args.peer or ["local"],
+            }
+        },
+    )
+    if registered.get("error"):
+        registered["phase"] = "register"
+        return {"identity": args.identity, "phases": [registered], "error": registered["error"]}
+    out["phases"].append(
+        {
+            "phase": "register",
+            **{
+                k: registered.get(k)
+                for k in ("registered", "token", "live", "needs_restart", "backups")
+            },
+        }
+    )
+    if args.no_restart:
+        out["phases"].append({"phase": "restart", "state": "skipped_by_flag"})
+        return out
+    if registered.get("needs_restart"):
+        busy = await _onboard_call(
+            config,
+            args.principal,
+            "team_work_list",
+            {"team_id": args.team_id, "after": 0, "limit": 100},
+        )
+        active = [
+            w
+            for w in (busy.get("work") or [])
+            if w.get("state")
+            in {"queued", "dispatching", "created", "accepted", "running", "processing_result"}
+        ]
+        if active:
+            out["phases"].append(
+                {"phase": "restart", "state": "skipped_busy", "active": len(active)}
+            )
+            return out
+        proc = await asyncio.create_subprocess_exec(
+            "launchctl",
+            "kickstart",
+            "-k",
+            f"gui/{os.getuid()}/com.kirabridge.bridge",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
+        ready = False
+        for _ in range(30):
+            await asyncio.sleep(1)
+            probe = await _onboard_call(config, args.principal, "team_list", {})
+            if not probe.get("error"):
+                ready = True
+                break
+        out["phases"].append(
+            {"phase": "restart", "state": "confirmed" if ready else "health_timeout"}
+        )
+        if not ready:
+            return out
+    if args.coordinator or args.role:
+        wanted = args.role or "coordinator"
+        team = await _onboard_call(config, args.principal, "team_get", {"team_id": args.team_id})
+        if team.get("error"):
+            out["phases"].append({"phase": "role", **team})
+            return out
+        for attempt in (1, 2):
+            role_result = await _onboard_call(
+                config,
+                args.principal,
+                "team_set_role",
+                {
+                    "request": {
+                        "team_id": args.team_id,
+                        "member": args.identity,
+                        "role": wanted,
+                        "active": True,
+                        "expected_revision": team["revision"],
+                        "idempotency_key": (args.key or "cli-onboard-" + uuid.uuid4().hex)
+                        + f"-role-{attempt}",
+                    }
+                },
+            )
+            if role_result.get("error", {}).get("code") == "team_revision_conflict":
+                if attempt == 1:
+                    team = await _onboard_call(
+                        config, args.principal, "team_get", {"team_id": args.team_id}
+                    )
+                    continue
+            out["phases"].append(
+                {
+                    "phase": "role",
+                    **{
+                        k: role_result.get(k)
+                        for k in ("coordinator", "revision", "error")
+                        if k in role_result
+                    },
+                }
+            )
+            break
+    final = await _onboard_call(config, args.principal, "team_get", {"team_id": args.team_id})
+    inbox = await _onboard_call(
+        config, args.principal, "team_messages", {"team_id": args.team_id, "after": 0, "limit": 50}
+    )
+    unacked = sum(
+        1
+        for m in (inbox.get("messages") or [])
+        if m.get("recipient") == args.identity and not m.get("acknowledged")
+    )
+    out["readback"] = {
+        "owner": final.get("owner"),
+        "coordinator": final.get("coordinator"),
+        "revision": final.get("revision"),
+        "identity_in_team": args.identity in (final.get("members") or {}),
+        "unbestaetigte_inbox_seite1": unacked,
+        "hinweis": "Inbox-Seite 1 von 50 Eintraegen",
+    }
+    return out
+
+
+class _BridgeSignalHandling:
+    """Keep Uvicorn's graceful stop inside Bridge's async context."""
+
+    @contextmanager
+    def capture_signals(self):
+        if threading.current_thread() is not threading.main_thread():
+            yield
+            return
+        signals = [signal.SIGINT, signal.SIGTERM]
+        sigbreak = getattr(signal, "SIGBREAK", None)
+        if sigbreak is not None:
+            signals.append(sigbreak)
+        original_handlers = {}
+        try:
+            for signum in signals:
+                original_handlers[signum] = signal.signal(signum, self._request_shutdown)
+            yield
+        finally:
+            for signum, handler in original_handlers.items():
+                signal.signal(signum, handler)
+
+    def _request_shutdown(self, signum, _frame):
+        if self.should_exit and signum == signal.SIGINT:
+            self.force_exit = True
+        else:
+            self.should_exit = True
+
+
+def _bind_http_listener(config):
+    try:
+        infos = socket.getaddrinfo(
+            config.host,
+            config.port,
+            type=socket.SOCK_STREAM,
+        )
+    except OSError as exc:
+        raise BridgeError("bind_failed", "Unable to bind the configured HTTP listener") from exc
+    listeners = []
+    seen = set()
+    try:
+        for family, socktype, proto, _canonname, sockaddr in infos:
+            key = (family, sockaddr)
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                listener = socket.socket(family, socktype, proto)
+            except OSError:
+                continue
+            listeners.append(listener)
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if family == socket.AF_INET6 and hasattr(socket, "IPPROTO_IPV6"):
+                listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            try:
+                listener.bind(sockaddr)
+            except OSError as exc:
+                if exc.errno == errno.EADDRNOTAVAIL:
+                    listeners.pop()
+                    listener.close()
+                    continue
+                raise
+            listener.set_inheritable(True)
+        if not listeners:
+            raise OSError("could not bind the configured HTTP listener")
+    except OSError as exc:
+        for listener in listeners:
+            listener.close()
+        raise BridgeError("bind_failed", "Unable to bind the configured HTTP listener") from exc
+    return listeners
+
+
+async def _serve_http(config, principal):
+    # Bind before Bridge starts its dispatcher, so a port conflict cannot claim queued work.
+    listeners = _bind_http_listener(config)
+    bridge = None
+    entered = False
+    try:
+        bridge = Bridge(config)
+        import uvicorn
+
+        from kirabridge.mcp_gateway.http import create_http_app
+
+        server_type = type("KiraBridgeUvicornServer", (_BridgeSignalHandling, uvicorn.Server), {})
+        server = server_type(
+            uvicorn.Config(
+                create_http_app(bridge),
+                host=config.host,
+                port=config.port,
+                ssl_certfile=config.tls_cert,
+                ssl_keyfile=config.tls_key,
+                access_log=False,
+                log_level="critical",
+                limit_concurrency=config.max_http_requests,
+                timeout_keep_alive=5,
+            )
+        )
+        async with bridge:
+            entered = True
+            await server.serve(sockets=listeners)
+    finally:
+        for listener in listeners:
+            listener.close()
+        if bridge is not None and not entered:
+            try:
+                await bridge.system_modules.close()
+            finally:
+                try:
+                    await bridge.threaddesk.close()
+                finally:
+                    bridge.store.close()
 
 
 def parse_request(path: str) -> TaskRequest:
@@ -34,6 +357,16 @@ def parse_request(path: str) -> TaskRequest:
 
 
 async def execute(args) -> None:
+    if args.command == "family":
+        from kirabridge.family_windows import execute_family, failure
+
+        try:
+            emit(await execute_family(args))
+        except (BridgeError, ValidationError, OSError, ValueError, TimeoutError) as exc:
+            emit(failure(exc, mutating=args.action == "switch"))
+            unknown = args.action == "switch" and isinstance(exc, UncertainExecution)
+            raise SystemExit(3 if unknown else 2) from None
+        return
     if args.command == "install":
         from kirabridge.installation import guided_install
         from kirabridge.local_runtime import default_config
@@ -180,6 +513,14 @@ async def execute(args) -> None:
         from kirabridge.mcp_gateway.client import MCPClientPool
 
         action = args.action
+        if action == "onboard":
+            out = await _run_team_onboard(args, config)
+            emit(out)
+            if any(p.get("error") for p in out.get("phases", []) if isinstance(p, dict)) or out.get(
+                "error"
+            ):
+                raise SystemExit(2)
+            return
         tool = {
             "list": "team_list",
             "show": "team_get",
@@ -193,6 +534,8 @@ async def execute(args) -> None:
             "complete": "team_work_complete",
             "reprocess": "team_work_reprocess",
             "events": "team_events",
+            "session": "team_session_get",
+            "session-clear": "team_session_clear",
         }[action]
         arguments = {} if action == "list" else {"team_id": args.team_id}
         if action == "create":
@@ -223,16 +566,36 @@ async def execute(args) -> None:
                 arguments.update(
                     core_task_id=args.core_task, expected_result_sha256=args.result_sha256
                 )
+        elif action in {"session", "session-clear"}:
+            if args.member:
+                arguments["member"] = args.member
         elif action == "work" and args.work_id:
             arguments["work_id"] = args.work_id
-        writes = action in {"create", "role", "send", "assign", "claim", "complete", "reprocess"}
+        elif action == "work" and args.latest is None:
+            arguments["after"] = args.after
+            arguments["limit"] = args.limit
+        writes = action in {
+            "create",
+            "role",
+            "send",
+            "assign",
+            "claim",
+            "complete",
+            "reprocess",
+            "session-clear",
+        }
         if writes:
             arguments["idempotency_key"] = args.key or "cli-" + uuid.uuid4().hex
             arguments = {"request": arguments}
         async with MCPClientPool(call_timeout=20) as pool:
             await pool.connect(peer(config, args.principal))
-            response = await pool.call("daemon", tool, arguments)
-        result = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+            if action == "work" and args.latest is not None and not args.work_id:
+                result = await _latest_team_work(pool, args.team_id, args.latest)
+            else:
+                response = await pool.call("daemon", tool, arguments)
+                result = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+                if action == "work" and not args.work_id and not result.get("error"):
+                    _next_after(result, args.limit)
         emit(result)
         if result.get("error"):
             raise SystemExit(2)
@@ -386,7 +749,15 @@ async def execute(args) -> None:
         if args.command == "connect":
             from kirabridge.mcp_gateway.proxy import connect_stdio
 
-            await connect_stdio(config, args.principal)
+            task_policy = None
+            if args.agent_task_policy:
+                from kirabridge.mcp_gateway.agent_policy import AgentTaskPolicy
+
+                task_policy = AgentTaskPolicy.load(args.agent_task_policy, args.principal)
+                config.data_dir = str(
+                    Path(args.agent_task_policy).resolve().parent / "connect-state"
+                )
+            await connect_stdio(config, args.principal, task_policy=task_policy)
         elif args.command == "service":
             if args.action == "install":
                 emit(
@@ -404,33 +775,15 @@ async def execute(args) -> None:
 
         load_service_credentials(config)
         config.validate_network()
+        await _serve_http(config, args.principal)
+        return
     bridge = Bridge(config)
     try:
         if args.command == "serve":
             from kirabridge.mcp_gateway.server import create_server
 
             async with bridge:
-                if args.transport == "stdio":
-                    await create_server(bridge, principal=args.principal).run_stdio_async()
-                else:
-                    import uvicorn
-
-                    from kirabridge.mcp_gateway.http import create_http_app
-
-                    server = uvicorn.Server(
-                        uvicorn.Config(
-                            create_http_app(bridge),
-                            host=config.host,
-                            port=config.port,
-                            ssl_certfile=config.tls_cert,
-                            ssl_keyfile=config.tls_key,
-                            access_log=False,
-                            log_level="critical",
-                            limit_concurrency=config.max_http_requests,
-                            timeout_keep_alive=5,
-                        )
-                    )
-                    await server.serve()
+                await create_server(bridge, principal=args.principal).run_stdio_async()
             return
         if args.command == "grant":
             request = parse_request(args.request)
@@ -711,6 +1064,16 @@ def main() -> None:
     # Not required: --doctor/--repair are a flag-based entry point without a subcommand;
     # the fallback below defaults a missing command to "status".
     sub = parser.add_subparsers(dest="command")
+    family = sub.add_parser("family", help="Fixed native five-product window adapter; no Store")
+    family_actions = family.add_subparsers(dest="action", required=True)
+    family_actions.add_parser("registration", help="Print disabled registration; no writes")
+    family_path = family_actions.add_parser("path-check", help="Read-only native path scope check")
+    family_path.add_argument("target")
+    for action in ("switch", "inspect"):
+        command = family_actions.add_parser(action)
+        command.add_argument("target")
+        command.add_argument("--source-pid", required=True)
+        command.add_argument("--source-start")
     install = sub.add_parser("install", help="Guided local installation; --check changes nothing")
     install.add_argument("--check", action="store_true", help="Read-only prerequisite check")
     install.add_argument("--language", choices=["de", "en"], default="de")
@@ -737,9 +1100,20 @@ def main() -> None:
     actions.add_parser("list")
     for action in ("show", "inbox", "events"):
         actions.add_parser(action).add_argument("team_id")
+    for action in ("session", "session-clear"):
+        command = actions.add_parser(action)
+        command.add_argument("team_id")
+        command.add_argument(
+            "member",
+            nargs="?",
+            help="Member name; omit for the authenticated identity or use * to list all",
+        )
     work = actions.add_parser("work")
     work.add_argument("team_id")
     work.add_argument("--work-id")
+    work.add_argument("--after", type=_integer_between(0, 2**63 - 1), default=0)
+    work.add_argument("--limit", type=_integer_between(1, 100), default=50)
+    work.add_argument("--latest", type=_integer_between(1, 100))
     create = actions.add_parser("create")
     create.add_argument("team_id")
     create.add_argument("--name")
@@ -753,6 +1127,17 @@ def main() -> None:
     role.add_argument("role", choices=["coordinator", "worker", "reviewer", "observer"])
     role.add_argument("--revision", type=int, required=True)
     role.add_argument("--disable", action="store_true")
+    onboard = actions.add_parser("onboard")
+    onboard.add_argument("team_id")
+    onboard.add_argument("identity")
+    onboard.add_argument("--coordinator", action="store_true")
+    onboard.add_argument("--role", choices=["coordinator", "worker", "reviewer"])
+    onboard.add_argument("--approval-mode", choices=["automatic", "ask"], default="automatic")
+    onboard.add_argument("--capability", action="append")
+    onboard.add_argument("--peer", action="append")
+    onboard.add_argument("--no-restart", action="store_true")
+    onboard.add_argument("--dry-run", action="store_true")
+    onboard.add_argument("--key")
     send = actions.add_parser("send")
     send.add_argument("team_id")
     send.add_argument("recipient")
@@ -787,6 +1172,7 @@ def main() -> None:
         assign,
         actions.choices["claim"],
         actions.choices["complete"],
+        actions.choices["session-clear"],
     ):
         command.add_argument(
             "--key", help="Reuse this key for exactly the same operation; never blindly repeat work"
@@ -798,7 +1184,8 @@ def main() -> None:
     readiness.add_argument("--executable", action="append", default=[])
     readiness.add_argument("--operation", action="append", default=[])
     readiness.add_argument("--workflow-id")
-    sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    connect = sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    connect.add_argument("--agent-task-policy", help="Owner-only task restriction file")
     message = sub.add_parser("message", help="Authenticated addressed agent messaging")
     message_actions = message.add_subparsers(dest="action", required=True)
     send = message_actions.add_parser("send")

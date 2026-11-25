@@ -49,10 +49,12 @@ async def test_source_id_reads_a_newer_notice_behind_an_unacked_inbox(bridge, co
             "notices"
         ]
         assert [item["payload"]["task_id"] for item in selected] == [later["payload"]["task_id"]]
+        # Newest first: fresh results are never buried behind old unacknowledged ones.
         assert (
             bridge.completions.receive("local")["notices"][0]["payload"]["task_id"]
-            == earlier["payload"]["task_id"]
+            == later["payload"]["task_id"]
         )
+        assert earlier["seq"] < later["seq"]
 
 
 async def test_immediate_completion_before_listener_and_route_is_atomic(bridge, config):

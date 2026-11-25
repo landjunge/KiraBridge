@@ -3,6 +3,7 @@ import plistlib
 from types import SimpleNamespace
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES, MacDesktop, console_state
@@ -122,6 +123,7 @@ async def test_probe_cancellation_reaps_only_its_own_child(monkeypatch):
 async def test_known_unavailable_desktop_blocks_osascript_before_any_ui_action(
     bridge, monkeypatch, code
 ):
+    bind_macos_provider(bridge)
     bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
     bridge.macos.capability_probe.executable = lambda path: True
     monkeypatch.setattr(

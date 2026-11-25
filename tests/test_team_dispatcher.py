@@ -18,7 +18,13 @@ from kirabridge.team_manager.dispatcher import (
     TeamDispatcher,
     parse_team_turn,
 )
-from kirabridge.team_manager.models import TeamMessageSend, TeamWorkComplete, TeamWorkCreate
+from kirabridge.team_manager.models import (
+    TeamMessageSend,
+    TeamSessionClear,
+    TeamSessionGet,
+    TeamWorkComplete,
+    TeamWorkCreate,
+)
 
 
 def test_plain_text_and_embedded_instructions_are_inert():
@@ -76,6 +82,88 @@ def test_invalid_or_impersonating_action_envelopes_fail_closed(changes):
 def test_team_payload_limit_counts_utf8_bytes():
     with pytest.raises(BridgeError) as error:
         parse_team_turn("ä" * 6, max_bytes=10)
+    assert error.value.code == "team_payload_limit"
+
+
+def _prompt_pool(snapshot):
+    class Pool:
+        async def call(self, peer_name, tool, arguments):
+            assert peer_name == "daemon"
+            if tool == "team_message_ack":
+                return SimpleNamespace(structuredContent={"ok": True}, isError=False)
+            assert tool == "team_context"
+            return SimpleNamespace(structuredContent=snapshot, isError=False)
+
+    return Pool()
+
+
+def _prompt_work(body):
+    return {
+        "id": "tw-current",
+        "team_id": "t",
+        "assigned_by": "local",
+        "assignee": "grok",
+        "title": "now",
+        "body": body,
+        "parent_id": None,
+        "root_id": "tw-current",
+        "depth": 0,
+    }
+
+
+def _shared_snapshot():
+    return {
+        "team": {"id": "t", "name": "n", "coordinator": "local", "members": {}},
+        "work": [
+            {
+                "id": f"old-{index}",
+                "assigned_by": "local",
+                "assignee": "grok",
+                "title": "old",
+                "state": "completed",
+                "parent_id": None,
+                "result": "R" * 400,
+                "result_truncated": False,
+            }
+            for index in range(40)
+        ],
+        "messages": [
+            {
+                "id": f"tm-{index}",
+                "sender": "local",
+                "recipient": "grok",
+                "kind": "note",
+                "reply_to": None,
+                "body": "M" * 400,
+                "body_truncated": False,
+                "acknowledged": None,
+            }
+            for index in range(40)
+        ],
+        "truncated": False,
+    }
+
+
+async def test_prompt_keeps_current_work_when_shared_context_exceeds_the_adapter(config):
+    dispatcher, _teams = isolated_dispatcher(config)
+    body = "B" * 240000
+    prompt = await dispatcher._prompt(_prompt_pool(_shared_snapshot()), _prompt_work(body))
+    assert body in prompt
+    assert '"context_truncated":true' in prompt
+    assert len(prompt.encode()) <= 262144
+    assert "tm-39" not in prompt
+
+
+async def test_current_work_over_the_adapter_maximum_still_stops(config):
+    dispatcher, _teams = isolated_dispatcher(config)
+    snapshot = {
+        "team": {"id": "t", "name": "n", "coordinator": "local", "members": {}},
+        "work": [],
+        "messages": [],
+        "truncated": False,
+    }
+    with pytest.raises(BridgeError) as error:
+        await dispatcher._prompt(_prompt_pool(snapshot), _prompt_work("B" * 262145))
     assert error.value.code == "team_payload_limit"
 
 
@@ -204,7 +292,8 @@ def configure_team(bridge, config, tmp_path, monkeypatch, *, answer=None):
 prompt=sys.stdin.read()
 assert 'KiraBridge team turn' in prompt
 open('team-codex-invocations','a').write('1\\n')
-for event in [{{'type':'thread.started','thread_id':'team-codex'}},
+open('team-codex-argv','a').write(json.dumps(sys.argv[1:])+'\\n')
+for event in [{{'type':'thread.started','thread_id':'01a1ce14-57d2-75f3-85c9-7208392ce422'}},
  {{'type':'turn.started'}},
  {{'type':'item.completed','item':{{'type':'agent_message','text':{answer!r}}}}},
  {{'type':'turn.completed'}}]:
@@ -766,3 +855,91 @@ async def test_terminal_team_work_cannot_apply_late_completed_core_actions(confi
     dispatcher._complete = unexpected
     await dispatcher._observe(None, {"id": "parent"}, {"id": "core", "state": "completed"}, 1)
     assert not teams.finished
+
+
+async def test_worker_session_is_recorded_and_resumed_for_followup_without_duplicate_turn(
+    http_bridge,  # noqa: F811
+    config,
+    tmp_path,
+    monkeypatch,
+):
+    bridge, endpoint = http_bridge
+    root = configure_team(
+        bridge,
+        config,
+        tmp_path,
+        monkeypatch,
+        answer=json.dumps({"kirabridge_team": "1", "result": "DONE", "actions": []}),
+    )
+    bridge.config.team.workers["codex"] = TeamWorkerConfig(
+        agent="codex",
+        cwd=root,
+        timeout=3,
+        execution_scope="separate_managed_session",
+    )
+    await bridge.team_dispatcher.start()
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        await clients.call(
+            "local",
+            "team_create",
+            {
+                "request": {
+                    "team_id": "dispatch-team",
+                    "name": "Testteam",
+                    "coordinator": "local",
+                    "members": {"local": "coordinator", "codex": "worker"},
+                    "idempotency_key": "team-create",
+                }
+            },
+        )
+
+        async def create_and_wait(index):
+            response = await clients.call(
+                "local",
+                "team_work_create",
+                {
+                    "request": {
+                        "team_id": "dispatch-team",
+                        "assignee": "codex",
+                        "title": f"Folgearbeit {index}",
+                        "body": f"Bitte fortsetzen {index}.",
+                        "idempotency_key": f"work-{index}",
+                    }
+                },
+            )
+            assert not response.structuredContent.get("error")
+            work_id = response.structuredContent["id"]
+            async with asyncio.timeout(15):
+                while True:
+                    row = bridge.teams.work_get("local", "dispatch-team", work_id)
+                    if row["state"] == "completed":
+                        return row
+                    await asyncio.sleep(0.05)
+
+        first = await create_and_wait(0)
+        session = bridge.teams.session("codex", TeamSessionGet(team_id="dispatch-team"))["session"]
+        assert session["session_id"] == "01a1ce14-57d2-75f3-85c9-7208392ce422"
+        assert session["agent"] == "codex" and session["state"] == "idle"
+        assert first["resume_session"] is None
+        second = await create_and_wait(1)
+        assert second["resume_session"] == "01a1ce14-57d2-75f3-85c9-7208392ce422"
+        assert second["evidence"]["session_resumed"] is True
+        assert second["evidence"]["session_id"] == "01a1ce14-57d2-75f3-85c9-7208392ce422"
+        cleared = bridge.teams.clear_session(
+            "codex",
+            TeamSessionClear(team_id="dispatch-team", idempotency_key="clear-codex"),
+        )
+        assert cleared["cleared"] is True
+        third = await create_and_wait(2)
+        assert third["resume_session"] is None
+        assert third["evidence"]["session_resumed"] is False
+        invocations = [
+            json.loads(line) for line in (Path(root) / "team-codex-argv").read_text().splitlines()
+        ]
+        assert len(invocations) == 3
+        assert "resume" not in invocations[0]
+        assert "resume" in invocations[1]
+        assert "01a1ce14-57d2-75f3-85c9-7208392ce422" in invocations[1]
+        assert "resume" not in invocations[2]
+    await bridge.team_dispatcher.stop()

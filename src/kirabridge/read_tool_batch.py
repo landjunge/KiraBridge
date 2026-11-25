@@ -26,7 +26,6 @@ READ_TOOLS = frozenset(
     {
         "bridge_health",
         "clipboard_info",
-        "coordinator_status",
         "operation_catalog",
         "task_get",
         "task_events",
@@ -36,9 +35,11 @@ READ_TOOLS = frozenset(
         "bridge_readiness",
         "agent_inventory",
         "macos_status",
+        "live_logs",
         "session_catalog",
         "session_read",
         "whiteboard_read",
+        "whiteboard_search",
         "read_query",
     }
 )

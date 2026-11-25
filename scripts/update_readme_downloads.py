@@ -5,10 +5,13 @@ Every button links straight to the installation file (``browser_download_url``),
 never to a release page, so one click starts the download. Drafts are ignored;
 prereleases count because the products currently ship previews only.
 
-Shared by KiraBridge, ThreadDesk and 4AllPass; the three copies are identical
-(see TOOL_VERSION). Only the block between the AUTO-DOWNLOADS markers in
-README.md / README.de.md and the generated ``assets/readme/download-<platform>.svg``
-buttons are touched. Other ``download-*.svg`` files are never removed.
+Based on the shared family updater. This KiraBridge version selects desktop
+buttons from the newest unprefixed ``v*`` release. KiraBridge's Debian server
+track (``linux-*`` tags) is a second lane
+and shows as optional ``Debian Server``. ``windows-*`` tags stay unused.
+Only the block between the AUTO-DOWNLOADS markers in README.md / README.de.md
+and the generated ``assets/readme/download-<platform>.svg`` buttons are
+touched. Other ``download-*.svg`` files are never removed.
 
 Before anything is written, every chosen asset is confirmed through the
 Releases API and, for public repositories, the download URL itself must answer.
@@ -25,13 +28,14 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
 from html import escape
 from pathlib import Path
 
-TOOL_VERSION = "2.0.0"
+TOOL_VERSION = "2.2.2"
 START, END = "<!-- AUTO-DOWNLOADS:START -->", "<!-- AUTO-DOWNLOADS:END -->"
 BUTTON_DIR = Path("assets/readme")
 API = "https://api.github.com"
@@ -43,12 +47,13 @@ BRAND = {
     "threaddesk": "#b99cff",
     "4allpass": "#6be4f2",
     "tollgate": "#e77745",
+    "agentauthority": "#3b78fc",
     "agent-authority-lab": "#3b78fc",
     "blockdesign": "#ebc33f",
 }
 
-# Display order of the buttons.
-ORDER = ["macOS Apple Silicon", "macOS Intel", "Windows", "Linux"]
+# Display order of the buttons. "Debian Server" is filled only from linux-* tags.
+ORDER = ["macOS Apple Silicon", "macOS Intel", "Windows", "Linux Desktop", "Debian Server"]
 
 PACKAGE = re.compile(r"\.(?:dmg|pkg|exe|msi|appimage|deb|rpm|zip|tar\.gz)$", re.IGNORECASE)
 NOT_PACKAGE = re.compile(
@@ -67,7 +72,10 @@ def slug(label):
     return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
 
 
-MANAGED = {f"download-{slug(label)}.svg" for label in ORDER}
+MANAGED = {f"download-{slug(label)}.svg" for label in ORDER} | {
+    "download-debian-remote.svg",
+    "download-linux.svg",
+}
 
 
 def platforms(name):
@@ -77,7 +85,7 @@ def platforms(name):
     if WINDOWS.search(name):
         return ["Windows"]
     if LINUX.search(name):
-        return ["Linux"]
+        return ["Linux Desktop"]
     if MAC.search(name):
         if UNIVERSAL.search(name):
             return ["macOS Apple Silicon", "macOS Intel"]
@@ -121,45 +129,74 @@ def button_svg(label, version, color):
     )
 
 
-def base_version(tag):
-    match = re.search(r"(\d+)\.(\d+)\.(\d+)", tag)
-    return match.groups() if match else None
+def lane(tag):
+    """desktop = unprefixed v*; remote = linux-*; windows-* is ignored."""
+    name = (tag or "").lower()
+    if name.startswith("linux-"):
+        return "remote"
+    if name.startswith("windows-"):
+        return None
+    return "desktop" if name.startswith("v") else None
 
 
-def choose(releases):
-    releases = sorted(
+def published(releases):
+    return sorted(
         (r for r in releases if not r.get("draft") and r.get("published_at")),
         key=lambda r: r["published_at"],
         reverse=True,
     )
-    # Offer only the current version line: an older line (e.g. 0.7 next to 0.8)
-    # must not reappear as a platform download just because it is the last one
-    # that happened to ship that platform.
-    current = next(
-        (
-            base_version(r["tag_name"])
-            for r in releases
-            if base_version(r["tag_name"])
-            and any(platforms(a.get("name", "")) for a in r.get("assets", []))
-        ),
-        None,
-    )
-    chosen = {}
-    for release in releases:
-        if base_version(release["tag_name"]) != current:
+
+
+def installer_labels(release):
+    labels = []
+    for asset in release.get("assets", []):
+        if asset.get("state") == "uploaded":
+            labels.extend(platforms(asset.get("name", "")))
+    return labels
+
+
+def pick_from(release):
+    best = {}
+    for asset in release.get("assets", []):
+        name = asset.get("name", "")
+        if asset.get("state") != "uploaded":
             continue
-        best = {}
-        for asset in release.get("assets", []):
-            name = asset.get("name", "")
-            if asset.get("state") != "uploaded":
-                continue
-            for label in platforms(name):
-                if label in chosen:
-                    continue
-                if label not in best or preference(name) > preference(best[label]["name"]):
-                    best[label] = asset
-        for label, asset in best.items():
-            chosen[label] = (release["tag_name"], asset)
+        for label in platforms(name):
+            if label not in best or preference(name) > preference(best[label]["name"]):
+                best[label] = asset
+    return {label: (release["tag_name"], asset) for label, asset in best.items()}
+
+
+def newest_lane(releases, wanted, required=None):
+    for release in published(releases):
+        if lane(release["tag_name"]) != wanted:
+            continue
+        labels = installer_labels(release)
+        if not labels:
+            continue
+        if required and required not in labels:
+            continue
+        return release
+    return None
+
+
+def choose(releases):
+    """Newest desktop release plus newest linux-* Debian Server, independently.
+
+    Desktop (unprefixed v*) still offers only that one release: missing
+    platforms stay empty. linux-* is a second track; its Linux installer
+    becomes ``Debian Server``. windows-* tags never fill a button. A 4AllPass
+    AppImage on v* stays ``Linux Desktop``.
+    """
+    chosen = {}
+    desktop = newest_lane(releases, "desktop")
+    if desktop:
+        chosen.update(pick_from(desktop))
+    remote = newest_lane(releases, "remote", required="Linux Desktop")
+    if remote:
+        linux = pick_from(remote).get("Linux Desktop")
+        if linux:
+            chosen["Debian Server"] = linux
     return chosen
 
 
@@ -241,16 +278,39 @@ def verify(repo, private, chosen):
 # --- output ------------------------------------------------------------------
 
 
+def placeholder_svg(label):
+    """Non-clickable, bilingual placeholder for a platform without a verified installer."""
+    label = escape(label)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="190" height="52" '
+        'viewBox="0 0 190 52" role="img" '
+        f'aria-label="{label}: In Vorbereitung / Coming soon">'
+        f"<title>{label}: In Vorbereitung / Coming soon</title>"
+        '<rect x="1" y="1" width="188" height="50" rx="10" '
+        'fill="#555b64" stroke="#858b94"/>'
+        f'<text x="95" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
+        f'font-size="13" font-weight="700" fill="#ffffff">{label}</text>'
+        '<text x="95" y="39" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
+        'font-size="10" fill="#ffffff">In Vorbereitung / Coming soon</text></svg>\n'
+    )
+
+
 def render(repo, chosen):
-    """Return ({button file: svg}, readme block) for the chosen downloads."""
+    """Five visible platform fields; only verified packages get clickable links."""
     color = BRAND[repo.split("/")[-1].lower()]
     buttons, links = {}, []
     for label in ORDER:
+        path = BUTTON_DIR / f"download-{slug(label)}.svg"
         if label not in chosen:
+            buttons[path] = placeholder_svg(label)
+            links.append(
+                f'<img src="{path.as_posix()}" '
+                f'alt="{escape(label)}: In Vorbereitung / Coming soon" '
+                'width="190" height="52">'
+            )
             continue
         tag, asset = chosen[label]
         version = version_of(tag)
-        path = BUTTON_DIR / f"download-{slug(label)}.svg"
         buttons[path] = button_svg(label, version, color)
         url = escape(asset["browser_download_url"], quote=True)
         title = escape(f"{asset['name']} herunterladen / download", quote=True)
@@ -300,13 +360,13 @@ def self_test():
         "4AllPass_0.1.2-rc.2_aarch64.dmg": ["macOS Apple Silicon"],
         "4AllPass_0.1.2-rc.2_x64.dmg": ["macOS Intel"],
         "4AllPass_0.1.2-rc.2_x64-setup.exe": ["Windows"],
-        "4AllPass_0.1.2-rc.2_amd64.AppImage": ["Linux"],
+        "4AllPass_0.1.2-rc.2_amd64.AppImage": ["Linux Desktop"],
         "ThreadDesk-macOS-AppleSilicon.dmg": ["macOS Apple Silicon"],
         "ThreadDesk-macOS.dmg": ["macOS Intel"],
         "ThreadDesk-Windows.exe": ["Windows"],
         "KiraBridge-0.8.0rc36-Intel-Installer.zip": ["macOS Intel"],
         "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip": ["Windows"],
-        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz": ["Linux"],
+        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz": ["Linux Desktop"],
         "App-universal.dmg": ["macOS Apple Silicon", "macOS Intel"],
         "SHA256SUMS": [],
         "third-party-notices-macOS.zip": [],
@@ -346,11 +406,139 @@ def self_test():
         },
     ]
     picked = {label: tag for label, (tag, _) in choose(releases).items()}
-    if picked != {"Linux": "v0.8.0rc2", "Windows": "v0.8.0rc1"}:
-        failed.append(f"choose: {picked}")
+    if picked != {"Linux Desktop": "v0.8.0rc2"}:
+        failed.append(f"choose-desktop: {picked}")
+    dual = [
+        {
+            "tag_name": "v0.8.0rc49",
+            "draft": False,
+            "published_at": "2026-11-12",
+            "assets": [
+                {
+                    "name": "KiraBridge-macos.tar.gz",
+                    "state": "uploaded",
+                    "browser_download_url": "https://example.test/macos.tar.gz",
+                }
+            ],
+        },
+        {
+            "tag_name": "linux-v0.8.0rc41",
+            "draft": False,
+            "published_at": "2026-11-07",
+            "assets": [
+                {
+                    "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+                    "state": "uploaded",
+                    "browser_download_url": "https://example.test/debian.tar.gz",
+                }
+            ],
+        },
+        {
+            "tag_name": "linux-v0.8.0rc40",
+            "draft": False,
+            "published_at": "2026-11-01",
+            "assets": [{"name": "KiraBridge-0.8.0rc40-Linux-x86_64.tar.gz", "state": "uploaded"}],
+        },
+        {
+            "tag_name": "windows-v0.8.0rc37.dev1",
+            "draft": False,
+            "published_at": "2026-11-13",
+            "assets": [{"name": "KiraBridge-Windows.zip", "state": "uploaded"}],
+        },
+    ]
+    picked = {label: tag for label, (tag, _) in choose(dual).items()}
+    if picked != {"macOS Intel": "v0.8.0rc49", "Debian Server": "linux-v0.8.0rc41"}:
+        failed.append(f"choose-lanes: {picked}")
+    if version_of("linux-v0.8.0rc41") != "0.8.0rc41":
+        failed.append(f"version_of linux tag: {version_of('linux-v0.8.0rc41')}")
+    appimage = [
+        {
+            "tag_name": "v0.1.2-rc.2",
+            "draft": False,
+            "published_at": "2026-06-01",
+            "assets": [
+                {"name": "4AllPass_0.1.2-rc.2_x64.dmg", "state": "uploaded"},
+                {"name": "4AllPass_0.1.2-rc.2_amd64.AppImage", "state": "uploaded"},
+            ],
+        }
+    ]
+    picked = {label: tag for label, (tag, _) in choose(appimage).items()}
+    if picked != {"macOS Intel": "v0.1.2-rc.2", "Linux Desktop": "v0.1.2-rc.2"}:
+        failed.append(f"choose-appimage: {picked}")
+    foreign = {
+        "tag_name": "docs-2099-01-01",
+        "draft": False,
+        "published_at": "2099-01-01",
+        "assets": [{"name": "Other-macOS.dmg", "state": "uploaded"}],
+    }
+    if choose([foreign, *dual]) != choose(dual):
+        failed.append("foreign release tag replaced the supported download lanes")
+    # All five fields stay visible; unavailable platforms never get download links.
+    preview_buttons, preview_block = render("landjunge/KiraBridge", choose(dual))
+    if len(preview_buttons) != len(ORDER) or preview_block.count("<a href=") != 2:
+        failed.append("five-field preview did not retain exactly two real download links")
+    if preview_block.count("In Vorbereitung / Coming soon") != 3:
+        failed.append("missing installers not represented by three placeholders")
+    # Exercise the actual write path after the last supported release is deleted.
+    # A successful empty API result must clear stale links, but a dry run must not.
+    original_api, original_releases = globals()["api"], globals()["all_releases"]
+    original_summary = globals()["summary"]
+    original_repo, original_cwd = os.environ.get("GITHUB_REPOSITORY"), Path.cwd()
+    try:
+        globals()["summary"] = lambda _lines: None
+        globals()["api"] = lambda _path: {"private": False}
+        globals()["all_releases"] = lambda _repo: []
+        os.environ["GITHUB_REPOSITORY"] = "landjunge/KiraBridge"
+        with tempfile.TemporaryDirectory() as scratch:
+            os.chdir(scratch)
+            stale = START + '\n<a href="https://example.invalid/deleted">old</a>\n' + END
+            for page in ("README.md", "README.de.md"):
+                Path(page).write_text(stale)
+            BUTTON_DIR.mkdir(parents=True)
+            stale_button = BUTTON_DIR / "download-debian-server.svg"
+            stale_button.write_text("old")
+            unrelated = BUTTON_DIR / "download-custom.svg"
+            unrelated.write_text("preserve")
+
+            def api_failure(_path):
+                raise SystemExit("Simulated API failure")
+
+            globals()["api"] = api_failure
+            try:
+                main([])
+                failed.append("API failure did not stop the updater")
+            except SystemExit:
+                pass
+            if Path("README.md").read_text() != stale or not stale_button.exists():
+                failed.append("API failure modified files")
+            globals()["api"] = lambda _path: {"private": False}
+            main(["--dry-run"])
+            if Path("README.md").read_text() != stale or not stale_button.exists():
+                failed.append("empty-release dry run modified files")
+            main([])
+            if stale_button.read_text() == "old":
+                failed.append("deleted release left a stale button instead of a placeholder")
+            for page in ("README.md", "README.de.md"):
+                if "example.invalid/deleted" in Path(page).read_text():
+                    failed.append(f"deleted release left a dead link in {page}")
+                if Path(page).read_text().count("In Vorbereitung / Coming soon") != len(ORDER):
+                    failed.append(f"{page}: expected five non-clickable placeholders")
+            if unrelated.read_text() != "preserve":
+                failed.append("unrelated download asset changed")
+    finally:
+        os.chdir(original_cwd)
+        globals()["api"], globals()["all_releases"] = original_api, original_releases
+        globals()["summary"] = original_summary
+        if original_repo is None:
+            os.environ.pop("GITHUB_REPOSITORY", None)
+        else:
+            os.environ["GITHUB_REPOSITORY"] = original_repo
     if failed:
         raise SystemExit("Self-test failed:\n  " + "\n  ".join(failed))
-    print(f"Self-test passed ({len(cases)} names, version-line selection), tool {TOOL_VERSION}")
+    print(
+        f"Self-test passed ({len(cases)} names, desktop plus linux-remote lanes), "
+        f"tool {TOOL_VERSION}"
+    )
 
 
 def main(argv):
@@ -363,10 +551,6 @@ def main(argv):
         raise SystemExit("GITHUB_REPOSITORY (owner/name) is required")
     private = bool(api(f"/repos/{repo}").get("private"))
     chosen = choose(all_releases(repo))
-    if not chosen:
-        print("No platform-specific release assets; keeping existing buttons unchanged.")
-        summary(["### README downloads", "", "No platform release assets; nothing changed."])
-        return
     rows = [
         f"| {label} | {chosen[label][0]} | `{chosen[label][1]['name']}` |"
         for label in ORDER
@@ -379,12 +563,20 @@ def main(argv):
         summary(["### README downloads: not updated", "", *[f"- {p}" for p in problems]])
         raise SystemExit("Not updating README; failed checks:\n  " + "\n  ".join(problems))
     if dry_run:
-        print("Dry run: all links verified, no files written.")
+        print(
+            "Dry run: all links verified, no files written."
+            if chosen
+            else "Dry run: no supported installers; would clear stale buttons, no files written."
+        )
         return
     buttons, block = render(repo, chosen)
     write(buttons, block)
     summary(["### README downloads", "", *table])
-    print(f"Verified {len(chosen)} direct download buttons for {repo} (tool {TOOL_VERSION})")
+    print(
+        f"Verified {len(chosen)} direct download buttons for {repo} (tool {TOOL_VERSION})"
+        if chosen
+        else f"Cleared stale download buttons for {repo}; no supported published installers."
+    )
 
 
 if __name__ == "__main__":

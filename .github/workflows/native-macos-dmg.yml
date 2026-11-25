@@ -1,0 +1,85 @@
+name: Native macOS DMG installers
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/native-macos-dmg.yml'
+permissions:
+  contents: read
+jobs:
+  plan:
+    # Apple Silicon runners are billed; that leg is only planned when the
+    # repository variable BUILD_APPLE_SILICON is 'true'. The Intel installer is
+    # always built and attached.
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    env:
+      BUILD_APPLE_SILICON: ${{ vars.BUILD_APPLE_SILICON }}
+    steps:
+      - id: matrix
+        run: |
+          set -euo pipefail
+          include='{"runner":"macos-15-intel","arch":"x86_64","suffix":"Intel"}'
+          if [ "$BUILD_APPLE_SILICON" = "true" ]; then
+            include="$include"',{"runner":"macos-15","arch":"arm64","suffix":"AppleSilicon"}'
+          fi
+          echo "matrix={\"include\":[$include]}" >> "$GITHUB_OUTPUT"
+  dmg:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build and validate native drag-and-drop DMG
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 scripts/build_desktop_app.py --out dist/KiraBridge.app
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          file dist/KiraBridge.app/Contents/MacOS/KiraBridge | grep "${{ matrix.arch }}"
+          codesign --verify --deep --strict dist/KiraBridge.app
+          mkdir -p dist/dmg
+          cp -R dist/KiraBridge.app dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname KiraBridge -srcfolder dist/dmg -format UDZO -ov "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg"
+          hdiutil verify "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg"
+          shasum -a 256 "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg" > "dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg.sha256"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: KiraBridge-macOS-${{ matrix.suffix }}-DMG
+          path: |
+            dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg
+            dist/KiraBridge-macOS-${{ matrix.suffix }}.dmg.sha256
+          retention-days: 14
+  attach:
+    # Attach the verified installers to the release that triggered this run.
+    if: github.event_name == 'release'
+    needs: dmg
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Verify checksums and upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          cd dist
+          for f in *.dmg; do
+            want="$(awk '{print $1}' "$f.sha256")"
+            got="$(sha256sum "$f" | awk '{print $1}')"
+            test "$want" = "$got"
+          done
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber *.dmg *.dmg.sha256

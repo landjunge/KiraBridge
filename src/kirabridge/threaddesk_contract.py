@@ -241,7 +241,7 @@ def validate_management(values, schema):
         return result
 
 
-def safe_peer_error(code, value, *, contract=None):
+def safe_peer_error(code, value, *, contract=None, management_request=None):
     """Keep only numeric/schema diagnostics; raw peer messages may contain secrets."""
     # The frozen legacy peer drops SecretRejected's type, retaining this fixed
     # public message only. Classify that exact signature; never echo peer text.
@@ -257,38 +257,61 @@ def safe_peer_error(code, value, *, contract=None):
     safe = {
         key: item
         for key, item in incoming.items()
-        if key
-        in {
-            "expected_revision",
-            "actual_revision",
-            "limit",
-            "actual",
-            "max_length",
-            "actual_length",
-            "max_bytes",
-            "actual_bytes",
-        }
+        if key in {"expected_revision", "actual_revision"}
         and type(item) is int
+        and item >= 0
+        and code != "threaddesk_rejected"
     }
-    if contract:
-        try:
-            fields, _, source = declaration(contract, "set_note")
-            safe["text_max_characters"] = fields.get("text", {}).get("maxLength")
-            fields, _, _ = declaration(contract, "create")
-            safe["description_max_characters"] = fields.get("description", {}).get("maxLength")
-            safe["limit_source"] = source
-        except ContractSchemaError:
-            safe["contract_state"] = "invalid_or_unsupported"
+    if code == "validation_error":
+        for actual, maximum in (
+            ("actual_length", "max_length"),
+            ("actual_bytes", "max_bytes"),
+            ("actual", "limit"),
+        ):
+            if (
+                type(incoming.get(actual)) is int
+                and type(incoming.get(maximum)) is int
+                and 0 <= incoming[maximum] < incoming[actual]
+            ):
+                safe.update({actual: incoming[actual], maximum: incoming[maximum]})
+        # The legacy peer can omit numeric facts. Derive only a proven size
+        # violation in the exact typed management request, using the same bounded
+        # schema validator as preflight. Never attach write limits to a read or
+        # knowledge call, or infer a size violation from remote prose.
+        if management_request is not None:
+            rejected = validate_management(management_request, contract)
+            details = rejected.get("details", {}) if rejected else {}
+            limit_key = {
+                "text": "text_max_characters",
+                "description": "description_max_characters",
+            }.get(details.get("field"))
+            if (
+                details.get("constraint") == "maxLength characters"
+                and limit_key
+                and type(details.get("limit")) is int
+                and type(details.get("characters")) is int
+                and 0 <= details["limit"] < details["characters"]
+            ):
+                safe.setdefault("actual_length", details["characters"])
+                safe.setdefault("max_length", details["limit"])
+                safe[limit_key] = details["limit"]
+                safe["limit_source"] = details["limit_source"]
+    lifecycle_messages = {
+        "object_in_trash": "ThreadDesk reports that the object is in trash or purged.",
+        "object_changed_in_trash": "ThreadDesk reports a changed object in trash.",
+        "lifecycle_conflict": "ThreadDesk reports a lifecycle state conflict.",
+    }
+    message = "ThreadDesk rejected the request; inspect its structured code and original request."
+    if code in lifecycle_messages:
+        message = lifecycle_messages[code] + " Inspect the object's lifecycle state."
+    elif code == "secret_detected":
+        message = "ThreadDesk secret protection reported a rejection; preserve the original input."
+    elif any(key in safe for key in ("max_length", "max_bytes", "limit")):
+        message = "ThreadDesk rejected the request size; inspect the structured size diagnostics."
     return {
         "error": {
             "code": code,
             "details": safe,
-            "message": (
-                "ThreadDesk secret protection reported a rejection; preserve input and "
-                "inspect the original operation ID. No automatic replay."
-                if code == "secret_detected"
-                else "ThreadDesk rejected the operation; inspect declared field limits "
-                "and the original operation ID. No automatic replay."
-            ),
+            "message": message + " No automatic replay.",
         }
     }

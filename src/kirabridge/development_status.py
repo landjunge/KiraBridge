@@ -220,6 +220,11 @@ async def agent_status(bridge, principal: str) -> dict:
         "tasks_truncated": len(rows) > TASK_LIMIT,
         "managed_terminal_sessions": own_sessions,
         "managed_terminal_sessions_scope": "only child processes started by this bridge principal",
+        "live_logs": (
+            bridge.live_logs.summary(principal)
+            if getattr(bridge, "live_logs", None) is not None
+            else {"count": 0, "by_state": {}, "running": [], "dropped_sources": 0}
+        ),
         "interactive_terminal_sessions": catalog["sessions"],
         "terminal_access": access,
         "observed_processes": observation.pop("processes"),

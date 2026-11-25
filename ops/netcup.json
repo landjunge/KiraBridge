@@ -59,7 +59,7 @@
       "release": "/opt/agent-authority-browser/releases/account-4da5fa818b7b590711d5",
       "env_names": ["PYTHONDONTWRITEBYTECODE", "PYTHONPATH", "AA_BROWSER_ORIGIN", "AA_BROWSER_PREFIX", "AA_BROWSER_STATE", "AA_BROWSER_PROXY_TOKEN_FILE", "AA_BROWSER_PROXY_TRANSPORT", "AA_HELP_PEER_URL", "AA_HELP_SERVICE_KEY_FILE", "AA_HELP_BRIDGE_KEY_FILE"],
       "product": "Agent Authority",
-      "owner_guess": "landjunge/agent-authority-lab, Lane L5"
+      "owner_guess": "landjunge/AgentAuthority, Lane L5"
     },
     {
       "unit": "ki-hilfezentrum.service",

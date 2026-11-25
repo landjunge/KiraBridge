@@ -31,3 +31,6 @@ examples/review-demo/automatic-*/state/
 examples/completion-demo/run-*/state/
 
 .claude/settings.local.json
+
+# Private provider/session acceptance artifacts; never publish prompts or local state.
+/.qwen-checkpoint/

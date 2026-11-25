@@ -115,8 +115,10 @@ class CodexAdapter:
         if special:
             return special
         result = legacy.assess(self.name, raw, binding, protocol)
+        interim = self.interim_readiness(raw, binding, protocol, observed=result)
         return {
             **result,
+            "interim_ready": interim["ready"],
             "ui_state": "composer"
             if result["ready"]
             else "draft"
@@ -127,7 +129,28 @@ class CodexAdapter:
             else "working"
             if result["state"] == "working"
             else "unknown",
-            "allowed_actions": ["insert", "submit"] if result["ready"] else [],
+            "allowed_actions": (["insert", "submit"] if result["ready"] else [])
+            + (["interim_message"] if interim["ready"] else []),
+        }
+
+    def interim_readiness(self, raw, binding, protocol=None, *, observed=None):
+        """A working turn can accept text; an existing draft/dialog cannot."""
+        from .codex_menus import unsupported_confirmation_frame
+
+        result = observed or legacy.assess(self.name, raw, binding, protocol)
+        view = self.input_view(raw)
+        footer = view.splitlines()[1:]
+        supported = (
+            result["input_empty"]
+            and result["state"] == "working"
+            and legacy.codex_input_footer_group(footer)
+            and not unsupported_confirmation_frame(raw)
+            and not re.search(r"Approval required|Select Model|Resume a previous|enter copy", view)
+        )
+        return {
+            **result,
+            "ready": bool(supported),
+            "reason": "current_codex_message_composer" if supported else result["reason"],
         }
 
     def return_readiness(self, raw, binding, protocol=None):
@@ -159,10 +182,12 @@ class CodexAdapter:
             or text in self.capabilities.slash_commands
         )
 
-    async def preflight_input(self, sessions, binding, text, before):
+    async def preflight_input(self, sessions, binding, text, before, *, composer_only=False):
         from .rendering import check_codex_paste_geometry
 
-        await check_codex_paste_geometry(sessions, self.name, binding, text, before)
+        await check_codex_paste_geometry(
+            sessions, self.name, binding, text, before, composer_only=composer_only
+        )
 
     def command_result(self, command, before, after, binding, protocol=None):
         state = self.observe(after, binding, protocol)

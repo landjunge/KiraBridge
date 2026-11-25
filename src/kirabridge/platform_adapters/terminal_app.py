@@ -45,7 +45,13 @@ def _parse_process_catalog(output, returncode):
         if not line.strip():
             continue
         parts = line.split(None, 4)
-        if len(parts) != 5 or any(not re.fullmatch(r"[0-9]+", part) for part in parts[:3]):
+        # macOS ps prints signed system UIDs (for example nobody as -2).
+        # PID/PPID remain nonnegative; ownership comparisons keep the signed UID.
+        if (
+            len(parts) != 5
+            or not re.fullmatch(r"-?[0-9]+", parts[0])
+            or any(not re.fullmatch(r"[0-9]+", part) for part in parts[1:3])
+        ):
             raise invalid("malformed_row")
         pid = int(parts[1])
         if pid in pids:
@@ -81,7 +87,13 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
     groups: dict[tuple, list[dict]] = {}
     for row in rows:
         bounds = row.get("bounds") or {}
-        if row.get("script_tab_count", 1) > 1:
+        if row.get("ended") is True:
+            key = ("minimized", row.get("window_id"))  # kept apart, never counted or merged
+        elif row.get("miniaturized") is True:
+            # A window minimized to the Dock is not on screen: it must neither count as an
+            # open window nor be merged with another window that has the same size.
+            key = ("minimized", row.get("window_id"))
+        elif row.get("script_tab_count", 1) > 1:
             key = ("script", row.get("window_id"))
         else:
             key = (
@@ -94,7 +106,7 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
             if None in key:
                 key = ("script", row.get("window_id"))
         groups.setdefault(key, []).append(row)
-    ui_count = len(groups)
+    ui_count = len([key for key in groups if key[0] != "minimized"])
     tty_count: dict[str, int] = {}
     for row in rows:
         if row.get("ended"):
@@ -131,6 +143,14 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
 
 
 class TerminalAppTransport:
+    # One slow System Events check can take about a second when Terminal and
+    # another agent are both busy. Eight attempts stay inside the mutation
+    # budget; a two-second wall clock expired before those attempts finished.
+    FOCUS_ATTEMPTS = 8
+    FOCUS_POLL_DELAY = 0.25
+    MUTATION_SCRIPT_TIMEOUT = 30
+    READ_SCRIPT_TIMEOUT = 10
+
     def __init__(self, clipboard_lock, *, desktop=None, clipboard_owner=clipboard_lease):
         self.clipboard_lock = clipboard_lock
         self.desktop = desktop or MacDesktop()
@@ -159,7 +179,9 @@ class TerminalAppTransport:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            async with asyncio.timeout(15 if mutation else 10):
+            async with asyncio.timeout(
+                self.MUTATION_SCRIPT_TIMEOUT if mutation else self.READ_SCRIPT_TIMEOUT
+            ):
                 stdout, stderr = await child.communicate(source.encode("utf-8"))
             if child.returncode:
                 detail = stderr.decode("utf-8", "replace")[:1024]
@@ -282,6 +304,7 @@ class TerminalAppTransport:
      const b = w.bounds();
      return w.tabs().map((t, i) => ({
       window_id:w.id(), index:w.index(), frontmost:w.frontmost(),
+      miniaturized:w.miniaturized(),
       bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
       script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
       tty:t.tty(), busy:t.busy(), selected:t.selected()
@@ -327,6 +350,25 @@ class TerminalAppTransport:
             ]
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
+            if not members:
+                # No user process on this tty: the shell ended (Terminal.app keeps the window
+                # open) or the login is still starting. Nothing can be typed into it yet, and
+                # it is not ambiguous, so it must not mark the whole catalog incomplete.
+                # Foreign processes on the same tty are different: the window exists but
+                # cannot be represented as one of ours, so the catalog stays incomplete.
+                omitted = omitted or bool(all_members)
+                continue
+            if len(roots) > 1:
+                # A background job handed over to launchd (ppid 1: nohup, ssh -f, (cmd &)) is
+                # not a second shell. The shell root is the login process Terminal.app started,
+                # or else the one root whose parent is another process on this tty.
+                names = {p: Path(comm).name.lstrip("-") for _, p, _, comm in all_members}
+                logins = [p for p in roots if names.get(p) == "login"]
+                attached = [p for p, parent in members if p in roots and parent in all_pids]
+                for chosen in (logins, attached):
+                    if len(chosen) == 1:
+                        roots = chosen
+                        break
             if len(roots) != 1:
                 omitted = True
                 continue
@@ -346,6 +388,7 @@ class TerminalAppTransport:
                     "tab_index": row.get("tab_index"),
                     "tab_count": row.get("tab_count"),
                     "tab_selected": row.get("tab_selected"),
+                    "miniaturized": bool(row.get("miniaturized")),
                     "ui_window_count": row.get("ui_window_count"),
                     "identity_ambiguous": bool(row.get("identity_ambiguous")),
                     "selection_ambiguous": bool(row.get("selection_ambiguous")),
@@ -397,6 +440,8 @@ class TerminalAppTransport:
 
     def native_focus(self, pane_id):
         window, tty = pane_id.split(":")[1:]
+        attempts = int(TerminalAppTransport.FOCUS_ATTEMPTS)
+        last_attempt = attempts - 1
         return (
             self.native_target(pane_id)
             + f"""
@@ -423,14 +468,17 @@ class TerminalAppTransport:
     }}
 """
             + TerminalAppTransport.native_focus_check(pane_id)
-            + """
-    // Window activation is asynchronous. Acquire once with a bounded wait;
-    // later pre-input checks remain immediate and never reassert focus.
-    const focusDeadline=Date.now()+2000;
-    while(true) {
-     try { checkFocus(); break; }
-     catch(error) { if(Date.now()>=focusDeadline) throw error; delay(0.05); }
-    }"""
+            + f"""
+    // Window activation is asynchronous. Acquire once, with a fixed number of
+    // attempts, so a slow accessibility check cannot consume the whole wait
+    // before Terminal is front. Later pre-input checks stay immediate.
+    for (let focusAttempt=0; focusAttempt<{attempts}; focusAttempt++) {{
+     try {{ checkFocus(); break; }}
+     catch(error) {{
+      if(focusAttempt==={last_attempt}) throw error;
+      delay({TerminalAppTransport.FOCUS_POLL_DELAY});
+     }}
+    }}"""
         )
 
     @staticmethod
@@ -471,9 +519,34 @@ class TerminalAppTransport:
         return f"Array.from(tab.history().slice(-{2 * limit})).slice(-{limit}).join('')"
 
     @staticmethod
-    def native_screen_guard(expected_screen):
+    def native_screen_guard(expected_screen, *, composer_only=False):
         if expected_screen is None:
             return ""
+        if composer_only:
+            # The turn output may grow; freeze the exact final composer and footer.
+            from kirabridge.cli_adapters._legacy_readiness import input_view
+
+            expected = input_view("codex", expected_screen)
+            if not expected:
+                raise BridgeError("visible_target_unknown", "No current Codex composer")
+            return (
+                "\n{ const frame="
+                + TerminalAppTransport.native_input_tail(65536)
+                + r";const prompts=Array.from(frame.matchAll(/^[ \t]*[›»][^\n]*/gm));"
+                + "if(!prompts.length || frame.slice(prompts[prompts.length-1].index)!=="
+                + json.dumps(expected)
+                + ") throw Error('Selected terminal input changed');"
+                + r"const start=prompts[prompts.length-1].index;"
+                + r"const pre=frame.slice(0,start).trimEnd().split(/\n[ \t]*\n/).pop();"
+                + r"if(/^[ \t]*(?:Approval required|Would you like to run the following command\?|"
+                + r"Would you like to make the following edits\?|"
+                + r"Do you want to allow this action\?)"
+                + r"[ \t]*$/m.test(pre.trim()))"
+                + " throw Error('Codex permission dialog is not a message composer');"
+                + r"if(!/^[ \t]*»/.test(frame.slice(start)) && "
+                + r"!/^[ \t]*[•◦]\s+[^\n]*\([^\n]*esc to interrupt/m.test(pre))"
+                + " throw Error('Codex turn no longer observed working'); }"
+            )
         # Freeze the current input and adjacent footer using the same source as
         # read(), rather than comparing that observation against a stale viewport.
         return (
@@ -628,11 +701,11 @@ class TerminalAppTransport:
             + "if(tab.busy())throw Error('Selected terminal is busy');"
         )
 
-    async def input_columns(self, pane_id, *, identity_guard, expected_screen):
+    async def input_columns(self, pane_id, *, identity_guard, expected_screen, composer_only=False):
         value = await self.native(
             self.native_target(pane_id)
             + self.native_identity_guard(identity_guard)
-            + self.native_screen_guard(expected_screen)
+            + self.native_screen_guard(expected_screen, composer_only=composer_only)
             + "\nJSON.stringify({columns:tab.numberOfColumns()});"
         )
         columns = value.get("columns")
@@ -647,6 +720,7 @@ class TerminalAppTransport:
         expected_screen=None,
         shell_snapshot=None,
         agent_target=None,
+        composer_only=False,
     ):
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
@@ -684,7 +758,7 @@ class TerminalAppTransport:
                         else ""
                     )
                     + "\ncheckFocus(); checkClipboard();"
-                    + self.native_screen_guard(expected_screen)
+                    + self.native_screen_guard(expected_screen, composer_only=composer_only)
                     + """
         const beforePaste="""
                     + self.native_input_tail(65536)
@@ -874,9 +948,12 @@ const entries=menus[0].menus()[0].menuItems().filter(m=>
  ['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(m)));
 if(entries.length!==1||!entries[0].enabled())throw Error('Detach menu is unavailable');
 checkCreatedTab();
-if(!selected()||owner.windows().filter(w=>named(w).includes(__NONCE__)).length!==1||
- !['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(entries[0]))||
- !entries[0].enabled())throw Error('Detach target changed');
+if(!selected())throw Error('Detach target focus changed');
+if(owner.windows().filter(w=>named(w).includes(__NONCE__)).length!==1)
+ throw Error('Detach target title changed');
+if(!['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(entries[0])))
+ throw Error('Detach target menu label changed');
+if(!entries[0].enabled())throw Error('Detach target menu disabled');
 entries[0].click();JSON.stringify({detached:true});
 """
         )
@@ -1135,7 +1212,13 @@ entries[0].click();JSON.stringify({detached:true});
         )
 
     async def press_return(
-        self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+        self,
+        pane_id,
+        *,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        composer_only=False,
     ):
         return await self.press_key(
             pane_id,
@@ -1143,10 +1226,18 @@ entries[0].click();JSON.stringify({detached:true});
             identity_guard=identity_guard,
             expected_screen=expected_screen,
             shell_snapshot=shell_snapshot,
+            composer_only=composer_only,
         )
 
     async def press_key(
-        self, pane_id, key, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+        self,
+        pane_id,
+        key,
+        *,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        composer_only=False,
     ):
         if key not in {"enter", "escape"}:
             raise BridgeError("invalid_arguments", "Unsupported bound terminal key")
@@ -1156,7 +1247,7 @@ entries[0].click();JSON.stringify({detached:true});
             + self.native_identity_guard(identity_guard)
             + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
             + "\ncheckFocus();"
-            + self.native_screen_guard(expected_screen)
+            + self.native_screen_guard(expected_screen, composer_only=composer_only)
             + "\nse.keyCode("
             + str(code)
             + "); JSON.stringify({key_sent:true});",

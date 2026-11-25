@@ -2,6 +2,7 @@
 # Fixtures imported for pytest dependency injection.
 # ruff: noqa: F811
 
+import hashlib
 import json
 
 import pytest
@@ -94,6 +95,61 @@ def snapshot(bridge):
     }
 
 
+def local_reply_result(bridge, message_id, run_id):
+    message = bridge.messages._row("local", message_id)
+    handoff = bridge.store.db.execute(
+        "SELECT binding FROM visible_handoffs WHERE id=?", (run_id,)
+    ).fetchone()
+    binding = json.loads(handoff["binding"])
+    answer = "Bound local Codex answer"
+    proof = {
+        "handoff_id": run_id,
+        "message_id": message_id,
+        "reply_source": "bound_local_codex_rollout",
+        "identity_scope": "OS_process_and_local_protocol_not_authenticated_mailbox",
+        "completion_scope": "local_agent_turn",
+        "binding": binding,
+        "protocol_binding": {
+            "thread_id": "01a192b9-64f2-7d22-8429-cabd5faf13b6",
+            "rollout_path": "/tmp/codex-rollout.jsonl",
+            "cwd": "/tmp",
+            "origin": "process_writer_discovery",
+        },
+        "baseline_offset": 128,
+        "baseline_sha256": "a" * 64,
+        "appended_sha256": "b" * 64,
+        "expected_payload_sha256": hashlib.sha256(message["body"].encode()).hexdigest(),
+        "turn_id": "manual-turn-1",
+        "user_item_id": "user-item-1",
+        "final_item_id": "final-item-1",
+        "task_complete_observed": True,
+        "process_writer_verified": True,
+        "agent_confirmed": False,
+        "request_reply_satisfied": True,
+    }
+    return {
+        "success": True,
+        "text": answer,
+        "scope": "local_agent_turn",
+        "reply_source": "bound_local_codex_rollout",
+        "agent_confirmed": False,
+        "request_reply_satisfied": True,
+        "work_completion_verified": False,
+        "project_completion_verified": False,
+        "evidence": proof,
+    }
+
+
+def install_local_reply_result(bridge, message_id, run_id):
+    bridge.store.db.execute(
+        "UPDATE visible_handoffs SET evidence=? WHERE id=?",
+        (
+            json.dumps({"local_reply_result": local_reply_result(bridge, message_id, run_id)}),
+            run_id,
+        ),
+    )
+
+
 def test_exact_completed_run_and_authenticated_reply_correct_unknown_once(completed_handoff):
     bridge, transport, message_id, run_id, reply_id, previous = completed_handoff
     before = snapshot(bridge)
@@ -130,6 +186,108 @@ def test_exact_completed_run_and_authenticated_reply_correct_unknown_once(comple
     assert after["message_events"][: len(before["message_events"])] == before["message_events"]
     assert not bridge.message_receiver.reconcile_completed_handoff("local", run_id)["reconciled"]
     assert snapshot(bridge) == after
+    assert transport["calls"] == []
+
+
+def test_exact_completed_local_reply_corrects_unknown_without_forging_mailbox_receipts(
+    completed_handoff,
+):
+    bridge, transport, message_id, run_id, reply_id, _ = completed_handoff
+    bridge.store.db.execute("UPDATE messages SET acknowledged=NULL WHERE id=?", (message_id,))
+    bridge.store.db.execute("UPDATE messages SET reply_to=NULL WHERE id=?", (reply_id,))
+    install_local_reply_result(bridge, message_id, run_id)
+    before = snapshot(bridge)
+    original_notice = before["completion_notices"][0]
+
+    result = bridge.message_receiver.reconcile_completed_handoff("local", run_id)
+
+    assert result == {
+        "reconciled": True,
+        "message_id": message_id,
+        "state": "completed",
+        "reply_source": "bound_local_codex_rollout",
+        "reconciled_without_input": True,
+    }
+    job = bridge.messages.get("local", message_id)["processing"]
+    evidence = job["evidence"]
+    assert job["state"] == "completed" and job["error"] is None and job["reply_id"] is None
+    assert evidence["reply_source"] == "bound_local_codex_rollout"
+    assert evidence["agent_confirmed"] is False
+    assert evidence["completion_scope"] == "local_agent_turn"
+    assert evidence["reconciled_without_input"] is True
+    persisted = json.loads(
+        bridge.store.db.execute(
+            "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+        ).fetchone()[0]
+    )
+    assert persisted["local_reply_result"]["text"] == "Bound local Codex answer"
+    assert evidence["previous_state"] == "unknown"
+    assert evidence["supersedes_notice_id"] == original_notice[1]
+    assert bridge.messages._row("local", message_id)["acknowledged"] is None
+    assert not bridge.store.db.execute(
+        "SELECT 1 FROM messages WHERE reply_to=? AND sender='codex' AND recipient='local'",
+        (message_id,),
+    ).fetchone()
+    notices = [tuple(row) for row in bridge.store.db.execute("SELECT * FROM completion_notices")]
+    assert len(notices) == 2 and notices[0] == original_notice
+    payload = json.loads(
+        bridge.store.db.execute(
+            "SELECT payload FROM completion_notices ORDER BY seq DESC LIMIT 1"
+        ).fetchone()[0]
+    )
+    assert payload["outcome"] == "success"
+    assert payload["completion_scope"] == "local_agent_turn"
+    assert payload["agent_confirmed"] is False
+    assert payload["reply_id"] is None and payload["supersedes"] == original_notice[1]
+    assert transport["calls"] == []
+    after = snapshot(bridge)
+    assert after["messages"] == before["messages"]
+    assert after["visible_handoffs"] == before["visible_handoffs"]
+    assert not bridge.message_receiver.reconcile_completed_handoff("local", run_id)["reconciled"]
+    assert snapshot(bridge) == after
+
+
+@pytest.mark.parametrize("corruption", ["body", "binding", "reply_claim"])
+def test_invalid_local_reply_evidence_never_corrects_unknown_job(completed_handoff, corruption):
+    bridge, transport, message_id, run_id, reply_id, _ = completed_handoff
+    bridge.store.db.execute("UPDATE messages SET acknowledged=NULL WHERE id=?", (message_id,))
+    bridge.store.db.execute("UPDATE messages SET reply_to=NULL WHERE id=?", (reply_id,))
+    result = local_reply_result(bridge, message_id, run_id)
+    if corruption == "body":
+        result["evidence"]["expected_payload_sha256"] = "f" * 64
+    elif corruption == "binding":
+        result["evidence"]["binding"]["agent_pid"] += 1
+    else:
+        result["agent_confirmed"] = True
+    bridge.store.db.execute(
+        "UPDATE visible_handoffs SET evidence=? WHERE id=?",
+        (json.dumps({"local_reply_result": result}), run_id),
+    )
+    before = snapshot(bridge)
+
+    outcome = bridge.message_receiver.reconcile_completed_handoff("local", run_id)
+
+    assert outcome == {
+        "reconciled": False,
+        "message_id": message_id,
+        "state": "unknown",
+        "reason": "local_reply_conflict",
+    }
+    assert snapshot(bridge) == before
+    assert transport["calls"] == []
+
+
+def test_authenticated_ack_and_reply_take_priority_over_local_reply_result(completed_handoff):
+    bridge, transport, message_id, run_id, reply_id, _ = completed_handoff
+    install_local_reply_result(bridge, message_id, run_id)
+
+    result = bridge.message_receiver.reconcile_completed_handoff("local", run_id)
+
+    assert result["reconciled"] and result["reply_id"] == reply_id
+    evidence = bridge.messages.get("local", message_id)["processing"]["evidence"]
+    assert evidence["reply_source"] == "authenticated_bridge_mailbox"
+    assert evidence["agent_confirmed"] is True
+    assert "local_reply_result" not in evidence
     assert transport["calls"] == []
 
 
@@ -264,6 +422,24 @@ async def test_existing_authenticated_status_tool_performs_explicit_correction(
 
 def test_notice_failure_rolls_back_the_entire_explicit_correction(completed_handoff, monkeypatch):
     bridge, _, _, run_id, _, _ = completed_handoff
+    before = snapshot(bridge)
+
+    def broken_notice(*args, **kwargs):
+        raise OSError("isolated outbox write failure")
+
+    monkeypatch.setattr("kirabridge.completion_manager.record_notice", broken_notice)
+    with pytest.raises(OSError):
+        bridge.message_receiver.reconcile_completed_handoff("local", run_id)
+    assert snapshot(bridge) == before
+
+
+def test_local_notice_failure_rolls_back_the_entire_explicit_correction(
+    completed_handoff, monkeypatch
+):
+    bridge, _, message_id, run_id, reply_id, _ = completed_handoff
+    bridge.store.db.execute("UPDATE messages SET acknowledged=NULL WHERE id=?", (message_id,))
+    bridge.store.db.execute("UPDATE messages SET reply_to=NULL WHERE id=?", (reply_id,))
+    install_local_reply_result(bridge, message_id, run_id)
     before = snapshot(bridge)
 
     def broken_notice(*args, **kwargs):

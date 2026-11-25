@@ -366,6 +366,10 @@ enum SystemBridge {
     }
     static func handle(_ operation: String, arguments args: [String: Any]) async throws -> [String: Any] {
         switch operation {
+        #if FAMILY_WINDOW_BROKER
+        case "family.window.switch", "family.window.inspect":
+            return try await FamilyWindowNative.perform(operation, args)
+        #endif
         case "windows.list":
             let titlesRequested = try bool(args, "include_titles")
             let titles = titlesRequested && CGPreflightScreenCaptureAccess()

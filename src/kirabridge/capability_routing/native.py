@@ -11,7 +11,7 @@ from .integration import RoutedAdapter, new_routed_manager
 from .router import RoutingError, Task, fingerprint, select
 from .source import local_source
 
-KINDS = {"codex": "codex", "grok_acp": "grok", "grok_structured": "grok"}
+KINDS = {"codex": "codex", "grok_acp": "grok", "grok_structured": "grok", "qwen_acp": "qwen"}
 
 
 class NativeRouting:
@@ -29,6 +29,10 @@ class NativeRouting:
         for name in self.workers:
             worker = bridge.config.team.workers[name]
             agent = bridge.config.agents.get(worker.agent)
+            if agent and agent.kind == "qwen_acp" and agent.qwen_auth_type != "qwen-subscription":
+                raise BridgeError(
+                    "routing_config", "Routed Qwen requires the verified existing subscription"
+                )
             if (
                 worker.execution_scope != "separate_managed_session"
                 or not agent
@@ -88,7 +92,6 @@ class NativeRouting:
         if initial and (stored.get("evidence") or {}).get("routing_decision"):
             raise BridgeError("routing_replay_denied", "Original routing decision already exists")
         self.bridge.teams.authorize_execution(stored)
-        self.bridge.agents.worktree_guard(stored, args)
         policy = self.bridge.security.principal(task["principal"], "agent.execute")
         agent = cfg.agents.get(worker.agent)
         if not agent or agent.kind not in KINDS or args.agent not in policy.agents:
@@ -109,9 +112,9 @@ class NativeRouting:
             )
         read_only = agent.sandbox_mode == "read-only"
         if (
-            agent.bridge_tools
-            or args.local_tools
-            or (read_only and agent.allow_local_tools)
+            (agent.bridge_tools and cli != "qwen")
+            or (args.local_tools and (cli != "qwen" or read_only))
+            or (read_only and agent.allow_local_tools and cli != "qwen")
             or (cli == "grok" and not read_only)
         ):
             raise BridgeError(
@@ -151,6 +154,7 @@ class NativeRouting:
             min_effort=worker.routing.min_effort,
             independent_of_provider=worker.routing.independent_of_provider,
             read_only=read_only,
+            execution_adapter="qwen_acp" if agent.kind == "qwen_acp" else None,
         )
 
     def profile(self, task, args):

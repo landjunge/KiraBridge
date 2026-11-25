@@ -487,8 +487,11 @@ async def test_running_codex_only_holds_the_same_terminal(
         if not same_pane:
             await asyncio.wait_for(grok_started.wait(), 1)
         else:
-            assert before_release["state"] == "failed"
-            assert before_release["error"] == "visible_target_busy"
+            assert before_release["state"] == "queued"
+            assert before_release["claimed"] is None
+            assert before_release["evidence"]["waiting_for_visible_target"] is True
+            assert before_release["evidence"]["reason"] == "visible_target_busy"
+            assert before_release["evidence"]["terminal_input_attempted"] is False
     finally:
         release.set()
         await receiver.stop()

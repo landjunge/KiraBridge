@@ -34,6 +34,7 @@ READ_OPERATIONS = frozenset(
         "process.list",
         "process.inspect",
         "agent.status",
+        "logs.live",
         "policy.inspect",
         "handoff.status",
         "handoff.inbox",
@@ -75,7 +76,6 @@ class Operation:
 
 OPERATIONS = {}
 for _name in (
-    "autonext.control",
     *READ_OPERATIONS,
     *STOP_OPERATIONS,
     *SYSTEM_LEAVES,
@@ -144,8 +144,6 @@ for _name in (
         if _name == "keyboard.system_inventory"
         else "bridge.health"
         if _name == "platform.status"
-        else "team.manage"
-        if _name == "autonext.control"
         else "threaddesk.manage"
         if _name == "threaddesk.dynamic"
         else "task.cancel"

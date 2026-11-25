@@ -3,6 +3,7 @@
 import contextlib
 import hashlib
 import importlib.util
+import itertools
 import json
 import tempfile
 import unittest
@@ -37,8 +38,8 @@ class InstallerSourceReadinessTests(unittest.TestCase):
             "runtime": {**self.expected, "config_sha256": self.installer.sha(self.config)},
         }
 
-    def wait(self, values):
-        ticks = iter(range(100))
+    def wait(self, values, seconds=None):
+        ticks = itertools.count()
         with (
             patch.object(self.installer, "release_source", return_value=self.expected, create=True),
             patch.object(self.installer, "cli", side_effect=values) as query,
@@ -46,7 +47,7 @@ class InstallerSourceReadinessTests(unittest.TestCase):
             patch.object(self.installer.time, "monotonic", side_effect=lambda: next(ticks)),
         ):
             result = self.installer.wait_health(
-                SimpleNamespace(config=self.config), self.release, "0.8.0rc40"
+                SimpleNamespace(config=self.config), self.release, "0.8.0rc40", seconds=seconds
             )
             return result, query.call_count
 
@@ -72,7 +73,50 @@ class InstallerSourceReadinessTests(unittest.TestCase):
             "runtime": {**self.health["runtime"], "source_tree_sha256": "a" * 64},
         }
         with self.assertRaisesRegex(RuntimeError, "readiness not proven"):
-            self.wait([stale] * 30)
+            self.wait([stale] * 200, seconds=30)
+
+    def test_readiness_failure_names_last_status_and_service_log(self):
+        """An opaque timeout must say what the daemon and its log reported."""
+        prefix = self.root / "install"
+        (prefix / "logs").mkdir(parents=True)
+        (prefix / "logs/service.stderr.log").write_text(
+            "Traceback (most recent call last):\nRuntimeError: backend_startup_unavailable\n"
+        )
+        args = SimpleNamespace(config=self.config, prefix=prefix)
+        stale = {
+            **self.health,
+            "runtime": {**self.health["runtime"], "source_tree_sha256": "a" * 64},
+        }
+        ticks = itertools.count()
+        with (
+            patch.object(self.installer, "release_source", return_value=self.expected, create=True),
+            patch.object(self.installer, "cli", side_effect=[stale] * 200),
+            patch.object(self.installer.time, "sleep"),
+            patch.object(self.installer.time, "monotonic", side_effect=lambda: next(ticks)),
+            self.assertRaises(RuntimeError) as raised,
+        ):
+            self.installer.wait_health(args, self.release, "0.8.0rc40", seconds=10)
+        message = str(raised.exception)
+        self.assertIn("within 10 seconds", message)
+        self.assertIn("version='0.8.0rc40'", message)
+        self.assertIn("backend_startup_unavailable", message)
+
+    def test_readiness_failure_reports_cli_error(self):
+        args = SimpleNamespace(config=self.config)
+        ticks = itertools.count()
+        with (
+            patch.object(self.installer, "release_source", return_value=self.expected, create=True),
+            patch.object(
+                self.installer,
+                "cli",
+                side_effect=RuntimeError("command failed (1): python"),
+            ),
+            patch.object(self.installer.time, "sleep"),
+            patch.object(self.installer.time, "monotonic", side_effect=lambda: next(ticks)),
+            self.assertRaises(RuntimeError) as raised,
+        ):
+            self.installer.wait_health(args, self.release, "0.8.0rc40", seconds=5)
+        self.assertIn("RuntimeError: command failed (1): python", str(raised.exception))
 
     def test_release_source_uses_isolated_venv_and_matches_runtime_manifest(self):
         package = Path(self.expected["source_package_path"])

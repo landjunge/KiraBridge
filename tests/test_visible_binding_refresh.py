@@ -11,6 +11,7 @@ from test_visible_handoff import callback, visible  # noqa: F401
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import VisibleTerminalBinding
 from kirabridge.bridge_core.models import AgentInput, BridgeError, canonical
+from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.visible_binding import overlay_path, save_refresh
 from kirabridge.visible_readiness import assess
@@ -23,6 +24,14 @@ IDLE = "Alte Zeile Thinking… [stop]\nDie Antwort ist fertig.\n╭\n│ ❯ │
 LIVE_STATUS = "Die Antwort ist fertig.\n⠋ Running [stop]\n╭\n│ ❯ │\n╰"
 BUSY = "╭\nThinking… [stop]\n│ ❯ │\n╰"
 NONEMPTY = "╭\n│ ❯ schon getippt │\n╰"
+REAL_EMPTY = (
+    " ╭────────────────────────────────────────────────────────╮ \n"
+    " │ ❯ Build anything                                       │ \n"
+    " ╰─────────────────── Grok 4.7 (medium) · always-approve ─╯ \n"
+    " \n Ctrl+x:shortcuts\n"
+)
+REAL_TYPED = REAL_EMPTY.replace("Build anything", "Bitte nicht überschreiben")
+REAL_UNKNOWN = "╭\n│ kein Eingabefeld\n╰"
 
 # The Grok paste-proof (single_row_capacity / insertion_observed) requires the
 # full boxed footer. These local full-box screens/transport are used only by the
@@ -122,6 +131,35 @@ def test_historical_grok_activity_is_not_current_work_and_composer_text_still_bl
     assert assess("grok", "╭\n│ ❯ │\nBack to bottom\n╰", binding)["state"] == "scrolled"
 
 
+def test_real_grok_placeholder_is_an_empty_composer_but_typed_text_blocks():
+    binding = SimpleBinding()
+    empty = assess("grok", REAL_EMPTY, binding)
+    assert empty["state"] == "ready" and empty["input_empty"]
+    typed = assess("grok", REAL_TYPED, binding)
+    assert typed["state"] == "input_not_empty" and not typed["input_empty"]
+    assert typed["reason"] == "existing_input_must_not_be_overwritten"
+
+
+def test_unrecognized_grok_box_is_unknown_not_existing_input():
+    result = assess("grok", REAL_UNKNOWN, SimpleBinding())
+    assert result["state"] == "unknown" and not result["input_empty"]
+    assert result["reason"] == "unrecognized_grok_composer"
+
+
+def test_observed_grok_return_is_allowed_only_for_a_current_draft():
+    adapter = adapter_for("grok")
+    empty = adapter.return_readiness(REAL_EMPTY, SimpleBinding())
+    assert not empty["ready"] and empty["reason"] == "empty_grok_composer"
+    typed = adapter.return_readiness(REAL_TYPED, SimpleBinding())
+    assert typed["ready"] and typed["reason"] == "current_nonempty_composer"
+    assert not adapter.return_readiness(REAL_UNKNOWN, SimpleBinding())["ready"]
+    busy = adapter.return_readiness(
+        "Thinking… esc to interrupt\n" + REAL_TYPED,
+        SimpleBinding(),
+    )
+    assert busy["state"] == "working"
+
+
 async def test_dead_binding_refreshes_to_the_only_live_grok_and_survives_reopen(
     visible, config, monkeypatch
 ):
@@ -151,6 +189,47 @@ async def test_dead_binding_refreshes_to_the_only_live_grok_and_survives_reopen(
         )
     finally:
         reopened.store.close()
+
+
+async def test_interactive_start_binds_only_a_proven_replacement(visible, config, monkeypatch):
+    bridge, _ = visible
+    previous = config.visible_handoffs.bindings["grok"].model_copy()
+    install_catalog(monkeypatch, bridge, [new_session()])
+
+    result = await bridge.visible_handoffs.started_binding("chatgpt", "grok", new_session())
+
+    assert result == {
+        "state": "bound",
+        "target": "grok",
+        "pane_id": NEW_PANE,
+        "expected_pid": NEW_SHELL,
+        "agent_pid": NEW_AGENT,
+    }
+    assert config.visible_handoffs.bindings["grok"].pane_id == NEW_PANE
+    assert json.loads(overlay_path(config).read_text())["grok"]["replaced_pane_id"] == (
+        previous.pane_id
+    )
+
+
+async def test_interactive_start_does_not_replace_a_still_live_binding(
+    visible, config, monkeypatch
+):
+    bridge, _ = visible
+    previous = config.visible_handoffs.bindings["grok"].model_copy()
+    old = {
+        "pane_id": previous.pane_id,
+        "expected_pid": previous.expected_pid,
+        "agent_pid": previous.agent_pid,
+        "agent_candidate": "grok",
+        "processes": [{"pid": previous.agent_pid, "name": "grok"}],
+    }
+    install_catalog(monkeypatch, bridge, [new_session(), old])
+
+    result = await bridge.visible_handoffs.started_binding("chatgpt", "grok", new_session())
+
+    assert result == {"state": "unresolved", "target": "grok"}
+    assert config.visible_handoffs.bindings["grok"] == previous
+    assert not overlay_path(config).exists()
 
 
 async def test_ambiguous_replacement_is_refused(visible, monkeypatch):
@@ -302,9 +381,12 @@ async def test_pre_paste_screen_mismatch_releases_the_lock_without_resending(vis
     assert job["state"] == "unknown"
 
 
-async def test_paste_that_may_have_landed_stays_locked(visible):
+@pytest.mark.parametrize("screen,released", [(NONEMPTY, False), (IDLE, True)])
+async def test_paste_that_may_have_landed_stays_locked_until_the_input_is_empty(
+    visible, screen, released
+):
     bridge, transport = visible
-    transport["text"] = IDLE
+    transport["text"] = screen
     binding = bridge.config.visible_handoffs.bindings["grok"]
     sent = enqueue(bridge, key="maybe-pasted")
     bridge.store.db.execute(
@@ -316,9 +398,16 @@ async def test_paste_that_may_have_landed_stays_locked(visible):
             canonical({"reason": "visible_paste_unconfirmed", "automatic_retry": False}),
         ),
     )
+    if released:
+        await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+        status = bridge.visible_handoffs.status("chatgpt", "pasted-run")
+        assert status["state"] == "unknown" and not transport["calls"]
+        assert status["evidence"]["reason"] == "unconfirmed_input_lock_released"
+        return
     with pytest.raises(BridgeError) as exc:
         await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
-    assert exc.value.code == "visible_target_busy" and not transport["calls"]
+    assert exc.value.code in {"visible_target_busy", "visible_input_not_empty"}
+    assert not transport["calls"]
 
 
 async def test_same_live_reservation_stays_busy_and_is_not_sent_twice(visible):

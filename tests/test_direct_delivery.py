@@ -83,8 +83,17 @@ async def settled(direct):
             await asyncio.sleep(0)
 
 
+def claimed_event(bridge, message_id):
+    row = bridge.store.db.execute(
+        "SELECT evidence FROM message_events WHERE message_id=? "
+        "AND kind='message.processing_claimed'",
+        (message_id,),
+    ).fetchone()
+    return json.loads(row[0])
+
+
 @pytest.mark.parametrize("limit", ["conversation", "hourly"])
-async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_later(delivery, limit):
+async def test_run_limit_is_noted_and_the_message_is_still_delivered(delivery, limit):
     bridge, transport, direct, _, _ = delivery
     prior = new_message(bridge, "limit-history")
     bridge.store.db.execute(
@@ -95,7 +104,7 @@ async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_lat
         recipient="grok",
         conversation_id=prior["conversation_id"],
         idempotency_key="new-over-limit",
-        body="This request is never admitted",
+        body="This request is still admitted",
         kind="work",
         dispatch=True,
     )
@@ -106,18 +115,97 @@ async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_lat
     sent = bridge.messages.send("chatgpt", request)
     direct.submit("chatgpt", sent["id"])
     await direct.wait_delivery(sent["id"])
+    await settled(direct)
     current = job(bridge, sent)
-    assert current["state"] == "blocked"
-    assert current["evidence"]["reason"] == limit + "_run_limit"
-    assert current["claimed"] is None and current["started"] is None
-    assert not transport["calls"]
-    assert bridge.store.db.execute(
-        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (sent["id"],)
-    ).fetchone()
-    inbox = bridge.messages.receive("grok", after=sent["seq"] - 1)["messages"]
-    assert inbox == []
-    assert bridge.messages.send("chatgpt", request)["id"] == sent["id"]
-    assert not direct.submit("chatgpt", sent["id"])
+    assert current["state"] == "completed"
+    assert current["evidence"].get("reason") != limit + "_run_limit"
+    assert transport["calls"] == ["insert", "return"]
+    assert (
+        bridge.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (sent["id"],)
+        ).fetchone()
+        is None
+    )
+    noted = claimed_event(bridge, sent["id"])
+    assert noted["limit_notes"] == [limit + "_run_limit"]
+    assert noted[limit + "_runs" if limit == "hourly" else "conversation_runs"] >= 1
+
+
+def message_in(bridge, conversation, key, *, recipient="grok"):
+    return bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient=recipient,
+            conversation_id=conversation,
+            idempotency_key=key,
+            body="A fresh request in an ongoing handover",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+
+
+async def test_conversation_run_limit_is_a_rolling_hour(delivery):
+    bridge, _, _, _, _ = delivery
+    bridge.config.messaging.max_runs_per_conversation = 4
+    conversation = "rolling-window"
+    older_than_window = time.time() - 3601
+    for n in range(4):
+        sent = message_in(bridge, conversation, f"old-run-{n}")
+        assert bridge.message_receiver._claim(sent["id"])
+        bridge.store.db.execute(
+            "UPDATE message_jobs SET claimed=? WHERE message_id=?",
+            (older_than_window, sent["id"]),
+        )
+    fresh = message_in(bridge, conversation, "fresh-run")
+    assert bridge.message_receiver._claim(fresh["id"])
+    assert bridge.messages.get("chatgpt", fresh["id"])["processing"]["state"] == "running"
+
+
+async def test_hourly_run_limit_is_scoped_to_the_recipient(delivery):
+    bridge, _, _, _, _ = delivery
+    bridge.config.messaging.max_runs_per_hour = 1
+    busy = message_in(bridge, "busy-grok", "busy-grok", recipient="grok")
+    assert bridge.message_receiver._claim(busy["id"])
+    second = message_in(bridge, "busy-grok-2", "busy-grok-2", recipient="grok")
+    assert bridge.message_receiver._claim(second["id"])
+    noted = bridge.messages.get("chatgpt", second["id"])["processing"]
+    assert noted["state"] == "running"
+    assert noted["evidence"]["limit_notes"] == ["hourly_run_limit"]
+    assert noted["evidence"]["hourly_runs"] >= 1
+    other = message_in(bridge, "fresh-codex", "fresh-codex", recipient="codex")
+    assert bridge.message_receiver._claim(other["id"])
+    assert (
+        "limit_notes" not in bridge.messages.get("chatgpt", other["id"])["processing"]["evidence"]
+    )
+
+
+async def test_default_limits_fit_an_eight_round_handover(delivery):
+    bridge, _, _, _, _ = delivery
+    assert bridge.config.messaging.max_runs_per_conversation == 16
+    assert bridge.config.messaging.max_conversation_messages == 64
+    conversation = "eight-rounds"
+    for n in range(8):
+        request = message_in(bridge, conversation, f"request-{n}")
+        assert bridge.message_receiver._claim(request["id"])
+        answer = bridge.messages.send(
+            "grok",
+            MessageSend(
+                recipient="chatgpt",
+                conversation_id=conversation,
+                idempotency_key=f"answer-{n}",
+                body="Round complete",
+                kind="answer",
+                reply_to=request["id"],
+            ),
+        )
+        assert answer["position"] == 2 * n + 2
+    assert (
+        bridge.store.db.execute(
+            "SELECT count(*) FROM messages WHERE conversation_id=?", (conversation,)
+        ).fetchone()[0]
+        == 16
+    )
 
 
 async def test_ready_target_gets_exactly_one_paste_return_and_authenticated_answer(delivery):
@@ -136,10 +224,6 @@ async def test_ready_target_gets_exactly_one_paste_return_and_authenticated_answ
 @pytest.mark.parametrize(
     "code",
     [
-        "visible_target_busy",
-        "visible_target_working",
-        "visible_target_unknown",
-        "session_busy",
         "session_selection_changed",
         "desktop_locked",
         "forbidden",
@@ -175,30 +259,59 @@ async def test_blocked_target_fails_once_without_claim_or_private_error_text(
     assert not direct.submit("chatgpt", sent["id"])
 
 
-@pytest.mark.parametrize("code", sorted(MessageReceiver.WAIT_REASONS))
-async def test_visible_wait_reason_is_reported_without_receiver_backoff(
+@pytest.mark.parametrize(
+    "code",
+    [
+        "visible_target_busy",
+        "visible_target_working",
+        "visible_target_unknown",
+        "session_busy",
+    ],
+)
+async def test_unsent_preinput_stays_queued_until_the_bound_composer_is_ready(
     delivery, monkeypatch, code
 ):
-    bridge, transport, direct, connected, _ = delivery
+    bridge, transport, direct, connected, pool = delivery
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr(
+        "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+    )
+    original = bridge.visible_handoffs.dispatch_ready
 
-    async def not_ready(*args):
-        raise BridgeError(code, "Visible target not ready")
+    async def refuse(*args):
+        error = BridgeError(code, "PRIVATE EXCEPTION CONTENT MUST NOT APPEAR")
+        error.observation = {"state": "working", "ready": False, "input_empty": True}
+        raise error
 
-    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", not_ready)
-    sent = new_message(bridge, "wait-" + code)
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", refuse)
+    sent = new_message(bridge)
     direct.submit("chatgpt", sent["id"])
-    async with asyncio.timeout(1):
-        await direct.wait_delivery(sent["id"])
+    await direct.wait_delivery(sent["id"])
     current = job(bridge, sent)
-    assert current["state"] == "failed" and current["error"] == code
-    assert current["claimed"] is None and current["started"] is None
-    assert current["evidence"]["phase"] == "direct_admission"
+    assert current["state"] == "queued" and current["claimed"] is None
+    assert current["evidence"]["waiting_for_visible_target"] is True
+    assert current["evidence"]["reason"] == code
     assert current["evidence"]["terminal_input_attempted"] is False
-    assert current["evidence"]["automatic_retry"] is False
-    assert "receiver_retry" not in current["evidence"]
-    assert "waiting_for_visible_target" not in current["evidence"]
-    assert "next_attempt_at" not in json.dumps(current)
+    assert "PRIVATE" not in json.dumps(current)
     assert not transport["calls"] and not connected
+    assert not bridge.store.db.execute(
+        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (sent["id"],)
+    ).fetchone()
+
+    from kirabridge.message_manager.receiver import MessageReceiver
+
+    restarted = MessageReceiver(bridge)
+    assert not await restarted._dispatch_next("grok", include_visible=False)
+    assert job(bridge, sent)["state"] == "queued"
+    assert transport["calls"] == []
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", original)
+    assert await restarted._dispatch_next("grok", include_visible=False)
+    assert job(bridge, sent)["state"] == "completed"
+    assert transport["calls"] == ["insert", "return"]
+    again = MessageReceiver(bridge)
+    assert not await again._dispatch_next("grok", include_visible=False)
+    assert transport["calls"] == ["insert", "return"]
 
 
 async def test_selection_race_after_internal_receipt_is_failed_without_requeue(
@@ -267,9 +380,14 @@ async def test_cancelled_caller_does_not_cancel_delivery(delivery, monkeypatch):
     assert transport["calls"] == ["insert", "return"]
 
 
-async def test_watchdog_bounds_preflight_without_any_waiting_caller(delivery, monkeypatch):
-    bridge, transport, direct, _, _ = delivery
+async def test_watchdog_requeues_an_unsent_timeout_and_delivers_once(delivery, monkeypatch):
+    bridge, transport, direct, _, pool = delivery
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr(
+        "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+    )
     direct.delivery_timeout = 0.02
+    original = bridge.visible_handoffs.dispatch_ready
 
     async def never_ready(*args):
         await asyncio.Event().wait()
@@ -279,10 +397,62 @@ async def test_watchdog_bounds_preflight_without_any_waiting_caller(delivery, mo
     direct.submit("chatgpt", sent["id"])
     await settled(direct)
     current = job(bridge, sent)
-    assert current["state"] == "failed" and current["error"] == "delivery_timeout"
+    assert current["state"] == "queued"
+    assert current["evidence"]["reason"] == "delivery_timeout"
+    assert current["evidence"]["waiting_for_visible_target"] is True
     assert current["evidence"]["terminal_input_attempted"] is False
-    assert current["evidence"]["automatic_retry"] is False
     assert current["claimed"] is None and not transport["calls"]
+    from kirabridge.message_manager.receiver import MessageReceiver
+
+    async def still_busy(*args):
+        raise BridgeError("visible_target_working", "still busy")
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", still_busy)
+    restarted = MessageReceiver(bridge)
+    assert not await restarted._dispatch_next("grok", include_visible=False)
+    assert job(bridge, sent)["state"] == "queued" and transport["calls"] == []
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", original)
+    assert await restarted._dispatch_next("grok", include_visible=False)
+    assert job(bridge, sent)["state"] == "completed"
+    assert transport["calls"] == ["insert", "return"]
+    assert not await MessageReceiver(bridge)._dispatch_next("grok", include_visible=False)
+    assert transport["calls"] == ["insert", "return"]
+
+
+async def test_old_unsent_message_is_delivered_once_but_evidenced_input_stays_blocked(
+    delivery, monkeypatch
+):
+    bridge, transport, direct, _, pool = delivery
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr(
+        "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+    )
+    stale = time.time() - bridge.config.queue_stale_seconds - 5
+    sent = new_message(bridge, "aged-unsent")
+    bridge.store.db.execute("UPDATE messages SET created=? WHERE id=?", (stale, sent["id"]))
+    assert direct.submit("chatgpt", sent["id"])
+    await direct.wait_delivery(sent["id"])
+    await settled(direct)
+    assert job(bridge, sent)["state"] == "completed"
+    assert transport["calls"] == ["insert", "return"]
+    assert not direct.submit("chatgpt", sent["id"])
+    from kirabridge.message_manager.receiver import MessageReceiver
+
+    assert not await MessageReceiver(bridge)._dispatch_next("grok", include_visible=False)
+    assert transport["calls"] == ["insert", "return"]
+
+    evidenced = new_message(bridge, "aged-uncertain")
+    bridge.store.db.execute("UPDATE messages SET created=? WHERE id=?", (stale, evidenced["id"]))
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=? WHERE message_id=?",
+        (json.dumps({"terminal_input_attempted": "unconfirmed"}), evidenced["id"]),
+    )
+    assert bridge.message_receiver._claim(evidenced["id"]) is None
+    blocked = job(bridge, evidenced)
+    assert blocked["state"] == "blocked"
+    assert blocked["evidence"]["reason"] == "stale_queue_expired"
+    assert bridge.message_receiver._claim(evidenced["id"]) is None
+    assert transport["calls"] == ["insert", "return"]
 
 
 async def test_watchdog_keeps_a_claimed_ambiguous_attempt_unknown(delivery, monkeypatch):
@@ -324,9 +494,12 @@ async def test_delivery_deadline_does_not_cancel_a_sent_reply_waiter(delivery, m
 
 
 @pytest.mark.parametrize("same_pane", [False, True])
-async def test_competing_admission_is_rejected_instead_of_waiting(delivery, monkeypatch, same_pane):
-    bridge, transport, direct, connected, _ = delivery
+async def test_competing_admission_waits_instead_of_a_second_execute(
+    delivery, monkeypatch, same_pane
+):
+    bridge, transport, direct, connected, pool = delivery
     release = asyncio.Event()
+    original_process = bridge.message_receiver._process
 
     async def pending_reply(pool, message, run_id, *, delivery_event, delivery_binding=None):
         delivery_event.set()
@@ -350,17 +523,39 @@ async def test_competing_admission_is_rejected_instead_of_waiting(delivery, monk
     direct.submit("chatgpt", second["id"])
     await direct.wait_delivery(second["id"])
     current = job(bridge, second)
-    assert current["state"] == "failed"
-    assert current["error"] == ("visible_target_busy" if same_pane else "execution_busy")
     assert current["claimed"] is None
     assert connected == ["grok"] and not transport["calls"]
     assert job(bridge, first)["state"] == "running"
+    if same_pane:
+        assert current["state"] == "queued"
+        assert current["evidence"]["reason"] == "visible_target_busy"
+        assert current["evidence"]["terminal_input_attempted"] is False
+    else:
+        assert current["state"] == "queued"
+        assert current["evidence"]["reason"] == "execution_busy"
+        assert current["evidence"]["terminal_input_attempted"] is False
+        assert not await bridge.message_receiver._dispatch_next("grok", include_visible=False)
+        assert job(bridge, second)["state"] == "queued"
+        assert connected == ["grok"]
     release.set()
     await settled(direct)
+    if not same_pane:
+        monkeypatch.setattr(bridge.message_receiver, "_process", original_process)
+        monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+        monkeypatch.setattr(
+            "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+        )
+        assert await bridge.message_receiver._dispatch_next("grok", include_visible=False)
+        assert job(bridge, second)["state"] == "completed"
+        assert connected == ["grok", "grok"]
 
 
-async def test_an_existing_running_job_blocks_only_new_admission(delivery):
-    bridge, transport, direct, connected, _ = delivery
+async def test_an_existing_running_job_queues_the_next_message(delivery, monkeypatch):
+    bridge, transport, direct, connected, pool = delivery
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr(
+        "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+    )
     previous = new_message(bridge, "previous")
     bridge.store.db.execute(
         "UPDATE message_jobs SET state='running',run_id='prior-run',claimed=1 WHERE message_id=?",
@@ -370,9 +565,20 @@ async def test_an_existing_running_job_blocks_only_new_admission(delivery):
     sent = new_message(bridge, "new")
     direct.submit("chatgpt", sent["id"])
     await direct.wait_delivery(sent["id"])
-    assert job(bridge, sent)["error"] == "execution_busy"
+    waiting = job(bridge, sent)
+    assert waiting["state"] == "queued"
+    assert waiting["evidence"]["reason"] == "execution_busy"
+    assert waiting["evidence"]["terminal_input_attempted"] is False
     assert job(bridge, previous) == original
     assert not transport["calls"] and not connected
+    # No in-flight pane hold remains after the admission returns. A ready
+    # terminal can take the queued message once; the old row stays untouched.
+    assert await bridge.message_receiver._dispatch_next("grok", include_visible=False)
+    assert job(bridge, sent)["state"] == "completed"
+    assert job(bridge, previous) == original
+    assert transport["calls"] == ["insert", "return"]
+    assert not await bridge.message_receiver._dispatch_next("grok", include_visible=False)
+    assert transport["calls"] == ["insert", "return"]
 
 
 async def test_new_message_does_not_select_or_dispatch_historical_queued_work(
@@ -572,23 +778,36 @@ async def test_public_send_observes_one_ready_delivery(delivery):
         await receiver.stop()
 
 
-async def test_public_busy_result_is_immediate_and_same_id_never_retries_when_ready(delivery):
-    bridge, transport, direct, connected, _ = delivery
+async def test_public_busy_result_stays_queued_and_delivers_once_when_ready(delivery, monkeypatch):
+    bridge, transport, direct, connected, pool = delivery
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr(
+        "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
+    )
     receiver = bridge.message_receiver
-    transport["text"] = "Thinking…\n╭\n│ ❯ │\n╰"
+    transport["text"] = "Thinking…\n╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     await receiver.start()
     try:
         request = public_request("public-busy")
         result = await receiver.send("chatgpt", request)
-        assert result["error"]["code"] == "visible_target_working"
-        assert result["processing"]["state"] == "failed"
+        assert "error" not in result
+        assert result["processing"]["state"] == "queued"
+        assert result["processing"]["evidence"]["reason"] == "visible_target_working"
+        assert result["processing"]["evidence"]["terminal_input_attempted"] is False
         assert result["processing"]["claimed"] is None
-        transport["text"] = "╭\n│ ❯ │\n╰"
+        assert not transport["calls"] and not connected
         repeated = await receiver.send("chatgpt", request)
         assert repeated["id"] == result["id"]
-        assert repeated["error"]["code"] == "visible_target_working"
-        assert not transport["calls"] and not connected
+        assert repeated["processing"]["state"] == "queued"
+        assert transport["calls"] == []
+        transport["text"] = "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
+        bridge.messages.wake.set()
+        async with asyncio.timeout(3):
+            while job(bridge, result)["state"] != "completed":
+                await asyncio.sleep(0.02)
+        assert transport["calls"] == ["insert", "return"]
         assert not direct.submit("chatgpt", result["id"])
+        assert transport["calls"] == ["insert", "return"]
     finally:
         await receiver.stop()
 
