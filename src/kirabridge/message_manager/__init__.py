@@ -301,6 +301,11 @@ class MessageManager:
                 "approval_required", "Messaging requires local automatic authorization"
             )
         requested_message = message
+        if (
+            principal in self.config.team.coordinator_only_senders
+            and message.recipient != "coordinator"
+        ):
+            message = message.model_copy(update={"recipient": "coordinator"})
         recipient_role = message.recipient if message.recipient == "coordinator" else None
         coordinator_route = None
         if recipient_role:
@@ -355,6 +360,8 @@ class MessageManager:
         if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
             if message.recipient not in limits.receivers:
                 dispatch = False
+        if coordinator_route and coordinator_route.get("delivery") == "inbox":
+            dispatch = False  # No bound session: store in the inbox, never drive an agent.
         if len(message.body.encode()) > limits.max_body_bytes:
             raise BridgeError("payload_limit", "Message exceeds configured byte limit")
         wants_reply = False if message.interim_session else message.request_reply

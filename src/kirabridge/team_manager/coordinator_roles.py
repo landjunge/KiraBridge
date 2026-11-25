@@ -103,6 +103,9 @@ class CoordinatorRoles:
                 },
             )
         if not candidates:
+            inbox = self._inbox_route(teams)
+            if inbox is not None:
+                return inbox
             code = (
                 "coordinator_session_unavailable" if configured_roles else "coordinator_unassigned"
             )
@@ -113,6 +116,46 @@ class CoordinatorRoles:
                 "More than one distinct team coordinator is active; direct role routing is unsafe",
             )
         return next(iter(candidates.values()))
+
+    def _inbox_route(self, teams):
+        """Inbox-only route to the registered coordinator when no session is bound.
+
+        Messages to the role must not vanish just because the coordinator is an interactive
+        or unbound agent: they are stored in that principal's inbox, never pushed into a
+        live session (the caller disables dispatch for ``delivery == "inbox"``). Stays closed
+        while a coordinator handoff is pending (the outgoing holder may no longer read) and
+        when several distinct principals hold the role.
+        """
+        holders = {}
+        for team in teams:
+            if self.db.execute(
+                "SELECT 1 FROM team_coordinator_handoffs "
+                "WHERE team_id=? AND accepted IS NULL AND outcome IS NULL",
+                (team["id"],),
+            ).fetchone():
+                return None
+            principal = team["coordinator"]
+            member = self.db.execute(
+                "SELECT active FROM team_members WHERE team_id=? AND principal=?",
+                (team["id"], principal),
+            ).fetchone()
+            if member and member["active"] and principal in self.manager.config.principals:
+                holders.setdefault(
+                    principal,
+                    {
+                        "principal": principal,
+                        "session": None,
+                        "team_id": team["id"],
+                        "revision": team["revision"],
+                        "delivery": "inbox",
+                    },
+                )
+        if len(holders) > 1:
+            raise BridgeError(
+                "coordinator_ambiguous",
+                "More than one distinct team coordinator is active; direct role routing is unsafe",
+            )
+        return next(iter(holders.values()), None)
 
     def native_ping_matches(self, team_id):
         expected = self.binding(team_id)
