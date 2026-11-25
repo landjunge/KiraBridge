@@ -17,6 +17,7 @@ from kirabridge.session_ports import SessionPorts
 
 OLD = f"{os.getuid()} ttys004 Sun Nov 1 12:00:00 2026 344 /bin/zsh"
 NEW = OLD.replace("12:00:00", "12:00:01")
+PROMPT = "➜  ~ \n\n"
 
 
 def native_manager(monkeypatch):
@@ -28,11 +29,13 @@ def native_manager(monkeypatch):
     native.process_identity = AsyncMock(return_value=OLD)
 
     async def execute(source, *, mutation=False):
-        assert mutation is True
-        script = """
+        if not mutation:
+            return PROMPT  # the pre-send input read: an empty shell prompt
+        script = (
+            """
 const vm=require('node:vm');
 const calls=[];
-const tab={tty:()=>'/dev/ttys004',busy:()=>false};
+const tab={tty:()=>'/dev/ttys004',busy:()=>false,contents:()=>PROMPT,history:()=>PROMPT};
 const win={id:()=>123,tabs:()=>[tab]};
 function windows(){return [win];} windows.byId=()=>win;
 const app={running:()=>true,windows:windows,doScript:(text)=>calls.push(text)};
@@ -42,7 +45,10 @@ let result,error;
 try{result=JSON.parse(vm.runInNewContext(SOURCE,{Application}));}
 catch(e){error=e.message;}
 process.stdout.write(JSON.stringify({result,error,calls}));
-""".replace("IDENTITY", json.dumps(current["identity"])).replace("SOURCE", json.dumps(source))
+""".replace("IDENTITY", json.dumps(current["identity"]))
+            .replace("SOURCE", json.dumps(source))
+            .replace("PROMPT", json.dumps(PROMPT))
+        )
         completed = await asyncio.to_thread(
             subprocess.run, [node, "-e", script], capture_output=True, text=True, timeout=3
         )

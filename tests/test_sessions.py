@@ -147,9 +147,11 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
         bridge.security.principal(principal, "session.inspect")
         return {"sessions": [selected]}
 
+    screen = {"text": "read-output"}
+
     async def native(source, *, mutation=False):
         calls.append((source, mutation))
-        return "read-output" if not mutation else {"sent": True}
+        return screen["text"] if not mutation else {"sent": True}
 
     monkeypatch.setattr(manager, "catalog", catalog)
     monkeypatch.setattr(manager.terminal_app, "native", native)
@@ -170,10 +172,54 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
     )
     with pytest.raises(BridgeError, match="single-line"):
         await manager.send("local", args.model_copy(update={"submit": False}))
+    screen["text"] = "➜  ~ \n\n"  # an empty shell prompt: the only state input may go to
     sent = await manager.send("local", args)
     assert sent["input_handed_to_transport"] and not sent["agent_processed"]
     assert calls[-1][1] is True
     assert 'hello \\"quoted\\"\\nline' in calls[-1][0]
+    # The exact observed screen is frozen inside the same native call as doScript.
+    assert "Selected terminal input changed" in calls[-1][0]
+
+
+@pytest.mark.parametrize(
+    "screen_text", ["➜  ~ git push --force", '➜  ~ echo "half typed', "read-output"]
+)
+async def test_raw_native_send_never_appends_to_existing_input(
+    bridge, config, monkeypatch, screen_text
+):
+    config.principals["local"].capabilities += ["session.inspect", "session.input"]
+    manager = SessionManager(bridge.sessions.ports)
+    selected = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "tty": "/dev/ttys004",
+        "transport": "terminal_app",
+    }
+    mutations = []
+
+    async def catalog(principal, *, transport=None):
+        return {"sessions": [selected]}
+
+    async def native(source, *, mutation=False):
+        if mutation:
+            mutations.append(source)
+            return {"sent": True}
+        return screen_text
+
+    monkeypatch.setattr(manager, "catalog", catalog)
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        manager.terminal_app,
+        "process_identity",
+        AsyncMock(
+            return_value=f"{__import__('os').getuid()} ttys004 Sun Nov 1 12:00:00 2026 1 /bin/zsh"
+        ),
+    )
+    args = SessionInput(pane_id=selected["pane_id"], expected_pid=345, text="printf harmless")
+    with pytest.raises(BridgeError) as refused:
+        await manager.send("local", args)
+    assert refused.value.code == "visible_input_not_empty"
+    assert not mutations, "text must not reach doScript while the input line is not empty"
 
 
 @pytest.mark.asyncio
