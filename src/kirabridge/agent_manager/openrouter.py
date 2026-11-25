@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from kirabridge.agent_manager.openrouter_credentials import keychain_credential
+from kirabridge.agent_manager.openrouter_credentials import keychain_or_opencode_credential
 from kirabridge.agent_manager.qwen_mcp import task_server
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
@@ -38,7 +38,7 @@ def _credential(config) -> str:
             return key
         raise BridgeError("agent_auth", "OpenRouter credential is unavailable")
     if config.openrouter_credential_source == "macos_keychain":
-        return keychain_credential()
+        return keychain_or_opencode_credential()
     raise BridgeError("agent_auth", "OpenRouter credential source is unsupported")
 
 

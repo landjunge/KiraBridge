@@ -751,6 +751,65 @@ def test_keychain_status_checks_presence_without_reading_value(monkeypatch):
     assert seen["kwargs"]["stderr"] == subprocess.DEVNULL
 
 
+def _write_opencode_auth(path, secret):
+    path.write_text(json.dumps({"openrouter": {"type": "api", "key": secret}}))
+    path.chmod(0o600)
+
+
+def test_keychain_credential_is_preferred_over_opencode(monkeypatch):
+    monkeypatch.setattr(openrouter_credentials, "keychain_credential", lambda: "synthetic-keychain")
+    monkeypatch.setattr(
+        openrouter_credentials,
+        "_opencode_credential",
+        lambda: pytest.fail("OpenCode fallback should not be read when Keychain succeeds"),
+    )
+    assert openrouter_credentials.keychain_or_opencode_credential() == "synthetic-keychain"
+
+
+def test_opencode_credential_is_fallback_for_keychain_keychain_source(tmp_path, monkeypatch):
+    path = tmp_path / "auth.json"
+    _write_opencode_auth(path, "synthetic-opencode-key")
+    monkeypatch.setattr(openrouter_credentials, "_opencode_auth_path", lambda: path)
+    monkeypatch.setattr(
+        openrouter_credentials,
+        "keychain_credential",
+        lambda: (_ for _ in ()).throw(BridgeError("agent_auth", "unavailable")),
+    )
+    assert openrouter_credentials.keychain_or_opencode_credential() == "synthetic-opencode-key"
+
+
+def test_opencode_fallback_status_reports_presence_only(tmp_path, monkeypatch):
+    path = tmp_path / "auth.json"
+    _write_opencode_auth(path, "synthetic-status-key")
+    monkeypatch.setattr(openrouter_credentials, "_opencode_auth_path", lambda: path)
+    monkeypatch.setattr(
+        openrouter_credentials,
+        "keychain_status",
+        lambda: (_ for _ in ()).throw(BridgeError("agent_auth", "unavailable")),
+    )
+    assert openrouter_credentials.credential_status() is True
+
+
+@pytest.mark.parametrize("mode", [0o644, 0o600])
+def test_opencode_credential_rejects_unsafe_file(tmp_path, monkeypatch, mode):
+    path = tmp_path / "auth.json"
+    _write_opencode_auth(path, "synthetic-unsafe-key")
+    if mode == 0o600:
+        link = tmp_path / "auth-link.json"
+        link.symlink_to(path)
+        path = link
+    else:
+        path.chmod(mode)
+    monkeypatch.setattr(openrouter_credentials, "_opencode_auth_path", lambda: path)
+    monkeypatch.setattr(
+        openrouter_credentials,
+        "keychain_credential",
+        lambda: (_ for _ in ()).throw(BridgeError("agent_auth", "unavailable")),
+    )
+    with pytest.raises(BridgeError, match="credential is unavailable"):
+        openrouter_credentials.keychain_or_opencode_credential()
+
+
 async def test_agent_manager_routes_openrouter_api_without_visible_terminal(tmp_path):
     from kirabridge.agent_manager import AgentManager
     from kirabridge.bridge_core.config import Config

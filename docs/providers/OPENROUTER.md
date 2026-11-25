@@ -11,15 +11,18 @@ The endpoint is fixed to `https://openrouter.ai/api/v1/chat/completions`; a
 profile cannot redirect the API key to another host.
 
 Use the fixed `OPENROUTER_API_KEY` environment variable for servers and
-cross-platform deployments. On macOS desktop installs, an explicit
-`macos_keychain` source can read the fixed `KiraBridge.OpenRouter` / `openrouter`
-generic-password item into memory. `kirabridge openrouter credential-import`
-uses the system `security` tool's hidden TTY prompt; the key is not placed in an
-argument, file, or log. `kirabridge openrouter credential-status` reports only
-whether the item exists. This does not import or read the separate OpenCode
-credential: that CLI has no targeted export command, and its SQLite key rows
-have no safe provider mapping. The adapter never saves the key, returns it in
-task evidence, or includes it in an error.
+cross-platform deployments. On macOS desktop installs, the explicit
+`macos_keychain` source first reads the fixed `KiraBridge.OpenRouter` /
+`openrouter` generic-password item into memory. If it is absent or unavailable,
+the adapter falls back to the mapped OpenRouter API credential in
+`~/.local/share/opencode/auth.json` (`openrouter.type=api`, `openrouter.key`).
+The file must be a regular user-owned file with no group or other permissions.
+The adapter only reads the value into memory; it never prints or copies it.
+`kirabridge openrouter credential-import` still uses the system `security`
+tool's hidden TTY prompt to populate the preferred Keychain item, and
+`kirabridge openrouter credential-status` reports only whether either local
+source is available. The adapter never saves the key, returns it in task
+evidence, or includes it in an error.
 
 ```toml
 [agents.openrouter]
@@ -42,8 +45,9 @@ openrouter_max_tool_result_bytes = 32768
 
 Provide `OPENROUTER_API_KEY` to the KiraBridge service. The config stores only
 the fixed variable name. On a macOS desktop, use
-`openrouter_credential_source = "macos_keychain"` after importing the item with
-the local CLI. Server deployments must use the environment source. Add the agent identity to the existing principal's
+`openrouter_credential_source = "macos_keychain"`; KiraBridge prefers its own
+Keychain item and then uses OpenCode's mapped credential. Server deployments
+must use the environment source. Add the agent identity to the existing principal's
 agent allowlist and use normal `task_request` / `task_get` permissions.
 
 ## Free and paid routing

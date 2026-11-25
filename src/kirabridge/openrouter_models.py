@@ -10,6 +10,7 @@ OPENROUTER_FREE_MODELS = frozenset(
     {
         OPENROUTER_DEFAULT_MODEL,
         *OPENROUTER_DEFAULT_FALLBACKS,
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
     }
 )
 
