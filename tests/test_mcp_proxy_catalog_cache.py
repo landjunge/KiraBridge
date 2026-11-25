@@ -11,7 +11,25 @@ from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
-from kirabridge.mcp_gateway.proxy import DaemonConnection
+from kirabridge.mcp_gateway.proxy import PROXY_INSTRUCTIONS, DaemonConnection
+
+
+def test_proxy_instructions_are_compact_and_keep_shared_safety_rules():
+    assert len(PROXY_INSTRUCTIONS) <= 1400
+    for required in (
+        "terminal.visible",
+        "busy/unconfirmed window",
+        "hidden fallback",
+        "permission_decision",
+        "approval_required",
+        "never replay an uncertain request",
+        "expected_pid",
+        "keyboard_sequence",
+        "ack only after processing",
+        "assigned existing visible windows",
+        "Historical buffers never auto-release",
+    ):
+        assert required in PROXY_INSTRUCTIONS
 
 
 def proxy(monkeypatch):
@@ -68,6 +86,17 @@ async def test_catalog_invalidation_expires_a_warm_entry(monkeypatch, change):
     previous = session.list_tools.await_count
     await connection.call_tool("write_once", {})
     assert session.list_tools.await_count == previous + 1
+
+
+async def test_unchanged_passive_epoch_keeps_the_warm_schema(monkeypatch):
+    connection, session, _ = proxy(monkeypatch)
+    session.call_tool.return_value = CallToolResult(
+        content=[], structuredContent={"discovery": {"revision": "first"}}
+    )
+    await connection.call_tool("write_once", {})
+    await connection.call_tool("write_once", {})
+    assert session.list_tools.await_count == 1
+    assert session.call_tool.await_count == 2
 
 
 async def test_dirty_refresh_failure_never_dispatches_with_cached_schemas(monkeypatch):

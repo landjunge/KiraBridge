@@ -9,6 +9,7 @@ import fcntl
 import hashlib
 import io
 import json
+import math
 import os
 import platform
 import plistlib
@@ -31,6 +32,8 @@ from pathlib import Path
 LABEL = "com.kirabridge.bridge"
 PRESENTER = None
 OUTPUT_TARGET = None
+ACTIVE_TERMINAL_TASK_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID"
+ACTIVE_TERMINAL_PRINCIPAL_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_PRINCIPAL"
 
 
 class NonBlockingOutput:
@@ -168,6 +171,18 @@ def report_summary(title, rows, *, success=True):
         method(title, rows=rows, success=success)
         return
     say(title + "".join(f"\n   {label}: {value}" for label, value in rows))
+
+
+def _safe_failure_detail(error):
+    """Keep useful bounded installer diagnostics without emitting credential values."""
+    detail = " ".join(str(error).split())
+    detail = re.sub(r"(?i)\b(?:bearer|basic)\s+[^\s,;]+", "[redacted authorization]", detail)
+    detail = re.sub(
+        r"(?i)([\"']?(?:access[_-]?token|refresh[_-]?token|token|secret|password|credential|api[_-]?key)[\"']?\s*[:=]\s*[\"']?)[^\s,;\"'}]+",
+        r"\1[redacted]",
+        detail,
+    )
+    return f"{type(error).__name__}: {detail[:400]}"
 
 
 def report_heading(args):
@@ -385,6 +400,156 @@ def state_file(config):
     return Path(settings(config)["data_dir"]).expanduser() / "bridge.sqlite3"
 
 
+def _process_ancestry(pid=None):
+    """Return the live caller and parent PIDs; fail closed if native ancestry is unreadable."""
+    current = os.getpid() if pid is None else pid
+    chain = set()
+    for _ in range(64):
+        if type(current) is not int or current <= 1 or current in chain:
+            break
+        chain.add(current)
+        try:
+            result = subprocess.run(
+                ["ps", "-o", "ppid=", "-p", str(current)],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            break
+        if result.returncode != 0:
+            break
+        try:
+            parent = int(result.stdout.strip())
+        except ValueError:
+            break
+        if parent <= 1 or parent == current:
+            break
+        current = parent
+    return chain
+
+
+def _current_tty():
+    try:
+        return os.ttyname(0)
+    except (OSError, ValueError):
+        return None
+
+
+def _verified_terminal_task_id(db, *, environ=None, tty=None, process_ids=None, now=None):
+    """Authenticate the one active visible-terminal task running this installer process.
+
+    The ID is carried only by the Core-generated one-shot terminal runner. It is not
+    sufficient by itself: the current durable task row, lease, RUNNING event, exact
+    terminal pane/PID/TTY, and live OS process ancestry must all agree.
+    """
+    environ = os.environ if environ is None else environ
+    task_id = environ.get(ACTIVE_TERMINAL_TASK_ENV)
+    task_principal = environ.get(ACTIVE_TERMINAL_PRINCIPAL_ENV)
+    if not isinstance(task_id, str) or not task_id or len(task_id) > 128:
+        return None
+    if not isinstance(task_principal, str) or not task_principal or len(task_principal) > 128:
+        return None
+    if any(character in task_id or character in task_principal for character in "\x00\r\n"):
+        return None
+    if tty is None:
+        tty = _current_tty()
+        if tty is None:
+            return None
+    if process_ids is None:
+        process_ids = _process_ancestry()
+    if now is None:
+        now = time.time()
+    try:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(tasks)")}
+        required = {
+            "id",
+            "principal",
+            "operation",
+            "state",
+            "args",
+            "evidence",
+            "lease_owner",
+            "lease_until",
+        }
+        if not required.issubset(columns):
+            return None
+        row = db.execute(
+            "SELECT id,principal,operation,state,args,evidence,lease_owner,lease_until "
+            "FROM tasks WHERE id=?",
+            (task_id,),
+        ).fetchone()
+        if (
+            row is None
+            or row[0] != task_id
+            or row[1] != task_principal
+            or row[2] != "terminal.visible"
+            or row[3] != "running"
+            or not isinstance(row[6], str)
+            or not row[6]
+            or type(row[7]) not in {int, float}
+            or not math.isfinite(row[7])
+            or row[7] <= now
+        ):
+            return None
+        args, evidence = json.loads(row[4]), json.loads(row[5])
+        if not isinstance(args, dict) or not isinstance(evidence, dict):
+            return None
+        pane_id, expected_pid, expected_tty = (
+            evidence.get("pane_id"),
+            evidence.get("expected_pid"),
+            evidence.get("tty"),
+        )
+        route = evidence.get("execution_route")
+        mac_pane_match = (
+            re.fullmatch(r"terminal:[0-9]+:(ttys[0-9]+)", pane_id)
+            if isinstance(pane_id, str)
+            else None
+        )
+        linux_pane_match = (
+            re.fullmatch(r"linux:([0-9]+)", pane_id) if isinstance(pane_id, str) else None
+        )
+        expected_pid_valid = type(expected_pid) is int and expected_pid > 1
+        mac_identity = (
+            route == "visible_terminal"
+            and expected_pid_valid
+            and mac_pane_match is not None
+            and isinstance(expected_tty, str)
+            and os.path.basename(expected_tty) == mac_pane_match.group(1)
+            and expected_pid in process_ids
+        )
+        linux_identity = (
+            route == "linux_owned_pty"
+            and expected_pid_valid
+            and linux_pane_match is not None
+            and int(linux_pane_match.group(1)) == expected_pid
+            and expected_pid == os.getpid()
+            and expected_pid in process_ids
+            and isinstance(expected_tty, str)
+            and re.fullmatch(r"/dev/pts/[0-9]+", expected_tty) is not None
+        )
+        if (
+            not expected_pid_valid
+            or not isinstance(expected_tty, str)
+            or tty != expected_tty
+            or not (mac_identity or linux_identity)
+            or args.get("pane_id") not in (None, pane_id)
+            or args.get("expected_pid") not in (None, expected_pid)
+        ):
+            return None
+        event = db.execute(
+            "SELECT evidence FROM events WHERE task_id=? AND state='running' "
+            "ORDER BY seq DESC LIMIT 1",
+            (task_id,),
+        ).fetchone()
+        if event is None or json.loads(event[0]) != evidence:
+            return None
+    except (sqlite3.Error, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return task_id
+
+
 @contextlib.contextmanager
 def idle_guard(config):
     path = state_file(config)
@@ -395,10 +560,13 @@ def idle_guard(config):
     try:
         db.execute("BEGIN IMMEDIATE")
         tables = {r[0] for r in db.execute("select name from sqlite_master where type='table'")}
+        current_task_id = _verified_terminal_task_id(db)
         tasks = (
             db.execute(
                 "select count(*) from tasks "
                 "where state in ('created','queued','accepted','running')"
+                + (" and id<>?" if current_task_id else ""),
+                (current_task_id,) if current_task_id else (),
             ).fetchone()[0]
             if "tasks" in tables
             else 0
@@ -474,6 +642,22 @@ def cli(release, config, *args, timeout=30):
             timeout=timeout,
         )
     )
+
+
+def wait_previous_health(release, config, *, seconds=20):
+    """Wait briefly for authenticated, read-only status before switching a service."""
+    deadline = time.monotonic() + seconds
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            health = cli(release, config, "status", timeout=min(8, remaining))
+            if isinstance(health, dict) and isinstance(health.get("version"), str):
+                return health
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
+            pass
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(0.5, remaining))
+    raise RuntimeError("Existing service health unavailable; no switch")
 
 
 def bundle_member(root, name):
@@ -1257,7 +1441,242 @@ def restart_service(args):
         )
 
 
+AUX_PREFIX = "com.kirabridge."
+TUNNEL_LABEL = "com.kirabridge.chatgpt"
+
+
+def _desktop_chatgpt_owned(active):
+    return any(
+        row.get("name") == "chatgpt" and row.get("changed") is True
+        for row in (active.get("desktop") or {}).get("services", [])
+    )
+
+
+def _launchctl(*argv, timeout=20):
+    return subprocess.run(
+        ["launchctl", *argv], capture_output=True, text=True, timeout=timeout, check=False
+    )
+
+
+def _aux_loaded_from(label):
+    """Plist path launchd loaded *label* from, or None when it is not loaded."""
+    result = _launchctl("print", f"gui/{os.getuid()}/{label}", timeout=10)
+    if result.returncode:
+        return None
+    match = re.search(r"^\s*path = (.+)$", result.stdout, re.MULTILINE)
+    return Path(match.group(1).strip('"')) if match else Path("<unknown>")
+
+
+def _aux_bootstrap(path):
+    deadline = time.monotonic() + 30
+    while True:
+        done = _launchctl("bootstrap", f"gui/{os.getuid()}", str(path))
+        if done.returncode == 0:
+            return
+        if done.returncode != 5 or time.monotonic() > deadline:
+            detail = (done.stderr or done.stdout or "").strip()
+            raise RuntimeError(f"bootstrap {done.returncode}: {detail[:200]}")
+        time.sleep(1)
+
+
+def _aux_strings(value, change):
+    if isinstance(value, str):
+        return change(value)
+    if isinstance(value, list):
+        return [_aux_strings(item, change) for item in value]
+    if isinstance(value, dict):
+        return {key: _aux_strings(item, change) for key, item in value.items()}
+    return value
+
+
+def _aux_texts(value):
+    if isinstance(value, str):
+        return [value]
+    items = value.values() if isinstance(value, dict) else value if isinstance(value, list) else []
+    return [text for item in items for text in _aux_texts(item)]
+
+
+def _restart_owned_tunnel(agents):
+    """kickstart the com.kirabridge.chatgpt tunnel so its live connect child uses
+    the current runtime; fail-soft and only for the owned, correctly loaded plist.
+
+    Returns a short German note on failure, else None. A probe/restart that raises
+    (e.g. subprocess.TimeoutExpired) is reported, never propagated, so callers keep
+    already collected data. Never touches a foreign or differently loaded tunnel.
+    """
+    tunnel = agents / f"{TUNNEL_LABEL}.plist"
+    try:
+        if not tunnel.exists() or _aux_loaded_from(TUNNEL_LABEL) != tunnel:
+            return None
+        done = _launchctl("kickstart", "-k", f"gui/{os.getuid()}/{TUNNEL_LABEL}")
+    except Exception as error:
+        return f"Neustart fehlgeschlagen: {error}"
+    if done.returncode:
+        return "Neustart fehlgeschlagen"
+    return None
+
+
+def sync_aux_services(args, release, backup, *, restart_tunnel=True, transaction=None):
+    """Point auxiliary com.kirabridge.* launchd services at *release*; fail-soft.
+
+    Returns (records, problems). Records describe rewritten plists for rollback;
+    problems are short German notes. Never raises for a single service.
+    """
+    records, problems = [], []
+    if args.service != "launchd" or LABEL != "com.kirabridge.bridge":
+        return records, problems
+    root = str(args.prefix / "releases")
+    pattern = re.compile(re.escape(root) + r"/([^/\s\"']+)")
+    token = re.compile(re.escape(root) + r"/[^\s\"'=:]+")
+    agents = args.plist.parent
+    for path in sorted(agents.glob(AUX_PREFIX + "*.plist")):
+        label = path.name[: -len(".plist")]
+        if path == args.plist or label == LABEL:
+            continue
+        try:
+            original = path.read_bytes()
+            data = plistlib.loads(original)
+            texts = _aux_texts(data)
+            found = {name for text in texts for name in pattern.findall(text)}
+            if not found or found == {release.name}:
+                continue
+            updated = _aux_strings(data, lambda s: pattern.sub(root + "/" + release.name, s))
+            missing = {
+                p
+                for text in _aux_texts(updated)
+                for p in token.findall(text)
+                if not Path(p).exists()
+            }
+            if missing:
+                problems.append(
+                    (label, "unverändert, fehlt im neuen Release: " + short(Path(min(missing))))
+                )
+                continue
+            source = _aux_loaded_from(label)
+            if source is not None and source != path:
+                problems.append((label, "unverändert, läuft aus anderer plist"))
+                continue
+            name = "aux." + path.name
+            mode = path.stat().st_mode & 0o777
+            updated_bytes = plistlib.dumps(updated)
+            atomic(backup / name, original, mode, exact_mode=True)
+            record = {
+                "plist": str(path),
+                "backup": name,
+                "installed_sha256": hashlib.sha256(updated_bytes).hexdigest(),
+                "original_sha256": hashlib.sha256(original).hexdigest(),
+                "was_loaded": source == path,
+            }
+            if transaction is not None:
+                # Checkpoint rollback data before replacing the live definition.
+                # current.json is the authoritative active transaction used by
+                # rollback(); a crash between writes still leaves recovery data.
+                transaction.setdefault("aux_services", []).append(record)
+                jwrite(args.prefix / "current.json", transaction)
+                jwrite(backup / "transaction.json", transaction)
+            atomic(path, updated_bytes, mode, exact_mode=True)
+            try:
+                if source is not None:
+                    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+                    _aux_bootstrap(path)
+            except Exception as error:
+                atomic(path, original, path.stat().st_mode & 0o777, exact_mode=True)
+                with contextlib.suppress(Exception):
+                    _aux_bootstrap(path)
+                problems.append((label, f"Neustart fehlgeschlagen, alte plist bleibt: {error}"))
+                continue
+            records.append({**record, "installed_sha256": sha(path)})
+        except Exception as error:
+            problems.append((label, f"nicht angepasst: {error}"))
+    # Restart the owned tunnel last; fail-soft so the already collected records
+    # are still returned and persisted by activate() for the rollback path.
+    if restart_tunnel:
+        note = _restart_owned_tunnel(agents)
+        if note:
+            problems.append((TUNNEL_LABEL, note))
+    return records, problems
+
+
+def _persist_aux_recovery(active, transaction_path):
+    if transaction_path is None:
+        return
+    jwrite(transaction_path, active)
+    backup = active.get("backup")
+    if backup:
+        jwrite(Path(backup) / "transaction.json", active)
+
+
+def restore_aux_services(active, transaction_path=None):
+    """Rollback: restore auxiliary plists recorded by sync_aux_services; fail-soft."""
+    backup = Path(active["backup"])
+    complete = True
+    for record in active.get("aux_services", []):
+        path = Path(record["plist"])
+        label = path.name[: -len(".plist")]
+        try:
+            if record.get("restore_complete"):
+                continue
+            current_sha = sha(path) if path.exists() else None
+            original_sha = record.get("original_sha256")
+            if current_sha != record["installed_sha256"] and (
+                not original_sha or current_sha != original_sha
+            ):
+                report("warn", f"{label} seit Umschaltung geändert; nicht zurückgesetzt")
+                complete = False
+                continue
+
+            # The file may already be restored after an interrupted prior attempt.
+            # Probe ownership before launchctl changes so a foreign binding is
+            # never booted out or replaced by this recovery.
+            if current_sha != original_sha:
+                saved = backup / record["backup"]
+                atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777, exact_mode=True)
+            source = _aux_loaded_from(label)
+            if source is not None and source != path:
+                report(
+                    "warn", f"{label} läuft inzwischen aus fremder plist; Bindung nicht verändert"
+                )
+                complete = False
+                continue
+
+            was_loaded = record.get("was_loaded")
+            # Persist both the target load state and an in-progress marker before
+            # launchctl changes. If bootstrap fails after bootout, a later rollback
+            # must still know to reload the service even though it is now unloaded.
+            if "restore_reload" not in record:
+                record["restore_reload"] = was_loaded is True or source == path
+            record["restore_pending"] = True
+            _persist_aux_recovery(active, transaction_path)
+            if record["restore_reload"]:
+                if source == path:
+                    _launchctl("bootout", f"gui/{os.getuid()}/{label}")
+                # Also repairs a crash after bootout, when source is None.
+                _aux_bootstrap(path)
+            record["restore_complete"] = True
+            record.pop("restore_pending", None)
+            record.pop("restore_reload", None)
+            _persist_aux_recovery(active, transaction_path)
+        except Exception as error:
+            report("warn", f"{label} nicht zurückgesetzt", detail=str(error)[:200])
+            complete = False
+    return complete
+
+
 SOURCE_FIELDS = ("source_package_path", "source_tree_sha256", "source_file_count")
+
+
+def source_tree_identity(package):
+    """Fingerprint one already-resolved package tree without importing it."""
+    package = Path(package).resolve(strict=True)
+    manifest = {str(p.relative_to(package)): sha(p) for p in sorted(package.rglob("*.py"))}
+    if not manifest:
+        raise RuntimeError("Target runtime source is unavailable")
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return {
+        "source_package_path": str(package),
+        "source_tree_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+        "source_file_count": len(manifest),
+    }
 
 
 def release_source(release):
@@ -1285,18 +1704,56 @@ def release_source(release):
             allowed.append(candidate.resolve(strict=True))
     if not any(package == base or package.is_relative_to(base) for base in allowed):
         raise RuntimeError("Target runtime imports a package outside its release")
-    manifest = {str(p.relative_to(package)): sha(p) for p in sorted(package.rglob("*.py"))}
-    if not manifest:
-        raise RuntimeError("Target runtime source is unavailable")
-    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return {
-        "source_package_path": str(package),
-        "source_tree_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
-        "source_file_count": len(manifest),
-    }
+    return source_tree_identity(package)
 
 
-def wait_health(args, release, version, *, expected_source=None):
+READINESS_SECONDS = 60
+LOG_TAIL_LINES = 12
+LOG_TAIL_CHARS = 1200
+
+
+def service_log_tail(args):
+    """Last service log lines, so a failed readiness check names its cause."""
+    paths = []
+    plist = getattr(args, "plist", None)
+    if plist is not None and Path(plist).is_file():
+        try:
+            settings = plistlib.loads(Path(plist).read_bytes())
+        except Exception:  # noqa: BLE001 - unreadable plist is not a readiness cause
+            settings = {}
+        for key in ("StandardErrorPath", "StandardOutPath"):
+            if isinstance(settings.get(key), str):
+                paths.append(Path(settings[key]))
+    prefix = getattr(args, "prefix", None)
+    if prefix is not None:
+        paths.extend(
+            [
+                Path(prefix) / "logs/service.stderr.log",
+                Path(prefix) / "logs/service.stdout.log",
+            ]
+        )
+    seen = set()
+    parts = []
+    for path in paths:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved in seen or not resolved.is_file():
+            continue
+        seen.add(resolved)
+        try:
+            lines = resolved.read_text(errors="replace").splitlines()[-LOG_TAIL_LINES:]
+        except OSError:
+            continue
+        text = "\n".join(line.strip() for line in lines if line.strip())
+        if text:
+            parts.append(f"{resolved.name}: {text}")
+    detail = "\n".join(parts)
+    return detail[-LOG_TAIL_CHARS:] if detail else ""
+
+
+def wait_health(args, release, version, *, expected_source=None, seconds=None):
     expected = release_source(release) if expected_source is None else expected_source
     if (
         not isinstance(expected.get("source_package_path"), str)
@@ -1307,7 +1764,9 @@ def wait_health(args, release, version, *, expected_source=None):
         or expected["source_file_count"] <= 0
     ):
         raise RuntimeError("Expected daemon source identity is unavailable")
-    deadline = time.monotonic() + 30
+    window = READINESS_SECONDS if seconds is None else seconds
+    deadline = time.monotonic() + window
+    last = "no status response observed"
     while time.monotonic() < deadline:
         try:
             health = cli(release, args.config, "status", timeout=8)
@@ -1320,10 +1779,16 @@ def wait_health(args, release, version, *, expected_source=None):
                 )
             ):
                 return health
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
-            pass
+            last = (
+                f"status reported version={health.get('version')!r} "
+                f"dispatcher_active={health.get('dispatcher_active')!r}"
+            )
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
+            last = f"{type(exc).__name__}: {exc}"[:300]
         time.sleep(0.5)
-    raise RuntimeError("New daemon readiness not proven within 30 seconds")
+    logs = service_log_tail(args)
+    message = f"New daemon readiness not proven within {window:g} seconds ({last})"
+    raise RuntimeError(message + (f"\nService log:\n{logs}" if logs else ""))
 
 
 def validate_service_owner(args):
@@ -1519,11 +1984,13 @@ def activate(args, release):
             config_after = updated.encode()
     previous_health = None
     if args.service != "none":
-        try:
-            previous_health = cli(release, args.config, "status", timeout=8)
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
-            if was_loaded:
-                raise RuntimeError("Existing service health unavailable; no switch") from None
+        if was_loaded:
+            previous_health = wait_previous_health(release, args.config)
+        else:
+            try:
+                previous_health = cli(release, args.config, "status", timeout=8)
+            except (RuntimeError, subprocess.TimeoutExpired, ValueError):
+                previous_health = None
         if previous_health and not was_loaded:
             raise RuntimeError("Backend runs outside expected launchd service; no switch")
     before = {
@@ -1652,19 +2119,39 @@ def activate(args, release):
                 types.SimpleNamespace(**globals()), args, release, before, current
             )
             report("ok", "Desktop-App, Konsole und Dienste aktualisiert")
-    except Exception:
+    except Exception as activation_error:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             report(
                 "warn",
                 "Umschaltung fehlgeschlagen",
                 detail="Der Rückweg wird unter erneuter Leerlaufprüfung versucht",
             )
-            rollback(args, _compensating=True)
+            try:
+                rollback(args, _compensating=True)
+            except Exception as rollback_error:
+                detail = (
+                    f"Aktivierung fehlgeschlagen ({_safe_failure_detail(activation_error)}); "
+                    "automatischer Rückweg fehlgeschlagen "
+                    f"({_safe_failure_detail(rollback_error)}); "
+                    "Transaktionsjournal für Fortsetzung erhalten"
+                )
+                report("fail", "Automatischer Rückweg fehlgeschlagen", detail=detail)
+                raise RuntimeError(detail) from rollback_error
         raise
     assert args.config.read_bytes() == config_after, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
     if args.service != "none":
         final_check(args, release)
+    # Only after the new release is active and verified; never fails the upgrade.
+    aux_records, aux_problems = sync_aux_services(
+        args,
+        release,
+        backup,
+        restart_tunnel=not _desktop_chatgpt_owned(before),
+        transaction=before,
+    )
+    for label, problem in aux_problems:
+        report("warn", f"Zusatzdienst {label.removeprefix(AUX_PREFIX)}", detail=problem)
     report_summary(
         f"KiraBridge {manifest['version']} ist installiert",
         [
@@ -1673,6 +2160,12 @@ def activate(args, release):
             *(
                 [("ThreadDesk", Path(threaddesk_plan["installed"]["source_root"]).parent.name)]
                 if threaddesk_plan
+                else []
+            ),
+            *([("Zusatzdienste", f"{len(aux_records)} umgestellt")] if aux_records else []),
+            *(
+                [("Zusatzdienste offen", ", ".join(label for label, _ in aux_problems))]
+                if aux_problems
                 else []
             ),
             ("Rückweg", short(backup)),
@@ -1733,16 +2226,15 @@ def rollback(args, *, _compensating=False):
                     path.unlink(missing_ok=True)
             if active.get("threaddesk_config"):
                 restore_threaddesk_config(args, active["threaddesk_config"])
-            if active.get("desktop"):
-                active["rollback_core_restored"] = True
-                active["restored_installed_wrapper_sha256"] = (
-                    sha(args.launcher) if args.launcher.exists() else None
-                )
-                active["restored_installed_plist_sha256"] = (
-                    sha(args.plist) if args.plist.exists() else None
-                )
-                jwrite(backup / "transaction.json", active)
-                jwrite(current, active)
+            active["rollback_core_restored"] = True
+            active["restored_installed_wrapper_sha256"] = (
+                sha(args.launcher) if args.launcher.exists() else None
+            )
+            active["restored_installed_plist_sha256"] = (
+                sha(args.plist) if args.plist.exists() else None
+            )
+            jwrite(current, active)
+            jwrite(backup / "transaction.json", active)
     if args.service == "systemd-user":
         if _systemctl(args, "daemon-reload").returncode:
             raise RuntimeError("Cannot reload user manager after rollback; recovery retained")
@@ -1758,6 +2250,19 @@ def rollback(args, *, _compensating=False):
                 and _systemctl(args, "enable", "--runtime", "--", args.plist.name).returncode
             ):
                 raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
+    aux_services_restored = restore_aux_services(active, current)
+    # Legacy transactions have no desktop service row, so restart the tunnel here.
+    # A changed desktop ChatGPT row owns its own stop/reload during restore().
+    tunnel_restarted = True
+    if (
+        args.service == "launchd"
+        and LABEL == "com.kirabridge.bridge"
+        and not _desktop_chatgpt_owned(active)
+    ):
+        note = _restart_owned_tunnel(args.plist.parent)
+        if note:
+            tunnel_restarted = False
+            report("warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note)
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
@@ -1775,7 +2280,13 @@ def rollback(args, *, _compensating=False):
             )
     # Keep the complete active recovery record until every affected component
     # is restored. Desktop failure must not erase its transaction checkpoint.
-    if active["previous"]:
+    if not aux_services_restored or not tunnel_restarted:
+        report(
+            "warn",
+            "Zusatzdienste noch nicht vollständig zurückgesetzt",
+            detail="Der Rückweg bleibt für eine spätere Wiederherstellung gespeichert",
+        )
+    elif active["previous"]:
         jwrite(current, active["previous"])
     else:
         current.unlink()

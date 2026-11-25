@@ -10,7 +10,6 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
-from kirabridge.autonext.models import AutoNextConfig
 from kirabridge.bridge_core.models import AgentToolGrant, BridgeError
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
 
@@ -100,9 +99,9 @@ class TeamWorkerConfig(BaseModel):
     timeout: float = Field(default=120, gt=0, le=3600)
     response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
     # Explicit per-worker route; never a fallback from a busy visible session.
-    execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
-        "existing_visible_terminal"
-    )
+    execution_scope: Literal[
+        "existing_visible_terminal", "separate_managed_session", "existing_native_codex_root"
+    ] = "existing_visible_terminal"
     local_tools: bool = False
     mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=256)
     mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
@@ -126,6 +125,40 @@ class TeamWorkerConfig(BaseModel):
         return self
 
 
+class TeamContinuationSource(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    board_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    entry_type: Literal["task", "decision"] = "task"
+    entry_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    task_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+    content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    assignee: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,79}$")
+    cwd: str = Field(min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def exact_directory(self):
+        if not Path(self.cwd).is_absolute():
+            raise ValueError("Continuation requires the fixed, absolute worker cwd")
+        return self
+
+
+class TeamContinuationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    team_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    workspace_id: str = Field(min_length=1, max_length=128)
+    board_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    authority_ref: str = Field(min_length=1, max_length=512)
+    sources: list[TeamContinuationSource] = Field(min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def unique_sources(self):
+        if len({source.task_id for source in self.sources}) != len(self.sources) or len(
+            {(source.board_id or self.board_id, source.entry_id) for source in self.sources}
+        ) != len(self.sources):
+            raise ValueError("Continuation must name unique tasks and original board entries")
+        return self
+
+
 class TeamConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
@@ -142,12 +175,19 @@ class TeamConfig(BaseModel):
     max_result_bytes: int = Field(default=65536, ge=256, le=262144)
     max_actions_per_turn: int = Field(default=4, ge=1, le=4)
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+    # Opt-in: a finished delegated work wakes its automated delegator exactly once.
+    coordinator_resume: bool = False
+    continuation: TeamContinuationConfig | None = None
 
     @model_serializer(mode="wrap")
     def routing_opt_out(self, handler):
         value = handler(self)
         if self.routing is None:
             value.pop("routing", None)
+        if not self.coordinator_resume:
+            value.pop("coordinator_resume", None)
+        if self.continuation is None:
+            value.pop("continuation", None)
         return value
 
     @model_validator(mode="after")
@@ -168,6 +208,7 @@ class AgentConfig(BaseModel):
     qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
     qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
+    grok_reasoning_effort: str | None = Field(default=None, pattern=r"^[a-z]{1,16}$")
     qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
     qwen_max_tool_calls: int = Field(default=32, ge=1, le=4096)
     qwen_max_session_turns: int = Field(default=48, ge=1, le=2048)
@@ -184,6 +225,8 @@ class AgentConfig(BaseModel):
         | None
     ) = None
     output_schema: str | None = Field(default=None, max_length=4096)
+    # Launch arguments for the opt-in kind "acp_pap" (see agent_manager/acp_pap_host.py).
+    acp_pap_args: list[str] = Field(default_factory=list)
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
     bridge_tools: bool = False
@@ -201,6 +244,10 @@ class AgentConfig(BaseModel):
             for key in list(value):
                 if key.startswith("qwen_"):
                     value.pop(key)
+        if self.grok_reasoning_effort is None:
+            value.pop("grok_reasoning_effort", None)
+        if not self.acp_pap_args:
+            value.pop("acp_pap_args", None)
         return value
 
     @model_validator(mode="after")
@@ -213,6 +260,10 @@ class AgentConfig(BaseModel):
             or self.qwen_reasoning_effort is not None
         ) and self.kind != "qwen_acp":
             raise ValueError("Qwen authentication selection requires kind qwen_acp")
+        if self.acp_pap_args and self.kind != "acp_pap":
+            raise ValueError("ACP-PAP launch arguments require kind acp_pap")
+        if self.grok_reasoning_effort is not None and self.kind != "grok_acp":
+            raise ValueError("Grok reasoning effort requires kind grok_acp")
         if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
             raise ValueError("Full access requires the operator's explicit full bridge profile")
         return self
@@ -232,6 +283,7 @@ class AgentConfig(BaseModel):
             }
         defaults = {
             "qwen_acp": "",
+            "acp_pap": "",
             "opencode": "OPENCODE_API_KEY",
             "gemini_cli": "GEMINI_API_KEY",
             "claude_code": "ANTHROPIC_API_KEY",
@@ -354,6 +406,8 @@ class ThreadDeskConfig(BaseModel):
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
     dynamic_read_proxy: bool = False  # Legacy read-only opt-in remains supported.
     dynamic_tool_proxy: bool = False  # Explicit all-tools opt-in; mutations use durable tasks.
+    # progress/claimed/task/problem stay in the local audit. False restores board writes.
+    route_technical_entries: bool = True
 
 
 class WorkflowControlConfig(BaseModel):
@@ -368,6 +422,16 @@ class WorkflowControlConfig(BaseModel):
     consumer_id: str = Field(default="kirabridge-cli", pattern=r"^[A-Za-z0-9_.:-]{1,128}$")
     source_commit: str | None = Field(default=None, pattern=r"^[a-f0-9]{40}$")
     source_package_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    # Read-only TollGate daily-budget check before each agent run (false = no call).
+    budget: bool = Field(default=True, strict=True)
+
+    @model_serializer(mode="wrap")
+    def omit_default_budget(self, handler):
+        # The effective-config digest of existing configurations must not change.
+        value = handler(self)
+        if self.budget:
+            value.pop("budget", None)
+        return value
 
 
 class TerminalConfig(BaseModel):
@@ -470,11 +534,41 @@ class VisibleTerminalBinding(BaseModel):
         return self
 
 
+class NativeCodexBinding(BaseModel):
+    """An administratively assigned ordinary root thread on an existing local host.
+
+    Thread IDs from request bodies, environment variables and child tool calls
+    never populate this assignment. Physical process/socket identities are fresh
+    observations, so a host restart does not change this logical destination.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    thread_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    session_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
+    codex_home: str = Field(min_length=1, max_length=4096)
+    host_executable: str = Field(min_length=1, max_length=4096)
+    source: Literal["cli", "vscode", "appServer"]
+    # Same minor line only: a patch update of the installed host keeps the assignment.
+    protocol_version: str = Field(
+        default="0.169.0",
+        pattern=r"^(?:0\.169\.[0-9]{1,3}|0\.171\.0|0\.172\.0)$",
+    )
+
+    @model_validator(mode="after")
+    def absolute_paths(self):
+        if any(
+            not Path(getattr(self, key)).is_absolute() for key in ("codex_home", "host_executable")
+        ):
+            raise ValueError("Native Codex host paths must be absolute")
+        return self
+
+
 class VisibleHandoffConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: Literal[True] = True
     allow_interim_messages: bool = True
     bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
+    native_codex: NativeCodexBinding | None = None
 
 
 class OutputHistoryConfig(BaseModel):
@@ -496,8 +590,32 @@ class LiveLogsConfig(BaseModel):
     max_line_chars: int = Field(default=4096, ge=64, le=65536)
 
 
+class AcpPapHostConfig(BaseModel):
+    """Opt-in ACP-PAP host adapter (kind "acp_pap"). Disabled unless explicitly enabled."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = Field(default=False, strict=True)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_serializer(mode="wrap")
+    def omit_default_acp_pap_host(self, handler):
+        # The effective-config digest of existing configurations must not change.
+        value = handler(self)
+        if not self.acp_pap_host.enabled:
+            value.pop("acp_pap_host", None)
+        return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ignore_retired_sections(cls, data):
+        # AutoNext was removed; an old config file may still carry its section.
+        if isinstance(data, dict) and "autonext" in data:
+            data = {key: value for key, value in data.items() if key != "autonext"}
+        return data
+
     _source_path: str | None = PrivateAttr(default=None)
     _source_sha256: str | None = PrivateAttr(default=None)
     _effective_sha256: str | None = PrivateAttr(default=None)
@@ -535,7 +653,6 @@ class Config(BaseModel):
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     team: TeamConfig = Field(default_factory=TeamConfig)
-    autonext: AutoNextConfig = Field(default_factory=AutoNextConfig)
     grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     file_transfer: FileTransferConfig = Field(default_factory=FileTransferConfig)
@@ -545,6 +662,7 @@ class Config(BaseModel):
     voice_messaging: VoiceMessagingConfig = Field(default_factory=VoiceMessagingConfig)
     voice_channel: VoiceChannelConfig = Field(default_factory=VoiceChannelConfig)
     visible_handoffs: VisibleHandoffConfig = Field(default_factory=VisibleHandoffConfig)
+    acp_pap_host: AcpPapHostConfig = Field(default_factory=AcpPapHostConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 

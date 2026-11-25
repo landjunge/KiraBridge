@@ -75,6 +75,13 @@ def test_linux_snapshot_keeps_desktop_unsupported_and_revision_stable():
     assert native.snapshot()["revision"] == native.snapshot()["revision"]
 
 
+def test_linux_passive_epoch_keeps_linux_transport_unknown():
+    native = provider()
+    before = native.passive_snapshot()
+    assert before["capabilities"]["owned_terminal"]["state"] == "unknown"
+    assert native.passive_snapshot()["revision"] == before["revision"]
+
+
 def test_provider_does_not_replace_descriptors_permissions_or_execution_guards():
     native = provider()
     legacy = MacOSProvider(capabilities=CapabilityProbe(facts=facts()))

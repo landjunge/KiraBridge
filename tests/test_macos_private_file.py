@@ -124,7 +124,16 @@ def test_private_file_rechecks_original_identity_after_read(tmp_path, monkeypatc
             return info
         value = {
             name: getattr(info, name)
-            for name in ("st_mode", "st_uid", "st_size", "st_ino", "st_mtime_ns")
+            for name in (
+                "st_dev",
+                "st_ino",
+                "st_size",
+                "st_mtime_ns",
+                "st_ctime_ns",
+                "st_mode",
+                "st_uid",
+                "st_gid",
+            )
         }
         value[field] += 1
         return SimpleNamespace(**value)

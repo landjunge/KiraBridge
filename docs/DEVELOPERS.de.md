@@ -81,6 +81,8 @@ Keine fremden Profile oder Shell-Pfade unbesehen überschreiben. Bestehende
 KiraBridge-Schlüssel bleiben bis zu einer gesondert freigegebenen und geprüften
 Migration erhalten. Die Betriebspfade stehen unten.
 
+Optionaler ACP-PAP-Host-Adapter (`[acp_pap_host] enabled = true`, Agent `kind = "acp_pap"`, Paket `acp_pap` aus dem privaten Repository separat installieren, kein Extra und keine Pflichtabhängigkeit): standardmäßig aus, eine Verbindung und Sitzung je Core-Task, Zeitüberschreitung oder Trennung bleibt UNKNOWN und wird nie erneut gesendet.
+
 ## Sicherheit
 
 Berechtigung, Zulassung, Eingabeversuch, bestätigte Zustellung und Ergebnis sind
@@ -159,7 +161,7 @@ in getrennten frischen Legacy-/Remoteprozessen mit gebundenen Importen, Pins und
 
 | Prüfzweig | Quellen und Umgebung |
 | --- | --- |
-| Legacy | ThreadDesk `869a38970bace13c37d73654538b64efa1629da3`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
+| Legacy | ThreadDesk `22fda1da813e228b0969795f9565dcbcca3499d6`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
 | Remote R2/R3 | ThreadDesk M4 `a0dd4c39478b031e0e31d335c2a15435dfbc52eb`; `KIRABRIDGE_TEST_THREADDESK_SOURCE` und `KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE` zeigen auf dessen `src/`; keine Legacy-TD-/TollGateimporte |
 
 Exakte `PYTHONPATH`-, Temp-/Reportpfade und Helferargumente stehen im Workflow;
@@ -186,3 +188,6 @@ Historische Belege: [RC18-Veröffentlichung und Installation](https://github.com
 [Intel-Bericht](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INTEL-RELEASE-20261029.md), [RC14-Rollback](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/RC14-ROLLBACK-20261026.md).
 Die Veröffentlichung von RC36 ist kein neuer Nachweis für ARM, macOS 26,
 gehostete macOS-CI oder alle ChatGPT-Live-/Voice-Abläufe.
+
+TollGate-Tagesbudget vor jedem Agentenlauf (`workflow_control.budget`, strikt bool, Standard `true`, `false` = kein Aufruf): `AgentManager.execute` (und der native Codex-Zweig) ruft genau einmal je Lauf das nur lesende `tollgate.agent_gate(<Agentenname>)` auf, in einem Thread mit 2 s Zeitgrenze; geladen wird nur aus dem gepinnten, per Fingerabdruck geprüften Paket (`source_package_sha256`). Nur `deny` aus einem vom Nutzer gesetzten Tageslimit (`limit_source = user_envelope`) verhindert den Start (`tollgate_budget_reached`, normale fehlgeschlagene Aufgabe). `allow`/`unknown` laufen weiter und tragen `evidence.tollgate` (inkl. `plan_exhausted`); fehlendes, ungepinntes oder fehlerhaftes TollGate sowie Zeitüberschreitung lassen den Lauf mit `tollgate_unavailable` weiterlaufen. Es werden weder Schlüssel noch Prompts gelesen und nichts reserviert oder verbucht; im Config-Digest taucht `budget` nur bei `false` auf.
+

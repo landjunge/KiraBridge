@@ -14,12 +14,16 @@ SHORT_ROW = "abc " * 31 + "abc"
 FULL_ROW = "abc " * 31 + "abcd"
 LONG_LINE = "abc " * 95 + "abcd"
 PAYLOAD = "Reply with MARKER.\n" + LONG_LINE
+# Four full logical-line ends: too many blank-row/space combinations to enumerate.
+UNENUMERABLE = "\n".join([FULL_ROW] * 4)
 FOOTER = "\n \n  GPT-Test high · owned workspace\n"
 BEFORE = "› " + FOOTER
 
 
 @pytest.mark.parametrize("route", ["literal", "handoff"])
-async def test_full_logical_row_is_refused_before_any_paste(literal_visible, monkeypatch, route):
+async def test_unenumerable_full_logical_rows_are_refused_before_any_paste(
+    literal_visible, monkeypatch, route
+):
     bridge, transport, row = literal_visible
     transport["text"] = BEFORE
     _, binding = bridge.sessions.explicit_agent_binding(row)
@@ -43,7 +47,7 @@ async def test_full_logical_row_is_refused_before_any_paste(literal_visible, mon
                     "args": {
                         "pane_id": row["pane_id"],
                         "expected_pid": row["expected_pid"],
-                        "text": PAYLOAD,
+                        "text": UNENUMERABLE,
                     },
                 },
                 running,
@@ -52,7 +56,7 @@ async def test_full_logical_row_is_refused_before_any_paste(literal_visible, mon
         else:
             await bridge.visible_handoffs.execute(
                 {"id": "refuse-full-handoff", "principal": "chatgpt"},
-                AgentInput(agent="codex", prompt=PAYLOAD, cwd="/tmp", wait_for_reply=False),
+                AgentInput(agent="codex", prompt=UNENUMERABLE, cwd="/tmp", wait_for_reply=False),
                 running,
                 callback,
             )
@@ -110,6 +114,59 @@ async def test_supported_geometry_preserves_one_exact_paste_and_return(
     else:
         result = await bridge.visible_handoffs.execute(
             {"id": "safe-geometry-handoff", "principal": "chatgpt"},
+            AgentInput(agent="codex", prompt=PAYLOAD, cwd="/tmp", wait_for_reply=False),
+            callback,
+            callback,
+        )
+        assert result["success"] is True
+    assert transport["literal_calls"] == [("paste", PAYLOAD), ("return", None)]
+
+
+@pytest.mark.parametrize("variant", range(4))
+@pytest.mark.parametrize("route", ["literal", "handoff"])
+async def test_full_logical_row_is_delivered_with_blank_row_or_extra_space(
+    literal_visible, monkeypatch, route, variant
+):
+    """A line filling exactly the width is shown with a blank row or one extra space."""
+    bridge, transport, row = literal_visible
+    transport["text"] = BEFORE
+    _, binding = bridge.sessions.explicit_agent_binding(row)
+    bridge.config.visible_handoffs.bindings["codex"] = binding
+
+    async def columns(pane, **guards):
+        return 131
+
+    async def insert(pane, text, **guards):
+        transport["literal_calls"].append(("paste", text))
+        forms = codex_wrapped_renderings(text, 131)
+        transport["text"] = "› " + forms[variant] + FOOTER
+
+    async def press_return(pane, **guards):
+        transport["literal_calls"].append(("return", None))
+        transport["text"] = BEFORE
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "input_columns", columns)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "insert", insert)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "press_return", press_return)
+    if route == "literal":
+        result = await bridge.execute(
+            {
+                "id": "full-row-literal",
+                "principal": "chatgpt",
+                "operation": "session.input",
+                "args": {
+                    "pane_id": row["pane_id"],
+                    "expected_pid": row["expected_pid"],
+                    "text": PAYLOAD,
+                },
+            },
+            callback,
+            callback,
+        )
+        assert result["return_sent"] is True
+    else:
+        result = await bridge.visible_handoffs.execute(
+            {"id": "full-row-handoff", "principal": "chatgpt"},
             AgentInput(agent="codex", prompt=PAYLOAD, cwd="/tmp", wait_for_reply=False),
             callback,
             callback,
@@ -217,9 +274,11 @@ def test_preflight_marks_only_supported_full_logical_line_ends(text, columns, ex
     assert codex_full_row_widths(text, columns) == expected
 
 
-@pytest.mark.parametrize("extra", ["", " ", "\n ", "\n  "])
-def test_cursor_row_and_additional_spaces_or_newlines_do_not_gain_verification(extra):
+@pytest.mark.parametrize(
+    "extra,verified", [("", True), (" ", True), ("\n ", False), ("\n  ", False)]
+)
+def test_only_one_blank_cursor_row_or_one_extra_space_gains_verification(extra, verified):
     painted = "Reply with MARKER.\n  " + SHORT_ROW + "\n  " + SHORT_ROW + "\n  " + FULL_ROW
-    assert not insertion_observed(
+    assert verified == insertion_observed(
         "codex", "› " + painted + "\n " + extra + FOOTER, PAYLOAD, BEFORE, columns=131
     )

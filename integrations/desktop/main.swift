@@ -208,12 +208,31 @@ import WebKit
 
 final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     /// The full release version (for example 0.8.0rc41); the bundle short version is numeric only.
+    private static func aboutPanelOptions(
+        release: String?, sourceCommit: String?
+    ) -> [NSApplication.AboutPanelOptionKey: Any] {
+        var options: [NSApplication.AboutPanelOptionKey: Any] = [.version: ""]
+
+        if let release {
+            options[.applicationVersion] = release
+        }
+
+        if let commit = sourceCommit, commit.utf8.count == 40,
+           commit.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) {
+            options[.version] = "App-Build \(commit.prefix(7))"
+        }
+
+        return options
+    }
+
     @objc func showAbout(_ sender: Any?) {
         let release = Bundle.main.object(forInfoDictionaryKey: "KiraBridgeVersion") as? String
-        var options: [NSApplication.AboutPanelOptionKey: Any] = [.version: ""]
-        if let release { options[.applicationVersion] = release }
+        let commit = Bundle.main.object(forInfoDictionaryKey: "KiraBridgeSourceCommit") as? String
+
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.orderFrontStandardAboutPanel(options: options)
+        NSApp.orderFrontStandardAboutPanel(
+            options: Self.aboutPanelOptions(release: release, sourceCommit: commit)
+        )
     }
 
     var windows: [NSWindow] = []

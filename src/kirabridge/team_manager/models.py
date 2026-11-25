@@ -15,7 +15,9 @@ class TeamCreate(Input):
     team_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
     name: str = Field(min_length=1, max_length=256)
     members: dict[str, Role] = Field(min_length=1, max_length=16)
-    coordinator: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
+    coordinator: str | None = Field(
+        default=None, min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$"
+    )
     idempotency_key: str = Field(min_length=1, max_length=128)
 
 
@@ -26,6 +28,30 @@ class TeamRoleSet(Input):
     active: bool = True
     expected_revision: int = Field(ge=1)
     idempotency_key: str = Field(min_length=1, max_length=128)
+
+
+class TeamCoordinatorHandoff(Input):
+    team_id: str = Field(min_length=1, max_length=128)
+    principal: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
+    session_id: str = Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+    generation: int = Field(ge=0)
+    expected_revision: int = Field(ge=1)
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    work_state: str = Field(default="", max_length=16384)
+
+
+class TeamOnboardRegister(Input):
+    """Owner-only registration of a new identity in config and credentials.
+
+    Re-running is safe: existing sections and tokens are kept untouched.
+    """
+
+    identity: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
+    config_path: str = Field(min_length=1, max_length=512)
+    credentials_path: str = Field(min_length=1, max_length=512)
+    approval_mode: Literal["automatic", "ask"] = "automatic"
+    capabilities: list[str] = Field(default_factory=list, max_length=16)
+    message_peers: list[str] = Field(default_factory=lambda: ["local"], max_length=16)
 
 
 class TeamMessageSend(Input):

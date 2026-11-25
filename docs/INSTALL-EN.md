@@ -68,6 +68,27 @@ restores exactly these two values unless someone changed them since.
 The launchd user service continues when Terminal/browser windows close; login,
 logout, sleep and shutdown are distinct. Presentation does not own the daemon.
 
+## DMG installer (source build, not yet published)
+
+For a conventional drag-and-drop install, a disk image can be built from the same
+exact release. It publishes and installs nothing. On the target Mac (same
+architecture as the release), with fully committed source (`build_release.py` creates `dist/release/KiraBridge-macos.tar.gz`;
+all outputs must be new, existing ones are never overwritten):
+
+```sh
+python3.11 scripts/build_release.py --out dist/release
+python3.11 scripts/build_installer_app.py --archive dist/release/KiraBridge-macos.tar.gz --out dist/KiraBridge-Installieren.app
+python3.11 scripts/build_installer_dmg.py --app dist/KiraBridge-Installieren.app --out dist/KiraBridge.dmg
+```
+
+Open the DMG, drag `KiraBridge.app` to `Applications` and launch it. First launch
+verifies the package and then runs the same visible Terminal installation as above
+(backup, idle check, rollback; configuration, credentials and data preserved; an
+existing approval service is moved to the new release). There is no second
+installer lifecycle. Python 3.11 and uv remain prerequisites. The app is ad-hoc
+signed, the DMG is unsigned and not notarized, so macOS may require right-click →
+Open on first launch.
+
 ## Status, errors and rollback
 
 `~/.local/bin/kirabridge status` reads the responding version and service state.

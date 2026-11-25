@@ -1,7 +1,8 @@
 """Claude Code's visible composer between two horizontal rules; literal text only.
 
 Claude wraps long input over continuation rows, so insertion is compared without
-whitespace. A collapsed paste ("[Pasted text #1 …]") never matches: no Return.
+whitespace. A collapsed paste ("[Pasted text #1 +k lines]") counts as the text only
+when the field was empty before and k matches the text's line count: no Return otherwise.
 No slash, menu, navigation or reply capability is claimed.
 """
 
@@ -14,10 +15,42 @@ from .contract import Capabilities
 _RULE = re.compile(r"[ \t]*─{3,}(?: [^─\n]{1,120} ─+)?[ \t]*")
 _PROMPT = "❯"
 _SPINNER = re.compile(r"[ \t]*[✻✽✶✳✢·*] ")
+_LIVE_SPINNER = re.compile(r"^[ \t]*[✻✽✶✳✢·*] \S+… \(", re.M)
+_OUTPUT = "⏺"
+
+
+def live_block(above):
+    """Rows between the last output block and the input separator.
+
+    A todo list (``⎿ ☐ …``), queued messages or hints may sit between the spinner and
+    the input, so the whole block counts, not only the two nearest rows.
+    """
+    for index in range(len(above) - 1, -1, -1):
+        if above[index].lstrip().startswith(_OUTPUT):
+            return above[index + 1 :]
+    return above[-30:]
 
 
 def _compact(text):
     return re.sub(r"\s+", "", text)
+
+
+_FOLDED = re.compile(r"\[Pastedtext#\d+(?:\+(\d+)lines?)?\]")
+
+
+def _folded_counts(text):
+    """Line counts Claude Code may show in "[Pasted text #N +k lines]" for this text."""
+    counts = set()
+    for variant in (text, text.rstrip("\r\n")):
+        newlines = len(re.findall(r"\r\n|\r|\n", variant))
+        counts.update({newlines, newlines + 1} if newlines else {0})
+    return counts
+
+
+def folded_paste(field, text):
+    """The whole input field is exactly one folded-paste marker for this text."""
+    match = _FOLDED.fullmatch(_compact(field))
+    return bool(match) and int(match.group(1) or 0) in _folded_counts(text)
 
 
 def composer(text):
@@ -41,6 +74,11 @@ def typed(rows):
 class ClaudeCodeAdapter:
     name = "claude"
     capabilities = Capabilities(text=True)
+    # Process-local for a fresh owner launch only. A startup prompt suggestion renders
+    # as text in the composer, which the readiness guard correctly treats as a draft
+    # (input_not_empty). Disabling it yields a genuinely empty composer; it never
+    # touches an existing session or weakens the draft guard (M4 live evidence).
+    launch_environment = {"CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}
 
     def input_view(self, raw):
         text, unknown = legacy.display_text(raw)
@@ -62,10 +100,12 @@ class ClaudeCodeAdapter:
             above, rows, footer = found
             first = rows[0].replace(" ", " ").rstrip()
             empty = len(rows) == 1 and bool(re.fullmatch(binding.ready_pattern, first.strip()))
-            # Only the live spinner row and the footer; quoted output never counts.
-            nearest = [line for line in above if line.strip()][-2:]
-            status = [line for line in nearest if _SPINNER.match(line)] + footer
-            busy = binding.busy_pattern and re.search(binding.busy_pattern, "\n".join(status), re.I)
+            # Only the block after the last output, and the footer; quoted output never counts.
+            block = live_block(above)
+            status = [line for line in block if _SPINNER.match(line)] + footer
+            busy = (
+                binding.busy_pattern and re.search(binding.busy_pattern, "\n".join(status), re.I)
+            ) or _LIVE_SPINNER.search("\n".join(block))
             state, reason = (
                 ("input_not_empty", "existing_input_must_not_be_overwritten")
                 if not empty
@@ -94,9 +134,10 @@ class ClaudeCodeAdapter:
         old = composer(legacy.display_text(before)[0])
         new_text, controls = legacy.display_text(raw)
         new = None if controls else composer(new_text)
-        if old is None or new is None or typed(old[1]) or "[Pasted text" in new_text:
+        if old is None or new is None or typed(old[1]) or not _compact(text):
             return False
-        return bool(_compact(text)) and _compact(typed(new[1])) == _compact(text)
+        field = typed(new[1])
+        return _compact(field) == _compact(text) or folded_paste(field, text)
 
     def navigation_preserves(self, before, after, observation, after_state):
         return False
@@ -108,11 +149,36 @@ class ClaudeCodeAdapter:
         return False
 
     def paste_source(self, text):
-        # Fresh-echo check for wrapped rows: compare without whitespace.
+        # Fresh-echo check: only the CURRENT input field, before and after. Empty before,
+        # exactly the text (whitespace-free, wrapped rows) or its folded marker after.
+        # __pasteDiag keeps only lengths/booleans of the LAST evaluation (never text),
+        # so an unconfirmed paste can be classified without reading the terminal.
+        # The verdict logic below is unchanged.
         return (
+            "\nvar __pasteDiag=null;"
             "\nfunction observedPaste(before, after) {"
             "const c=s=>s.replace(/[\\s\\u00a0]+/g,''), p=c(" + json.dumps(text) + ");"
-            "return p.length>0 && c(after).includes(p) && !c(before).includes(p);}\n"
+            "const counts=" + json.dumps(sorted(_folded_counts(text))) + ";"
+            "const rule=/^[ \\t]*─{3,}(?: [^─\\n]{1,120} ─+)?[ \\t]*$/;"
+            "const field=s=>{const l=s.split('\\n');"
+            "for(let i=l.length-1;i>0;i--){"
+            "if(l[i].trimStart().startsWith('" + _PROMPT + "')&&rule.test(l[i-1])){"
+            "for(let e=i+1;e<l.length;e++){if(rule.test(l[e])){"
+            "return [l[i].trimStart().slice(1),...l.slice(i+1,e)].join('\\n');}}"
+            "return null;}}return null;};"
+            "const old=field(before), now=field(after);"
+            "const seen=now===null?null:c(now); let common=0;"
+            "if(seen!==null){while(common<seen.length&&common<p.length"
+            "&&seen[common]===p[common])common++;}"
+            "__pasteDiag={before_field:old===null?-1:c(old).length,"
+            "after_field:seen===null?-1:seen.length,expected:p.length,common_prefix:common,"
+            "after_rows:now===null?-1:now.split('\\n').length,"
+            "tail_changed:before!==after,tail_delta:after.length-before.length,"
+            "marker:seen!==null&&/^\\[Pastedtext#/.test(seen)};"
+            "if(!p.length||old===null||now===null||c(old).length) return false;"
+            "const cur=c(now); if(cur===p) return true;"
+            r"const m=/^\[Pastedtext#\d+(?:\+(\d+)lines?)?\]$/.exec(cur);"
+            "return !!m && counts.includes(m[1]===undefined?0:Number(m[1]));}\n"
         )
 
     def slash_insertion_observed(self, sessions, binding, raw, text, before, **options):

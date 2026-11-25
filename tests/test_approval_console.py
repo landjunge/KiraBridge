@@ -8,7 +8,13 @@ import httpx
 import pytest
 from conftest import request
 
-from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token, valid_token
+from kirabridge.approval_console import (
+    ORIGIN,
+    ApprovalConsole,
+    signature,
+    signed_token,
+    valid_token,
+)
 from kirabridge.bridge_core.models import BridgeError, State
 from kirabridge.console_runtime import console_key, open_console, probe
 from kirabridge.operator_application import operator_application
@@ -180,6 +186,31 @@ def test_launcher_does_not_trust_an_unrelated_local_listener():
         pytest.raises(BridgeError, match="Port 8766"),
     ):
         probe(operator, KEY)
+
+
+def test_readiness_probe_retries_transient_transport_but_keeps_proof_check():
+    calls = 0
+
+    def handler(request):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.RemoteProtocolError("transient")
+        challenge = request.headers["X-KiraBridge-Challenge"]
+        instance = "test-instance"
+        return httpx.Response(
+            200,
+            json={
+                "name": "KiraBridge approvals",
+                "instance": instance,
+                "proof": signature(KEY, "probe", challenge + "." + instance),
+            },
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as operator:
+        assert probe(operator, KEY) is None
+        assert probe(operator, KEY) == "test-instance"
+    assert calls == 2
 
 
 def test_cancel_compare_and_transition_is_atomic(bridge, config):

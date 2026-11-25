@@ -20,6 +20,27 @@ from kirabridge.mcp_gateway.schema_validation import (
 from kirabridge.mcp_gateway.timing import ToolSpan, instrument_server
 
 SCHEMA_CACHE_SECONDS = 30.0
+PROXY_INSTRUCTIONS = (
+    "Direct ChatGPT terminal work uses terminal_control (terminal.visible): an idle confirmed "
+    "visible shell on macOS "
+    "or a fresh owned PTY on Linux; never type into a busy/unconfirmed window or use a hidden "
+    "fallback. This rule is separate from internal Codex/Grok execution and ThreadDesk. "
+    "Refresh tools/list and operation_catalog after connection, version or session changes; "
+    "compare discovery.revision. Check each permission_decision; request local approval only "
+    "when approval_required is true. For known schemas, call directly; otherwise select only "
+    "needed operations in operation_catalog. Batch independent reads with read_queries or "
+    "read_query tool.batch and "
+    "prefer structured results. Submit writes once; for pending work observe the same task_id, "
+    "never replay an uncertain request. Completed inline results need no poll. Terminal input "
+    "requires an exact pane_id and expected_pid. session.input sends literal text; "
+    "use one keyboard_sequence call for physical keys. Posting input does not prove app "
+    "processing. "
+    "Receipts do not prove execution or completion. Keep completion_receive active and ack only "
+    "after processing; ChatGPT chats are not awakened automatically. Use team tools for "
+    "addressed role-based work. Agent/CLI handoffs require assigned existing visible windows; "
+    "no background fallback. Historical buffers never auto-release. Eve relays Daniel's "
+    "dictation unchanged."
+)
 
 
 class DaemonConnection:
@@ -189,51 +210,7 @@ async def connect_stdio(config, principal, *, task_policy=None):
         server = Server(
             "KiraBridge",
             version=pool.initializations[connection.endpoint.id].serverInfo.version,
-            instructions="Direct ChatGPT terminal work uses terminal_control / terminal.visible. "
-            "no busy/unconfirmed window and no invisible fallback. Internal Codex/Grok execution "
-            "and ThreadDesk are separate. Refresh tools/list on list_changed and compare "
-            "discovery.revision after connection/version/session changes. "
-            "Use keyboard_sequence for ordered genuine individual keystrokes in one call; "
-            "use keyboard_control text only for literal text requests. No clipboard is used. "
-            "If a cached Apps catalog lacks keyboard_sequence, use action_request with "
-            "request.operation=keyboard.sequence and args.steps in one call. "
-            "Reduce cloud roundtrips: read_query operation=tool.batch combines 1–8 existing "
-            "read-only calls [{tool,arguments}]; read.batch combines query objects. "
-            "read_query native.read accepts native_operation and arguments for automatic "
-            "apps/windows/accessibility reads without task/completion overhead; "
-            "accessibility.inspect max_depth>0 reads a bounded descendant tree in one call. "
-            "Prefer result_format=structured for lossless structured values without duplicate "
-            "child JSON text; full preserves envelopes. "
-            "Read_query operation=task.observe returns an existing task and events together "
-            "with wait_seconds<=18 and events_after; never resubmit uncertain work. "
-            "For known schemas submit directly, without routine health/catalog prefetches. "
-            "Select operation_catalog operations=[...] for the needed schemas only. "
-            "A completed inline response needs no unconditional task/status/completion poll. "
-            "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
-            "Use task_request; automatic mode queues permitted work without a browser click. "
-            "Only when approval_required is true, give the operator local_approval_url. "
-            "Do not ask for approval when approval_required is false. "
-            "Set a unique completion_target and keep a completion_receive consumer active; "
-            "completion_ack only after processing. Inactive ChatGPT chats are not awakened. "
-            "Use task_get and task_events for additional evidence; "
-            "no task-ID copying is needed. "
-            "Use message_send/message_receive for addressed peer communication, not shared files. "
-            "Eve is Grok Voice, Kira is ChatGPT Voice, Grok Build and Codex are terminals. "
-            "Eve relays only Daniel's unchanged dictation, without additions. "
-            "Explicit voice and terminal user requests need no special approval marker. "
-            "Normal permissions apply; historical buffers never auto-release. "
-            "CLI handoffs require assigned existing visible windows; no background fallback. "
-            "message_channel_status reports the dispatcher and each identity separately; "
-            "For existing Terminal.app tabs and tmux panes use session_catalog and session_read; "
-            "session_open opens a visible window. session.input addresses an exact catalog handle. "
-            "session.input sends literal text and slash commands; "
-            "submit=false pastes without Return. "
-            "Use agent.execute or message_send(kind=work) for addressed agent assignments. "
-            "session_input_policy controls only an optional buffer, not terminal availability. "
-            "agent_status includes interactive_terminal_sessions; cached tools can discover and "
-            "read handles using read_query operations session.catalog and session.read. "
-            "These tools have the same permissions on mobile, browser, Live and voice. "
-            "Use connection_check from the actual conversation to verify its current device/mode.",
+            instructions=PROXY_INSTRUCTIONS,
         )
 
         downstream = set()
@@ -350,6 +327,26 @@ async def connect_stdio(config, principal, *, task_policy=None):
         async def call_tool(name, arguments):
             try:
                 downstream.add(server.request_context.session)
+                from kirabridge.technical_entries import proxy_retention
+
+                retained = proxy_retention(config, name, arguments)
+                if retained is not None:
+                    # Keep the latest state in this process. Do not call the ThreadDesk peer.
+                    result = await connection.call_tool("threaddesk_dynamic_call", retained)
+                    data = result.structuredContent
+                    if isinstance(data, dict) and "error" in data:
+                        return CallToolResult(
+                            isError=True,
+                            content=[TextContent(type="text", text=json.dumps(data))],
+                            structuredContent=data,
+                        )
+                    if task_policy is not None:
+                        try:
+                            task_policy.observe_result(name, arguments, result)
+                        except Exception:
+                            pass
+                    await changed()
+                    return result
                 definition = await server._get_cached_tool_definition(name)
                 if task_policy is not None:
                     await task_policy.authorize(connection, name, arguments, definition=definition)

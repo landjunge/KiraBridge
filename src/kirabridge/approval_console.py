@@ -72,6 +72,7 @@ class ApprovalConsole:
                 Route("/style.css", self.asset),
                 Route("/networkpunkt.css", self.asset),
                 Route("/center.js", self.asset),
+                Route("/coordinator.js", self.asset),
                 Route("/keyboard.js", self.asset),
                 Route("/center.css", self.asset),
                 Route("/networkpunkt-appbar.js", self.asset),

@@ -43,12 +43,15 @@ def version_tuple(value):
 class CapabilityProbe:
     """Capture metadata once; inspecting the snapshot never invokes a leaf adapter."""
 
-    def __init__(self, *, facts=None, executable=None, native_metadata=None):
+    def __init__(
+        self, *, facts=None, executable=None, native_metadata=None, passive_native_metadata=None
+    ):
         self.facts = dict(host_facts() if facts is None else facts)
         self.executable = executable or (lambda path: os.access(path, os.X_OK))
         self.native_metadata = native_metadata
+        self.passive_native_metadata = passive_native_metadata
 
-    def snapshot(self):
+    def snapshot(self, *, passive=False):
         darwin = self.facts.get("platform") == "darwin"
         version = version_tuple(self.facts.get("os_version"))
         supported = darwin and bool(version) and version >= (12,)
@@ -74,7 +77,8 @@ class CapabilityProbe:
                 "minimum_os": "12.0",
                 "permission_scope": "not_checked_by_technical_probe",
             }
-        native = self.native_metadata() if self.native_metadata is not None else {}
+        reader = self.passive_native_metadata if passive else self.native_metadata
+        native = reader() if reader is not None else {}
         for name in (
             "system",
             "apps",
@@ -84,6 +88,7 @@ class CapabilityProbe:
             "notifications",
             "preferences",
             "keyboard",
+            "mouse",
         ):
             minimum = (14,) if name == "capture" else (12,)
             available = supported and version >= minimum and native.get("available") is True
@@ -92,6 +97,12 @@ class CapabilityProbe:
                     available
                     and type(native.get("keyboard_protocol")) is int
                     and native["keyboard_protocol"] == 1
+                )
+            if name == "mouse":
+                available = (
+                    available
+                    and type(native.get("mouse_protocol")) is int
+                    and native["mouse_protocol"] == 1
                 )
             result[name] = {
                 "available": available,
@@ -103,11 +114,13 @@ class CapabilityProbe:
                 if not supported or version < minimum
                 else "keyboard_protocol_unavailable"
                 if name == "keyboard" and native.get("available") is True
+                else "mouse_protocol_unavailable"
+                if name == "mouse" and native.get("available") is True
                 else native.get("reason", "native_app_protocol_unavailable"),
                 "minimum_os": "14.0" if name == "capture" else "12.0",
                 "permission_scope": "executing_native_app_worker; checked for every operation",
                 "permission_requested_automatically": False,
-                "provider_revision": native.get("revision"),
+                "provider_revision": native.get("provider_generation", native.get("revision")),
             }
         result["desktop_session"]["support"] = "ioreg_key_compatibility_heuristic"
         return {"host": self.facts, "capabilities": result}

@@ -85,6 +85,88 @@ def test_team_payload_limit_counts_utf8_bytes():
     assert error.value.code == "team_payload_limit"
 
 
+def _prompt_pool(snapshot):
+    class Pool:
+        async def call(self, peer_name, tool, arguments):
+            assert peer_name == "daemon"
+            if tool == "team_message_ack":
+                return SimpleNamespace(structuredContent={"ok": True}, isError=False)
+            assert tool == "team_context"
+            return SimpleNamespace(structuredContent=snapshot, isError=False)
+
+    return Pool()
+
+
+def _prompt_work(body):
+    return {
+        "id": "tw-current",
+        "team_id": "t",
+        "assigned_by": "local",
+        "assignee": "grok",
+        "title": "now",
+        "body": body,
+        "parent_id": None,
+        "root_id": "tw-current",
+        "depth": 0,
+    }
+
+
+def _shared_snapshot():
+    return {
+        "team": {"id": "t", "name": "n", "coordinator": "local", "members": {}},
+        "work": [
+            {
+                "id": f"old-{index}",
+                "assigned_by": "local",
+                "assignee": "grok",
+                "title": "old",
+                "state": "completed",
+                "parent_id": None,
+                "result": "R" * 400,
+                "result_truncated": False,
+            }
+            for index in range(40)
+        ],
+        "messages": [
+            {
+                "id": f"tm-{index}",
+                "sender": "local",
+                "recipient": "grok",
+                "kind": "note",
+                "reply_to": None,
+                "body": "M" * 400,
+                "body_truncated": False,
+                "acknowledged": None,
+            }
+            for index in range(40)
+        ],
+        "truncated": False,
+    }
+
+
+async def test_prompt_keeps_current_work_when_shared_context_exceeds_the_adapter(config):
+    dispatcher, _teams = isolated_dispatcher(config)
+    body = "B" * 240000
+    prompt = await dispatcher._prompt(_prompt_pool(_shared_snapshot()), _prompt_work(body))
+    assert body in prompt
+    assert '"context_truncated":true' in prompt
+    assert len(prompt.encode()) <= 262144
+    assert "tm-39" not in prompt
+
+
+async def test_current_work_over_the_adapter_maximum_still_stops(config):
+    dispatcher, _teams = isolated_dispatcher(config)
+    snapshot = {
+        "team": {"id": "t", "name": "n", "coordinator": "local", "members": {}},
+        "work": [],
+        "messages": [],
+        "truncated": False,
+    }
+    with pytest.raises(BridgeError) as error:
+        await dispatcher._prompt(_prompt_pool(snapshot), _prompt_work("B" * 262145))
+    assert error.value.code == "team_payload_limit"
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -207,13 +289,18 @@ def configure_team(bridge, config, tmp_path, monkeypatch, *, answer=None):
         }
     )
     codex_body = f"""import json,sys
+from pathlib import Path
 prompt=sys.stdin.read()
 assert 'KiraBridge team turn' in prompt
 open('team-codex-invocations','a').write('1\\n')
 open('team-codex-argv','a').write(json.dumps(sys.argv[1:])+'\\n')
+output = Path(sys.argv[sys.argv.index('--output-last-message')+1])
+schema = json.loads(Path(sys.argv[sys.argv.index('--output-schema')+1]).read_text())
+assert schema['required']==['kirabridge_team','result','actions']
+output.write_text({answer!r}, encoding='utf-8')
 for event in [{{'type':'thread.started','thread_id':'01a1ce14-57d2-75f3-85c9-7208392ce422'}},
  {{'type':'turn.started'}},
- {{'type':'item.completed','item':{{'type':'agent_message','text':{answer!r}}}}},
+ {{'type':'item.completed','item':{{'type':'agent_message','text':'Untrusted progress preview'}}}},
  {{'type':'turn.completed'}}]:
  print(json.dumps(event),flush=True)
 """
@@ -578,7 +665,20 @@ class RecordingTeams:
 
 def isolated_dispatcher(config):
     teams = RecordingTeams()
-    return TeamDispatcher(SimpleNamespace(config=config, teams=teams)), teams
+    teams.coordinator_roles = SimpleNamespace(linked_work=lambda _work_id: None)
+
+    class EmptyRows:
+        @staticmethod
+        def fetchall():
+            return []
+
+    class EmptyDatabase:
+        @staticmethod
+        def execute(*_args):
+            return EmptyRows()
+
+    bridge = SimpleNamespace(config=config, teams=teams, store=SimpleNamespace(db=EmptyDatabase()))
+    return TeamDispatcher(bridge), teams
 
 
 @pytest.mark.parametrize("framing,action_count", [("strict_json", 0), ("work_reply_header", 1)])

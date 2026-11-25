@@ -264,24 +264,39 @@ async def _stop_owned_session(process, pin, grace):
 
 
 async def spawn_process(
-    argv: list[str], cwd_fd: int, env: dict, *, stdin, stdout, stderr, limit: int = 1048576
+    argv: list[str],
+    cwd_fd: int,
+    env: dict,
+    *,
+    stdin,
+    stdout,
+    stderr,
+    limit: int = 1048576,
+    start_gated: bool = False,
 ):
     import asyncio
 
     subprocess_options()  # Fail closed on platforms without an adapter.
     read_fd, write_fd = os.pipe()
+    gate_read_fd = gate_write_fd = -1
+    if start_gated:
+        gate_read_fd, gate_write_fd = os.pipe()
     process = None
     transport = None
     try:
+        trampoline = [str(cwd_fd), str(write_fd)]
+        inherited_fds = [cwd_fd, write_fd]
+        if start_gated:
+            trampoline.extend(("--start-gate", str(gate_read_fd)))
+            inherited_fds.append(gate_read_fd)
+        trampoline.extend(argv)
         creation = asyncio.create_task(
             asyncio.create_subprocess_exec(
                 sys.executable,
                 "-I",
                 str(Path(__file__).with_name("_exec.py")),
-                str(cwd_fd),
-                str(write_fd),
-                *argv,
-                pass_fds=(cwd_fd, write_fd),
+                *trampoline,
+                pass_fds=tuple(inherited_fds),
                 env=env,
                 stdin=stdin,
                 stdout=stdout,
@@ -310,8 +325,13 @@ async def spawn_process(
         )
         read_fd = -1
         async with asyncio.timeout(10):
-            error = await reader.read(1024)
-        if error:
+            status = await reader.readexactly(6) if start_gated else await reader.read(1024)
+        if start_gated:
+            if status != b"READY\n":
+                raise BridgeError("spawn_failed", "Configured executable could not be started")
+            process._kirabridge_start_gate_fd = gate_write_fd
+            gate_write_fd = -1
+        elif status:
             raise BridgeError("spawn_failed", "Configured executable could not be started")
         return process
     except BaseException as exc:
@@ -325,7 +345,7 @@ async def spawn_process(
     finally:
         if transport:
             transport.close()
-        for fd in (read_fd, write_fd):
+        for fd in (read_fd, write_fd, gate_read_fd, gate_write_fd):
             if fd != -1:
                 os.close(fd)
 

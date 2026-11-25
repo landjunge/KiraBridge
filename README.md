@@ -1,6 +1,6 @@
 <!-- readme-header-v1: Kopf nach ThreadDesk docs/contracts/readme-header-v1.md. Nicht von Hand umgestalten; scripts/readme_header.py apply/check verwenden. -->
 
-**English** · [Deutsch](README.de.md)
+<p align="center"><strong>English</strong> &nbsp;|&nbsp; <a href="README.de.md">Deutsch</a></p>
 
 <p align="center">
   <img src="assets/readme/normalized/KiraBridge-large.svg" alt="KiraBridge" width="256" height="256">
@@ -22,11 +22,19 @@
 
 <!-- AUTO-DOWNLOADS:START -->
 <p align="center">
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc49" width="190" height="52"></a>
+  <img src="assets/readme/download-macos-apple-silicon.svg" alt="macOS Apple Silicon: In Vorbereitung / Coming soon" width="190" height="52">
   &nbsp;
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz" title="KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz herunterladen / download"><img src="assets/readme/download-debian-remote.svg" alt="Download Debian Remote 0.8.0rc41" width="190" height="52"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc59/KiraBridge-macOS-Intel.dmg" title="KiraBridge-macOS-Intel.dmg herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc59" width="190" height="52"></a>
+  &nbsp;
+  <img src="assets/readme/download-windows.svg" alt="Windows: In Vorbereitung / Coming soon" width="190" height="52">
+  &nbsp;
+  <img src="assets/readme/download-linux-desktop.svg" alt="Linux Desktop: In Vorbereitung / Coming soon" width="190" height="52">
+  &nbsp;
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz" title="KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz herunterladen / download"><img src="assets/readme/download-debian-server.svg" alt="Download Debian Server 0.8.0rc41" width="190" height="52"></a>
 </p>
 <!-- AUTO-DOWNLOADS:END -->
+
+<sub>macOS DMG builds: not notarized by Apple. On first launch, macOS may require approval in System Settings → Privacy & Security. The existing macOS archive is not a DMG.</sub>
 
 <p align="center"><strong>Talk to your AI. KiraBridge connects your voice to direct computer control.</strong></p>
 
@@ -41,6 +49,8 @@ The development console has a compact product header: the original two-color wor
 **KiraBridge is more than a gateway to terminal AI agents.** Direct computer control is a core capability: open or focus applications, switch windows, enter text directly, write and edit notes, press individual keys and use keyboard shortcuts. Direct typing can work without relying on the clipboard. With the necessary permissions and a compatible interface, mouse, window and screen operations are also available. This allows an AI to interact with existing applications through their ordinary user interfaces, without requiring a custom AI integration for every app.
 
 For example, ask the AI to write down a note. It can open or select the notes app, bring the appropriate window forward and enter your words. Workflows can likewise combine shortcuts, text input and window changes. The goal is not merely to send a command, but to produce a visible action and verifiable result on your computer. Success depends on the application, the operating system's accessibility support, granted permissions and connection stability.
+
+In the development source, MCP clients can request only the schemas they need through `operation_catalog`. Setting `compact=true` returns the selected catalog, the required permission context and a lightweight discovery revision; the full catalog response remains the default. This addition is in source and is not confirmed in a new installed version.
 
 ## Voice control for everyone, with accessibility built in
 
@@ -58,6 +68,10 @@ Alongside direct control, KiraBridge can pass work to **Codex and Grok** through
 
 The development source supports interim questions to an explicitly selected, working Codex session without stopping its work or submitting another agent job. Proven delivery-only steering does not consume the conversation/hourly model-run budgets; claimed managed attempts still count, including failed or unknown outcomes. The current native route uses the existing macOS terminal; uncertain delivery is retained without automatic repetition, and users can disable interim messages. Live macOS acceptance and native Windows/Linux/server transport acceptance are recorded separately and remain open.
 
+The development source also offers an optional [native Codex root binding](docs/NATIVE-CODEX-BINDING.md) for new direct messages on macOS with Codex 0.169. It verifies the assigned logical root on the existing host for every attempt, refreshing host process and socket observations automatically instead of retaining an old terminal handle. Parallel sessions keep their own identities; acceptance, recipient acknowledgement and reply remain separate. This route is not activated or live accepted by the source tests.
+
+The 0.8.0rc81 source line (versions between rc59 and rc80 were skipped on purpose) extends this route: the native Codex host is pinned to 0.172, verified Codex bindings survive tab moves and Core restarts, and the coordinator role is persisted so direct messages and handovers follow it. Verified TeamWork milestones can reach the ChatGPT team inbox while a turn is still running, and team reply and acknowledgement status is readable. Managed macOS shells get a private zsh readiness signal (ZLE), and Linux release scratch no longer fills the RAM-backed temporary directory. These are source-level results with local tests; install and live acceptance are recorded separately.
+
 The source also includes [Qwen Code 0.27.2/0.27.3 via ACP and task-scoped MCP](docs/providers/QWEN.md): explicit existing authentication, native session model/effort readback, configurable operator budgets and policy-filtered KiraBridge tools for read or explicitly granted coding tasks. Codex remains available. Same-session recovery requires a proven owned binding; native turn completion remains separate from project acceptance. Production activation and full task acceptance remain gated.
 
 The development source now includes a shared ACP client and an `opencode_acp` adapter for isolated text-only tasks, with session validation, bounded output and explicit timeout or disconnect results. This adapter creates its own process; observing that same session in the OpenCode app and the full macOS workflow still require acceptance. These changes have not been installed in the published runtime.
@@ -65,6 +79,16 @@ The development source now includes a shared ACP client and an `opencode_acp` ad
 A separate development adapter `opencode_http_v2` targets the installed shared OpenCode 2.2.7 app's `/api` surface (session create/get, prompt with a stable message id, paged message list). It correlates its own admitted prompt causally because V2 assistant messages carry no `parentID`/`sessionID`, and it fails closed on foreign or ambiguous inputs. The legacy V1 HTTP path stays unchanged and there is no protocol or POST fallback after an unclear start. This adapter is not installed and its live acceptance remains a separate gate. An observed idle outcome of `failed` or `interrupted` remains unconfirmed even if an assistant message has text and `finish=stop`.
 
 Team assignments also keep the proven provider session for each worker. A later assignment to the same worker resumes that session only while it is idle and for the unchanged agent, adapter and working directory; a still-running or unconfirmed (unknown) session is never reused. `team_session_get` exposes the binding and `team_session_clear` tombstones it, so a turn still in flight cannot resurrect a cleared session. Resume currently covers Codex, Grok ACP, sealed idle Qwen ACP sessions and the separate native OpenCode HTTP path; the OpenCode CLI and `opencode_acp` adapters are rejected for resume because their isolated profile has no persisted session store. Resumption is restricted to sealed team work, survives a bridge restart and never replays a claimed core task. The live acceptance with Codex, Grok and OpenCode/DeepSeek across a bridge restart is recorded in `docs/evidence/team-coordination-live-20261112.json`.
+
+### Source: team scope, resume and error fields
+
+- New in the development source: owner-only `kirabridge team onboard <team_id> <identity> [--coordinator]`. The daemon tool `team_onboard_register` accepts only the owner identity `local`, appends `[principals.<id>]` plus `[team.workers.<id>]` and a generated token only after the candidate config validates against the strict model, keeps timestamped backups, restores both files on any failure, is idempotent on re-run and never returns token values. The running daemon keeps a start-up config snapshot, so the CLI orchestrates the rest: idle-guarded service reload (active team work or `--no-restart` stops it), one role call with revision CAS and a single renewed attempt, then a mandatory readback of owner, coordinator, revision, membership and the pending inbox page. Not an installed release.
+- `execution_scope = "existing_native_codex_root"` runs one team turn on the single loaded, parentless Codex root whose resolved cwd equals the resolved worker cwd, through app-server `turn/start`. Among at most 16 loaded ids, any other count raises `native_codex_root_not_unique`. A missing or longer id list, and a running turn, raise `native_codex_target_not_ready`. The path records `terminal_input_attempted = false` and does not select a pane, terminal PID or rollout path. Host identity is checked; a patch release of the same minor line stays valid. `protocol_version` accepts only `0.169.<patch>`. The route needs `[visible_handoffs.native_codex]` with `codex_home`, `host_executable` and `protocol_version`. The worker's agent and kind must be `codex`. See [Native Codex root binding](docs/NATIVE-CODEX-BINDING.md).
+- `team.coordinator_resume` defaults to off. When it is on, finished delegated work (`finish`, `fail` or manual `work_complete`) records one completion notice, source `team`, target `team:<team_id>`, and `TeamManager.resume_coordinators` creates one idempotent coordination task for an assigner that has `agent` set. The link is stored in `team_coordinator_resumes`. Work assigned to its own assignee records no notice.
+- `agents.<name>.model` is optional. `grok_reasoning_effort` is accepted only for `kind = "grok_acp"` and must match `^[a-z]{1,16}$`. The Grok ACP adapter passes a set model as `--model` and a set effort as `--reasoning-effort`.
+- When an execution returns a failure, the task stores `error` as `{code, kind, retry_safe}`, plus `exit_code` when the result has an integer exit code. Codes from that normalization are `command_exit_nonzero`, `command_timeout`, `command_killed`, `agent_exit_nonzero` and `operation_failed`. A nested peer `value.error.code` is kept when it matches `^[a-z][a-z0-9_]{0,79}$`; otherwise the code is `tool_rejected`. `retry_safe` is true only for that peer form when `evidence.request_sent` is false. Dispatcher restart and shutdown store `error.code` `dispatcher_restart` or `dispatcher_shutdown` without that normalized object. The completion payload copies `error.kind` to `error_kind`.
+- A short terminal catalog raises `session_catalog_incomplete` with `provider_error.reason = "catalog_truncated"`. A complete catalog that no longer matches the selected pane raises `session_selection_changed` with `provider_error.reason` `expected_pid_changed`, `window_changed` or `pane_missing`.
+- Gemini and Copilot CLI failures can set `provider_error.diagnostic` from non-empty stderr only, sanitized and at most 200 characters. `opencode_http` and `opencode_http_v2` record `provider_error.http_status` on status failures. An unexpected ACP response id raises `agent_identity` with shape fields only: `response_id`, `message_keys`, `pending_requests`, `adapter`, `reason` and `already_answered`.
 
 ThreadDesk adds projects and work history to this workflow, while the other family tools are intended to work together through the shared voice interface. Each tool remains independent; integration plans are not presented as shipped functionality.
 
@@ -88,8 +112,11 @@ tracks, so their version numbers can differ.
 
 | Download | Intended use | Installation guide |
 | --- | --- | --- |
-| **macOS Intel** | Desktop app and local KiraBridge service on an Intel Mac. | [Install, verify and get help](docs/INSTALL-EN.md) |
-| **Debian Remote** | Debian/Linux x86_64 server with remote-agent and MCP capabilities. This package does not provide a Linux desktop app. | [Linux / Debian server](docs/INSTALL-LINUX-SERVER.md) |
+| **macOS Intel** | Desktop app and local KiraBridge service. Current verified Intel download is linked above. | [Install, verify and get help](docs/INSTALL-EN.md) |
+| **macOS Apple Silicon (M-series)** | Native Apple Silicon desktop installation. **No verified Apple Silicon installer published yet; download button will appear once available.** | [All releases](https://github.com/landjunge/KiraBridge/releases) |
+| **Windows Desktop** | Local Windows computer control. **No current downloadable installer in the selected desktop release.** | [Windows setup guide](docs/WINDOWS-SETUP.md) |
+| **Linux Desktop (Ubuntu / Debian Desktop)** | Local graphical computer control. **No separately verified desktop installer currently linked.** This is not the server package. | [All releases](https://github.com/landjunge/KiraBridge/releases) |
+| **Debian Server (Debian Remote)** | Headless Debian/Linux x86_64 server with remote-agent and MCP capabilities; **not a Linux desktop app**. The separate server download is linked above. | [Debian server installation](docs/INSTALL-LINUX-SERVER.md) |
 
 [All releases, checksums and release notes](https://github.com/landjunge/KiraBridge/releases)
 are public; downloading does not require a GitHub account. Releases may be
@@ -108,6 +135,9 @@ The source repository can contain newer changes than the published packages.
 Check the app or `kirabridge status` for the version actually running on your
 computer. A source commit, a successful build and an installed version are
 separate pieces of evidence.
+
+In the macOS development build, the About window shows the app’s own build
+commit as **App-Build**, alongside the package version.
 
 **Earlier Windows development previews:** the [RC33 package report](docs/RC33-DELIVERY-20261104.md)
 and [Windows setup report](docs/WINDOWS-SETUP-20261104.md) describe their limited
@@ -130,6 +160,8 @@ remains available as dated evidence, not as the current installed version.
 - **No late surprises:** at most three tasks wait at a time; a fourth cancels the
   oldest waiting one. Work that waited longer than an hour is stopped and reported,
   never run later. Large outputs are kept short in the database, the audit trail stays complete.
+- **Newest board text (development source):** `order="newest"` reads the latest whiteboard page, and `whiteboard_search` finds text in one board. Not a new installed release.
+- **Technical board entries:** `progress`, `claimed`, `task` and `problem` stay in KiraBridge as the latest in-process state only, with no audit row and no database write. Turn off with `[threaddesk]` `route_technical_entries = false`.
 
 ThreadDesk and other integrations are optional. KiraBridge's core works independently.
 If ThreadDesk is configured, the package brings the pinned ThreadDesk library and the
@@ -138,10 +170,12 @@ Python; rollback restores both values. Other settings stay unchanged.
 
 ## Get started
 
-1. **Install or update.** Download and fully extract `KiraBridge-macos.tar.gz`.
-   Run `sh ./install.sh --desktop --require-visible-terminal` from the extracted
-   `KiraBridge` directory in a separate Terminal window and follow its confirmation.
-   Preserve running agent sessions.
+1. **Install or update.** If your download is a DMG, open it, drag `KiraBridge.app`
+   to `Applications` and launch it. Otherwise download and fully extract
+   `KiraBridge-macos.tar.gz`, then run `sh ./install.sh --desktop
+   --require-visible-terminal` from the extracted `KiraBridge` directory in a
+   separate Terminal window. Follow its confirmation. Preserve running agent
+   sessions.
 2. **Open the app.** The installer updates the service and desktop app together.
    Open `KiraBridge.app` in `~/Applications`. Existing settings and credentials
    remain; the installer creates a rollback backup.
@@ -253,19 +287,13 @@ Local Big Plan coordinator adapter: [approved-task loop, Codex/Grok review and a
 
 Source update: the coordinator reports substantive status changes instead of resending unchanged states every minute. Local observations stay current; report attempts retain their identity across restarts, including uncertain outcomes. Running services require a separately verified update.
 
-The [standing-mandate supervisor](docs/COORDINATOR-CONTINUATION-20261106.md) continues coordinator-assigned ThreadDesk tasks without another user approval. It reconciles existing claims and results, skips completed work and keeps task-local problems separate from independent work.
-
 The source command `bigplan-loop --profile <fixture-profile> preview --fixture <fixture.json>` checks private offline fixtures only and shows a possible selection or hold with the evaluated route. Preview is neither approval nor a claim and starts no task; it reads no live board or Core.
 
-Lost team-submit responses retain the original Core task. New marked submission ambiguities can reconcile one proven successful original attempt without submitting another turn. Historical UNKNOWNs remain held. For a reviewed zero-action result, the stopped supervisor's owner can use `bigplan-loop --profile <profile> reconcile --request <TeamWorkReprocess.json> --expected-profile-sha256 <sha256>`: it holds the existing singleton lock, checks the profile identity/reporting scope and original work ownership, and applies the existing owner operation. The request must bind the original work/Core IDs, request SHA256, receipt, attempt and native-result SHA256. It starts no Bridge, dispatcher, provider or successor; the normal supervisor processes the existing result after restart. To finish an original grant already stopped with `autonext_review_unknown`, add `--accept-original --expected-grant-sha256 <sha256> --expected-lease-owner <original-owner>`. All original native turns must have completed within the original execution lease. This result-only path runs the existing pinned acceptance checks, publishes the original receipt through the existing outbox and processes its completion ACK; it does not extend the lease or start another turn. Other stop reasons remain held. Back up the current state first; preserve current status, grant files, outbox, unrelated UNKNOWNs and leases.
+Lost team-submit responses retain the original Core task. New marked submission ambiguities can reconcile one proven successful original attempt without submitting another turn. Historical UNKNOWNs remain held. For a reviewed zero-action result, the stopped supervisor's owner can use `bigplan-loop --profile <profile> reconcile --request <TeamWorkReprocess.json> --expected-profile-sha256 <sha256>`: it holds the existing singleton lock, checks the profile identity/reporting scope and original work ownership, and applies the existing owner operation. The request must bind the original work/Core IDs, request SHA256, receipt, attempt and native-result SHA256. It starts no Bridge, dispatcher, provider or successor; the normal supervisor processes the existing result after restart. All original native turns must have completed within the original execution lease. This result-only path runs the existing pinned acceptance checks, publishes the original receipt through the existing outbox and processes its completion ACK; it does not extend the lease or start another turn. Other stop reasons remain held. Back up the current state first; preserve current status, grant files, outbox, unrelated UNKNOWNs and leases.
 
 Trusted `continuation.task_routing` entries bind a Codex `WorkerRouting` policy to an assigned task ID. Preview and execution resolve the same policy; tasks without an override retain global worker routing. Legacy `continuation.assignments` profiles require explicit migration and are never silently rewritten.
 
 [The November 6 integration checkpoint](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) records accepted packages, combined remote/crash tests and the gates open at that time. Use the [November 7 verification](docs/evidence/readme-current-20261107.json) for the reviewed source and installed pin; dated checkpoints retain their historical results.
-
-The integrated coordinator source also supports native Core activation, owner-scoped MCP `coordinator_status` and durable accepted/stopped notices through the existing completion inbox. It follows pinned tasks after successful review and checks without loading a skill. See [native coordinator contract and validation](docs/COORDINATOR-NATIVE-20261106.md); desktop and live deployment acceptance remain separate.
-
-An explicitly configured `autonext.completion_mode="verified_ack"` lets that same daemon process its bound accepted-result notices autonomously. A follow-up claim requires the matching acceptance receipt, verified board outbox and persisted owner-scoped completion ACK, rechecked in the claim transaction. The default `external` mode retains existing behavior. This adds no second Bridge, service or queue; see [configuration and restart contract](docs/COORDINATOR-NATIVE-20261106.md#opt-in-autonome-verarbeitung-vor-folgestart). Source tests and live server acceptance remain separate.
 
 The configured coordinator and the freshly verified immutable owner of its configured team can read the same bounded `coordinator_status`, including recorded timings. Team ownership grants this status view only; control, completion ACKs and private Core data retain their existing permissions.
 

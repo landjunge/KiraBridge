@@ -87,6 +87,41 @@ def test_restart_preserves_queue_and_never_reexecutes_unknown(bridge, config):
         reopened.store.close()
 
 
+def test_restart_mid_visible_install_keeps_unknown_and_never_replays(bridge, config):
+    config.principals["local"].capabilities.append("session.inspect")
+    value = request(
+        "terminal.visible",
+        {
+            "argv": [sys.executable, "-c", "pass"],
+            "cwd": config.principals["local"].roots[0],
+        },
+        task_id="restart-mid-visible-install",
+    )
+    submit(bridge, value)
+    claimed = bridge.store.claim_exact(bridge.tasks.owner, 30, value.task_id)
+    assert claimed is not None
+    evidence = {
+        "execution_route": "visible_terminal",
+        "pane_id": "terminal:42:ttys001",
+        "expected_pid": 222,
+        "tty": "/dev/ttys001",
+    }
+    bridge.store.transition(value.task_id, State.RUNNING, evidence, owner=bridge.tasks.owner)
+    bridge.store.close()
+
+    reopened = Bridge(config)
+    try:
+        assert reopened.store.recover() == 1
+        unknown = reopened.store.get(value.task_id)
+        assert unknown["state"] == "unknown"
+        assert unknown["evidence"].get("automatic_retry", False) is False
+        assert unknown["evidence"]["last_observation"] == evidence
+        assert reopened.store.recover() == 0
+        assert reopened.store.claim("new-worker", 30) is None
+    finally:
+        reopened.store.close()
+
+
 async def test_exclusive_dispatcher_lock(bridge, config):
     second = Bridge(config)
     try:
@@ -179,3 +214,70 @@ def test_audit_detects_tampering_and_does_not_log_payload(bridge, config):
     assert verify(bridge.store)["valid"]
     bridge.store.db.execute("UPDATE audit SET kind='tampered' WHERE seq=1")
     assert not verify(bridge.store)["valid"]
+
+
+async def test_heartbeat_survives_a_failed_lease_renewal():
+    import asyncio
+    from types import SimpleNamespace
+
+    from kirabridge.task_manager.manager import TaskManager
+
+    calls = []
+
+    class Db:
+        def execute(self, *args):
+            calls.append(args)
+            if len(calls) == 1:
+                raise RuntimeError("database is locked")
+
+    fake = SimpleNamespace(
+        config=SimpleNamespace(lease_seconds=0.03),
+        store=SimpleNamespace(db=Db()),
+        owner="test",
+    )
+    beat = asyncio.create_task(TaskManager._heartbeat(fake, "task"))
+    await asyncio.sleep(0.2)
+    assert not beat.done()
+    assert len(calls) >= 2
+    beat.cancel()
+
+
+async def test_worker_lane_recovers_from_transient_maintenance_failure(bridge, monkeypatch):
+    manager = bridge.tasks
+    maintenance_calls, claimed, executed = 0, [], asyncio.Event()
+
+    def maintenance():
+        nonlocal maintenance_calls
+        maintenance_calls += 1
+        if maintenance_calls == 1:
+            raise OSError("sensitive storage detail")
+
+    def claim(*args, **kwargs):
+        if not claimed:
+            claimed.append({"id": "later-task"})
+            return claimed[0]
+        return None
+
+    async def execute(task):
+        assert task["id"] == "later-task"
+        executed.set()
+
+    manager.maintenance = maintenance
+    monkeypatch.setattr(manager.store, "claim", claim)
+    monkeypatch.setattr(manager, "_execute", execute)
+    worker = asyncio.create_task(manager._worker("normal"))
+    try:
+        await asyncio.wait_for(executed.wait(), 2)
+        assert maintenance_calls >= 2
+        assert not worker.done()
+        records = bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='task.worker_loop_failed'"
+        ).fetchall()
+        assert records and all(
+            json.loads(row[0]) == {"reason": "worker_loop_failed", "lane": "normal"}
+            for row in records
+        )
+        assert "sensitive" not in str([row[0] for row in records])
+    finally:
+        worker.cancel()
+        await asyncio.gather(worker, return_exceptions=True)

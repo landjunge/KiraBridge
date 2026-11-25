@@ -48,7 +48,7 @@ async def test_hidden_singleton_binds_complete_partition_then_restores_old_ax_an
     result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert result["physical_window"]["host_identity_basis"] == "hidden_singleton_partition"
     assert result["physical_window"]["move_confirmed"]
-    assert events == ["create", "receipt", "focus", "move"]
+    assert events == ["create", "receipt", "focus", "tag", "move"]
     await leaf.verify_opened(result, principal="chatgpt")
 
 
@@ -89,7 +89,7 @@ async def test_hidden_host_detach_requires_original_anchor_and_coherent_layout(p
     with pytest.raises(UncertainExecution) as error:
         await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
-    assert events == ["create", "receipt", "focus", "move"]
+    assert events == ["create", "receipt", "focus", "tag", "move"]
 
 
 async def test_hidden_candidate_never_substitutes_changed_visible_radio_partition(product):  # noqa: F811
@@ -114,7 +114,7 @@ async def test_hidden_candidate_never_substitutes_changed_visible_radio_partitio
     assert error.value.provider_error["cause_message"] == (
         "Shared host is not positively bound to the pre-open radio partition"
     )
-    assert events == ["create", "receipt", "focus"]
+    assert events == ["create", "receipt", "focus", "tag"]
 
 
 @pytest.mark.parametrize("operation", ["windows.list", "accessibility.inspect"])

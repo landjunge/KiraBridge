@@ -41,7 +41,10 @@ def bridge_fixture(monkeypatch, config, *, enabled=True, automatic=True):
         pool=pool,
         read_catalog=lambda: pool.list_tools("threaddesk"),
         note_success=lambda: None,
-        decode=lambda response, mutation: (True, json.loads(response.content[0].text)),
+        decode=lambda response, mutation, verified_read_tool=None: (
+            True,
+            json.loads(response.content[0].text),
+        ),
     )
     pool.sessions = {"threaddesk": SimpleNamespace(list_tools=AsyncMock(return_value=listing))}
     pool.call = AsyncMock(

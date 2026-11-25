@@ -129,6 +129,41 @@ def runtime_status(binary: str, config_path: Path | None = None) -> dict:
     }
 
 
+def wait_for_tunnel_readiness(
+    binary: str,
+    config_path: Path,
+    *,
+    timeout: float = 75,
+    poll_interval: float = 0.5,
+) -> dict:
+    """Wait for the existing read-only runtime status probe to become ready.
+
+    Only subprocess transport timeouts are retried. This never reconnects, starts,
+    or mutates the tunnel; every check remains the same authenticated health read.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BridgeError(
+                "chatgpt_runtime_not_ready",
+                "ChatGPT tunnel readiness was not proven before the bounded deadline",
+            )
+        try:
+            result = runtime_status(binary, config_path)
+        except subprocess.TimeoutExpired:
+            result = None
+        if isinstance(result, dict) and result.get("connected") is True:
+            return result
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BridgeError(
+                "chatgpt_runtime_not_ready",
+                "ChatGPT tunnel readiness was not proven before the bounded deadline",
+            )
+        time.sleep(min(poll_interval, remaining))
+
+
 def wait_for_service(config_path: Path, *, timeout: float = 30) -> None:
     """Wait for authenticated health after a restart; never retry an execution."""
     deadline = time.monotonic() + timeout

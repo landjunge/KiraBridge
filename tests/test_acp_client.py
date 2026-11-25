@@ -5,6 +5,7 @@ provider is started.
 """
 
 import asyncio
+import json
 import sys
 
 import pytest
@@ -620,3 +621,69 @@ for line in sys.stdin:
     finally:
         await acp.aclose()
         await stop(process)
+
+
+async def test_unexpected_response_id_reports_its_shape_but_never_its_content(tmp_path):
+    body = (
+        HANDSHAKE
+        + """
+import json, sys
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/prompt":
+        # A response nobody asked for, carrying a secret-looking payload.
+        print(json.dumps({"jsonrpc": "2.0", "id": 4242, "result": {"leak": "TOPSECRET"}}),
+              flush=True)
+        result = {"stopReason": "end_turn"}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        await acp.request("authenticate", {"methodId": "cached_token"}, 3)
+        new = await acp.request("session/new", {"cwd": str(tmp_path), "mcpServers": []}, 3)
+        acp.bind_session(new["sessionId"])
+        with pytest.raises(UncertainExecution) as caught:
+            await acp.request(
+                "session/prompt", {"sessionId": "s1", "prompt": [{"type": "text", "text": "hi"}]}, 3
+            )
+        assert caught.value.code == "agent_identity"
+        evidence = caught.value.provider_error
+        assert evidence["response_id"] == "4242" and "result" in evidence["message_keys"]
+        assert "TOPSECRET" not in json.dumps(evidence)
+    finally:
+        await acp.aclose()
+
+
+async def test_grok_skills_reload_notice_is_ignored_but_other_stray_ids_are_not(tmp_path):
+    body = (
+        HANDSHAKE
+        + """
+import json, sys
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/prompt":
+        print(json.dumps({"jsonrpc": "2.0", "id": "skills-reload", "result": {}}), flush=True)
+        result = {"stopReason": "end_turn"}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        await acp.request("authenticate", {"methodId": "cached_token"}, 3)
+        new = await acp.request("session/new", {"cwd": str(tmp_path), "mcpServers": []}, 3)
+        acp.bind_session(new["sessionId"])
+        done = await acp.request(
+            "session/prompt", {"sessionId": "s1", "prompt": [{"type": "text", "text": "hi"}]}, 3
+        )
+        assert done["stopReason"] == "end_turn"
+    finally:
+        await acp.aclose()

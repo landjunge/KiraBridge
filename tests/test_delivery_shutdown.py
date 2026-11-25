@@ -152,8 +152,11 @@ async def test_message_and_native_task_share_existing_handoff_input_guard(delive
             admitted = await bridge.tasks.wait_delivery(request.task_id)
             assert admitted["state"] == "running"
             rejected = await receiver.send("chatgpt", message)
-            assert rejected["processing"]["state"] == "failed"
-            assert rejected["error"]["code"] == "visible_target_busy"
+            assert rejected["processing"]["state"] == "queued"
+            assert rejected["processing"]["claimed"] is None
+            assert rejected["processing"]["evidence"]["waiting_for_visible_target"] is True
+            assert rejected["processing"]["evidence"]["reason"] == "visible_target_busy"
+            assert rejected["processing"]["evidence"]["terminal_input_attempted"] is False
         assert transport["calls"] == ["insert", "return"]
         assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 1
     finally:

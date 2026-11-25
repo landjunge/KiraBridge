@@ -351,6 +351,163 @@ async def test_real_authenticated_mcp_receiver_roundtrip_is_finite(
         assert verify(bridge.store)["valid"]
 
 
+async def test_authenticated_mcp_projects_only_exact_native_request_reply(
+    channel,
+    http_bridge,  # noqa: F811
+):
+    bridge, endpoint = http_bridge
+    async with MCPClientPool() as pool:
+        await pool.connect(Peer("codex", url=endpoint, token="codex-message-token-" + "x" * 40))
+
+        def completed_native_request(message_id, *, request_reply=True):
+            original = channel.send(
+                "codex",
+                message(
+                    idempotency_key=f"native-{message_id}",
+                    message_id=message_id,
+                    request_reply=request_reply,
+                ),
+            )
+            receipt = channel.receive("grok")["messages"][-1]["receipt"]
+            channel.ack("grok", message_id, receipt)
+            bridge.store.db.execute(
+                "INSERT INTO message_jobs(message_id,state,run_id,finished,evidence,error) "
+                "VALUES(?, 'completed', ?, 1, ?, NULL)",
+                (
+                    message_id,
+                    f"native-run-{message_id}",
+                    '{"completion_scope":"native_input_delivery","native_input_attempted":true}',
+                ),
+            )
+            return original
+
+        async def get(message_id):
+            return (
+                await pool.call("codex", "message_get", {"message_id": message_id})
+            ).structuredContent["processing"]
+
+        original_id = "native-reply-projection"
+        completed_native_request(original_id)
+        before = await get(original_id)
+        assert before["completion_scope"] == "native_input_delivery"
+        assert before["reply_id"] is None and before["request_reply_satisfied"] is False
+
+        valid = channel.send(
+            "grok",
+            message(
+                recipient="codex",
+                idempotency_key="native-valid-reply",
+                reply_to=original_id,
+                kind="answer",
+            ),
+        )
+        after = await get(original_id)
+        assert after["reply_id"] == valid["id"]
+        assert after["request_reply_satisfied"] is True
+        assert after["completion_scope"] == "native_input_delivery"
+        stored = bridge.store.db.execute(
+            "SELECT reply_id,evidence FROM message_jobs WHERE message_id=?", (original_id,)
+        ).fetchone()
+        assert stored["reply_id"] is None
+        assert stored["evidence"] == (
+            '{"completion_scope":"native_input_delivery","native_input_attempted":true}'
+        )
+
+        # A linked but wrong-kind, wrong-direction or foreign-thread record is not a reply.
+        wrong_kind_id = "native-reply-wrong-kind"
+        completed_native_request(wrong_kind_id)
+        channel.send(
+            "grok",
+            message(
+                recipient="codex",
+                idempotency_key="native-note-reply",
+                reply_to=wrong_kind_id,
+                kind="note",
+            ),
+        )
+        assert (await get(wrong_kind_id))["request_reply_satisfied"] is False
+
+        wrong_role_id = "native-reply-wrong-role"
+        completed_native_request(wrong_role_id)
+        bridge.store.db.execute(
+            "INSERT INTO messages(id,conversation_id,position,sender,recipient,kind,body,idem,"
+            "request_hash,reply_to,depth,request_reply,created) "
+            "VALUES(?, 'conversation-1', 100, 'codex', 'grok', 'answer', 'answer', ?, 'hash', ?, "
+            "1, 0, 1)",
+            ("wrong-role-answer", "wrong-role-answer", wrong_role_id),
+        )
+        assert (await get(wrong_role_id))["request_reply_satisfied"] is False
+
+        unrequested_id = "native-reply-unrequested"
+        completed_native_request(unrequested_id, request_reply=False)
+        channel.send(
+            "grok",
+            message(
+                recipient="codex",
+                idempotency_key="native-unsolicited-answer",
+                reply_to=unrequested_id,
+                kind="answer",
+            ),
+        )
+        assert (await get(unrequested_id))["request_reply_satisfied"] is False
+
+        foreign_thread_id = "native-reply-foreign-thread"
+        completed_native_request(foreign_thread_id)
+        # Model a pre-existing/corrupt cross-conversation record in the database;
+        # the projection must reject it even though its direction and reply_to match.
+        bridge.store.db.execute(
+            "INSERT INTO conversations(id,party_a,party_b,created) VALUES(?,?,?,1)",
+            ("other-thread", "codex", "grok"),
+        )
+        bridge.store.db.execute(
+            "INSERT INTO messages(id,conversation_id,position,sender,recipient,kind,body,idem,"
+            "request_hash,reply_to,depth,request_reply,created) "
+            "VALUES(?, 'other-thread', 1, 'grok', 'codex', 'answer', 'answer', ?, 'hash', ?, "
+            "1, 0, 1)",
+            ("foreign-thread-answer", "foreign-thread-answer", foreign_thread_id),
+        )
+        assert (await get(foreign_thread_id))["request_reply_satisfied"] is False
+
+        for message_id, state, attempted in [
+            ("native-reply-unknown", "unknown", True),
+            ("native-reply-no-attempt", "completed", False),
+        ]:
+            channel.send(
+                "codex",
+                message(
+                    idempotency_key=message_id,
+                    message_id=message_id,
+                    request_reply=True,
+                ),
+            )
+            receipt = channel.receive("grok")["messages"][-1]["receipt"]
+            channel.ack("grok", message_id, receipt)
+            bridge.store.db.execute(
+                "INSERT INTO message_jobs(message_id,state,run_id,finished,evidence,error) "
+                "VALUES(?,?,?,1,?,NULL)",
+                (
+                    message_id,
+                    state,
+                    f"run-{message_id}",
+                    '{"completion_scope":"native_input_delivery",'
+                    f'"native_input_attempted":{str(attempted).lower()}'
+                    "}",
+                ),
+            )
+            channel.send(
+                "grok",
+                message(
+                    recipient="codex",
+                    idempotency_key=f"reply-{message_id}",
+                    reply_to=message_id,
+                    kind="answer",
+                ),
+            )
+            projected = await get(message_id)
+            assert projected["request_reply_satisfied"] is False
+            assert projected["reply_id"] is None
+
+
 async def test_interrupted_receiver_is_unknown_and_never_claimed_again(
     channel, bridge, config, tmp_path
 ):
@@ -394,14 +551,62 @@ async def test_persisted_queue_is_resumed_by_new_receiver(
     assert (Path(config.principals["grok"].roots[0]) / "grok-invocations").read_text() == "1\n"
 
 
-def test_receiver_budget_blocks_extra_provider_turns(channel, bridge, config, tmp_path):
+async def test_receiver_recovers_persisted_jobs_without_configured_receivers(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    queued = channel.send("codex", message(dispatch=True))
+    held = channel.send("codex", message(idempotency_key="held", dispatch=True))
+    running = channel.send("codex", message(idempotency_key="interrupted", dispatch=True))
+    assert bridge.message_receiver._claim(running["id"])
+    with bridge.store.transaction():
+        bridge.queues._place_hold("codex", "messages", held["id"], "operator_hold")
+    config.messaging.receivers.clear()
+
+    await bridge.message_receiver.start()
+
+    queued_state = channel.get("codex", queued["id"])["processing"]
+    held_state = channel.get("codex", held["id"])["processing"]
+    running_state = channel.get("codex", running["id"])["processing"]
+    assert queued_state["state"] == "blocked"
+    assert queued_state["evidence"]["reason"] == "receiver_removed"
+    assert held_state["state"] == "queued"
+    assert bridge.store.db.execute(
+        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (held["id"],)
+    ).fetchone()
+    assert running_state["state"] == "unknown"
+    assert running_state["evidence"]["reason"] == "receiver_restart"
+    assert bridge.message_receiver.worker is None
+    assert bridge.messages.delivery_hook is None
+
+
+async def test_receiver_preserves_pre_cutoff_queue_without_configured_receivers(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    queued = channel.send("codex", message(dispatch=True))
+    config.messaging.receivers.clear()
+    config.messaging.separate_managed_after = queued["created"] + 1
+
+    await bridge.message_receiver.start()
+
+    assert channel.get("codex", queued["id"])["processing"]["state"] == "queued"
+    assert bridge.message_receiver.worker is None
+
+
+def test_receiver_budget_notes_extra_provider_turns_and_still_claims(
+    channel, bridge, config, tmp_path
+):
     configure_receivers(bridge, config, tmp_path)
     config.messaging.max_runs_per_conversation = 1
     first = channel.send("codex", message(dispatch=True))
     assert bridge.message_receiver._claim(first["id"])
     second = channel.send("codex", message(dispatch=True, idempotency_key="second"))
-    assert bridge.message_receiver._claim(second["id"]) is None
-    assert channel.get("codex", second["id"])["processing"]["state"] == "blocked"
+    assert bridge.message_receiver._claim(second["id"])
+    processing = channel.get("codex", second["id"])["processing"]
+    assert processing["state"] == "running"
+    assert processing["evidence"]["limit_notes"] == ["conversation_run_limit"]
+    assert processing["evidence"]["conversation_runs"] >= 1
 
 
 async def test_long_poll_is_bounded_and_wakes_on_delivery(channel):

@@ -38,6 +38,7 @@ def test_handoff_diagnostics_distinguish_retirement_from_unknown_view_withdrawal
     manager = SimpleNamespace(
         store=SimpleNamespace(db=db), security=SimpleNamespace(principal=Mock())
     )
+    manager._status_record = lambda row: VisibleHandoffs._status_record(manager, row)
     allowed = {sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION}
     db.set_authorizer(
         lambda action, *unused: sqlite3.SQLITE_OK if action in allowed else sqlite3.SQLITE_DENY

@@ -17,6 +17,38 @@ from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 from kirabridge.timing import timed, timed_async
 
+_PASTE_DIAG_INTS = (
+    "before_field",
+    "after_field",
+    "expected",
+    "common_prefix",
+    "after_rows",
+    "tail_delta",
+)
+_PASTE_DIAG_BOOLS = ("tail_changed", "marker")
+
+
+def paste_observation(detail):
+    """Content-free echo-check facts from a failed native paste, or None.
+
+    Only the known integer/boolean keys survive; any text, extra key or malformed
+    value drops the whole diagnostic. Never evidence of input, only of observation.
+    """
+    match = re.search(r"; diag=(\{[^{}\n]{1,512}\})", detail or "")
+    if not match:
+        return None
+    try:
+        value = json.loads(match.group(1))
+    except ValueError:
+        return None
+    if not isinstance(value, dict) or set(value) != set(_PASTE_DIAG_INTS + _PASTE_DIAG_BOOLS):
+        return None
+    if any(type(value[key]) is not int or abs(value[key]) > 10**7 for key in _PASTE_DIAG_INTS):
+        return None
+    if any(type(value[key]) is not bool for key in _PASTE_DIAG_BOOLS):
+        return None
+    return {key: value[key] for key in (*_PASTE_DIAG_INTS, *_PASTE_DIAG_BOOLS)}
+
 
 def _process_observation_timeout(phase):
     error = BridgeError(
@@ -87,7 +119,13 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
     groups: dict[tuple, list[dict]] = {}
     for row in rows:
         bounds = row.get("bounds") or {}
-        if row.get("script_tab_count", 1) > 1:
+        if row.get("ended") is True:
+            key = ("minimized", row.get("window_id"))  # kept apart, never counted or merged
+        elif row.get("miniaturized") is True:
+            # A window minimized to the Dock is not on screen: it must neither count as an
+            # open window nor be merged with another window that has the same size.
+            key = ("minimized", row.get("window_id"))
+        elif row.get("script_tab_count", 1) > 1:
             key = ("script", row.get("window_id"))
         else:
             key = (
@@ -100,7 +138,7 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
             if None in key:
                 key = ("script", row.get("window_id"))
         groups.setdefault(key, []).append(row)
-    ui_count = len(groups)
+    ui_count = len([key for key in groups if key[0] != "minimized"])
     tty_count: dict[str, int] = {}
     for row in rows:
         if row.get("ended"):
@@ -198,7 +236,12 @@ class TerminalAppTransport:
                     if "Selected terminal is busy" in detail
                     else "session_transport_unavailable"
                 )
-                raise BridgeError(code, detail or "Terminal.app automation failed")
+                failure = BridgeError(code, detail or "Terminal.app automation failed")
+                if code == "visible_paste_unconfirmed":
+                    observation = paste_observation(detail)
+                    if observation is not None:
+                        failure.provider_error = {"paste_observation": observation}
+                raise failure
             if len(stdout) > 1048576:
                 raise BridgeError("output_limit", "Terminal.app response too large")
             return json.loads(stdout)
@@ -298,9 +341,12 @@ class TerminalAppTransport:
      const b = w.bounds();
      return w.tabs().map((t, i) => ({
       window_id:w.id(), index:w.index(), frontmost:w.frontmost(),
+      miniaturized:w.miniaturized(),
       bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
       script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
-      tty:t.tty(), busy:t.busy(), selected:t.selected()
+      tty:t.tty(), busy:t.busy(), selected:t.selected(),
+      controlled_shell:t.titleDisplaysCustomTitle()===true&&
+       /^KiraBridge_ZLE_[0-9a-f]{48}$/.test(t.customTitle())
      }));
     }) : []);""")
             rows = attach_visual_windows(rows if isinstance(rows, list) else [])
@@ -343,6 +389,25 @@ class TerminalAppTransport:
             ]
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
+            if not members:
+                # No user process on this tty: the shell ended (Terminal.app keeps the window
+                # open) or the login is still starting. Nothing can be typed into it yet, and
+                # it is not ambiguous, so it must not mark the whole catalog incomplete.
+                # Foreign processes on the same tty are different: the window exists but
+                # cannot be represented as one of ours, so the catalog stays incomplete.
+                omitted = omitted or bool(all_members)
+                continue
+            if len(roots) > 1:
+                # A background job handed over to launchd (ppid 1: nohup, ssh -f, (cmd &)) is
+                # not a second shell. The shell root is the login process Terminal.app started,
+                # or else the one root whose parent is another process on this tty.
+                names = {p: Path(comm).name.lstrip("-") for _, p, _, comm in all_members}
+                logins = [p for p in roots if names.get(p) == "login"]
+                attached = [p for p, parent in members if p in roots and parent in all_pids]
+                for chosen in (logins, attached):
+                    if len(chosen) == 1:
+                        roots = chosen
+                        break
             if len(roots) != 1:
                 omitted = True
                 continue
@@ -362,6 +427,7 @@ class TerminalAppTransport:
                     "tab_index": row.get("tab_index"),
                     "tab_count": row.get("tab_count"),
                     "tab_selected": row.get("tab_selected"),
+                    "miniaturized": bool(row.get("miniaturized")),
                     "ui_window_count": row.get("ui_window_count"),
                     "identity_ambiguous": bool(row.get("identity_ambiguous")),
                     "selection_ambiguous": bool(row.get("selection_ambiguous")),
@@ -411,11 +477,11 @@ class TerminalAppTransport:
     }}
 """
 
-    def native_focus(self, pane_id):
+    def native_focus(self, pane_id, *, include_surface=False):
         window, tty = pane_id.split(":")[1:]
         attempts = int(TerminalAppTransport.FOCUS_ATTEMPTS)
         last_attempt = attempts - 1
-        return (
+        source = (
             self.native_target(pane_id)
             + f"""
     const w=targetWindow; tab.selected=true; app.activate(); w.frontmost=true; delay(0.15);
@@ -453,6 +519,104 @@ class TerminalAppTransport:
      }}
     }}"""
         )
+        if include_surface:
+            source += """
+    const focusedWindow=app.windows()[0], focusedBounds=focusedWindow.bounds(),
+     terminalOwner=se.processes.byName('Terminal');
+    checkFocus();
+    if(tab.busy()) throw Error('Selected terminal is busy');
+    JSON.stringify({screen:Array.from(tab.history().slice(-131072)).slice(-65536).join(''),
+     surface:{window_id:focusedWindow.id(),tty:focusedWindow.selectedTab().tty(),
+      owner_pid:terminalOwner.unixId(),title:focusedWindow.name(),
+      bounds:{x:focusedBounds.x,y:focusedBounds.y,
+       width:focusedBounds.width,height:focusedBounds.height}}});
+"""
+        return source
+
+    @staticmethod
+    def native_window_surface_guard(binding):
+        bounds = binding["bounds"]
+        return (
+            "\nconst provenBounds=targetWindow.bounds(), provenValues=[provenBounds.x,"
+            "provenBounds.y,provenBounds.width,provenBounds.height];"
+            "if(!provenValues.every(v=>typeof v==='number'&&Number.isFinite(v))"
+            "||targetWindow.id()!=="
+            + str(binding["terminal_window_id"])
+            + "||tab.tty()!=="
+            + json.dumps(binding["tty"])
+            + "||targetWindow.name()!=="
+            + json.dumps(binding["title"])
+            + "||Math.abs(provenBounds.x-"
+            + repr(bounds["x"])
+            + ")>1||Math.abs(provenBounds.y-"
+            + repr(bounds["y"])
+            + ")>1||Math.abs(provenBounds.width-"
+            + repr(bounds["width"])
+            + ")>1||Math.abs(provenBounds.height-"
+            + repr(bounds["height"])
+            + ")>1)throw Error('Physical Terminal window changed');"
+        )
+
+    async def prove_existing_target(self, row, surface, *, principal):
+        from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+        return await TerminalWindowProof(
+            self, getattr(self, "system_transport", None), principal
+        ).prove_existing_target(row, surface)
+
+    async def focus_and_prove_existing_target(
+        self,
+        row,
+        *,
+        principal,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        verify_shell=True,
+    ):
+        target = self.native_target(row["pane_id"])
+        surface = await self.native(
+            target
+            + self.native_identity_guard(identity_guard)
+            + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
+            + self.native_screen_guard(expected_screen)
+            + self.native_focus(row["pane_id"], include_surface=True)[len(target) :],
+            mutation=True,
+        )
+        if (
+            not isinstance(surface, dict)
+            or not isinstance(surface.get("screen"), str)
+            or not isinstance(surface.get("surface"), dict)
+        ):
+            raise BridgeError(
+                "visible_window_unconfirmed", "Focused Terminal window evidence is incomplete"
+            )
+        # The focus step can change what is in the input; check the screen read
+        # AFTER focus for every shell target, not only when a pre-focus screen
+        # was supplied. Agent composers use their own composer checks.
+        if verify_shell:
+            await self.verify_shell_readiness(row, surface["screen"])
+        return await self.prove_existing_target(row, surface["surface"], principal=principal)
+
+    async def verify_shell_readiness(self, row, screen=None):
+        """Use ZLE proof for KiraBridge-owned shells, text parsing for other shells."""
+        if row.get("controlled_shell") is True:
+            readiness = getattr(self, "zle_readiness", None)
+            if readiness is None:
+                raise BridgeError(
+                    "zle_session_stale", "Controlled shell ZLE channel is unavailable"
+                )
+            await readiness.probe(row)
+            return True
+        if screen is not None:
+            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+            if not empty_shell_prompt(screen):
+                raise BridgeError(
+                    "visible_input_not_empty",
+                    "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
+                )
+        return True
 
     @staticmethod
     def native_identity_guard(identities):
@@ -607,8 +771,6 @@ class TerminalAppTransport:
             await reap_process(child, process_group=False)
 
     async def prepare_shell_paste(self, row):
-        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
-
         if row.get("busy", True) or not row.get("processes"):
             raise BridgeError("session_busy", "Selected shell must be positively idle")
         snapshot = await self.shell_process_snapshot(row["tty"])
@@ -647,11 +809,7 @@ class TerminalAppTransport:
         ):
             raise BridgeError("session_busy", "Other processes exist on selected TTY")
         screen = await self.read(row["pane_id"])
-        if not empty_shell_prompt(screen):
-            raise BridgeError(
-                "visible_input_not_empty",
-                "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
-            )
+        await self.verify_shell_readiness(row, screen)
         return {
             "identities": {pid: data[3] for pid, data in records.items()},
             "screen": screen,
@@ -694,13 +852,33 @@ class TerminalAppTransport:
         shell_snapshot=None,
         agent_target=None,
         composer_only=False,
+        require_physical_visibility=False,
+        principal="local",
+        before_transport=None,
     ):
+        surface_binding = None
+        if require_physical_visibility:
+            surface_binding = await self.focus_and_prove_existing_target(
+                {"pane_id": pane_id, "tty": "/dev/" + pane_id.rsplit(":", 1)[1]},
+                principal=principal,
+                identity_guard=identity_guard,
+                expected_screen=expected_screen,
+                shell_snapshot=shell_snapshot,
+                verify_shell=agent_target is None,
+            )
+            if before_transport is not None:
+                await before_transport()
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
             # worker. native() reaps that worker before the lease requests restore.
             async with self.clipboard_owner(text) as lease:
+                focus_prefix = (
+                    self.native_target(pane_id) + self.native_focus_check(pane_id)
+                    if surface_binding is not None
+                    else self.native_focus(pane_id)
+                )
                 await self.native(
-                    self.native_focus(pane_id)
+                    focus_prefix
                     + self.native_identity_guard(identity_guard)
                     + self.native_paste_observation(text, target=agent_target)
                     + f"""
@@ -732,6 +910,11 @@ class TerminalAppTransport:
                     )
                     + "\ncheckFocus(); checkClipboard();"
                     + self.native_screen_guard(expected_screen, composer_only=composer_only)
+                    + (
+                        self.native_window_surface_guard(surface_binding)
+                        if surface_binding is not None
+                        else ""
+                    )
                     + """
         const beforePaste="""
                     + self.native_input_tail(65536)
@@ -744,7 +927,9 @@ class TerminalAppTransport:
                     + self.native_input_tail(65536)
                     + """,Number(tab.numberOfColumns()))) { echoed=true; break; }
         }
-        if(!echoed) throw Error("Paste not observed; no Return sent");
+        if(!echoed) throw Error("Paste not observed; no Return sent"
+          +(typeof __pasteDiag!=='undefined'&&__pasteDiag
+            ?"; diag="+JSON.stringify(__pasteDiag):""));
         JSON.stringify({paste_event_sent:true,return_sent:false});""",
                     mutation=True,
                 )
@@ -881,29 +1066,61 @@ class TerminalAppTransport:
             + "receipt.app_identity=host.doShellScript('/usr/bin/env LC_ALL=C /"
             "bin/ps -p '+receipt.app_pid+' -o uid=,tty=,lstart=,ppid=,comm=')"
             ".trim().replace(/\\s+/g,' ');"
-            + "receipt.creation_bound=true;tab.customTitle="
-            + json.dumps(nonce)
-            + ";tab.titleDisplaysCustomTitle=true;receipt.tagged=true;"
+            + "receipt.creation_bound=true;receipt.tagged=false;"
             + "}catch(error){receipt.preparation_error=String(error);}JSON.stringify(receipt);"
         )
 
-    def created_tab_guard(self, receipt):
+    def created_tab_guard(self, receipt, *, require_tag=False):
         pane = f"terminal:{receipt['window_id']}:{Path(receipt['tty']).name}"
-        return (
+        source = (
             self.native_target(pane)
             + self.native_identity_guard({receipt["app_pid"]: receipt["app_identity"]})
             + "\nfunction checkCreatedTab(){checkTargetIdentity();"
             + "if(targetWindow.tabs().length!==1||app.windows().flatMap(w=>w.ta"
             "bs()).filter(t=>t.tty()==="
             + json.dumps(receipt["tty"])
-            + ").length!==1||!targetWindow.name().includes("
+            + ").length!==1)throw Error('Created terminal identity changed');}checkCreatedTab();"
+        )
+        if require_tag:
+            source += (
+                "function receiptTagMatches(){const matches=app.windows().flatMap(w=>w.tabs())"
+                ".filter(t=>t.customTitle()==="
+                + json.dumps(receipt["nonce"])
+                + "&&t.titleDisplaysCustomTitle()===true);return matches.length===1&&"
+                "matches[0].tty()===" + json.dumps(receipt["tty"]) + "&&"
+                "tab.customTitle()==="
+                + json.dumps(receipt["nonce"])
+                + "&&tab.titleDisplaysCustomTitle()===true;}"
+                "if(!receiptTagMatches())throw Error('Created terminal tag changed');"
+            )
+        return source
+
+    def tag_created_tab(self, receipt):
+        return (
+            self.created_tab_guard(receipt)
+            + "\nconst nonce="
             + json.dumps(receipt["nonce"])
-            + "))throw Error('Created terminal identity changed');}checkCreatedTab();"
+            + ";"
+            + "if(app.windows().flatMap(w=>w.tabs()).some(t=>t.tty()!=="
+            + json.dumps(receipt["tty"])
+            + "&&t.customTitle()===nonce&&t.titleDisplaysCustomTitle()===true))"
+            + "throw Error('Created terminal tag is ambiguous');"
+            + "tab.selected=true;tab.customTitle=nonce;tab.titleDisplaysCustomTitle=true;"
+            + "const getterTitle=tab.customTitle(),getterDisplay=tab.titleDisplaysCustomTitle();"
+            + "const titleMatches=app.windows().flatMap(w=>w.tabs()).filter(t=>"
+            "t.customTitle()===nonce&&t.titleDisplaysCustomTitle()===true);"
+            + "if(getterTitle!==nonce||getterDisplay!==true||titleMatches.length!==1||"
+            "titleMatches[0].tty()!=="
+            + json.dumps(receipt["tty"])
+            + ")"
+            + "throw Error('Created terminal tag readback failed');"
+            + "JSON.stringify({tagged:true,tty:tab.tty(),window_id:targetWindow.id(),"
+            "custom_title_readback:getterTitle,title_display_readback:getterDisplay});"
         )
 
     async def move_created_tab(self, receipt):
         source = (
-            self.created_tab_guard(receipt)
+            self.created_tab_guard(receipt, require_tag=True)
             + """
 const se=Application('System Events'), owners=se.processes().filter(p=>p.unixId()===__PID__);
 if(owners.length!==1||owners[0].bundleIdentifier()!=='com.apple.Terminal')
@@ -940,21 +1157,25 @@ entries[0].click();JSON.stringify({detached:true});
         if result.get("detached") is not True:
             raise UncertainExecution("session_open_unknown", "Detach result unknown; never replay")
 
-    async def open(self, command, *, on_created=None, principal="session_open"):
+    async def open(self, command, *, on_created=None, principal="session_open", custom_title=None):
         from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
 
         proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)
         await proof.prepare()
         receipt = None
         try:
-            source = self.native_open_source(command, "KiraBridge_" + secrets.token_hex(16), proof)
+            source = self.native_open_source(
+                command,
+                custom_title or "KiraBridge_" + secrets.token_hex(16),
+                proof,
+            )
             receipt = await self.native(source, mutation=True)
             if on_created is not None:
                 await on_created(dict(receipt))
             require(
                 receipt.get("opened") is True
                 and receipt.get("creation_bound") is True
-                and receipt.get("tagged") is True
+                and receipt.get("tagged") is False
                 and not receipt.get("preparation_error")
                 and receipt.get("script_tab_count") == 1,
                 "Created Terminal receipt is incomplete",
@@ -968,6 +1189,16 @@ entries[0].click();JSON.stringify({detached:true});
                 + "\ncheckCreatedTab();checkFocus();JSON.stringify({focused:true});",
                 mutation=True,
             )
+            stamped = await self.native(self.tag_created_tab(receipt), mutation=True)
+            require(
+                stamped.get("tagged") is True
+                and stamped.get("tty") == receipt["tty"]
+                and stamped.get("window_id") == receipt["window_id"]
+                and stamped.get("custom_title_readback") == receipt["nonce"]
+                and stamped.get("title_display_readback") is True,
+                "Created Terminal tag receipt is incomplete",
+            )
+            receipt["tagged"] = True
             binding = await proof.isolate(receipt)
             return {**receipt, "physical_window": binding, "separate_window": True}
         except Exception as cause:
@@ -1090,19 +1321,21 @@ entries[0].click();JSON.stringify({detached:true});
                 await reap_process(child, process_group=False)
 
     async def send_confirmed(
-        self, row, text, identity, *, before_transport=None, expected_cwd=None
+        self,
+        row,
+        text,
+        identity,
+        *,
+        before_transport=None,
+        expected_cwd=None,
+        require_physical_visibility=False,
+        principal="local",
     ):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
         if identity.split()[1] != Path(row["tty"]).name:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
-        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
-
         screen = await self.read(row["pane_id"])
-        if not empty_shell_prompt(screen):
-            raise BridgeError(
-                "visible_input_not_empty",
-                "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
-            )
+        await self.verify_shell_readiness(row, screen)
         detailed = len(identity.split(None, 8)) == 9
         if expected_cwd is not None:
             if not detailed or any(ord(c) < 32 or ord(c) == 127 for c in str(expected_cwd)):
@@ -1132,9 +1365,14 @@ entries[0].click();JSON.stringify({detached:true});
             if expected_cwd is not None
             else ""
         )
-        if before_transport is not None:
+        if before_transport is not None and not require_physical_visibility:
             await before_transport()
         target = self.native_target(row["pane_id"])
+        focused = self.native_focus(row["pane_id"], include_surface=require_physical_visibility)[
+            len(target) :
+        ]
+        if not require_physical_visibility:
+            focused += "\ncheckFocus(); JSON.stringify(" + self.native_input_tail(65536) + ");"
         identity_check = (
             "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
             + "\nconst observed=host.doShellScript("
@@ -1144,25 +1382,42 @@ entries[0].click();JSON.stringify({detached:true});
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
         )
-        screen = await self.native(
+        focused_result = await self.native(
             target
             + identity_guard
             + own_boundary
             + identity_check
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             + self.native_screen_guard(screen)
-            + self.native_focus(row["pane_id"])[len(target) :]
-            + "\ncheckFocus(); JSON.stringify("
-            + self.native_input_tail(65536)
-            + ");",
+            + focused,
             mutation=True,
         )
+        surface_binding = None
+        if require_physical_visibility:
+            if (
+                not isinstance(focused_result, dict)
+                or not isinstance(focused_result.get("screen"), str)
+                or not isinstance(focused_result.get("surface"), dict)
+            ):
+                raise BridgeError(
+                    "visible_window_unconfirmed", "Focused Terminal window evidence is incomplete"
+                )
+            screen = focused_result["screen"]
+            surface_binding = await self.prove_existing_target(
+                row, focused_result["surface"], principal=principal
+            )
+        else:
+            screen = focused_result
         # Tab selection may reflow history or change blank row padding. Accept
         # only the fresh history tail read AFTER that transition in the same
         # focus call. Compare it byte-for-byte later, without another selection
         # or activation in the dispatch.
-        if not empty_shell_prompt(screen):
-            raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
+        await self.verify_shell_readiness(row, screen)
+        if before_transport is not None and require_physical_visibility:
+            await before_transport()
+        # Fresh challenge after focus and screen checks, immediately before
+        # the native Paste script is launched.
+        await self.verify_shell_readiness(row, screen)
         return await self.native(
             target
             + identity_guard
@@ -1170,6 +1425,11 @@ entries[0].click();JSON.stringify({detached:true});
             + identity_check
             + TerminalAppTransport.native_focus_check(row["pane_id"])
             + "\ncheckFocus();"
+            + (
+                self.native_window_surface_guard(surface_binding)
+                if surface_binding is not None
+                else ""
+            )
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             # Use the accepted screen, not a second prompt parser that can drift.
             + self.native_screen_guard(screen)

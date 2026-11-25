@@ -27,7 +27,7 @@ def _offline_harness(source: str, change: str | None) -> str:
         + r"""
 let clicks=0, selectedCalls=0, windowCalls=0, nameCalls=0, enabledCalls=0;
 const nonce='KiraBridge_test_nonce', tty='/dev/ttys014';
-const tab={tty:()=>tty};
+const tab={tty:()=>tty,customTitle:()=>nonce,titleDisplaysCustomTitle:()=>true};
 const targetWindow={id:()=>12601,tabs:()=>[tab],selectedTab:()=>tab,name:()=>nonce};
 const app={windows:()=>[targetWindow]};
 function checkTargetIdentity(){}
@@ -35,6 +35,8 @@ function checkCreatedTab(){checkTargetIdentity();if(targetWindow.tabs().length!=
  app.windows().flatMap(w=>w.tabs()).filter(t=>t.tty()==='/dev/ttys014').length!==1||
  !targetWindow.name().includes('KiraBridge_test_nonce'))
  throw Error('Created terminal identity changed');}
+function checkTag(){if(tab.customTitle()!==nonce||tab.titleDisplaysCustomTitle()!==true)
+ throw Error('Created terminal tag changed');}
 const detach={
  name:()=>{nameCalls++;return cfg.change==='late-label'&&nameCalls>1
   ?'Other':'Tab in ein neues Fenster bewegen';},
@@ -70,9 +72,10 @@ async def _capture_actual_source() -> str:
         "FakeTransport",
         (),
         {
-            "created_tab_guard": lambda self, receipt: (
+            "created_tab_guard": lambda self, receipt, *, require_tag=False: (
                 "const app=Application('Terminal');"
-                "const targetWindow={id:()=>12601,tabs:()=>[{tty:()=>'/dev/ttys014'}],"
+                "const targetWindow={id:()=>12601,tabs:()=>[{tty:()=>'/dev/ttys014',"
+                "customTitle:()=> 'KiraBridge_test_nonce',titleDisplaysCustomTitle:()=>true}],"
                 "selectedTab:()=>({tty:()=>'/dev/ttys014'}),"
                 "name:()=> 'KiraBridge_test_nonce'};"
                 "function checkTargetIdentity(){};"
@@ -81,12 +84,21 @@ async def _capture_actual_source() -> str:
                 "app.windows().flatMap(w=>w.tabs()).filter(t=>t.tty()==='/dev/ttys014').length!==1||"
                 "!targetWindow.name().includes('KiraBridge_test_nonce'))"
                 "throw Error('Created terminal identity changed');}"
+                + (
+                    "function receiptTagMatches(){return targetWindow.tabs().filter(t=>"
+                    "t.tty()==='/dev/ttys014'&&t.customTitle()==='KiraBridge_test_nonce'&&"
+                    "t.titleDisplaysCustomTitle()===true).length===1;}"
+                    "if(!receiptTagMatches())throw Error('Created terminal tag changed');"
+                    if require_tag
+                    else ""
+                )
             ),
             "native": native,
         },
     )()
     await TerminalAppTransport.move_created_tab(transport, RECEIPT)
     assert len(captured) == 1
+    assert "receiptTagMatches()" in captured[0]
     return captured[0]
 
 

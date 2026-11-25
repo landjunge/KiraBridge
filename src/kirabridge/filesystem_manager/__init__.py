@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import os
 import re
 import stat
@@ -45,8 +46,10 @@ class PathScope:
                 next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
                 os.close(fd)
                 fd = next_fd
-        except OSError:
+        except OSError as error:
             os.close(fd)
+            if error.errno == errno.ENOENT:
+                raise BridgeError("not_found", "Directory does not exist") from None
             raise BridgeError(
                 "path_denied", "Cannot open a directory without following symlinks"
             ) from None

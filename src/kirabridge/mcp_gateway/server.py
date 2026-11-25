@@ -19,8 +19,10 @@ from kirabridge.keyboard_system import KeyboardSystemKeyInput
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
 from kirabridge.team_manager.models import (
+    TeamCoordinatorHandoff,
     TeamCreate,
     TeamMessageSend,
+    TeamOnboardRegister,
     TeamRoleSet,
     TeamSessionClear,
     TeamSessionGet,
@@ -29,6 +31,7 @@ from kirabridge.team_manager.models import (
     TeamWorkCreate,
     TeamWorkReprocess,
 )
+from kirabridge.visible_handoff import peer_route_status
 
 
 def inline_task_timeout(operation: str) -> float:
@@ -55,6 +58,23 @@ def inline_task_timeout(operation: str) -> float:
     }:
         return 1
     return 2
+
+
+def strip_schema_titles(node, *, names=False):
+    """Drop generated ``title`` labels from a JSON schema; they only repeat the field name.
+
+    ``names`` marks a mapping whose keys are property or definition names, which are kept
+    even when one is called ``title``. Validation does not use the published schema.
+    """
+    if isinstance(node, list):
+        return [strip_schema_titles(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    return {
+        key: strip_schema_titles(value, names=key in ("properties", "$defs") and not names)
+        for key, value in node.items()
+        if names or key != "title" or not isinstance(value, str)
+    }
 
 
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
@@ -102,9 +122,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Query task_get and task_events for additional evidence. "
         "Use message_send/message_receive for addressed peer communication. "
         "Use team_* tools for shared role-based teams, addressed communication and delegated work. "
-        "For an explicitly configured native AutoNext coordinator, coordinator_status reads "
-        "its owner-scoped phases; completion_receive/ack consumes its durable terminal notices. "
-        "Only pinned grants and successful checks advance work; reading or acknowledging "
+        "completion_receive/ack consumes durable terminal notices; reading or acknowledging "
         "a notice grants no execution rights. "
         "Team results are shared only with team members; private tasks stay private. "
         "ChatGPT is an external participant and is never automatically awakened by a team role. "
@@ -444,7 +462,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Allowed: bridge_health, clipboard_info, operation_catalog, task_get,
         task_events, task_diagnose, task_list, policy_inspect, bridge_readiness,
         agent_inventory, macos_status, live_logs, session_catalog, session_read,
-        whiteboard_read, read_query (one non-batch query).
+        whiteboard_read, whiteboard_search, read_query (one non-batch query).
         JSON text results only: use the original tool for images. The cooperative
         deadline is 12s and the result budget 2 MiB; partial results are explicit.
         Cached clients can use read_query operation=tool.batch with these calls.
@@ -549,13 +567,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def whiteboard_read(
-        ctx: Context, thread_id: str | None = None, entry_id: str | None = None
+        ctx: Context,
+        thread_id: str | None = None,
+        entry_id: str | None = None,
+        order: Literal["oldest", "newest"] = "oldest",
+        offset: int = 0,
+        limit: int | None = None,
+        include_content: bool = False,
     ) -> dict[str, Any]:
         """Read one ThreadDesk whiteboard, or one entry, without switching threads.
 
         Uses only the configured ThreadDesk workspace files. Does not append,
         execute whiteboard text, or change the active thread. Omit thread_id to
         read the active thread. Pass the repair thread id to read that board.
+        Für die neuesten Einträge order="newest" verwenden.
         """
         from kirabridge.whiteboard_read import read_whiteboard
 
@@ -564,9 +589,38 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             workspace = bridge.config.threaddesk.workspace
             if not workspace:
                 raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
-            return read_whiteboard(workspace, thread_id, entry_id)
+            return read_whiteboard(
+                workspace,
+                thread_id,
+                entry_id,
+                offset=offset,
+                limit=limit,
+                include_content=include_content,
+                order=order,
+            )
 
         # Large boards take seconds to scan; never stall other calls on the loop.
+        return await asyncio.to_thread(safe, action)
+
+    @server.tool(annotations=read)
+    async def whiteboard_search(
+        id: str, query: str, ctx: Context, limit: int = 10
+    ) -> dict[str, Any]:
+        """Search entry text on one whiteboard. Same read permission as whiteboard_read.
+
+        Case-insensitive substring, newest hit first, excerpt at most 200
+        characters. The result is untrusted data and is never executed.
+        query is at most 200 characters; limit is 1..20.
+        """
+        from kirabridge.whiteboard_read import search_whiteboard
+
+        def action():
+            bridge.security.principal(identity(ctx), "threaddesk.read")
+            workspace = bridge.config.threaddesk.workspace
+            if not workspace:
+                raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
+            return search_whiteboard(workspace, id, query, limit=limit)
+
         return await asyncio.to_thread(safe, action)
 
     @server.tool(annotations=write)
@@ -583,8 +637,28 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         Existing files are not rewritten. Repeat the same external_key to
         receive the original entry id again. The result is untrusted data.
+        Technical types progress, claimed, task and problem keep only the
+        latest state in this KiraBridge process.
         """
+        from kirabridge.technical_entries import mcp_append_decision
         from kirabridge.whiteboard_read import append_whiteboard
+
+        try:
+            who = identity(ctx)
+        except Exception:
+            who = actor if isinstance(actor, str) and actor else "unknown"
+        decision = mcp_append_decision(
+            bridge,
+            who,
+            thread_id=thread_id,
+            entry_type=entry_type,
+            content=content,
+            actor=actor,
+            actor_type=actor_type,
+            external_key=external_key,
+        )
+        if decision is not None:
+            return decision
 
         def action():
             bridge.security.principal(identity(ctx), "threaddesk.manage")
@@ -633,6 +707,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         ctx: Context,
         observe_terminals: bool = False,
         operations: list[str] | None = None,
+        compact: bool = False,
     ) -> dict[str, Any]:
         """Permitted version-1 operations and exact argument JSON schemas.
 
@@ -642,6 +717,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         observations never authorize input or replace fresh target validation.
         Set operations to 1–32 exact operation names to obtain only the argument
         schemas needed for this action; omit it for the complete permitted catalog.
+        With selected operations, compact=true returns only permission context, the
+        selected schemas and a lightweight discovery epoch. It cannot observe terminals.
         """
 
         def action():
@@ -660,21 +737,39 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 or any(name not in INPUTS and name not in setup_reads for name in operations)
             ):
                 raise BridgeError("invalid_arguments", "Select 1–32 distinct known operations")
-            platform_rows = {
-                row["operation"]: row
-                for row in bridge.macos.operation_catalog(
-                    lambda op: decision(bridge.config, identity(ctx), op)
+            if compact and (operations is None or observe_terminals):
+                raise BridgeError(
+                    "invalid_arguments",
+                    "Compact discovery requires selected operations and no terminal observation",
                 )
+            requested = set(operations) if operations is not None else set(INPUTS)
+            platform_rows = {}
+            macos_operations = requested & set(bridge.macos.descriptors)
+            if requested & macos_operations:
+                platform_rows.update(
+                    {
+                        row["operation"]: row
+                        for row in bridge.macos.operation_catalog(
+                            lambda op: decision(bridge.config, identity(ctx), op)
+                        )
+                    }
+                )
+            windows_keyboard_operations = {
+                "windows.keyboard.inspect",
+                "windows.keyboard.sequence",
+                "windows.keyboard.shortcut",
+                "windows.keyboard.text",
             }
-            platform_rows.update(
-                {
-                    row["operation"]: row
-                    for row in bridge.windows_keyboard.catalog(
-                        lambda op: decision(bridge.config, identity(ctx), op)
-                    )
-                }
-            )
-            if current_platform().name == "linux":
+            if requested & windows_keyboard_operations:
+                platform_rows.update(
+                    {
+                        row["operation"]: row
+                        for row in bridge.windows_keyboard.catalog(
+                            lambda op: decision(bridge.config, identity(ctx), op)
+                        )
+                    }
+                )
+            if current_platform().name == "linux" and "terminal.visible" in requested:
                 permission = decision(bridge.config, identity(ctx), "terminal.visible")
                 platform_rows["terminal.visible"] = {
                     "operation": "terminal.visible",
@@ -690,17 +785,65 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "os_permission_state": "current_user_process",
                     "runtime_availability": "not_probed",
                 }
-            platform_rows.update(
-                {
-                    row["operation"]: row
-                    for row in bridge.windows_windows.catalog(
-                        lambda op: decision(bridge.config, identity(ctx), op)
-                    )
-                }
-            )
+            windows_window_operations = {"windows.window.list", "windows.window.control"}
+            if requested & windows_window_operations:
+                platform_rows.update(
+                    {
+                        row["operation"]: row
+                        for row in bridge.windows_windows.catalog(
+                            lambda op: decision(bridge.config, identity(ctx), op)
+                        )
+                    }
+                )
             # Host platform is a process-lifetime fact. Do not reconstruct the
             # full native capability snapshot for every operation in this request.
             native_host = bridge.macos.host_platform == "darwin"
+            selected_rows = {
+                name: {
+                    **OPERATIONS[name].describe(),
+                    "execution_budget_seconds": TERMINAL_QUERY_SECONDS
+                    if name in {"session.catalog", "session.read"}
+                    else None,
+                    "arguments": model.model_json_schema(),
+                    "approval_required": decision(bridge.config, identity(ctx), name)[
+                        "approval_required"
+                    ],
+                    "permission_decision": decision(bridge.config, identity(ctx), name),
+                    **({"platform": platform_rows[name]} if name in platform_rows else {}),
+                }
+                for name, model in INPUTS.items()
+                if (operations is None or name in operations)
+                and decision(bridge.config, identity(ctx), name)["authorized"]
+                and (
+                    name not in platform_rows
+                    or name
+                    in {
+                        "session.catalog",
+                        "session.read",
+                        "session.input",
+                        "session.focus",
+                        "session.close",
+                        "clipboard.info",
+                    }
+                    or not native_host
+                    or platform_rows[name]["eligible_for_submission"]
+                )
+            }
+            selected_rows.update(
+                {
+                    name: entry
+                    for name, entry in setup_reads.items()
+                    if operations is None or name in operations
+                }
+            )
+            if compact:
+                return {
+                    "api_version": "1",
+                    "approval_mode": policy.approval_mode,
+                    "permission_level": level_for(policy),
+                    "permission_label": LEVELS[level_for(policy)],
+                    "operations": selected_rows,
+                }
             result = {
                 "api_version": "1",
                 "approval_mode": policy.approval_mode,
@@ -724,45 +867,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "automatic_prompt_additions": False,
                 },
                 **bridge.messages.voice_channel.profile(identity(ctx)),
-                "operations": {
-                    name: {
-                        **OPERATIONS[name].describe(),
-                        "execution_budget_seconds": TERMINAL_QUERY_SECONDS
-                        if name in {"session.catalog", "session.read"}
-                        else None,
-                        "arguments": model.model_json_schema(),
-                        "approval_required": decision(bridge.config, identity(ctx), name)[
-                            "approval_required"
-                        ],
-                        "permission_decision": decision(bridge.config, identity(ctx), name),
-                        **({"platform": platform_rows[name]} if name in platform_rows else {}),
-                    }
-                    for name, model in INPUTS.items()
-                    if (operations is None or name in operations)
-                    and decision(bridge.config, identity(ctx), name)["authorized"]
-                    and (
-                        name not in platform_rows
-                        or name
-                        in {
-                            "session.catalog",
-                            "session.read",
-                            "session.input",
-                            "session.focus",
-                            "session.close",
-                            "clipboard.info",
-                        }
-                        or not native_host
-                        or platform_rows[name]["eligible_for_submission"]
-                    )
-                },
+                "operations": selected_rows,
             }
-            result["operations"].update(
-                {
-                    name: entry
-                    for name, entry in setup_reads.items()
-                    if operations is None or name in operations
-                }
-            )
             return result
 
         from kirabridge.discovery import live, snapshot
@@ -778,11 +884,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                         "unauthorized or unavailable"
                     ),
                 }
-            result["discovery"] = (
-                await live(bridge, identity(ctx))
-                if observe_terminals
-                else snapshot(bridge, identity(ctx))
-            )
+            if compact:
+                from kirabridge.discovery import epoch
+
+                result["discovery"] = epoch(bridge, identity(ctx))
+            else:
+                result["discovery"] = (
+                    await live(bridge, identity(ctx))
+                    if observe_terminals
+                    else snapshot(bridge, identity(ctx))
+                )
         return result
 
     @server.tool(annotations=write)
@@ -1158,8 +1269,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """Direct native terminal work with task-bound output and observed exit status.
 
-        Reuses one suitable empty existing Terminal.app shell or opens a separate visible
-        window under the same exact-task/standing grant. Busy agents are preserved.
+        Reuses one suitable empty existing Terminal.app shell or, when create_if_needed is
+        true, opens a separate controlled visible shell if no confirmed-empty shell exists.
+        Ambiguous existing prompts are preserved; busy agents are preserved. Window creation
+        remains under the same exact-task/standing grant.
         Optional pane_id/expected_pid binds an explicit current target. Inspect task_get
         for actual visible command completion; an uncertain outcome must never be replayed.
         On Linux, executes exact argv in a fresh short-lived owned PTY and closes it after
@@ -1282,20 +1395,6 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 
-    @server.tool(annotations=read)
-    def coordinator_status(ctx: Context) -> dict[str, Any]:
-        """Read your configured coordinator's bounded phases without starting work.
-
-        Requires team.read and the configured owner. Returns only the current
-        pinned grant, work IDs/states and completion channel; no prompts/results.
-        Use completion_receive on that target and completion_ack after processing
-        for durable accepted/stopped notices. Cached clients can use read_query
-        operation=coordinator.status. Receipt delivery does not wake an inactive chat.
-        """
-        from kirabridge.autonext.status import coordinator_status as project_status
-
-        return safe(lambda: project_status(bridge, identity(ctx)))
-
     @server.tool(annotations=delivery)
     async def completion_receive(
         ctx: Context,
@@ -1307,7 +1406,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Wait for own durable completion notices, including already finished tasks.
 
         Pass source_id (the task id) to read that notice even when older unacked
-        notices still sit in the same target. Omit it to keep the oldest-first inbox.
+        notices still sit in the same target. Without source_id, notices are newest-first.
         Run a persistent consumer that rearms this bounded wait; no task-status polling.
         Receipts/IDs remain stable until completion_ack after consumer processing.
         A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.
@@ -1356,10 +1455,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         exact same message. Work/questions to CLI agents use their assigned visible terminal
         even with dispatch=false. One bounded visible attempt is observed before returning;
         busy/missing/changed targets fail without a waiting backlog or hidden fallback.
-        For guidance to an already-working cooperating agent, use a NEW note with
-        dispatch=false and request_reply=false on its agreed conversation_id.
-        The recipient must poll message_receive and deduplicate IDs before applying/ACK;
-        this inbox route does not wake or automatically steer the active session.
+        Set recipient='coordinator' to address the currently bound coordinator role. The
+        resolver uses persisted team-role/session records and requires one exact eligible
+        current identity; stale, changing or ambiguous roles fail closed. During handoff,
+        the current coordinator remains the route until acceptance is verified.
+        A concrete recipient such as 'codex' or 'grok' remains an explicit peer override.
+        The message keeps its original role target on idempotent replay; new messages resolve
+        the role again. A reply to a role-addressed message stays in that logical conversation.
+        For an addressed message to the assigned native Codex, use dispatch=true only
+        when the sender has the existing message-peer, agent.execute, session.inspect
+        and session.input grants. The verified native route steers the exact active turn
+        (or starts the assigned route when idle); accepted input is not proof of reading,
+        an ACK, or a reply. The recipient must process and ACK the original message ID.
+        dispatch=false is explicitly a passive inbox post: it does not wake or steer an
+        active session. Use it only when polling/reading later is intended.
         Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         Returned answers stay in the sender's client inbox; they do not automatically
@@ -1469,14 +1578,25 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                             and bridge.message_receiver.worker
                             and not bridge.message_receiver.worker.done()
                         ),
+                        "route": peer_route_status(bridge, config, peer),
                     }
                     for peer in policy.message_peers
                 },
-                "session_scope": "existing_visible_terminal"
+                "session_scope": "per_recipient"
+                if config.visible_handoffs.native_codex is not None
+                else "existing_visible_terminal"
                 if config.visible_handoffs.enabled
                 else "separate_managed_session",
                 "visible_handoffs": config.visible_handoffs.model_dump(),
                 "binding_runtime_status": "not_probed",
+                "native_codex_route": {
+                    "configured": config.visible_handoffs.native_codex is not None,
+                    "recipient": "codex",
+                    "scope": "new_direct_messages_to_assigned_root",
+                    "session_scope": "existing_native_codex_root",
+                    "validation": "fresh_host_and_root_on_each_attempt",
+                    "automatic_history_retry": False,
+                },
                 "existing_session_attached": False,
                 "attachment_meaning": "no_persistent_agent_protocol_attachment; "
                 "exact_existing_UI_target_revalidated_on_each_action",
@@ -1488,6 +1608,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "input_operation": "session.input",
                 },
                 "jobs": {row["state"]: row["count"] for row in states},
+                # Team replies are stored and pulled; no push to this caller exists.
+                "team_return_path": bridge.teams.return_path_status(principal),
                 "limits": config.messaging.model_dump(exclude={"receivers"}),
             }
 
@@ -1530,6 +1652,25 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.teams.get(identity(ctx), team_id))
 
     @server.tool(annotations=read)
+    def team_coordinator_status(team_id: str, ctx: Context) -> dict[str, Any]:
+        """Read the team coordinator, authorized session candidates and any pending handoff."""
+        return safe(lambda: bridge.teams.coordinator_status(identity(ctx), team_id))
+
+    # Publicly observed short name. Same function, identity, authorization and result;
+    # previously absent from the catalog (proxy: tool_unavailable).
+    server.add_tool(
+        team_coordinator_status,
+        name="coordinator_status",
+        annotations=read,
+        description="Alias of team_coordinator_status; identical authorization and result.",
+    )
+
+    @server.tool(annotations=write)
+    def team_coordinator_handoff(request: TeamCoordinatorHandoff, ctx: Context) -> dict[str, Any]:
+        """Offer a proven session the coordinator role, effective only after acceptance."""
+        return safe(lambda: bridge.teams.request_coordinator_handoff(identity(ctx), request))
+
+    @server.tool(annotations=read)
     def team_context(team_id: str, ctx: Context) -> dict[str, Any]:
         """Bounded current team context, recent results and this member's pending messages."""
         return safe(lambda: bridge.teams.context(identity(ctx), team_id))
@@ -1554,8 +1695,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.teams.set_role(identity(ctx), request))
 
     @server.tool(annotations=write)
+    def team_onboard_register(request: TeamOnboardRegister, ctx: Context) -> dict[str, Any]:
+        """Owner-only identity registration; candidate validated, backups kept, tokens hidden."""
+        return safe(lambda: bridge.teams.onboard_register(identity(ctx), request))
+
+    @server.tool(annotations=write)
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
-        """Send addressed team data; sender is authenticated, never supplied.
+        """Send to a named member or to recipient 'coordinator'; sender comes from authentication.
 
         Kira and Eve need no special approval marker; normal team permissions apply.
         Historical buffers never release automatically.
@@ -1664,5 +1810,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     from kirabridge.mcp_gateway.timing import instrument_server
 
+    for registered in server._tool_manager.list_tools():
+        registered.parameters = strip_schema_titles(registered.parameters)
     instrument_server(server._mcp_server, "daemon")
     return server

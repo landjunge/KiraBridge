@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -20,6 +21,20 @@ from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 
 def automatic(config):
     config.principals["local"].approval_mode = "automatic"
+
+
+def test_empty_completion_read_does_not_wait_for_sqlite_writer(bridge):
+    writer = sqlite3.connect(bridge.config.state_path / "bridge.sqlite3", isolation_level=None)
+    original_timeout = bridge.store.db.execute("PRAGMA busy_timeout").fetchone()[0]
+    writer.execute("BEGIN IMMEDIATE")
+    bridge.store.db.execute("PRAGMA busy_timeout=0")
+    try:
+        result = bridge.completions.receive("local")
+        assert result["notices"] == []
+    finally:
+        bridge.store.db.execute(f"PRAGMA busy_timeout={original_timeout}")
+        writer.execute("ROLLBACK")
+        writer.close()
 
 
 def terminal(config, code, task_id="work", timeout=3):
@@ -49,10 +64,12 @@ async def test_source_id_reads_a_newer_notice_behind_an_unacked_inbox(bridge, co
             "notices"
         ]
         assert [item["payload"]["task_id"] for item in selected] == [later["payload"]["task_id"]]
+        # Newest first: fresh results are never buried behind old unacknowledged ones.
         assert (
             bridge.completions.receive("local")["notices"][0]["payload"]["task_id"]
-            == earlier["payload"]["task_id"]
+            == later["payload"]["task_id"]
         )
+        assert earlier["seq"] < later["seq"]
 
 
 async def test_immediate_completion_before_listener_and_route_is_atomic(bridge, config):

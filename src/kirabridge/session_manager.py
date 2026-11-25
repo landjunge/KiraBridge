@@ -24,6 +24,36 @@ from kirabridge.session_ports import SessionPorts, SessionTransport, TerminalApp
 from kirabridge.terminal_manager import check_executable
 from kirabridge.timing import timed_async
 
+# The only receiver-management owner: the local operator identity (see VisibleHandoffs).
+RECEIVER_OWNER = "local"
+
+
+def launch_command(principal, launched_agent, argv):
+    """Exact shell line for an owned launch; owner-launched known CLIs get their
+    adapter's process-local environment as POSIX assignment prefixes only."""
+    line = shlex.join(argv)
+    if principal != RECEIVER_OWNER or not launched_agent:
+        return line
+    from kirabridge.cli_adapters import adapter_for
+
+    try:
+        environment = getattr(adapter_for(launched_agent), "launch_environment", None)
+    except (KeyError, LookupError, BridgeError):
+        environment = None
+    if not isinstance(environment, dict) or not environment:
+        return line
+    assignments = []
+    for key, value in sorted(environment.items()):
+        if not (
+            isinstance(key, str)
+            and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key)
+            and isinstance(value, str)
+            and re.fullmatch(r"[A-Za-z0-9_.-]{0,64}", value)
+        ):
+            raise BridgeError("invalid_arguments", "Adapter launch environment is not literal")
+        assignments.append(f"{key}={shlex.quote(value)}")
+    return " ".join([*assignments, line])
+
 
 class SessionReference(Input):
     pane_id: str = Field(pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+|linux:[1-9][0-9]*)$")
@@ -139,6 +169,7 @@ class SessionManager:
         )
         self.linux = linux if linux is not None else LinuxOwnedTerminal()
         self.desktop = self.terminal_app.desktop
+        self.zle_readiness = None
 
     def direct(self, principal):
         return (
@@ -534,19 +565,23 @@ class SessionManager:
                     "Native agent input requires a task-owned selection",
                 )
             if identities is not None:
-                text = await self.terminal_app.read(args.pane_id)
-                if self.readiness is None:
-                    raise BridgeError(
-                        "visible_target_unknown", "No readiness assessor for agent input"
+                # The selection above is this insert's fresh read. The widget
+                # check reuses that row; it must not start a second catalogue
+                # before the paste, and it must not authorize the paste itself.
+                with self.observation_scope(principal, selected):
+                    text = await self.terminal_app.read(args.pane_id)
+                    if self.readiness is None:
+                        raise BridgeError(
+                            "visible_target_unknown", "No readiness assessor for agent input"
+                        )
+                    observation = await self.readiness(
+                        principal,
+                        {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
                     )
-                observation = await self.readiness(
-                    principal,
-                    {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
-                )
-                if not observation or not observation.get("ready"):
-                    raise BridgeError(
-                        "visible_target_not_ready", "Current agent widget is not ready"
-                    )
+                    if not observation or not observation.get("ready"):
+                        raise BridgeError(
+                            "visible_target_not_ready", "Current agent widget is not ready"
+                        )
                 if before_transport is not None:
                     await before_transport()
                 await self.terminal_app.insert(
@@ -659,10 +694,15 @@ class SessionManager:
                 )
             plain_paste = args.pane_id.startswith("terminal:") and not args.submit
             args = self.input_release.dispatch(principal, args, task_id)
+            physical_visibility = (
+                {"require_physical_visibility": True, "principal": principal}
+                if visible_direct
+                else {}
+            )
             if plain_paste:
                 self.terminal_app.validate_shell_paste_text(args.text)
                 context = await self.terminal_app.prepare_shell_paste(selected)
-                if before_transport is not None:
+                if before_transport is not None and not visible_direct:
                     await before_transport()
                 await self.terminal_app.insert(
                     args.pane_id,
@@ -670,11 +710,17 @@ class SessionManager:
                     identity_guard=context["identities"],
                     expected_screen=context["screen"],
                     shell_snapshot=context["snapshot"],
+                    **({"before_transport": before_transport} if visible_direct else {}),
+                    **physical_visibility,
                 )
             elif visible_direct:
                 identity = await self.terminal_app.process_identity(selected["expected_pid"])
                 await self.terminal_app.send_confirmed(
-                    selected, args.text, identity, before_transport=before_transport
+                    selected,
+                    args.text,
+                    identity,
+                    before_transport=before_transport,
+                    **physical_visibility,
                 )
             else:
                 identities = None
@@ -747,10 +793,40 @@ class SessionManager:
                     "Several live tabs report this tty; no input until the view is unique",
                 )
             return selected
-        raise BridgeError(
+        # A catalog that was cut short or could not see every tab proves nothing about
+        # this pane; report that instead of claiming the selection changed.
+        if catalog.get("truncated"):
+            failure = BridgeError(
+                "session_catalog_incomplete",
+                "The terminal catalog is incomplete; the selected pane cannot be judged",
+            )
+            failure.provider_error = {
+                "reason": "catalog_truncated",
+                "sessions": len(catalog["sessions"]),
+            }
+            raise failure
+        same_pane = [row for row in catalog["sessions"] if row["pane_id"] == pane_id]
+        same_tty = [
+            row
+            for row in catalog["sessions"]
+            if pane_id.rsplit(":", 1)[-1] == str(row.get("tty", "")).rsplit("/", 1)[-1]
+        ]
+        if same_pane:
+            reason = "expected_pid_changed"
+        elif same_tty:
+            shell_found = any(
+                expected_pid in {row["expected_pid"], row.get("legacy_expected_pid")}
+                for row in same_tty
+            )
+            reason = "window_changed" if shell_found else "tty_reused"
+        else:
+            reason = "pane_missing"
+        failure = BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
         )
+        failure.provider_error = {"reason": reason, "sessions": len(catalog["sessions"])}
+        raise failure
 
     async def focus(self, principal, pane_id, expected_pid):
         self.authorization.principal(principal, "session.input")
@@ -958,25 +1034,43 @@ class SessionManager:
         launched_agent = self._started_agent(argv)
         command_submitted = False
         command = "cd -- " + shlex.quote(cwd)
+        zle_shell = None
         if args.controlled_shell:
             if argv:
                 raise BridgeError(
                     "invalid_arguments", "Controlled shell setup takes no initial command"
                 )
-            command += (
-                " && exec /usr/bin/env PS1="
-                + shlex.quote("KiraBridge visible %% ")
-                + " /bin/zsh -f"
-            )
+            if sys.platform != "darwin" or self.zle_readiness is None:
+                command += (
+                    " && exec /usr/bin/env PS1="
+                    + shlex.quote("KiraBridge visible %% ")
+                    + " /bin/zsh -f"
+                )
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
             if sys.platform.startswith("linux"):
                 return await self._open_owned_linux(principal, task_id, cwd, argv)
+            if args.controlled_shell and sys.platform == "darwin":
+                zle_shell = await self.zle_readiness.create()
+                env = {
+                    "ZDOTDIR": zle_shell["zdotdir"],
+                    "PS1": "KiraBridge visible %% ",
+                }
+                command += (
+                    " && exec /usr/bin/env "
+                    + " ".join(shlex.quote(f"{name}={value}") for name, value in env.items())
+                    + " /bin/zsh -d -i"
+                )
             try:
                 result = await self.terminal_app.open(
-                    command, on_created=on_created, principal=principal
+                    command,
+                    on_created=on_created,
+                    principal=principal,
+                    custom_title=(zle_shell["tag"] if zle_shell else None),
                 )
             except BaseException:
+                if zle_shell is not None:
+                    await self.zle_readiness.close_session(zle_shell["generation"])
                 self.authorization.window_outcome(principal, task_id, "unknown")
                 raise
             self.authorization.window_outcome(principal, task_id, "opened")
@@ -991,6 +1085,8 @@ class SessionManager:
                         )
                     selected = matches[0] if matches else None
                     if selected:
+                        if zle_shell is not None:
+                            await self.zle_readiness.bind(zle_shell, selected)
                         if argv:
                             from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
@@ -1014,7 +1110,7 @@ class SessionManager:
                                 continue
                             await self.terminal_app.send_confirmed(
                                 selected,
-                                shlex.join(argv),
+                                launch_command(principal, launched_agent, argv),
                                 identity,
                                 expected_cwd=cwd,
                                 before_transport=lambda: self.terminal_app.verify_opened(
@@ -1119,6 +1215,8 @@ class SessionManager:
                     raise UncertainExecution(
                         "session_open_pending", "Window opened; argv was not dispatched"
                     )
+                if zle_shell is not None:
+                    await self.zle_readiness.close_session(zle_shell["generation"])
                 return {**result, "session_handle_pending": True, "agent_processed": False}
             except Exception as cause:
                 error = UncertainExecution(

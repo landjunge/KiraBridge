@@ -149,7 +149,10 @@ async def test_visible_receiver_preserves_body_and_reports_delivery_only(
     assert received == [body]
     original = bridge.messages.get("chatgpt", sent["id"])
     assert original["acknowledged"] is None
-    assert original["processing"]["state"] == "completed"
+    assert original["processing"]["state"] == ("unknown" if request_reply else "completed")
+    assert original["processing"]["error"] == (
+        "message_reply_unverified" if request_reply else None
+    )
     evidence = original["processing"]["evidence"]
     assert evidence["completion_scope"] == "visible_input_delivery"
     assert evidence["agent_confirmed"] is False

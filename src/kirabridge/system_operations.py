@@ -31,6 +31,9 @@ SYSTEM_LEAVES = {
     "accessibility.inspect": "accessibility",
     "accessibility.action": "accessibility",
     "accessibility.set": "accessibility",
+    "mouse.move": "mouse",
+    "mouse.click": "mouse",
+    "mouse.scroll": "mouse",
 }
 SYSTEM_READ_OPERATIONS = frozenset(
     operation
@@ -48,6 +51,9 @@ SYSTEM_READ_OPERATIONS = frozenset(
         "preferences.reset",
         "accessibility.action",
         "accessibility.set",
+        "mouse.move",
+        "mouse.click",
+        "mouse.scroll",
     }
 )
 SYSTEM_PERMISSIONS = {
@@ -62,6 +68,9 @@ SYSTEM_PERMISSIONS = {
         "accessibility.inspect",
         "accessibility.action",
         "accessibility.set",
+        "mouse.move",
+        "mouse.click",
+        "mouse.scroll",
     }
     else "notifications"
     if operation == "notifications.post"

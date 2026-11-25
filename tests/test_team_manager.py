@@ -257,6 +257,53 @@ def test_role_cas_and_idempotency(domain):
         domain.set_role("local", request.model_copy(update={"role": "observer"}))
 
 
+def test_coordinator_can_replay_exact_role_handoff_after_self_demotion(domain):
+    request = TeamRoleSet(
+        team_id="test-team",
+        member="grok",
+        role="coordinator",
+        expected_revision=1,
+        idempotency_key="coordinator-handoff-response-lost",
+    )
+    first = domain.set_role("chatgpt", request)
+    assert first["coordinator"] == "grok"
+    assert first["members"]["chatgpt"]["role"] == "worker"
+    assert first["revision"] == 2
+
+    event_count = domain.store.db.execute(
+        "SELECT count(*) FROM team_events WHERE kind='team.role_changed'"
+    ).fetchone()[0]
+    replay = domain.set_role("chatgpt", request)
+    assert replay["coordinator"] == "grok"
+    assert replay["revision"] == 2
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_events WHERE kind='team.role_changed'"
+        ).fetchone()[0]
+        == event_count
+    )
+
+    # The receipt is actor- and request-bound: another member cannot use the
+    # original actor's key to retrieve or repeat the role operation.
+    with pytest.raises(BridgeError, match="owner or coordinator"):
+        domain.set_role("codex", request)
+    with pytest.raises(BridgeError, match="different") as conflict:
+        domain.set_role("chatgpt", request.model_copy(update={"role": "reviewer"}))
+    assert conflict.value.code == "idempotency_conflict"
+
+    # A stored write receipt does not bypass a subsequently revoked read grant.
+    domain.config.principals["chatgpt"].capabilities = [
+        capability
+        for capability in domain.config.principals["chatgpt"].capabilities
+        if capability != "team.read"
+    ]
+    with pytest.raises(BridgeError) as denied:
+        domain.set_role("chatgpt", request)
+    assert denied.value.code == "forbidden"
+    assert "members" not in str(denied.value)
+    assert domain.get("local", "test-team")["revision"] == 2
+
+
 def test_observers_read_only_and_revoked_members_cannot_read(domain):
     item = domain.delegate("codex", work(assignee="grok"))
     assert domain.work_get("observer", "test-team", item["id"])["body"]
@@ -335,11 +382,28 @@ def test_messages_and_work_utf8_bounds_apply_before_insertion(domain):
             operation()
     domain.config.team.max_pending_per_member = 1
     domain.send("codex", message())
-    with pytest.raises(BridgeError, match="inbox"):
-        domain.send("codex", message(idempotency_key="second"))
+    inbox = domain.send("codex", message(idempotency_key="second"))
+    assert inbox["limit_notes"] == ["message_queue_full"]
+    assert len(domain.messages("local", "test-team")["messages"]) == 2
     domain.delegate("codex", work(assignee="grok"))
-    with pytest.raises(BridgeError, match="queue"):
-        domain.delegate("codex", work(assignee="grok", idempotency_key="second"))
+    queued = domain.delegate("codex", work(assignee="grok", idempotency_key="second"))
+    assert queued["state"] == "queued"
+    assert queued["evidence"]["limit_notes"] == ["team_queue_full"]
+    assert len(domain.work_list("local", "test-team")["work"]) == 2
+
+
+def test_full_message_and_work_archives_are_accepted_and_noted(domain):
+    domain.config.team.max_messages = 1
+    domain.config.team.max_total_work = 1
+    domain.send("codex", message())
+    stored = domain.send("codex", message(idempotency_key="second"))
+    assert stored["limit_notes"] == ["message_store_full"]
+    assert len(domain.messages("local", "test-team")["messages"]) == 2
+    domain.delegate("codex", work(assignee="grok"))
+    archived = domain.delegate("codex", work(assignee="grok", idempotency_key="second"))
+    assert archived["state"] == "queued"
+    assert archived["evidence"]["limit_notes"] == ["team_store_full"]
+    assert len(domain.work_list("local", "test-team")["work"]) == 2
 
 
 def test_manual_chatgpt_receipt_is_not_execution_and_completion_is_assignee_report(domain):
@@ -398,6 +462,7 @@ def test_claim_persists_once_before_execution_and_restart_does_not_queue_again(d
     item = domain.delegate("grok", work())
     claimed = domain.claim(item["id"])
     assert claimed["state"] == "dispatching" and claimed["core_task_id"] == "team-" + item["id"]
+    assert claimed["started"] is not None
     assert domain.claim(item["id"]) is None and not domain.pending()
     reopened = Bridge(config)
     try:
@@ -411,7 +476,29 @@ def test_claim_persists_once_before_execution_and_restart_does_not_queue_again(d
         reopened.store.close()
 
 
-def test_claim_revalidates_roles_permissions_and_hourly_budget(domain):
+def test_dispatched_start_stamp_survives_observation_and_refines_with_evidence(domain):
+    item = domain.delegate("grok", work())
+    claimed = domain.claim(item["id"])
+    blind = core(domain, claimed, state="accepted", started=None)
+    domain.bind_task(item["id"], blind)
+    row = domain.store.db.execute(
+        "SELECT started FROM team_work WHERE id=?", (item["id"],)
+    ).fetchone()
+    assert row["started"] == claimed["started"]
+    refined = core(domain, claimed, state="running", started=claimed["started"] + 5)
+    domain.bind_task(item["id"], refined)
+    row = domain.store.db.execute(
+        "SELECT started FROM team_work WHERE id=?", (item["id"],)
+    ).fetchone()
+    assert row["started"] == claimed["started"] + 5
+    domain.bind_task(item["id"], blind)
+    row = domain.store.db.execute(
+        "SELECT started FROM team_work WHERE id=?", (item["id"],)
+    ).fetchone()
+    assert row["started"] == claimed["started"] + 5
+
+
+def test_claim_revalidates_roles_and_permissions_and_notes_the_hourly_count(domain):
     item = domain.delegate("grok", work())
     role(domain, "codex", "observer")
     assert domain.claim(item["id"]) is None
@@ -421,8 +508,8 @@ def test_claim_revalidates_roles_permissions_and_hourly_budget(domain):
     first = domain.delegate("grok", work(idempotency_key="first"))
     second = domain.delegate("grok", work(idempotency_key="second"))
     assert domain.claim(first["id"])
-    assert domain.claim(second["id"]) is None
-    assert domain.work_get("local", "test-team", second["id"])["error"] == "team_rate_limit"
+    # Crossing the hourly count is only noted: work is never blocked by KiraBridge's own limit.
+    assert domain.claim(second["id"])
 
 
 def test_running_task_scope_revalidation_blocks_role_and_roster_escalation(domain):
@@ -666,6 +753,17 @@ def test_context_selects_recent_results_and_prioritizes_old_own_pending_with_byt
     domain.config.team.workers.pop("codex")
     with pytest.raises(BridgeError, match="not found"):
         domain.context("codex", "test-team")
+
+
+def test_context_over_the_metadata_budget_is_returned_truncated(domain):
+    kept = domain.send("grok", message(recipient="codex", body="keep-me", idempotency_key="kept"))
+    huge = domain.send("grok", message(recipient="codex", body="drop-me", idempotency_key="huge"))
+    domain.store.db.execute("UPDATE team_messages SET kind=? WHERE id=?", ("k" * 40000, huge["id"]))
+    context = domain.context("codex", "test-team")
+    assert context["truncated"] is True
+    assert len(canonical(context).encode("utf-8")) <= 32768
+    assert [item["id"] for item in context["messages"]] == [kept["id"]]
+    assert context["messages"][0]["body"] == "keep-me"
 
 
 def test_manual_receipt_has_claimed_timestamp_without_execution_or_automatic_approval(domain):

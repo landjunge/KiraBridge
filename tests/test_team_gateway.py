@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import subprocess
 import sys
 
 import pytest
@@ -10,11 +11,12 @@ from test_mcp import http_bridge as live_http_fixture
 
 from kirabridge.bridge_core.config import PrincipalConfig, TeamConfig, TeamWorkerConfig
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.team_manager.models import TeamWorkCreate
 
 http_bridge = live_http_fixture
 
 
-async def setup_team(http_bridge):
+async def setup_team(http_bridge, *, coordinator="local"):
     bridge, endpoint = http_bridge
     bridge.config.team = TeamConfig(
         enabled=True, workers={name: TeamWorkerConfig() for name in ("local", "other")}
@@ -34,7 +36,7 @@ async def setup_team(http_bridge):
                 "team_id": "gateway",
                 "name": "Gateway team",
                 "members": {"other": "worker"},
-                "coordinator": "local",
+                "coordinator": coordinator,
                 "idempotency_key": "create-gateway",
             }
         },
@@ -132,6 +134,98 @@ async def test_authenticated_team_identity_roles_and_manual_work(http_bridge):
         )
         assert blocked.structuredContent["error"]["code"] == "team_role_denied"
         assert not bridge.store.db.execute("SELECT id FROM tasks").fetchall()
+    finally:
+        await pool.__aexit__(None, None, None)
+
+
+async def test_mcp_coordinator_self_demotion_retry_obeys_read_grant(http_bridge):
+    bridge, _, pool = await setup_team(http_bridge, coordinator="other")
+    request = {
+        "team_id": "gateway",
+        "member": "local",
+        "role": "coordinator",
+        "active": True,
+        "expected_revision": 1,
+        "idempotency_key": "mcp-coordinator-handoff",
+    }
+    try:
+        first = await pool.call("peer", "team_set_role", {"request": request})
+        assert first.structuredContent["coordinator"] == "local"
+        assert first.structuredContent["revision"] == 2
+        role_changes = bridge.store.db.execute(
+            "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
+            ("gateway",),
+        ).fetchone()[0]
+        assert role_changes == 1
+
+        # The old coordinator can read back its exact operation after losing
+        # manage rights, without repeating the write.
+        replay = await pool.call("peer", "team_set_role", {"request": request})
+        assert replay.structuredContent["coordinator"] == "local"
+        assert replay.structuredContent["revision"] == 2
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
+                ("gateway",),
+            ).fetchone()[0]
+            == role_changes
+        )
+
+        # A real team the actor does not belong to remains invisible through
+        # an idempotent role request, including when the key matches another team.
+        foreign_team = await pool.call(
+            "owner",
+            "team_create",
+            {
+                "request": {
+                    "team_id": "private-gateway",
+                    "name": "Private gateway",
+                    "members": {"local": "worker"},
+                    "coordinator": "local",
+                    "idempotency_key": "create-private-gateway",
+                }
+            },
+        )
+        assert foreign_team.structuredContent["id"] == "private-gateway"
+        foreign = await pool.call(
+            "peer",
+            "team_set_role",
+            {"request": {**request, "team_id": "private-gateway"}},
+        )
+        assert foreign.structuredContent["error"]["code"] == "not_found"
+        assert not {"members", "revision", "coordinator"} & foreign.structuredContent.keys()
+
+        changed = await pool.call(
+            "peer",
+            "team_set_role",
+            {"request": {**request, "role": "worker"}},
+        )
+        assert changed.structuredContent["error"]["code"] == "idempotency_conflict"
+        assert not {"members", "revision", "coordinator"} & changed.structuredContent.keys()
+
+        # Idempotency records are principal-scoped: another actor cannot read
+        # the first actor's receipt and receives no team snapshot.
+        other_actor = await pool.call("owner", "team_set_role", {"request": request})
+        assert other_actor.structuredContent["error"]["code"] == "team_revision_conflict"
+        assert not {"members", "revision", "coordinator"} & other_actor.structuredContent.keys()
+
+        bridge.config.principals["other"].capabilities = [
+            capability
+            for capability in bridge.config.principals["other"].capabilities
+            if capability != "team.read"
+        ]
+        denied = await pool.call("peer", "team_set_role", {"request": request})
+        assert denied.structuredContent["error"]["code"] == "forbidden"
+        assert not {"members", "revision", "coordinator"} & denied.structuredContent.keys()
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
+                ("gateway",),
+            ).fetchone()[0]
+            == role_changes
+        )
+        denied_read = await pool.call("peer", "team_get", {"team_id": "gateway"})
+        assert denied_read.structuredContent["error"]["code"] == "forbidden"
     finally:
         await pool.__aexit__(None, None, None)
 
@@ -259,3 +353,103 @@ async def test_all_seven_authenticated_agent_identities_can_address_each_other(
         assert bridge.store.db.execute("SELECT count(*) FROM team_messages").fetchone()[0] == 42
         assert bridge.store.db.execute("SELECT count(*) FROM team_work").fetchone()[0] == 42
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+
+
+def client_config(tmp_path, endpoint):
+    config_file = tmp_path / "client.toml"
+    port = endpoint.split(":")[2].split("/")[0]
+    config_file.write_text(
+        'host="127.0.0.1"\nport=' + port + '\n[principals.local]\ntoken_env="BRIDGE_TEST_TOKEN"\n'
+    )
+    return config_file
+
+
+async def team_command(config_file, *arguments):
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "kirabridge.cli",
+        "--config",
+        str(config_file),
+        "team",
+        *arguments,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=os.environ.copy(),
+    )
+    stdout, stderr = await process.communicate()
+    return process.returncode, stdout, stderr
+
+
+def fill_work(bridge, count=60):
+    bridge.config.team.max_pending_per_member = count
+    for index in range(count):
+        bridge.teams.delegate(
+            "local",
+            TeamWorkCreate(
+                team_id="gateway",
+                assignee="other",
+                title=f"item {index}",
+                body="paging",
+                idempotency_key=f"page-{index}",
+            ),
+        )
+
+
+async def test_team_work_cli_pages_past_the_default_fifty(http_bridge, tmp_path):
+    bridge, endpoint, pool = await setup_team(http_bridge)
+    config_file = client_config(tmp_path, endpoint)
+    try:
+        fill_work(bridge)
+        code, stdout, stderr = await team_command(config_file, "work", "gateway")
+        assert code == 0, stderr.decode()
+        board = json.loads(stdout)
+        assert [item["title"] for item in board["work"]] == [f"item {index}" for index in range(50)]
+        assert board["next_after"] == board["work"][-1]["seq"]
+        assert board["next_cursor"] == board["next_after"]
+        code, stdout, stderr = await team_command(
+            config_file, "work", "gateway", "--after", str(board["next_after"])
+        )
+        assert code == 0, stderr.decode()
+        rest = json.loads(stdout)
+        assert [item["title"] for item in rest["work"]] == [
+            f"item {index}" for index in range(50, 60)
+        ]
+        assert "next_after" not in rest
+        assert rest["next_cursor"] == rest["work"][-1]["seq"]
+    finally:
+        await pool.__aexit__(None, None, None)
+
+
+async def test_team_work_cli_latest_returns_the_newest_five_ascending(http_bridge, tmp_path):
+    bridge, endpoint, pool = await setup_team(http_bridge)
+    config_file = client_config(tmp_path, endpoint)
+    try:
+        fill_work(bridge)
+        code, stdout, stderr = await team_command(config_file, "work", "gateway", "--latest", "5")
+        assert code == 0, stderr.decode()
+        latest = json.loads(stdout)
+        assert [item["title"] for item in latest["work"]] == [
+            f"item {index}" for index in range(55, 60)
+        ]
+        sequences = [item["seq"] for item in latest["work"]]
+        assert sequences == sorted(sequences) and len(set(sequences)) == 5
+        assert "next_after" not in latest
+    finally:
+        await pool.__aexit__(None, None, None)
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [("--limit", "0"), ("--limit", "101"), ("--latest", "0"), ("--latest", "101")],
+)
+def test_team_work_cli_rejects_invalid_limit_and_latest(flag, value):
+    process = subprocess.run(
+        [sys.executable, "-m", "kirabridge.cli", "team", "work", "gateway", flag, value],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert process.returncode != 0
+    assert "unrecognized arguments" not in process.stderr
+    assert flag in process.stderr

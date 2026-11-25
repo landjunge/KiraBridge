@@ -236,8 +236,8 @@ async def test_native_open_checks_authority_and_quotes_command(
         if "const tab=app.doScript(" in call.args[0]
     ]
     assert len(creations) == 1 and json.dumps("cd -- " + shlex.quote(cwd)) in creations[0]
-    assert events == ["create", "receipt", "focus", "move", "argv"]
-    assert leaf.native.await_count == 3  # One creation, plus required focus/move calls.
+    assert events == ["create", "receipt", "focus", "tag", "move", "argv"]
+    assert leaf.native.await_count == 4  # One creation, then focus/tag/move on its exact TTY.
     leaf.send_confirmed.assert_awaited_once()
     assert {operation for operation, _ in scene.calls} >= {
         "apps.list",
@@ -247,7 +247,7 @@ async def test_native_open_checks_authority_and_quotes_command(
     }
     with pytest.raises(BridgeError) as exc:
         await manager.open("local", args, task_id="explicit-new-window")
-    assert exc.value.code == "window_already_dispatched" and leaf.native.await_count == 3
+    assert exc.value.code == "window_already_dispatched" and leaf.native.await_count == 4
     leaf.send_confirmed.assert_awaited_once()
 
 
@@ -348,3 +348,72 @@ async def test_native_two_step_scripts_compile_without_executing_ui(
         subprocess.run, command, capture_output=True, text=True, timeout=10
     )
     assert compiled.returncode == 0, compiled.stderr
+
+
+async def test_ended_shell_windows_do_not_make_the_catalog_incomplete(bridge, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
+    manager = SessionManager(bridge.sessions.ports)
+
+    async def native(*args, **kwargs):
+        return [
+            {"window_id": 123, "tty": "/dev/ttys004", "busy": False, "miniaturized": False},
+            {"window_id": 124, "tty": "/dev/ttys005", "busy": False, "miniaturized": True},
+        ]
+
+    async def communicate():
+        uid = __import__("os").getuid()
+        # ttys005 has no process at all: its shell ended and the window only remains.
+        return (f"{uid} 400 1 ttys004 /bin/zsh\n".encode(), b"")
+
+    async def process(*args, **kwargs):
+        return SimpleNamespace(
+            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
+        )
+
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec", process
+    )
+    rows = await manager.terminal_app.catalog()
+    assert [row["pane_id"] for row in rows] == ["terminal:123:ttys004"]
+    assert manager.terminal_app.last_catalog_incomplete is False
+    assert rows[0]["miniaturized"] is False
+
+
+async def test_orphaned_background_job_is_not_a_second_shell_root(bridge, monkeypatch):
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
+    manager = SessionManager(bridge.sessions.ports)
+
+    async def native(*args, **kwargs):
+        return [{"window_id": 123, "tty": "/dev/ttys004", "busy": False}]
+
+    async def communicate():
+        uid = __import__("os").getuid()
+        return (
+            (
+                f"{uid} 345 1 ttys004 /usr/bin/login\n"
+                f"{uid} 346 345 ttys004 /bin/zsh\n"
+                # nohup/ssh -f job handed over to launchd: parent 1, not a second shell
+                f"{uid} 777 1 ttys004 /usr/bin/ssh\n"
+            ).encode(),
+            b"",
+        )
+
+    async def process(*args, **kwargs):
+        return SimpleNamespace(
+            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
+        )
+
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec", process
+    )
+    rows = await manager.terminal_app.catalog()
+    assert [row["expected_pid"] for row in rows] == [345]
+    assert manager.terminal_app.last_catalog_incomplete is False
+    # The orphan is still reported as a process, so the window is not an idle shell.
+    assert 777 in {process["pid"] for process in rows[0]["processes"]}

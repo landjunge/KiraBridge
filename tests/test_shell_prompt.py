@@ -5,6 +5,7 @@ The JS harness cannot access Terminal.app, clipboard, processes or operator stat
 
 import asyncio
 import json
+import re
 import shutil
 import sys
 from unittest.mock import AsyncMock
@@ -76,6 +77,18 @@ def test_input_or_unknown_prompts_stay_protected(screen):
     assert not empty_shell_prompt(screen)
 
 
+def test_terminal_right_padding_without_cursor_proof_is_ambiguous():
+    # Live readback supplied for the idle user shell: its last line is the
+    # normal prompt followed by 55 spaces. The current Terminal.app history
+    # source does not report a cursor column, so this cannot be distinguished
+    # from a whitespace-only draft by text parsing alone.
+    padded = "➜  ~" + " " * 55 + "\n\n"
+    assert empty_shell_prompt("➜  ~ ")
+    assert not empty_shell_prompt(padded)
+    assert not empty_shell_prompt("➜  ~ echo harmless ")
+    assert not empty_shell_prompt("➜  ~ " + " " * 55 + "echo harmless ")
+
+
 @pytest.fixture
 def direct_shell(bridge, config, monkeypatch):
     # Use the production client-type decision, not a monkeypatched direct() flag.
@@ -94,9 +107,31 @@ def direct_shell(bridge, config, monkeypatch):
     monkeypatch.setattr(bridge.sessions, "selected", AsyncMock(return_value=row))
     monkeypatch.setattr(terminal, "process_identity", AsyncMock(return_value=identity))
     monkeypatch.setattr(terminal, "read", AsyncMock(return_value="➜  ~ \n\n"))
+    # These tests cover the shell-prompt guards; the on-screen window proof has its own tests.
+    monkeypatch.setattr(
+        terminal,
+        "prove_existing_target",
+        AsyncMock(
+            return_value={
+                "terminal_window_id": 123,
+                "tty": "/dev/ttys004",
+                "title": "shell",
+                "bounds": {"x": 0, "y": 0, "width": 800, "height": 600},
+            }
+        ),
+    )
     # Executing this fallback would conceal a broken ChatGPT preflight path.
     monkeypatch.setattr(terminal, "send", AsyncMock(side_effect=AssertionError("raw send")))
-    monkeypatch.setattr(terminal, "native", AsyncMock(side_effect=["➜  ~ \n\n", {"sent": True}]))
+    monkeypatch.setattr(
+        terminal,
+        "native",
+        AsyncMock(
+            side_effect=[
+                {"screen": "➜  ~ \n\n", "surface": {"window_id": 123}},
+                {"sent": True},
+            ]
+        ),
+    )
     return bridge, row, identity
 
 
@@ -141,7 +176,11 @@ async def test_chatgpt_refusal_never_enters_native_dispatch(direct_shell, failur
         intent.side_effect = BridgeError("evidence_unavailable", "Cannot persist intent")
     with pytest.raises(BridgeError):
         await bridge.sessions.send("local", arguments(row), before_transport=intent)
-    terminal.native.assert_not_awaited()
+    if failure == "intent":
+        # The focus proof is the first native step; the intent record follows it.
+        assert terminal.native.await_count == 1
+    else:
+        terminal.native.assert_not_awaited()
     terminal.send.assert_not_awaited()
     if failure != "intent":
         intent.assert_not_awaited()
@@ -231,11 +270,17 @@ async def run_dispatch_js(source, state):
         command = ["/usr/bin/osascript", "-l", "JavaScript", "-"]
     else:
         pytest.skip("native dispatch JS requires node or macOS JavaScript runtime")
+    pid = re.search(r"unixId\(\)===(\d+)", source)
     harness = (
+        "const owner={frontmost:()=>true,unixId:()=>"
+        + (pid.group(1) if pid else "1")
+        + ",bundleIdentifier:()=>'com.apple.Terminal'};"
+        "const owners=()=>[owner]; owners.byName=()=>owner;"
         "const state=" + json.dumps(state) + "; const calls=[];"
         "const tab={tty:()=>'/dev/ttys004',busy:()=>state.busy,"
         "contents:()=>state.screen,history:()=>state.screen};"
-        "const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab};"
+        "const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab,name:()=>'shell',"
+        "bounds:()=>({x:0,y:0,width:800,height:600})};"
         "const windows=()=>[win]; windows.byId=()=>win;"
         "const app={running:()=>true,windows,activate:()=>{"
         "if(state.focusScreen!==undefined)state.screen=state.focusScreen;"
@@ -243,7 +288,7 @@ async def run_dispatch_js(source, state):
         "doScript:(text,target)=>{if(target.in!==tab)throw Error('wrong target');"
         "calls.push(text);}};"
         "const Application=name=>name==='System Events'?"
-        "{processes:{byName:()=>({frontmost:()=>true})}}:app;const delay=()=>{};"
+        "{processes:owners}:app;const delay=()=>{};"
         "Application.currentApplication=()=>({doShellScript:()=>state.identity});"
         "let result;try{result={value:JSON.parse(eval("
         + json.dumps(source)
@@ -275,7 +320,7 @@ async def run_dispatch_js(source, state):
         ("none", None),
         ("before-input", "Selected terminal input changed"),
         ("before-prompt", "Selected terminal input changed"),
-        ("focus-input", "Focused shell input is not empty"),
+        ("focus-input", "Cannot verify an empty shell prompt"),
         ("focus-busy", "Selected terminal is busy"),
         ("busy", "Selected terminal is busy"),
         ("identity", "Selected target identity changed"),
@@ -286,6 +331,12 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
     terminal = bridge.sessions.terminal_app
     state = {"screen": terminal.read.return_value, "busy": False, "identity": identity}
     observed = []
+    # Focusing is the first native step, so these changes must already be present
+    # when the tab is activated; they are not a race after the proof.
+    if change == "focus-input":
+        state["focusScreen"] = "➜  ~ user command "
+    elif change == "focus-busy":
+        state["focusBusy"] = True
 
     async def intent():
         if change == "before-input":
@@ -293,10 +344,6 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
         elif change == "before-prompt":
             # Even another supported empty prompt is a changed observation.
             state["screen"] = "host% "
-        elif change == "focus-input":
-            state["focusScreen"] = "➜  ~ user command "
-        elif change == "focus-busy":
-            state["focusBusy"] = True
         elif change == "busy":
             state["busy"] = True
         elif change == "identity":

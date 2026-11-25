@@ -115,6 +115,106 @@ class TerminalWindowProof:
             )
         self.app = matches[0] if matches else None
 
+    async def prove_existing_target(self, row, surface):
+        """Bind a focused Terminal script window to one current on-screen CG window."""
+        timeout = getattr(self.native, "timeout", 12.0)
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+            timeout = 12.0
+        try:
+            async with asyncio.timeout(min(float(timeout) + 1.0, 31.0)):
+                return await self._prove_existing_target(row, surface)
+        except TimeoutError:
+            raise BridgeError(
+                "visible_window_unconfirmed", "Physical Terminal window proof timed out"
+            ) from None
+
+    async def _prove_existing_target(self, row, surface):
+        app_pid = surface.get("owner_pid")
+        script_window = surface.get("window_id")
+        tty = surface.get("tty")
+        title = surface.get("title")
+        bounds = surface.get("bounds")
+        expected_window = int(row["pane_id"].split(":")[1])
+        require(
+            type(app_pid) is int
+            and app_pid > 0
+            and type(script_window) is int
+            and script_window == expected_window
+            and tty == row.get("tty")
+            and isinstance(title, str)
+            and bool(title.strip())
+            and not any(ord(char) < 32 or ord(char) == 127 for char in title)
+            and isinstance(bounds, dict),
+            "Focused Terminal window identity is incomplete",
+        )
+        for key in ("x", "y", "width", "height"):
+            value = bounds.get(key)
+            require(
+                type(value) in (int, float) and math.isfinite(value),
+                "Focused Terminal window geometry is incomplete",
+            )
+        require(bounds["width"] > 0 and bounds["height"] > 0, "Invalid Terminal geometry")
+        await self.application(expected_pid=app_pid)
+        require(self.app is not None, "Terminal application identity is unavailable")
+        result = await self.page(
+            "windows.list",
+            {
+                "owner_pid": self.app["pid"],
+                "expected_start": f"{self.app['started_at']:.6f}",
+                "include_titles": True,
+                "include_ax": False,
+                "limit": 100,
+            },
+            "windows",
+        )
+        require(result.get("titles_redacted") is False, "Physical window titles are unavailable")
+
+        def same_geometry(cg_bounds):
+            if not isinstance(cg_bounds, dict):
+                return False
+            values = {
+                "x": cg_bounds.get("X"),
+                "y": cg_bounds.get("Y"),
+                "width": cg_bounds.get("Width"),
+                "height": cg_bounds.get("Height"),
+            }
+            return all(
+                type(values[key]) in (int, float)
+                and math.isfinite(values[key])
+                and abs(values[key] - bounds[key]) <= 1.0
+                for key in values
+            )
+
+        matches = [
+            window
+            for window in result["windows"]
+            if window.get("layer") == 0
+            and window.get("on_screen") is True
+            and window.get("owner_pid") == app_pid
+            and window.get("application_start") == f"{self.app['started_at']:.6f}"
+            and window.get("title") == title
+            and same_geometry(window.get("bounds"))
+        ]
+        if not matches:
+            raise BridgeError(
+                "visible_target_not_on_screen",
+                "The exact focused Terminal window is not physically confirmed on screen",
+            )
+        if len(matches) != 1:
+            raise BridgeError(
+                "visible_target_ambiguous",
+                "The exact Terminal window has ambiguous physical identity",
+            )
+        return {
+            "terminal_window_id": script_window,
+            "cg_window_id": matches[0]["window_id"],
+            "tty": tty,
+            "owner_pid": app_pid,
+            "application_start": self.app["started_at"],
+            "title": title,
+            "bounds": dict(bounds),
+        }
+
     async def ax(self, token=None):
         args = {
             "pid": self.app["pid"],

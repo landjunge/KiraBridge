@@ -29,7 +29,10 @@ async def test_managed_spawn_releases_http_call_but_not_execution(
     code = (
         "import time; from pathlib import Path; "
         f"release=Path({str(release)!r}); "
-        "\nwhile not release.exists(): time.sleep(.01)"
+        "\ndeadline = time.monotonic() + 10"
+        "\nwhile not release.exists():"
+        "\n    if time.monotonic() >= deadline: raise SystemExit('Fixture release timed out')"
+        "\n    time.sleep(.01)"
         "\nprint('OWNED_HTTP_COMPLETE')"
     )
     task_id = "managed-http-" + tool

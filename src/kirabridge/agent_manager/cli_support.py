@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
@@ -84,6 +85,53 @@ class BoundedText:
     @property
     def text(self) -> str:
         return self._data.decode("utf-8", errors="ignore")
+
+
+_BEARER = re.compile(r"(?i)\bBearer\s+\S+")
+_ASSIGNMENT = re.compile(
+    r"(?i)(?<![A-Za-z0-9])(api_key|token|password|secret|authorization)(\s*[=:]\s*)\S+"
+)
+_LONG_TOKEN = re.compile(r"[A-Za-z0-9_./+=-]{24,}")
+
+
+def _redact_assignment(match: re.Match) -> str:
+    return f"{match.group(1)}{match.group(2)}[redacted]"
+
+
+def safe_diagnostic(text: str, limit: int = 200) -> str:
+    """Bounded CLI diagnostic: no control characters, collapsed space, secrets masked.
+
+    Callers pass an already captured error stream only. The result is never a prompt,
+    a model reply, or a file body. At most ``limit`` characters, and never more than 200.
+    """
+    if not isinstance(text, str):
+        return ""
+    if type(limit) is not int or not 1 <= limit <= 200:
+        limit = 200
+    cleaned: list[str] = []
+    for char in text[:4096]:
+        if char.isspace():
+            cleaned.append(" ")
+        elif unicodedata.category(char) == "Cc":
+            continue
+        else:
+            cleaned.append(char)
+    collapsed = re.sub(r" {2,}", " ", "".join(cleaned)).strip()
+    collapsed = _BEARER.sub("Bearer [redacted]", collapsed)
+    collapsed = _ASSIGNMENT.sub(_redact_assignment, collapsed)
+    collapsed = _LONG_TOKEN.sub("[redacted]", collapsed)
+    return collapsed[:limit]
+
+
+def note_cli_failure(exc, result):
+    """Attach provider_error['diagnostic'] from stderr only, never from stdout."""
+    if isinstance(result, dict):
+        text = result.get("stderr")
+        if isinstance(text, str) and text.strip():
+            diagnostic = safe_diagnostic(text)
+            if diagnostic:
+                exc.provider_error = {"diagnostic": diagnostic}
+    return exc
 
 
 def bind_session(current: str | None, new: str) -> str:

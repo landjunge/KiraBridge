@@ -21,6 +21,9 @@ from kirabridge.bridge_core.models import UncertainExecution
 _MESSAGE_KINDS = {"agent_message_chunk", "agent_thought_chunk", "tool_call"}
 
 
+_GROK_SKILLS_RELOAD = "skills-reload"
+
+
 class ACPClient:
     """ACP v1 stdio client bound to one process and, after negotiation, one session."""
 
@@ -232,9 +235,24 @@ class ACPClient:
         return False
 
     async def _handle_response(self, identifier, message: dict) -> None:
+        if identifier == _GROK_SKILLS_RELOAD and set(message) <= {"id", "jsonrpc", "result"}:
+            # Grok CLI 1.0.89 announces a skills reload as an unsolicited "response".
+            # It answers none of our requests and carries no turn content: ignore it,
+            # and only this exact id and shape. Every other stray id stays an error.
+            return
         entry = self._response_events.pop(identifier, None)
         if entry is None or entry[0].done():
-            raise UncertainExecution("agent_identity", "Unexpected ACP response id")
+            error = UncertainExecution("agent_identity", "Unexpected ACP response id")
+            # Shape only (never content): what arrived and what we were still waiting for.
+            error.provider_error = {
+                "adapter": "acp",
+                "reason": "Unexpected ACP response id",
+                "response_id": str(identifier)[:64],
+                "already_answered": entry is not None,
+                "pending_requests": sorted(str(key)[:32] for key in self._response_events)[:8],
+                "message_keys": sorted(str(key)[:32] for key in message)[:8],
+            }
+            raise error
         future, method = entry
         if "error" in message:
             error = UncertainExecution("agent_rpc", "ACP server returned an error")

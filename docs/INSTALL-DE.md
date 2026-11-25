@@ -70,6 +70,36 @@ niemand geändert hat.
 Der launchd-Benutzerdienst läuft weiter, wenn Terminal oder Browser geschlossen
 werden. Die sichtbare Installation ist kein Fenster, das den Dienst am Leben hält.
 
+Nach erfolgreicher Umschaltung und Prüfung stellt der Installer die Zusatzdienste
+(`com.kirabridge.*` neben der Bridge, etwa Freigaben, Chat-Events, Grok) auf die neue
+Release um: Pfade unter `install/releases/<version>/` werden ersetzt, die alte plist
+liegt im Rückweg-Backup, der Dienst wird neu gestartet; der ChatGPT-Tunnel wird per
+`kickstart -k` neu gestartet. Fehlt eine Datei in der neuen Release oder scheitert ein
+Neustart, bleibt diese plist unverändert und die Zusammenfassung nennt sie; das Update
+selbst gilt trotzdem. `rollback` stellt die umgestellten plists wieder her.
+
+## DMG-Installer (Quellbau, noch nicht veröffentlicht)
+
+Für eine übliche Installation per Ziehen und Ablegen lässt sich aus demselben
+exakten Release ein Disk-Image bauen. Es veröffentlicht und installiert nichts.
+Auf dem Ziel-Mac (gleiche Architektur wie das Release), bei vollständig
+committetem Quellstand (`build_release.py` legt `dist/release/KiraBridge-macos.tar.gz`
+an; alle Ausgaben müssen neu sein, vorhandene werden nicht überschrieben):
+
+```sh
+python3.11 scripts/build_release.py --out dist/release
+python3.11 scripts/build_installer_app.py --archive dist/release/KiraBridge-macos.tar.gz --out dist/KiraBridge-Installieren.app
+python3.11 scripts/build_installer_dmg.py --app dist/KiraBridge-Installieren.app --out dist/KiraBridge.dmg
+```
+
+DMG öffnen, `KiraBridge.app` in `Programme` ziehen und starten. Der erste Start
+prüft das Paket und führt dann dieselbe sichtbare Terminal-Installation wie oben
+aus (Backup, Leerlaufprüfung, Rollback; Konfiguration, Zugangsdaten und Daten
+bleiben erhalten; ein vorhandener Freigabedienst wird auf die neue Release
+umgestellt). Es gibt keinen zweiten Installationsablauf. Python 3.11 und uv
+bleiben Voraussetzung. App ad-hoc signiert, DMG unsigniert, keine Notarisierung:
+macOS verlangt daher beim ersten Öffnen ggf. Rechtsklick → Öffnen.
+
 ## Status und Rückweg
 
 `~/.local/bin/kirabridge status` liest den tatsächlich antwortenden Dienst.

@@ -1,9 +1,11 @@
 # Repository work context
 
-Use the existing ThreadDesk Whiteboard **“ThreadDesk und KiraBridge – Wechselentwicklung
-durch Codex”**, thread ID **188ce4729a62**, as the current work memory. Do not create a
+Use the ThreadDesk board **“KiraBridge Arbeiten”**, thread ID **ba619be9cbf4**, only for
+KiraBridge itself (its plan, decisions and current state). The thread **“Big Plan”**
+(`7fb455b083f7`) is overarching and holds the plan of all five tools. Do not create a
 competing Whiteboard. Read it through existing authorized ThreadDesk tools when resuming.
-Update it at meaningful milestones and before switching between KiraBridge and ThreadDesk.
+Technical logs, progress messages, heartbeats, claims and temporary working data do **not**
+go into ThreadDesk; KiraBridge keeps them (user order 2026-11-18). Update it at meaningful milestones and before switching between KiraBridge and ThreadDesk.
 Separate completed work, work in progress, open issues and plans. Preserve existing
 content; append with an observed revision and stable operation ID. Independently read
 back every write before reporting it saved. A failed/uncertain write must be reconciled
@@ -40,6 +42,8 @@ not accumulate test windows or close unrelated windows or agent sessions.
 
 ## Plan-Governance (Nutzerbeschluss 09.11.2026)
 
-- ThreadDesk ist die einzige maßgebliche Quelle für den Big Plan (Master `6b5b73b9de36`, Status im Board `188ce4729a62`). Planänderungen werden nur dort gemacht.
+- ThreadDesk ist die einzige maßgebliche Quelle für den Big Plan (Thread „Big Plan“, `7fb455b083f7`). Planänderungen werden nur dort gemacht. Es gibt genau einen Big Plan; keine Namen wie „Master“, „Gesamtplan“, „Hauptplan“ erfinden.
+- ThreadDesk ist das Gedächtnis des Nutzers: nur Pläne, Entscheidungen, wichtige Erkenntnisse und aktuelle Stände (Nutzerauftrag 18.11.2026). Aufträge, Agenten und technische Logs gehören zu KiraBridge. Ein aktueller Stand ersetzt den vorigen, Abgearbeitetes fällt weg.
+- Keine Sperren, von niemandem: Weder Software noch Agenten bauen Sperren, Blockaden, Abweisungen oder Prüfpflichten ein, Sperren setzt allein der Nutzer.
 - In GitHub gibt es keine Big-Plan-Dateien, auch keine Spiegel oder Kopien. GitHub enthält nur technische Entwicklung und Umsetzung (Code, Tests, Install-/Release-Doku). Die früheren GitHub-Plandateien wurden am 09.11.2026 gelöscht; ihr Inhalt steht im ThreadDesk-Board (Rückführung R5a–R5c), die Git-Historie bleibt.
 - Die ChatGPT-Bibliothek bleibt als Backup unverändert. Nichts eigenmächtig löschen.

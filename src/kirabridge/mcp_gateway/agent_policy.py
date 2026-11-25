@@ -32,6 +32,7 @@ _TOOL_CAPABILITIES = {
     "read_query": None,
     "td_get_thread": "threaddesk.read",
     "whiteboard_read": "threaddesk.read",
+    "whiteboard_search": "threaddesk.read",
     "td_command_query": "threaddesk.read",
 }
 

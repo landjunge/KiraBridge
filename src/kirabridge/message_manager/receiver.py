@@ -36,6 +36,7 @@ def separate_managed_eligible(config, created: float) -> bool:
 
 class MessageReceiver:
     WAIT_REASONS = {
+        "session_busy",
         "visible_target_busy",
         "visible_target_not_ready",
         "desktop_locked",
@@ -44,6 +45,18 @@ class MessageReceiver:
         "visible_input_not_empty",
         "visible_target_scrolled",
         "visible_target_unknown",
+    }
+    # Busy or not ready, and no input was attempted. Wrong window, a draft,
+    # a locked Mac, and permission failures stay permanent refusals.
+    DEFER_UNSENT = {
+        "session_busy",
+        "visible_target_busy",
+        "visible_target_not_ready",
+        "visible_target_working",
+        "visible_target_scrolled",
+        "visible_target_unknown",
+        "execution_busy",
+        "delivery_timeout",
     }
 
     def __init__(self, bridge):
@@ -66,30 +79,45 @@ class MessageReceiver:
             if not self.worker.cancelled():
                 self.worker.exception()  # Consume the finished task before replacing its handle.
             self.worker = None
-        if self.worker or not self.bridge.config.messaging.receivers:
+        if self.worker:
             return
         self.recovered_handoffs.clear()
+        recovered_native = []
         # The task dispatcher owns the exclusive runtime lock before this is called.
         with self.bridge.store.transaction():
             rows = self.bridge.store.db.execute(
-                "SELECT message_id,evidence FROM message_jobs WHERE state='running'"
+                "SELECT j.*,m.id,m.sender,m.recipient,m.request_reply,m.body FROM message_jobs j "
+                "JOIN messages m ON m.id=j.message_id WHERE j.state='running'"
             ).fetchall()
             for row in rows:
                 if self._reply_can_finish(row):
                     self.recovered_handoffs.add(row["message_id"])
                     continue  # Return already happened; do not interrupt or paste again.
+                if receipt := self.direct.native_reply_receipt(row):
+                    recovered_native.append((row, receipt))
+                    continue
+                previous = json.loads(row["evidence"])
+                native = (
+                    previous
+                    if isinstance(previous, dict)
+                    and previous.get("session_scope") == "existing_native_codex_root"
+                    else {}
+                )
                 self._finish(
-                    row[0],
+                    row["message_id"],
                     "unknown",
                     {
+                        **native,
                         "reason": "receiver_restart",
-                        "last_observation": json.loads(row["evidence"]),
+                        "last_observation": previous,
                     },
                     "interrupted",
                 )
             queued = self.bridge.store.db.execute(
                 "SELECT m.id,m.recipient,m.created FROM messages m "
-                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued'"
+                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h "
+                "WHERE h.queue_id='messages' AND h.item_id=m.id)"
             ).fetchall()
             cutoff = self.bridge.config.messaging.separate_managed_after
             for row in queued:
@@ -100,6 +128,10 @@ class MessageReceiver:
                         continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
         self._reconcile_recovered_handoffs()
+        for row, receipt in recovered_native:
+            self.direct.recover_native_reply(row, receipt)
+        if not self.bridge.config.messaging.receivers:
+            return
         self.stopping = False
         self.direct.accepting = True
         self.messages.delivery_hook = self._submit_new
@@ -158,6 +190,8 @@ class MessageReceiver:
             await self.direct.wait_delivery(identifier)
         result = self.messages.get(principal, identifier)
         job = result["processing"]
+        if job["state"] == "queued" and job["evidence"].get("waiting_for_visible_target") is True:
+            return result
         if job["state"] == "queued":
             # No active runtime attempt means a historical/unadmitted record.
             # Its ID remains readable, but reading it never starts delivery.
@@ -171,9 +205,17 @@ class MessageReceiver:
                 "message": "No active delivery attempt for this record; inspect without replay",
             }
         elif job["state"] in {"failed", "blocked", "cancelled", "unknown"}:
+            delivery_confirmed = job["evidence"].get("completion_scope") in {
+                "visible_input_delivery",
+                "native_input_delivery",
+            }
             result["error"] = {
                 "code": job["error"] or job["evidence"].get("reason", "delivery_not_admitted"),
-                "message": "Visible delivery unconfirmed; inspect this message ID, never replay",
+                "message": (
+                    "Input submitted but reply unconfirmed; inspect this message ID, never replay"
+                    if delivery_confirmed
+                    else "Message delivery unconfirmed; inspect this message ID, never replay"
+                ),
             }
         return result
 
@@ -184,7 +226,7 @@ class MessageReceiver:
         except (TypeError, ValueError):
             return False
         handoff_id = evidence.get("handoff_id") if isinstance(evidence, dict) else None
-        if not handoff_id:
+        if not handoff_id or handoff_id != row["run_id"]:
             return False
         handoff = self.bridge.store.db.execute(
             "SELECT h.state FROM visible_handoffs h JOIN messages m ON m.id=h.message_id "
@@ -376,7 +418,9 @@ class MessageReceiver:
                         # shape of an optional local cache. This handoff is already
                         # terminal; retain the existing principal read check.
                         try:
-                            self.bridge.security.principal(row["sender"], "task.read")
+                            self.bridge.visible_handoffs._recovery_task_read(
+                                row["run_id"], row["sender"], row["recipient"], message_id
+                            )
                         except BridgeError as exc:
                             if exc.code != "forbidden":
                                 raise
@@ -431,17 +475,21 @@ class MessageReceiver:
                         self._finish(message_id, "completed", local)
                         self.recovered_handoffs.discard(message_id)
                         continue
-                if not reply_id:
+                if not reply_id or local_handoff is None:
                     continue
                 evidence = json.loads(row["evidence"])
                 try:
-                    handoff = self.bridge.visible_handoffs.reconcile(
-                        row["sender"], evidence["handoff_id"]
+                    self.bridge.visible_handoffs._recovery_task_read(
+                        row["run_id"], row["sender"], row["recipient"], message_id
                     )
+                    self.bridge.security.principal(row["sender"], "message.read")
                 except BridgeError as exc:
                     if exc.code != "forbidden":
                         raise
                     continue  # Revoked historical access must not stop other receiver work.
+                handoff = self.bridge.visible_handoffs._reconcile_owned(
+                    row["run_id"], row["sender"], row["recipient"], message_id
+                )
                 if handoff["state"] != "completed":
                     continue
                 self._finish(
@@ -607,14 +655,18 @@ class MessageReceiver:
 
         message_id = job["message_id"]
         now = time.time()
+        row = self.bridge.store.db.execute(
+            "SELECT * FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        delivery_scope = evidence.get("completion_scope")
+        delivery_only = delivery_scope in {"visible_input_delivery", "native_input_delivery"}
+        if state == "completed" and row["request_reply"] and delivery_only:
+            state, error = "unknown", "message_reply_unverified"
         self.bridge.store.db.execute(
             "UPDATE message_jobs SET state=?,finished=?,evidence=?,error=?,reply_id=? "
             "WHERE message_id=?",
             (state, now, canonical(evidence), error, reply_id, message_id),
         )
-        row = self.bridge.store.db.execute(
-            "SELECT * FROM messages WHERE id=?", (message_id,)
-        ).fetchone()
         self.messages._event(
             message_id,
             "message.processing_" + state,
@@ -636,15 +688,14 @@ class MessageReceiver:
             "finished": now,
             "result": {"text": evidence.get("response_preview", "")},
         }
-        delivery_only = evidence.get("completion_scope") == "visible_input_delivery"
         if delivery_only:
-            task["operation"] = "message.visible_input_delivery"
+            task["operation"] = "message." + delivery_scope
             task["result"] = {
                 "submitted": True,
                 "agent_confirmed": False,
                 "agent_work_completion_verified": False,
                 "request_reply_satisfied": False,
-                "scope": "visible_input_delivery",
+                "scope": delivery_scope,
             }
         local_reply = evidence.get("completion_scope") == "local_agent_turn"
         if local_reply:
@@ -663,7 +714,7 @@ class MessageReceiver:
             payload["supersedes"] = evidence["supersedes_notice_id"]
         if delivery_only:
             payload.update(
-                completion_scope="visible_input_delivery",
+                completion_scope=delivery_scope,
                 agent_confirmed=False,
                 agent_work_completion_verified=False,
                 request_reply_satisfied=False,
@@ -685,7 +736,7 @@ class MessageReceiver:
             payload,
         )
 
-    def _claim(self, message_id, *, direct=False, interim=False):
+    def _claim(self, message_id, *, direct=False, interim=False, native=False):
         config = self.bridge.config.messaging
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
@@ -731,14 +782,18 @@ class MessageReceiver:
                         },
                     )
 
-            if row["created"] <= time.time() - self.bridge.config.queue_stale_seconds:
-                # Late delivery could duplicate work already done in the visible terminal.
+            if row[
+                "created"
+            ] <= time.time() - self.bridge.config.queue_stale_seconds and self._delivery_evidenced(
+                message_id, row
+            ):
+                # Age alone does not block a message that was never sent.
                 blocked("stale_queue_expired")
                 return None
-            # Both run ceilings are rolling one-hour windows that bound provider
-            # cost and queue growth. They are not identity, authentication or
-            # dedupe guards: those are enforced before this point and must never
-            # depend on these counters.
+            # Both run ceilings are rolling one-hour counters. They are displayed
+            # when crossed and never reject, block, or hold the message.
+            # They are not identity, authentication or dedupe guards: those are
+            # enforced before this point and must never depend on these counters.
             # Exempt only the exact run claimed by DirectDelivery for steering.
             # A queued interim target can instead reach agents.execute through
             # the managed cutoff route, so the original message is not proof.
@@ -749,25 +804,33 @@ class MessageReceiver:
                 "AND json_type(e.evidence,'$.interim_delivery')='true')"
             )
             since = time.time() - 3600
-            count = self.bridge.store.db.execute(
+            conversation_runs = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.conversation_id=? AND j.claimed>? " + delivery_only_claim,
                 (row["conversation_id"], since),
             ).fetchone()[0]
-            if not interim and count >= config.max_runs_per_conversation:
-                blocked("conversation_run_limit")
-                return None
-            count = self.bridge.store.db.execute(
+            hourly_runs = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.recipient=? AND j.claimed>? " + delivery_only_claim,
                 (row["recipient"], since),
             ).fetchone()[0]
-            if not interim and count >= config.max_runs_per_hour:
-                blocked("hourly_run_limit")
-                return None
+            limit_notes = []
+            if not interim and conversation_runs >= config.max_runs_per_conversation:
+                limit_notes.append("conversation_run_limit")
+            if not interim and hourly_runs >= config.max_runs_per_hour:
+                limit_notes.append("hourly_run_limit")
+            noted = {}
+            if limit_notes:
+                noted = {
+                    "limit_notes": limit_notes,
+                    "conversation_runs": conversation_runs,
+                    "hourly_runs": hourly_runs,
+                }
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
-                "separate_managed_session"
+                "existing_native_codex_root"
+                if native
+                else "separate_managed_session"
                 if separate_managed_eligible(self.bridge.config, row["created"])
                 else "existing_visible_terminal"
                 if self.bridge.config.visible_handoffs.enabled
@@ -780,7 +843,7 @@ class MessageReceiver:
                 (
                     run_id,
                     time.time(),
-                    canonical({"session_scope": scope}),
+                    canonical({"session_scope": scope, **noted}),
                     config.receivers[row["recipient"]].cwd,
                     message_id,
                 ),
@@ -792,10 +855,93 @@ class MessageReceiver:
                 {
                     "run_id": run_id,
                     "session_scope": scope,
+                    **noted,
                     **({"interim_delivery": True} if direct and interim else {}),
                 },
             )
             return dict(row), run_id
+
+    def _delivery_evidenced(self, message_id, row):
+        """True when a paste, receipt, or uncertain attempt is already recorded."""
+        if any(row[key] is not None for key in ("delivered", "receipt", "acknowledged")):
+            return True
+        job = self.bridge.store.db.execute(
+            "SELECT started, evidence FROM message_jobs WHERE message_id=?",
+            (message_id,),
+        ).fetchone()
+        if job is None or job["started"] is not None:
+            return True
+        try:
+            evidence = json.loads(job["evidence"] or "{}")
+        except (ValueError, TypeError):
+            return True
+        if not isinstance(evidence, dict):
+            return True
+        if evidence.get("terminal_input_attempted", False) is not False:
+            return True
+        handoffs = self.bridge.store.db.execute(
+            "SELECT state, evidence FROM visible_handoffs WHERE message_id=?",
+            (message_id,),
+        ).fetchall()
+        for handoff in handoffs:
+            try:
+                saved = json.loads(handoff["evidence"] or "{}")
+            except (ValueError, TypeError):
+                return True
+            safe_abort = (
+                handoff["state"] == "interrupted"
+                and isinstance(saved, dict)
+                and saved.get("preinput_abort") is True
+                and saved.get("terminal_input_attempted") is False
+            )
+            if not safe_abort:
+                return True
+        return False
+
+    def _deferred_unsent(self, row):
+        """True only for a queued message that never attempted input."""
+        try:
+            evidence = json.loads(row["evidence"] or "{}")
+        except (ValueError, TypeError):
+            return False
+        return (
+            isinstance(evidence, dict)
+            and evidence.get("waiting_for_visible_target") is True
+            and evidence.get("terminal_input_attempted") is False
+            and evidence.get("reason") in self.DEFER_UNSENT
+        )
+
+    def _recipient_turn_open(self, recipient):
+        """Do not paste into a pane that an in-flight turn still holds.
+
+        A finished dispatcher call may leave its own job running. That row does
+        not by itself block a later delivery. The shared pane does: another
+        recipient's running turn, or this admission's pane key, must end first.
+        """
+        if ("recipient", recipient) in self.direct.targets:
+            return True
+        if not self.bridge.config.visible_handoffs.enabled:
+            return False
+        binding = self.bridge.config.visible_handoffs.bindings.get(recipient)
+        if binding is None:
+            return False
+        if ("pane", binding.pane_id) in self.direct.targets:
+            return True
+        others = [
+            name
+            for name, other in self.bridge.config.visible_handoffs.bindings.items()
+            if name != recipient and other.pane_id == binding.pane_id
+        ]
+        if not others:
+            return False
+        marks = ",".join("?" for _ in others)
+        return bool(
+            self.bridge.store.db.execute(
+                "SELECT 1 FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                f"WHERE j.state='running' AND m.recipient IN ({marks}) LIMIT 1",
+                tuple(others),
+            ).fetchone()
+        )
 
     def _waiting(self, message_id, reason, observation=None):
         """A pre-dispatch observation is not a failed turn or an input attempt."""
@@ -805,6 +951,7 @@ class MessageReceiver:
             "reason": reason,
             "terminal_input_attempted": False,
             "waiting_message": {
+                "session_busy": "Die Sitzung ist belegt; die Nachricht wartet ohne Eingabe.",
                 "visible_target_busy": "Eine frühere Übergabe muss noch abgeglichen werden.",
                 "visible_target_not_ready": "Das Agentenfenster ist noch nicht eingabebereit.",
                 "desktop_locked": "Mac gesperrt; die Nachricht wartet ohne Eingabe.",
@@ -813,6 +960,8 @@ class MessageReceiver:
                 "visible_input_not_empty": "Vorhandener Eingabetext wird nicht überschrieben.",
                 "visible_target_scrolled": "Zur aktuellen Eingabeansicht zurückkehren.",
                 "visible_target_unknown": "Bereitschaft nicht eindeutig; Diagnose ansehen.",
+                "execution_busy": "Ein früherer Lauf ist noch offen; die Nachricht wartet.",
+                "delivery_timeout": "Die Zustellung wartete ohne Eingabe und wird erneut geprüft.",
             }[reason],
         }
         if observation is not None:
@@ -976,8 +1125,22 @@ class MessageReceiver:
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=older.id) "
             "AND (? IS NULL OR older.created>=?) "
-            "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
-            (cutoff, cutoff, recipient, recipient, cutoff, cutoff),
+            "AND older.recipient=m.recipient AND older.seq<m.seq "
+            "AND (? = 1 OR (? IS NOT NULL AND older.created>=?) OR ("
+            "json_extract(q.evidence, '$.waiting_for_visible_target') = 1 "
+            "AND json_extract(q.evidence, '$.terminal_input_attempted') = 0))) "
+            "ORDER BY m.seq LIMIT 17",
+            (
+                cutoff,
+                cutoff,
+                recipient,
+                recipient,
+                cutoff,
+                cutoff,
+                1 if include_visible else 0,
+                cutoff,
+                cutoff,
+            ),
         ).fetchall()
         for row in rows:
             if row["acknowledged"] is not None:
@@ -989,9 +1152,12 @@ class MessageReceiver:
                 not include_visible
                 and self.bridge.config.visible_handoffs.enabled
                 and not separate_managed_eligible(self.bridge.config, row["created"])
+                and not self._deferred_unsent(row)
             ):
                 # Old visible backlog is inventory, never fresh authorization.
-                # New visible work has one runtime-owned direct admission.
+                # A deferred unsent message is delivered once the bound composer is ready.
+                continue
+            if self._deferred_unsent(row) and self._recipient_turn_open(row["recipient"]):
                 continue
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue
@@ -1113,6 +1279,13 @@ class MessageReceiver:
                 )
 
         async def running(evidence):
+            # For role-addressed visible messages this is the last
+            # application-level check before SessionManager starts its input
+            # path. Terminal.app still performs asynchronous native checks
+            # afterward, so this narrows the race but cannot serialize an
+            # external role writer with the physical paste.
+            if delivery_event is not None:
+                self.direct._verify_coordinator_route(message)
             with self.bridge.store.transaction():
                 self.bridge.store.db.execute(
                     "UPDATE message_jobs SET started=COALESCE(started,?) WHERE message_id=?",
@@ -1254,7 +1427,7 @@ class MessageReceiver:
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
                 job = self.bridge.store.db.execute(
-                    "SELECT message_id,evidence FROM message_jobs WHERE message_id=?",
+                    "SELECT message_id,run_id,evidence FROM message_jobs WHERE message_id=?",
                     (message_id,),
                 ).fetchone()
                 if (

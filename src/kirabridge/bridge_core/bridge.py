@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
-from kirabridge.agent_manager import AgentManager
-from kirabridge.autonext.models import AutoNextControl
+from kirabridge.agent_manager import AgentManager, codex_output_schema
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -87,7 +89,6 @@ from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboard
 from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
 INPUTS = {
-    "autonext.control": AutoNextControl,
     **WINDOWS_KEYBOARD_INPUTS,
     **WINDOWS_WINDOW_INPUTS,
     **WINDOWS_APP_INPUTS,
@@ -172,6 +173,7 @@ class Bridge:
             self.diagnostics,
             lambda principal: AuditObserver(config, principal, self.runtime, self.store),
         )
+        self.threaddesk.store = self.store
         from kirabridge.handoff_manager import HandoffManager
 
         self.handoffs = HandoffManager(self, peer=handoff_peer)
@@ -246,6 +248,11 @@ class Bridge:
                 ),
             )
         )
+        if sys.platform == "darwin":
+            from kirabridge.platform_adapters.macos.zle_readiness import ZLEReadiness
+
+            self.sessions.zle_readiness = ZLEReadiness(self.sessions.terminal_app)
+            self.sessions.terminal_app.zle_readiness = self.sessions.zle_readiness
         self.visible_terminal = VisibleTerminal(
             config, self.security, self.sessions, self.terminal.environment
         )
@@ -317,9 +324,16 @@ class Bridge:
         self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
 
+        next_prune = 0.0
+
         def maintain():
+            nonlocal next_prune
             self.messages.voice_policy.expire()
-            self.outputs.prune()
+            # Tidying runs often enough to stay current, not on every idle worker wake-up:
+            # capture() still prunes before every write, so nothing is ever left expired.
+            if time.monotonic() >= next_prune:
+                next_prune = time.monotonic() + 30.0
+                self.outputs.prune()
 
         self.tasks.maintenance = maintain
         self.message_receiver = MessageReceiver(self)
@@ -327,20 +341,10 @@ class Bridge:
         from kirabridge.team_manager.dispatcher import TeamDispatcher
 
         self.teams = TeamManager(self)
+        self.messages.coordinator_resolver = self.teams.coordinator_roles.resolve_global
         self.agents.qwen_session_guard = self.teams.qwen_session_proof
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
-        from kirabridge.autonext.manager import AutoNextManager
-
-        if config.autonext.coordinator_mode:
-            from kirabridge.autonext.coordinator import CoordinatedAutoNext
-
-            self.autonext = CoordinatedAutoNext(self)
-        else:
-            self.autonext = AutoNextManager(self)
-        self.agents.worktree_guard = lambda task, args: self.autonext.authorize_execution(
-            {**task, "args": args.model_dump()}
-        )
         from kirabridge.queue_management import QueueManager
 
         self.queues = QueueManager(
@@ -483,7 +487,6 @@ class Bridge:
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
-            "autonext": {"state": "not_probed"},
             "health_detail": {
                 "included": include_diagnostics,
                 "request": "bridge_health(include_diagnostics=true)",
@@ -501,7 +504,6 @@ class Bridge:
                 },
                 output_history=self.outputs.status(),
                 diagnostics_storage=self.diagnostics.status(),
-                autonext=self.autonext.inspect(),
             )
         if sys.platform.startswith("linux"):
             from kirabridge.platform_adapters import LinuxAdapter
@@ -939,13 +941,39 @@ class Bridge:
             ).fetchone()
             worker = self.config.team.workers.get(work["assignee"]) if work else None
             managed = bool(worker and worker.execution_scope == "separate_managed_session")
+            if worker and worker.execution_scope == "existing_native_codex_root":
+                if worker.agent != "codex" or self.config.agents[worker.agent].kind != "codex":
+                    raise BridgeError("native_codex_unsupported", "Native route is Codex only")
+                from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
+
+                schema_path = codex_output_schema(self.config.agents[worker.agent], team_turn=True)
+                try:
+                    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+                    if not isinstance(schema, dict):
+                        raise ValueError()
+                except (ValueError, OSError) as exc:
+                    raise BridgeError("agent_schema", "Codex output schema is invalid") from exc
+
+                note = await self.agents.budget_note(worker.agent)
+                await running({"evidence_type": "native_codex_turn_dispatch"})
+                result = await NativeCodexTurns().execute(
+                    self.config.visible_handoffs.native_codex,
+                    str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + task["id"])),
+                    args.prompt,
+                    min(args.timeout, worker.timeout),
+                    progress,
+                    output_schema=schema,
+                )
+                return self.agents.with_budget_note(result, note, create=True)
             return await self.agents.execute(
-                task, args, policy, running, progress, separate_managed=managed
+                task,
+                args,
+                policy,
+                running,
+                progress,
+                separate_managed=managed,
+                team_turn=worker is not None,
             )
-        if operation == "autonext.control":
-            self.autonext.validate_control(principal, args)
-            await running({"evidence_type": "autonext_control", "action": args.action})
-            return self.autonext.control(principal, args)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation == "workflow.stop":
@@ -1101,16 +1129,94 @@ class Bridge:
             },
         )
 
+    BINDING_REFRESH_FIRST = 10.0
+    BINDING_REFRESH_INTERVAL = 90.0
+
+    async def refresh_agent_bindings_once(self, principal="local"):
+        """Re-check the configured agent windows against one fresh catalogue.
+
+        Rehome a moved tab only when the recorded process generations still match.
+        An absent binding can be replaced only after fresh proven absence and a unique
+        live candidate. Returns changed targets. No terminal input is sent.
+        """
+        from kirabridge.visible_binding import binding_still_present
+
+        bindings = dict(self.config.visible_handoffs.bindings)
+        if not bindings:
+            return []
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except Exception as error:  # noqa: BLE001 - an unavailable Terminal is retried next round
+            # A failed probe must not leave an older "available" standing.
+            for target, binding in bindings.items():
+                try:
+                    self.visible_handoffs.record_presence(
+                        principal,
+                        target,
+                        "unknown",
+                        binding,
+                        {"reason": "catalog_" + getattr(error, "code", "unavailable")},
+                    )
+                except Exception:  # noqa: BLE001 - reporting never stops the sweep
+                    pass
+            return []
+        sessions = catalog.get("sessions") or []
+        replaced = []
+        for target, binding in bindings.items():
+            if binding_still_present(binding, sessions):
+                exact = any(self.sessions.binding_matches(r, binding, target) for r in sessions)
+                try:
+                    if not exact:
+                        moved = await self.visible_handoffs.rehome_binding(
+                            principal, target, binding, catalog
+                        )
+                        if moved is not None:
+                            replaced.append(target)
+                            continue
+                    if self.config.visible_handoffs.bindings.get(target) != binding:
+                        continue
+                    # Readiness and identity are re-validated at the effect point.
+                    self.visible_handoffs.record_presence(
+                        principal,
+                        target,
+                        "available" if exact else "stale",
+                        binding,
+                        {"reason": "matched" if exact else "original_pane_or_pid_in_catalog"},
+                    )
+                except Exception:  # noqa: BLE001 - reporting never stops the sweep
+                    pass
+                continue
+            try:
+                updated, _ = await self.visible_handoffs.refreshed_binding(
+                    principal, target, binding
+                )
+            except Exception:  # noqa: BLE001 - never stops the loop; the next round retries
+                continue
+            if updated is not binding and updated != binding:
+                replaced.append(target)
+        return replaced
+
+    async def _binding_refresher(self):
+        await asyncio.sleep(self.BINDING_REFRESH_FIRST)
+        while True:
+            try:
+                await self.refresh_agent_bindings_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                pass
+            await asyncio.sleep(self.BINDING_REFRESH_INTERVAL)
+
     async def __aenter__(self):
         await self.tasks.start()
         try:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
-            await self.autonext.start()
+            if self.config.visible_handoffs.bindings and sys.platform == "darwin":
+                self._binding_task = asyncio.create_task(self._binding_refresher())
         except BaseException:
             for stop in (
-                self.autonext.stop,
                 self.team_dispatcher.stop,
                 self.message_receiver.stop,
                 self.tasks.stop,
@@ -1120,14 +1226,15 @@ class Bridge:
         return self
 
     async def __aexit__(self, *exc):
+        task = getattr(self, "_binding_task", None)
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
         try:
             try:
-                await self.autonext.stop()
+                await self.team_dispatcher.stop()
             finally:
-                try:
-                    await self.team_dispatcher.stop()
-                finally:
-                    await self.message_receiver.stop()
+                await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.system_modules.close()

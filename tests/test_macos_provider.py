@@ -71,6 +71,43 @@ def test_keyboard_requires_its_own_advertised_native_contract(protocol, availabl
         assert leaves["keyboard"]["reason"] == "keyboard_protocol_unavailable"
 
 
+@pytest.mark.parametrize(
+    "protocol,available", [(None, False), (True, False), (2, False), (1, True)]
+)
+def test_mouse_requires_its_own_advertised_native_contract(protocol, available):
+    current = probe()
+    current.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "mouse_protocol": protocol,
+    }
+    leaves = current.snapshot()["capabilities"]
+    assert leaves["mouse"]["available"] is available
+    assert leaves["keyboard"]["available"] is False
+    if not available:
+        assert leaves["mouse"]["reason"] == "mouse_protocol_unavailable"
+
+
+def test_mouse_operations_require_the_mouse_leaf_and_its_contract():
+    native = provider(system_modules=object())
+    native.capability_probe.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "keyboard_protocol": 1,
+        "mouse_protocol": 1,
+    }
+    for operation in ("mouse.move", "mouse.click", "mouse.scroll"):
+        assert native.require(operation).leaf == "mouse"
+    native.capability_probe.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "keyboard_protocol": 1,
+    }
+    with pytest.raises(BridgeError) as error:
+        native.require("mouse.click")
+    assert error.value.code == "macos_capability_unavailable"
+
+
 def test_internal_native_guard_is_available_but_not_advertised_as_public_execution():
     native = provider()
     assert native.require("terminal.native").leaf == "terminal_app"
@@ -95,6 +132,18 @@ def test_snapshot_and_catalog_do_not_probe_permissions_or_use_leaves():
     assert native.leaves["desktop_session"] is native.leaves["terminal_app"].desktop
     before["capabilities"]["terminal_app"]["available"] = False
     assert native.snapshot()["capabilities"]["terminal_app"]["available"]
+
+
+def test_passive_snapshot_never_falls_back_to_full_native_metadata():
+    def forbidden():
+        raise AssertionError("Passive epochs must not read or hash the native executable")
+
+    current = CapabilityProbe(
+        facts={"platform": "darwin", "os_version": "15.7.4"},
+        native_metadata=forbidden,
+    )
+    observed = current.snapshot(passive=True)
+    assert not observed["capabilities"]["system"]["available"]
 
 
 def test_manual_policy_is_submission_eligibility_not_execution_authorization():

@@ -510,6 +510,10 @@ async def _fresh_tools(manager: Any, *, operation: bool = False) -> dict[str, di
         raise BridgeError("threaddesk_tool_limit", "Tool catalog is too large")
     approved: dict[str, dict[str, Any]] = {}
     for tool in tools:
+        # A complete catalog can contain hundreds of independently bounded
+        # schemas. Validation is synchronous CPU work; yield between schemas so
+        # it cannot monopolize the MCP server's event loop for the whole list.
+        await asyncio.sleep(0)
         item = _validated_tool(tool)
         if item is not None:
             if item["name"] in approved:
@@ -574,6 +578,10 @@ async def catalog(bridge: Any, principal: str) -> dict[str, Any]:
 
 
 async def read(bridge: Any, principal: str, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    from kirabridge.technical_entries import dynamic_success, should_retain
+
+    if should_retain(bridge.config, name, arguments):
+        return dynamic_success(bridge, principal, name, arguments)
     _guard(bridge, principal)
     if not isinstance(name, str) or not _NAME.fullmatch(name):
         raise BridgeError("invalid_arguments", "Invalid tool call")
@@ -588,7 +596,7 @@ async def read(bridge: Any, principal: str, name: str, arguments: dict[str, Any]
         _validate(tool, arguments)
     # The read runs outside the discovery lock: a hanging call must not block the catalog.
     result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
-    success, value = bridge.threaddesk.decode(result, mutation=False)
+    success, value = bridge.threaddesk.decode(result, mutation=False, verified_read_tool=name)
     return {
         "success": success,
         "value": value,
@@ -608,6 +616,10 @@ async def call(
     compact_response: bool = False,
 ) -> dict[str, Any]:
     """Read immediately, or submit one durable authorized mutation and wait boundedly."""
+    from kirabridge.technical_entries import dynamic_success, should_retain
+
+    if should_retain(bridge.config, name, arguments):
+        return dynamic_success(bridge, principal, name, arguments)
     _guard(bridge, principal)
     if type(compact_response) is not bool:
         raise BridgeError("invalid_arguments", "compact_response must be a boolean")
@@ -630,7 +642,7 @@ async def call(
             contract = digest(tool)
     if not mutation:
         result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
-        success, value = bridge.threaddesk.decode(result, mutation=False)
+        success, value = bridge.threaddesk.decode(result, mutation=False, verified_read_tool=name)
         return {
             "success": success,
             "value": value,
@@ -701,7 +713,11 @@ async def call(
 
 async def execute(bridge: Any, task: dict, args: Any, running: Any) -> dict[str, Any]:
     """Task-owned mutation. Restart, cancellation and lost replies remain protected."""
+    from kirabridge.technical_entries import dynamic_success, should_retain
+
     principal = task["principal"]
+    if should_retain(bridge.config, getattr(args, "name", ""), getattr(args, "arguments", {})):
+        return dynamic_success(bridge, principal, args.name, args.arguments)
     _guard(bridge, principal, mutation=True)
     _arguments(args.arguments)
     async with bridge.threaddesk.lock:

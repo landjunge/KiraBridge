@@ -5,25 +5,77 @@ import hashlib
 import re
 import time
 
+from kirabridge.bridge_core.config import VisibleTerminalBinding
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
-from kirabridge.session_manager import SessionInput
+from kirabridge.process_lifecycle import fresh_generations, same_generation, valid_generation
+from kirabridge.session_manager import RECEIVER_OWNER, SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
     catalog_can_replace,
+    clear_refresh,
     distinct_window_processes,
     load_refresh,
+    refresh_destination,
+    refresh_entry,
+    refresh_state,
     replacement_binding,
     save_refresh,
 )
 from kirabridge.visible_readiness import assess, input_view
 
 RETURN_OBSERVATION_TIMEOUT = 8.0
+# Two sweeper rounds. An older "available" observation is reported as aged.
+PRESENCE_FRESH_SECONDS = 180.0
+
+
+def peer_route_status(bridge, config, peer):
+    """Sanitized route state for one authorized peer: no pane, PID or process data.
+
+    Never reports a recipient as ready. Exact selection, identity and readiness are
+    re-validated at the effect point of every attempt.
+    """
+    base = {"known_ready": False, "effect_point": "exact_target_revalidated_before_input"}
+    if peer == "codex" and config.visible_handoffs.native_codex is not None:
+        return {**base, "kind": "native_codex_root", "state": "validated_per_attempt"}
+    if peer not in config.visible_handoffs.bindings:
+        return {**base, "kind": "no_visible_binding", "state": "not_applicable"}
+    presence = bridge.visible_handoffs.presence(peer)
+    state, observed = presence["state"], presence.get("observed_at")
+    age = time.time() - observed if isinstance(observed, (int, float)) else None
+    # A negative age means the wall clock stepped back; it is never "fresh".
+    if state in {"available", "replaced", "rehomed"} and (
+        age is None or age < -5.0 or age > PRESENCE_FRESH_SECONDS
+    ):
+        state = "observation_aged"
+    if age is not None:
+        age = max(0.0, age)
+    evidence = presence.get("evidence") or {}
+    return {
+        **base,
+        "kind": "visible_terminal",
+        "state": state,
+        "reason": presence.get("reason"),
+        "observed_age_seconds": round(age) if age is not None else None,
+        **({"remedy": evidence["remedy"]} if isinstance(evidence.get("remedy"), str) else {}),
+    }
 
 
 def _text_sha256(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+# Raised by the native insert script's guards before the Paste menu action is performed.
+PRE_PASTE_REFUSALS = frozenset(
+    {
+        "clipboard_changed",
+        "visible_input_not_empty",
+        "visible_input_changed",
+        "visible_target_changed",
+        "session_busy",
+    }
+)
 
 
 class VisibleReadinessError(BridgeError):
@@ -179,7 +231,6 @@ class VisibleHandoffs:
 
         self.codex_state = CodexTurnState()
         self.codex_reply = CodexReplyObserver()
-        load_refresh(config)
         with store.transaction():
             store.db.execute(
                 "CREATE TABLE IF NOT EXISTS visible_handoffs ("
@@ -200,15 +251,284 @@ class VisibleHandoffs:
                 "id TEXT NOT NULL REFERENCES visible_handoffs(id),"
                 "at REAL NOT NULL,state TEXT NOT NULL,evidence TEXT NOT NULL)"
             )
+            # Kernel generation of an exact binding triple, recorded once at an
+            # authorized, fresh native match. Equality-only; legacy rows stay absent.
+            store.db.execute(
+                "CREATE TABLE IF NOT EXISTS binding_generations ("
+                "pane_id TEXT NOT NULL,expected_pid INTEGER NOT NULL,"
+                "agent_pid INTEGER NOT NULL,target TEXT NOT NULL,"
+                "generations TEXT NOT NULL,recorded_at REAL NOT NULL,"
+                "source TEXT NOT NULL DEFAULT 'exact_match_bootstrap',"
+                "PRIMARY KEY(pane_id,expected_pid,agent_pid))"
+            )
+            # Current per-target receiver presence; reporting only, never an effect.
+            store.db.execute(
+                "CREATE TABLE IF NOT EXISTS receiver_presence ("
+                "target TEXT PRIMARY KEY,state TEXT NOT NULL,binding TEXT NOT NULL,"
+                "evidence TEXT NOT NULL,observed_at REAL NOT NULL)"
+            )
+        self.refresh_ambiguities = load_refresh(
+            config, same_live_generation=self._same_live_rehome_generation
+        )
+
+    PRESENCE_STATES = frozenset(
+        {"available", "stale", "absent", "ambiguous", "replaced", "rehomed", "unknown"}
+    )
+    # The only receiver-management owner: the local operator identity. Capabilities
+    # such as session.open/terminal.execute are granted to remote callers too and
+    # are not authority to replace a persistent assignment.
+    OWNER_PRINCIPAL = RECEIVER_OWNER
+    # Lineage is recorded at an exact match, owner launch, or proven replacement.
+    GENERATION_SOURCES = frozenset(
+        {"exact_match_bootstrap", "owner_started_assignment", "strict_dead_replacement"}
+    )
+
+    # Injectable for tests: (pids) -> {pid: generation} or None when unverifiable.
+    generation_observer = staticmethod(fresh_generations)
+
+    def recorded_generations(self, binding, target=None):
+        """Recorded generations of this exact triple (scoped to ``target`` if given).
+
+        A malformed record is returned as an empty mapping: it exists, so it can
+        never be bootstrapped over, and it never compares equal.
+        """
+        import json
+
+        query = (
+            "SELECT generations FROM binding_generations "
+            "WHERE pane_id=? AND expected_pid=? AND agent_pid=?"
+        )
+        values = [binding.pane_id, binding.expected_pid, binding.agent_pid]
+        if target is not None:
+            query += " AND target=?"
+            values.append(target)
+        row = self.store.db.execute(query, values).fetchone()
+        if row is None:
+            return None
+        try:
+            saved = json.loads(row["generations"])
+            return {
+                int(pid): value
+                for pid, value in saved.items()
+                if valid_generation(value) and value["pid"] == int(pid)
+            }
+        except (TypeError, ValueError, AttributeError):
+            return {}
+
+    def generation_source(self, binding, target):
+        row = self.store.db.execute(
+            "SELECT source FROM binding_generations WHERE pane_id=? AND expected_pid=? "
+            "AND agent_pid=? AND target=?",
+            (binding.pane_id, binding.expected_pid, binding.agent_pid, target),
+        ).fetchone()
+        return row["source"] if row else None
+
+    def _store_generation(self, target, binding, observed, source):
+        if source not in self.GENERATION_SOURCES:
+            raise ValueError(source)
+        pids = (binding.expected_pid, binding.agent_pid)
+        with self.store.transaction():
+            self.store.db.execute(
+                "INSERT OR IGNORE INTO binding_generations VALUES(?,?,?,?,?,?,?)",
+                (
+                    binding.pane_id,
+                    binding.expected_pid,
+                    binding.agent_pid,
+                    target,
+                    canonical({str(p): observed[p] for p in pids}),
+                    time.time(),
+                    source,
+                ),
+            )
+
+    def fresh_pair(self, binding):
+        """Two kernel reads of the binding PIDs; equal means one stable generation."""
+        pids = (binding.expected_pid, binding.agent_pid)
+        try:
+            first = self.generation_observer(pids)
+            second = self.generation_observer(pids)
+        except Exception:  # noqa: BLE001 - an adapter fault is unverifiable, never "same"
+            return None
+        if (
+            not isinstance(first, dict)
+            or not isinstance(second, dict)
+            or not all(same_generation(first.get(p), second.get(p)) for p in pids)
+        ):
+            return None
+        return second
+
+    def _same_live_rehome_generation(self, target, original, updated):
+        source = self.generation_source(original, target)
+        if (
+            source not in self.GENERATION_SOURCES
+            or self.generation_source(updated, target) != source
+        ):
+            return False
+        original_pair = self.recorded_generations(original, target) or {}
+        updated_pair = self.recorded_generations(updated, target) or {}
+        current = self.fresh_pair(updated) or {}
+        return all(
+            same_generation(original_pair.get(pid), updated_pair.get(pid))
+            and same_generation(updated_pair.get(pid), current.get(pid))
+            for pid in (updated.expected_pid, updated.agent_pid)
+        )
+
+    def effect_generation_guard(self, target, binding):
+        """Immediately before transport: a recorded lineage must still be the same.
+
+        No record keeps the legacy route unchanged. A record that cannot be
+        re-verified, or differs, refuses before any input.
+        """
+        recorded = self.recorded_generations(binding, target)
+        if recorded is None:
+            return "unverified"
+        current = self.fresh_pair(binding)
+        pids = (binding.expected_pid, binding.agent_pid)
+        if current is None or not all(
+            same_generation(recorded.get(p), current.get(p)) for p in pids
+        ):
+            error = BridgeError(
+                "visible_target_changed",
+                "Receiver process generation changed or unverifiable at input; no input",
+            )
+            error.observation = {
+                "state": "target_changed",
+                "reason": "process_generation_changed"
+                if current is not None
+                else "process_generation_unverifiable",
+                "target": target,
+            }
+            raise error
+        return "verified"
+
+    def verify_generation(self, target, binding, before, after):
+        """Effect-point identity for one exact native match. Never infers legacy birth.
+
+        ``before``/``after`` are kernel observations taken around the catalog match;
+        equal values prove the matched PIDs belonged to those generations. The first
+        such fresh match records the generation; later matches must be equal.
+        Returns ``verified`` or ``unverified``; raises on a proven different process.
+        """
+        pids = (binding.expected_pid, binding.agent_pid)
+        recorded = self.recorded_generations(binding, target)
+        fresh = (
+            isinstance(before, dict)
+            and isinstance(after, dict)
+            and all(same_generation(before.get(p), after.get(p)) for p in pids)
+        )
+        if recorded is not None:
+            if not fresh:
+                raise BridgeError(
+                    "visible_target_unknown",
+                    "Recorded process generation cannot be re-verified now; no input",
+                )
+            if not all(same_generation(recorded.get(p), after.get(p)) for p in pids):
+                error = BridgeError(
+                    "visible_target_changed",
+                    "Same PID number, different kernel process generation; no input",
+                )
+                error.observation = {
+                    "state": "target_changed",
+                    "reason": "process_generation_changed",
+                    "target": target,
+                }
+                raise error
+            return "verified"
+        if not fresh:
+            return "unverified"
+        # Bootstrap of an exactly matched legacy triple: what holds it now is, by the
+        # existing binding definition, the bound process. Never back-dated.
+        self._store_generation(target, binding, after, "exact_match_bootstrap")
+        return "verified"
+
+    def record_presence(self, principal, target, state, binding, evidence):
+        import json
+
+        if state not in self.PRESENCE_STATES:
+            raise ValueError(state)
+        now = time.time()
+        with self.store.transaction():
+            previous = self.store.db.execute(
+                "SELECT state,evidence FROM receiver_presence WHERE target=?", (target,)
+            ).fetchone()
+            self.store.db.execute(
+                "INSERT INTO receiver_presence VALUES(?,?,?,?,?) ON CONFLICT(target) DO UPDATE "
+                "SET state=excluded.state,binding=excluded.binding,"
+                "evidence=excluded.evidence,observed_at=excluded.observed_at",
+                (target, state, canonical(binding.model_dump()), canonical(evidence), now),
+            )
+            if (
+                previous is None
+                or previous["state"] != state
+                or (json.loads(previous["evidence"]).get("reason") != evidence.get("reason"))
+            ):
+                self.store.audit(
+                    "receiver_presence_changed",
+                    principal,
+                    None,
+                    {
+                        "target": target,
+                        "state": state,
+                        "previous_state": previous["state"] if previous else None,
+                        "reason": evidence.get("reason"),
+                        "pane_id": binding.pane_id,
+                        "automatic_retry": False,
+                    },
+                )
+
+    def presence(self, target):
+        import json
+
+        unresolved = refresh_state(self.refresh_ambiguities.get(target))
+        if unresolved is not None:
+            return {
+                "target": target,
+                "state": "ambiguous",
+                "reason": unresolved,
+                "evidence": {"remedy": "new_exact_assignment_required"},
+                "binding": self.config.visible_handoffs.bindings.get(target).model_dump()
+                if self.config.visible_handoffs.bindings.get(target)
+                else None,
+            }
+        row = self.store.db.execute(
+            "SELECT * FROM receiver_presence WHERE target=?", (target,)
+        ).fetchone()
+        if row is None:
+            return {"target": target, "state": "unknown", "reason": "never_observed"}
+        evidence = json.loads(row["evidence"])
+        return {
+            "target": target,
+            "state": row["state"],
+            "reason": evidence.get("reason"),
+            "evidence": evidence,
+            "binding": json.loads(row["binding"]),
+            "observed_at": row["observed_at"],
+        }
 
     def status(self, principal, identifier):
+        """Public read: requires task.read and the handoff's sender or target."""
         self.security.principal(principal, "task.read")
         row = self.store.db.execute(
             "SELECT * FROM visible_handoffs WHERE id=? AND (principal=? OR target=?)",
             (identifier, principal, principal),
         ).fetchone()
-        if not row:
+        if row is None:
             raise BridgeError("not_found", "Visible handoff not found")
+        return self._status_record(row)
+
+    def _owned_status(self, identifier, sender, target, message_id):
+        """Read the exact original handoff for trusted execution bookkeeping."""
+        row = self.store.db.execute(
+            "SELECT * FROM visible_handoffs "
+            "WHERE id=? AND principal=? AND target=? AND message_id=?",
+            (identifier, sender, target, message_id),
+        ).fetchone()
+        if row is None:
+            raise BridgeError("not_found", "Visible handoff not found")
+        return self._status_record(row)
+
+    def _status_record(self, row):
+        identifier = row["id"]
         import json
 
         result = dict(row)
@@ -227,14 +547,53 @@ class VisibleHandoffs:
         return result
 
     def reconcile(self, principal, identifier):
-        """Read authenticated evidence after an uncertain outcome; never send input."""
+        """Read authenticated evidence after an uncertain outcome; never send input.
+
+        Public path: task.read, handoff scope and message.read are enforced unchanged.
+        """
         status = self.status(principal, identifier)
         message = self.messages.get(principal, status["message_id"])
+        self._apply_reconcile(identifier, status, message["acknowledged"])
+        return self.status(principal, identifier)
+
+    def _message_acknowledged(self, message_id, sender, target):
+        row = self.store.db.execute(
+            "SELECT acknowledged FROM messages WHERE id=? AND sender=? AND recipient=?",
+            (message_id, sender, target),
+        ).fetchone()
+        return row["acknowledged"] if row else None
+
+    def _recovery_task_read(self, identifier, sender, target, message_id):
+        """Preserve revoked grants while admitting originally send-only task scopes."""
+        try:
+            self.security.principal(sender, "task.read")
+        except BridgeError as exc:
+            if exc.code != "forbidden":
+                raise
+            self.security.principal(sender)
+            if not self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs h JOIN visible_handoff_events e ON e.id=h.id "
+                "WHERE h.id=? AND h.principal=? AND h.target=? AND h.message_id=? "
+                "AND e.state='planned' AND CASE WHEN json_valid(e.evidence) "
+                "THEN json_type(e.evidence, '$.task_read_at_admission')='false' ELSE 0 END",
+                (identifier, sender, target, message_id),
+            ).fetchone():
+                raise
+
+    def _reconcile_owned(self, identifier, sender, target, message_id):
+        """Observe this execution's durable ACK/reply facts without public read scope."""
+        status = self._owned_status(identifier, sender, target, message_id)
+        self._apply_reconcile(
+            identifier, status, self._message_acknowledged(message_id, sender, target)
+        )
+        return self._owned_status(identifier, sender, target, message_id)
+
+    def _apply_reconcile(self, identifier, status, acknowledged):
         idle_reply_pending = (
             status["state"] == "unknown"
             and status["evidence"].get("reason") == "target_idle_reply_unconfirmed"
         ) or self.body_only_input_released(status)
-        if message["acknowledged"] and status["state"] not in {"completed", "interrupted"}:
+        if acknowledged and status["state"] not in {"completed", "interrupted"}:
             evidence = {
                 "authenticated_principal": status["target"],
                 "message_id": status["message_id"],
@@ -253,7 +612,6 @@ class VisibleHandoffs:
             ).fetchone()
             if reply:
                 self.transition(identifier, "completed", {**evidence, "reply_id": reply["id"]})
-        return self.status(principal, identifier)
 
     async def reconcile_observed(self, principal, identifier):
         """Reconcile a manually completed Codex turn from its original pre-paste cursor.
@@ -372,10 +730,10 @@ class VisibleHandoffs:
                 import json
 
                 current_evidence = json.loads(current["evidence"])
-                if (
-                    current["state"] == "confirmed"
-                    or current_evidence.get("reason") == "visible_paste_unconfirmed"
-                ):
+                if current["state"] == "confirmed" or "visible_paste_unconfirmed" in {
+                    current_evidence.get("reason"),
+                    current_evidence.get("previous_reason"),
+                }:
                     message_row = self.store.db.execute(
                         "SELECT acknowledged,conversation_id FROM messages WHERE id=?",
                         (status["message_id"],),
@@ -580,7 +938,7 @@ class VisibleHandoffs:
                     "visible_selection_required", "Return requires task-owned native identities"
                 )
         active = self.store.db.execute(
-            "SELECT id,principal,state,binding FROM visible_handoffs WHERE target=? "
+            "SELECT id,principal,state,binding,message_id FROM visible_handoffs WHERE target=? "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='handoffs' AND h.item_id=visible_handoffs.id) AND state IN "
             "('planned','inserting','inserted','submitting',"
@@ -622,7 +980,11 @@ class VisibleHandoffs:
                 principal, target, row, binding, observed_sessions
             ):
                 continue  # Dead pane stays recorded. It does not lock the replacement.
-            status = self.reconcile(row["principal"], row["id"])
+            owner = row["principal"]
+            message_id = row["message_id"]
+            self._recovery_task_read(row["id"], owner, target, message_id)
+            self.security.principal(owner, "message.read")
+            status = self._reconcile_owned(row["id"], owner, target, message_id)
             if status["state"] in {"completed", "interrupted"}:
                 continue
             if (
@@ -666,7 +1028,33 @@ class VisibleHandoffs:
                         },
                     )
                 continue
-            message = self.messages.get(row["principal"], status["message_id"])
+            if (
+                status["state"] == "unknown"
+                and status["binding"] == binding.model_dump()
+                and self.body_only_delivery(status)
+                and status["evidence"].get("reason")
+                in {"reply_unconfirmed", "reply_unconfirmed_target_ready"}
+            ):
+                # The input was delivered and returned; only its ANSWER is unknown and its
+                # waiter has ended. The lock exists to protect pending input, so a fresh
+                # positive ready check of this same target releases it. Never replayed.
+                if status["evidence"].get("reason") == "reply_unconfirmed_target_ready":
+                    continue
+                await self.check_target(principal, target, binding, ready=True)
+                self.transition(
+                    row["id"],
+                    "unknown",
+                    {
+                        **status["evidence"],
+                        "reason": "reply_unconfirmed_target_ready",
+                        "previous_reason": status["evidence"].get("reason"),
+                        "input_reservation_released": True,
+                        "automatic_retry": False,
+                        "target_readiness": "verified_ready_before_new_input",
+                    },
+                )
+                continue
+            acknowledged = self._message_acknowledged(message_id, owner, target)
             reply = self.store.db.execute(
                 "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
                 "AND kind IN ('answer','result') LIMIT 1",
@@ -675,7 +1063,7 @@ class VisibleHandoffs:
             if (
                 adapter_for(target).has_bound_protocol(binding)
                 and status["state"] in {"sent", "confirmed", "unknown"}
-                and message["acknowledged"]
+                and acknowledged
                 and not reply
             ):
                 # The accepted turn has finished, but its answer may still be missing.
@@ -715,18 +1103,49 @@ class VisibleHandoffs:
                         },
                     )
                 continue  # The old message stays unknown and is not sent again.
+            if self._unconfirmed_input(status):
+                # The paste/insert outcome stayed unknown. The lock protects possibly
+                # pending input, so only a FRESH ready observation (empty, idle input of
+                # this same window) releases it. Text still in the field keeps the lock.
+                await self.check_target(principal, target, binding, ready=True)
+                if status["evidence"].get("reason") != "unconfirmed_input_lock_released":
+                    self.transition(
+                        row["id"],
+                        "unknown",
+                        {
+                            **status["evidence"],
+                            "reason": "unconfirmed_input_lock_released",
+                            "previous_reason": status["evidence"].get("reason"),
+                            "input_reservation_released": True,
+                            "automatic_retry": False,
+                            "target_readiness": "verified_ready_before_new_input",
+                        },
+                    )
+                continue  # The old message stays unknown and is never sent again.
             error = BridgeError("visible_target_busy", busy_message)
-            last = status["events"][-1] if status["events"] else None
-            error.observation = {
-                "state": "reserved",
-                "handoff_id": row["id"],
-                "handoff_state": status["state"],
-                "message_id": message["id"],
-                "acknowledged": message["acknowledged"],
-                "last_event": {key: last[key] for key in ("state", "at")} if last else None,
-                "next_step": "Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
-            }
+            error.observation = {"state": "reserved"}
+            if principal in {owner, target} and {"task.read", "message.read"}.issubset(
+                self.security.principal(principal).capabilities
+            ):
+                last = status["events"][-1] if status["events"] else None
+                error.observation.update(
+                    handoff_id=row["id"],
+                    handoff_state=status["state"],
+                    message_id=message_id,
+                    acknowledged=acknowledged,
+                    last_event={key: last[key] for key in ("state", "at")} if last else None,
+                    next_step="Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
+                )
             raise error
+
+    @staticmethod
+    def _unconfirmed_input(status):
+        """Paste/insert outcome unknown; its lock ends only after a fresh ready check."""
+        return status["state"] == "unknown" and status["evidence"].get("reason") in {
+            "visible_paste_unconfirmed",
+            "visible_insert_unknown",
+            "unconfirmed_input_lock_released",
+        }
 
     @staticmethod
     def _pre_paste_refusal(status):
@@ -752,42 +1171,309 @@ class VisibleHandoffs:
         await self.reconcile_target_reservations(
             principal, target, binding, observed_sessions=observed
         )
-        await self.check_target(principal, target, binding, ready=True)
+        presence = self.presence(target)
+        try:
+            await self.check_target(principal, target, binding, ready=True)
+        except BridgeError as error:
+            # Same pre-input code as before; the sender additionally learns the
+            # persisted receiver state. Never starts, picks or rebinds an agent.
+            if (
+                error.code == "session_selection_changed"
+                and presence["state"] in {"stale", "absent", "ambiguous", "unknown"}
+                and getattr(error, "observation", None) is None
+            ):
+                error.observation = {
+                    "state": presence["state"],
+                    "reason": presence["reason"] or "unobserved",
+                    "target": target,
+                }
+            raise
 
-    async def refreshed_binding(self, principal, target, binding):
+    async def refreshed_binding(self, principal, target, binding, *, only_candidate=None):
         """Use the saved binding while its process lives. Replace only a dead unique agent.
 
         The returned session list is the catalog snapshot that proved the replacement.
         Callers may use it to ignore reservations on that dead pane. A matched binding
         returns no snapshot, so an unrelated reservation keeps its existing lock.
+        Every outcome is recorded as receiver presence; none of them sends input.
         """
+        refresh_record = self.refresh_ambiguities.get(target)
+        unresolved_refresh = refresh_state(refresh_record)
+        legacy_destination = refresh_destination(refresh_record)
+        expected_overlay_entry = (
+            refresh_entry(self.config, target)
+            if unresolved_refresh
+            in {"legacy_overlay_unverified", "manual_protocol_binding_precedence"}
+            else None
+        )
+        selection_reason = None
         try:
             selected = await self.sessions.selected(
                 principal, binding.pane_id, binding.expected_pid
             )
-        except BridgeError:
+        except BridgeError as error:
             selected = None
-        if selected is not None and self.sessions.binding_matches(selected, binding, target):
+            detail = getattr(error, "provider_error", None)
+            selection_reason = (
+                detail.get("reason") if isinstance(detail, dict) else None
+            ) or error.code
+        selected_matches = selected is not None and self.sessions.binding_matches(
+            selected, binding, target
+        )
+        if unresolved_refresh == "manual_protocol_binding_precedence" and not selected_matches:
+            self._refuse_unresolved_refresh(principal, target, binding, unresolved_refresh)
+        if selected_matches and unresolved_refresh is None:
+            self.record_presence(principal, target, "available", binding, {"reason": "matched"})
             return binding, None
+        if unresolved_refresh == "legacy_overlay_unverified":
+            # The legacy destination is usable only after a new catalog and native
+            # absence/generation proof below. Never trust its persisted pane/PIDs alone.
+            pass
+        lifecycle = self._lifecycle_change(target, binding, selected, selection_reason)
+        original_generation_before_catalog = (
+            self.fresh_pair(binding)
+            if unresolved_refresh
+            in {"legacy_overlay_unverified", "manual_protocol_binding_precedence"}
+            and selected_matches
+            else None
+        )
         try:
             catalog = await self.sessions.catalog(principal)
-        except BridgeError:
+        except BridgeError as error:
+            self.record_presence(
+                principal, target, "unknown", binding, {"reason": "catalog_" + error.code}
+            )
             return binding, None
         if not catalog_can_replace(catalog):
+            self.record_presence(
+                principal, target, "unknown", binding, {"reason": "catalog_incomplete"}
+            )
             return binding, None
         sessions = catalog.get("sessions") or []
+        if unresolved_refresh in {
+            "legacy_overlay_unverified",
+            "manual_protocol_binding_precedence",
+        } and binding_still_present(binding, sessions):
+            exact_original = (
+                selected_matches
+                and sum(
+                    self._exact_row(
+                        row,
+                        target,
+                        binding.pane_id,
+                        binding.expected_pid,
+                        binding.agent_pid,
+                    )
+                    for row in sessions
+                )
+                == 1
+            )
+            before = original_generation_before_catalog if exact_original else None
+            after = self.fresh_pair(binding) if exact_original else None
+            if (
+                exact_original
+                and before is not None
+                and after is not None
+                and all(
+                    same_generation(before.get(pid), after.get(pid))
+                    for pid in (binding.expected_pid, binding.agent_pid)
+                )
+            ):
+                current_binding = self.config.visible_handoffs.bindings.get(target)
+                current_entry = refresh_entry(self.config, target)
+                if (
+                    current_binding != binding
+                    or expected_overlay_entry is None
+                    or current_entry != expected_overlay_entry
+                ):
+                    return current_binding or binding, None
+                self.verify_generation(target, binding, before, after)
+                if not clear_refresh(self.config, target, expected_entry=expected_overlay_entry):
+                    current_binding = self.config.visible_handoffs.bindings.get(target)
+                    current_entry = refresh_entry(self.config, target)
+                    if current_binding != binding or current_entry != expected_overlay_entry:
+                        return current_binding or binding, None
+                    self._refuse_unresolved_refresh(
+                        principal, target, binding, "legacy_overlay_clear_failed"
+                    )
+                self.refresh_ambiguities.pop(target, None)
+                self.record_presence(
+                    principal,
+                    target,
+                    "available",
+                    binding,
+                    {"reason": "overlay_disproved_by_exact_live_original"},
+                )
+                return binding, None
+            self._refuse_unresolved_refresh(
+                principal, target, binding, "legacy_original_still_present"
+            )
+        elif unresolved_refresh == "manual_protocol_binding_precedence":
+            self._refuse_unresolved_refresh(
+                principal, target, binding, "manual_binding_original_unavailable"
+            )
+        if selected is None and only_candidate is None and unresolved_refresh is None:
+            rehomed = await self.rehome_binding(principal, target, binding, catalog)
+            if rehomed is not None:
+                return rehomed, None
+        updated = replacement_binding(target, binding, sessions)
+        if unresolved_refresh == "legacy_overlay_unverified":
+            if legacy_destination is None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_destination_invalid"
+                )
+            destination_matches = [
+                row
+                for row in sessions
+                if self._unique_exact_catalog_row(
+                    sessions,
+                    target,
+                    legacy_destination["pane_id"],
+                    legacy_destination["expected_pid"],
+                    legacy_destination["agent_pid"],
+                )
+                and row.get("pane_id") == legacy_destination["pane_id"]
+                and self._exact_row(
+                    row,
+                    target,
+                    legacy_destination["pane_id"],
+                    legacy_destination["expected_pid"],
+                    legacy_destination["agent_pid"],
+                )
+            ]
+            if len(destination_matches) != 1:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_destination_not_exactly_live"
+                )
+            try:
+                updated = VisibleTerminalBinding.model_validate(
+                    {
+                        **binding.model_dump(),
+                        **legacy_destination,
+                        "codex_thread_id": None,
+                        "codex_rollout_path": None,
+                    }
+                )
+            except ValueError:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_destination_invalid"
+                )
+        if (
+            updated is not None
+            and only_candidate is not None
+            and (updated.pane_id, updated.expected_pid, updated.agent_pid) != tuple(only_candidate)
+        ):
+            # An owner launch must never adopt a different live same-CLI session.
+            updated = None
+        before = self.fresh_pair(updated) if updated is not None else None
+        if (
+            unresolved_refresh == "legacy_overlay_unverified"
+            and binding.codex_thread_id is not None
+        ):
+            recorded = self.recorded_generations(updated, target) or {} if updated else {}
+            owner_destination_confirmed = (
+                updated is not None
+                and self.generation_source(updated, target) == "owner_started_assignment"
+                and before is not None
+                and all(
+                    same_generation(recorded.get(pid), before.get(pid))
+                    for pid in (updated.expected_pid, updated.agent_pid)
+                )
+            )
+            if not owner_destination_confirmed:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_codex_destination_unproven"
+                )
         try:
             await self.sessions.prove_original_target_gone(principal, binding.model_dump())
-        except BridgeError:
+        except BridgeError as error:
+            # Strict proof failed (e.g. an original PID number is occupied). A
+            # legacy binding has no kernel generation, so nothing can be proven:
+            # the operator must assign the receiver again, exactly, once.
+            self.record_presence(
+                principal,
+                target,
+                "stale",
+                binding,
+                {
+                    "reason": error.code,
+                    "selection_reason": selection_reason,
+                    "lifecycle": lifecycle,
+                    "identity": (
+                        "generation_recorded"
+                        if self.recorded_generations(binding, target) is not None
+                        else "unverified_legacy"
+                    ),
+                    "remedy": "new_exact_assignment_required",
+                },
+            )
+            if unresolved_refresh is not None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_original_absence_unproven"
+                )
             return binding, None
-        updated = replacement_binding(target, binding, sessions)
         if updated is None:
             # The catalog is complete and the configured pane is proven gone;
             # retain that snapshot even without a replacement so an orphaned
             # reservation on this exact binding can be released.
+            candidates = [
+                row
+                for row in sessions
+                if row.get("agent_candidate") == target
+                or row.get("agent_candidates_ambiguous")
+                and any(p.get("name") == target for p in row.get("processes", []))
+            ]
+            self.record_presence(
+                principal,
+                target,
+                "ambiguous" if candidates else "absent",
+                binding,
+                {
+                    "reason": (
+                        "replacement_not_unique"
+                        if candidates
+                        else "original_target_gone_no_replacement"
+                    ),
+                    "candidates": len(candidates),
+                    "remedy": "new_exact_assignment_required",
+                },
+            )
+            if unresolved_refresh is not None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_replacement_unverified"
+                )
             return binding, sessions
-        self.config.visible_handoffs.bindings[target] = updated
-        save_refresh(self.config, target, binding, updated)
+        sessions, failure = await self._confirm_replacement(
+            principal,
+            target,
+            binding,
+            updated,
+            before,
+            legacy_destination=legacy_destination
+            if unresolved_refresh == "legacy_overlay_unverified"
+            else None,
+        )
+        if failure is not None:
+            current = self.config.visible_handoffs.bindings.get(target)
+            if current is None:
+                raise BridgeError("visible_target_missing", "The receiver assignment was removed")
+            if current == binding:
+                self.record_presence(principal, target, "stale", binding, {"reason": failure})
+            if unresolved_refresh is not None:
+                self._refuse_unresolved_refresh(
+                    principal, target, binding, "legacy_replacement_unverified"
+                )
+            return current, None
+        self.record_presence(
+            principal,
+            target,
+            "replaced",
+            updated,
+            {
+                "reason": "unique_replacement_bound",
+                "previous_pane_id": binding.pane_id,
+            },
+        )
         self.store.audit(
             "visible_binding_refreshed",
             principal,
@@ -802,6 +1488,482 @@ class VisibleHandoffs:
             },
         )
         return updated, sessions
+
+    def _refuse_unresolved_refresh(self, principal, target, binding, reason):
+        evidence = {"reason": reason, "remedy": "new_exact_assignment_required"}
+        self.record_presence(principal, target, "ambiguous", binding, evidence)
+        error = BridgeError(
+            "session_selection_changed",
+            "Legacy receiver refresh has no verified destination; assign the receiver exactly",
+        )
+        error.observation = {"state": "ambiguous", "target": target, **evidence}
+        raise error
+
+    async def _confirm_replacement(
+        self, principal, target, binding, updated, before, *, legacy_destination=None
+    ):
+        """Re-observe the unique candidate after the asynchronous absence proof."""
+        if before is None:
+            return None, "replacement_generation_unverifiable"
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except BridgeError:
+            return None, "replacement_catalog_unavailable"
+        if not catalog_can_replace(catalog):
+            return None, "replacement_catalog_incomplete"
+        sessions = catalog.get("sessions") or []
+        pids = (updated.expected_pid, updated.agent_pid)
+        exact_rows = [
+            row
+            for row in sessions
+            if self._unique_exact_catalog_row(
+                rowset=sessions,
+                target=target,
+                pane_id=updated.pane_id,
+                shell=updated.expected_pid,
+                agent=updated.agent_pid,
+            )
+            and row.get("pane_id") == updated.pane_id
+            and self._exact_row(row, target, updated.pane_id, *pids)
+        ]
+        destination_matches = legacy_destination == {
+            "pane_id": updated.pane_id,
+            "expected_pid": updated.expected_pid,
+            "agent_pid": updated.agent_pid,
+        }
+        if len(exact_rows) != 1 or (
+            replacement_binding(target, binding, sessions) != updated
+            if legacy_destination is None
+            else not destination_matches
+        ):
+            return None, "replacement_candidate_changed"
+        if legacy_destination is not None and binding_still_present(binding, sessions):
+            return None, "legacy_original_reappeared"
+        after = self.fresh_pair(updated) or {}
+        if not all(same_generation(before.get(pid), after.get(pid)) for pid in pids):
+            return None, "replacement_generation_changed_or_unverifiable"
+        if legacy_destination is not None and binding.codex_thread_id is not None:
+            recorded = self.recorded_generations(updated, target) or {}
+            if self.generation_source(updated, target) != "owner_started_assignment" or not all(
+                same_generation(recorded.get(pid), after.get(pid)) for pid in pids
+            ):
+                return None, "legacy_destination_lineage_changed"
+        if self.config.visible_handoffs.bindings.get(target) != binding:
+            return None, "binding_changed"
+        source = (
+            "owner_started_assignment"
+            if legacy_destination is not None
+            and self.generation_source(updated, target) == "owner_started_assignment"
+            else "strict_dead_replacement"
+        )
+        failure = self._persist_assignment(target, binding, updated, after, source)
+        return sessions, failure
+
+    def _lifecycle_change(self, target, binding, selected, selection_reason):
+        """Name what changed in the bound tab; reporting only, never a rebind."""
+        if selected is None:
+            return {
+                "expected_pid_changed": "shell_restarted_or_replaced",
+                "tty_reused": "tty_in_other_window_with_different_shell",
+                "window_changed": "tty_in_other_window",
+                "pane_missing": "window_closed_or_moved",
+            }.get(selection_reason, "unobserved")
+        agents, _ = self.sessions.agent_registry()
+        names = {p.get("name") for p in selected.get("processes", []) if p.get("name") in agents}
+        if any(
+            p.get("pid") == binding.agent_pid and p.get("name") != target
+            for p in selected.get("processes", [])
+        ):
+            return "agent_pid_now_other_program"
+        if target in names:
+            return "agent_restarted_new_process"
+        if names:
+            return "agent_switched"
+        return "agent_exited"
+
+    @staticmethod
+    def _unique_exact_catalog_row(rowset, target, pane_id, shell, agent):
+        """Require one row across every independent destination identity axis."""
+        if not isinstance(rowset, list) or not all(
+            isinstance(row, dict) and isinstance(row.get("processes", []), list) for row in rowset
+        ):
+            return False
+        tty = "/dev/" + pane_id.rsplit(":", 1)[-1]
+        by_pane = [row for row in rowset if row.get("pane_id") == pane_id]
+        by_tty = [row for row in rowset if row.get("tty") == tty]
+        by_shell = [
+            row
+            for row in rowset
+            if shell in {row.get("expected_pid"), row.get("legacy_expected_pid")}
+        ]
+        by_agent = [
+            row
+            for row in rowset
+            if any(isinstance(proc, dict) and proc.get("pid") == agent for proc in row["processes"])
+        ]
+        return (
+            len(by_pane) == len(by_tty) == len(by_shell) == len(by_agent) == 1
+            and by_pane[0] is by_tty[0] is by_shell[0] is by_agent[0]
+            and VisibleHandoffs._exact_row(by_pane[0], target, pane_id, shell, agent)
+        )
+
+    @staticmethod
+    def _exact_row(row, target, pane_id, shell, agent):
+        """One native, unambiguous row for exactly this pane/TTY/shell/agent handle."""
+        try:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(pane_id, str)
+                or not isinstance(row.get("processes"), list)
+                or type(shell) is not int
+                or type(agent) is not int
+                or shell <= 0
+                or agent <= 0
+                or shell == agent
+            ):
+                return False
+            tty = pane_id.rsplit(":", 1)[-1]
+            processes = row["processes"]
+            if not all(isinstance(p, dict) for p in processes):
+                return False
+            return (
+                bool(re.fullmatch(r"terminal:[1-9][0-9]*:ttys[0-9]+", pane_id))
+                and row.get("pane_id") == pane_id
+                and row.get("expected_pid") == shell
+                and row.get("transport") == "terminal_app"
+                and row.get("identity_ambiguous") is not True
+                and not row.get("selection_ambiguous")
+                and row.get("tty") == "/dev/" + tty
+                and sum(p.get("pid") == agent for p in processes) == 1
+                and sum(p.get("pid") == agent and p.get("name") == target for p in processes) == 1
+            )
+        except (TypeError, AttributeError, ValueError):
+            return False
+
+    def _same_process_moved(self, target, binding, sessions):
+        """The same kernel processes now appear in exactly one other native tab.
+
+        Requires a recorded lineage, a well-formed complete catalog, one row per old
+        shell PID / old TTY / old agent PID that is the same exact row, and equal fresh
+        generations. Name/geometry never count; a corrupted observation is None.
+        """
+        recorded = self.recorded_generations(binding, target)
+        pids = (binding.expected_pid, binding.agent_pid)
+        if not recorded or not all(p in recorded for p in pids):
+            return None
+        try:
+            if not isinstance(sessions, list) or not all(
+                isinstance(r, dict)
+                and isinstance(r.get("processes", []), list)
+                and all(isinstance(p, dict) for p in r.get("processes", []))
+                for r in sessions
+            ):
+                return None  # any malformed row makes the whole observation untrusted
+            if any(r.get("pane_id") == binding.pane_id for r in sessions):
+                return None
+            tty = "/dev/" + binding.pane_id.rsplit(":", 1)[1]
+            by_shell = [
+                r
+                for r in sessions
+                if binding.expected_pid in {r.get("expected_pid"), r.get("legacy_expected_pid")}
+            ]
+            by_tty = [r for r in sessions if r.get("tty") == tty]
+            by_agent = [
+                r
+                for r in sessions
+                if isinstance(r.get("processes"), list)
+                and any(
+                    isinstance(p, dict) and p.get("pid") == binding.agent_pid
+                    for p in r["processes"]
+                )
+            ]
+        except (TypeError, AttributeError, ValueError):
+            return None
+        if not (len(by_shell) == len(by_tty) == len(by_agent) == 1):
+            return None
+        row = by_shell[0]
+        if row is not by_tty[0] or row is not by_agent[0]:
+            return None
+        pane_id = row.get("pane_id")
+        if not self._exact_row(row, target, pane_id, binding.expected_pid, binding.agent_pid):
+            return None
+        if not pane_id.endswith(":" + binding.pane_id.rsplit(":", 1)[1]):
+            return None
+        current = self.fresh_pair(binding)
+        if current is None or not all(
+            same_generation(recorded.get(p), current.get(p)) for p in pids
+        ):
+            return None
+        try:
+            return VisibleTerminalBinding.model_validate(
+                {**binding.model_dump(), "pane_id": pane_id}
+            )
+        except ValueError:
+            return None
+
+    async def rehome_binding(self, principal, target, binding, catalog):
+        if not catalog_can_replace(catalog):
+            return None
+        moved = self._same_process_moved(target, binding, catalog.get("sessions") or [])
+        if moved is None:
+            return None
+        return await self._rehome(principal, target, binding, moved)
+
+    def _persist_assignment(
+        self, target, previous, updated, generations, source, *, preserve_codex_protocol=False
+    ):
+        """Ledger, then overlay, then RAM. Returns a refusal reason or None.
+
+        A ledger row without an overlay is inert evidence: no mapping refers to it.
+        An existing lineage row for the new triple must be identical (same target,
+        source and generations); it is never silently overwritten or reinterpreted.
+        """
+        import sqlite3
+
+        pids = (updated.expected_pid, updated.agent_pid)
+        try:
+            existing = self.store.db.execute(
+                "SELECT target,source,generations FROM binding_generations "
+                "WHERE pane_id=? AND expected_pid=? AND agent_pid=?",
+                (updated.pane_id, updated.expected_pid, updated.agent_pid),
+            ).fetchone()
+            if existing is not None:
+                saved = self.recorded_generations(updated, target) or {}
+                lineage_matches = all(
+                    same_generation(saved.get(p), generations.get(p)) for p in pids
+                )
+                owner_assignment_is_verified = (
+                    source == "strict_dead_replacement"
+                    and existing["source"] == "owner_started_assignment"
+                    and lineage_matches
+                )
+                if (
+                    existing["target"] != target
+                    or (existing["source"] != source and not owner_assignment_is_verified)
+                    or not lineage_matches
+                ):
+                    return "lineage_conflict"
+            else:
+                self._store_generation(target, updated, generations, source)
+        except (sqlite3.Error, ValueError, TypeError):
+            return "lineage_write_failed"
+        try:
+            save_refresh(
+                self.config,
+                target,
+                previous,
+                updated,
+                preserve_codex_protocol=preserve_codex_protocol,
+            )
+        except OSError:
+            return "overlay_write_failed"
+        except ValueError:
+            return "overlay_binding_invalid"
+        self.config.visible_handoffs.bindings[target] = updated
+        self.refresh_ambiguities.pop(target, None)
+        return None
+
+    async def _rehome(self, principal, target, binding, moved):
+        """Same processes, new window id: carry lineage; reservations keep their locks.
+
+        Re-selects the new pane after the catalog and requires both recorded
+        generations before and after that read, then compare-and-sets the mapping.
+        Returns None (no change) on any doubt.
+        """
+        recorded = self.recorded_generations(binding, target)
+        source = self.generation_source(binding, target)
+        pids = (moved.expected_pid, moved.agent_pid)
+        before = self.fresh_pair(moved)
+        try:
+            row = await self.sessions.selected(principal, moved.pane_id, moved.expected_pid)
+        except BridgeError:
+            return None
+        after = self.fresh_pair(moved)
+        if (
+            not recorded
+            or source is None
+            or before is None
+            or after is None
+            or not self._exact_row(row, target, moved.pane_id, *pids)
+            or not all(
+                same_generation(recorded.get(p), before.get(p))
+                and same_generation(recorded.get(p), after.get(p))
+                for p in pids
+            )
+            or self.config.visible_handoffs.bindings.get(target) != binding
+        ):
+            return None
+        failure = self._persist_assignment(
+            target, binding, moved, after, source, preserve_codex_protocol=True
+        )
+        if failure is not None:
+            return None
+        self.record_presence(
+            principal,
+            target,
+            "rehomed",
+            moved,
+            {"reason": "same_generation_new_window", "previous_pane_id": binding.pane_id},
+        )
+        self.store.audit(
+            "visible_binding_rehomed",
+            principal,
+            None,
+            {
+                "target": target,
+                "previous_pane_id": binding.pane_id,
+                "pane_id": moved.pane_id,
+                "expected_pid": moved.expected_pid,
+                "agent_pid": moved.agent_pid,
+                "lineage_source": source,
+                "automatic_retry": False,
+            },
+        )
+        return moved
+
+    async def _owner_assignment(self, principal, target, binding, started, current):
+        """Bind exactly the handle the local owner's launch started, as a new lineage.
+
+        Only ``OWNER_PRINCIPAL`` may do this. Refusals keep the unchanged ``unresolved``
+        result and audit their reason. After every await the exact candidate is
+        resolved again with a stable kernel pair; immediately before persisting, a
+        synchronous compare-and-set re-validates authority, the original mapping,
+        active reservations and handle ownership. Old messages, reservations and
+        history are never touched or re-sent.
+        """
+
+        def refused(reason):
+            self.store.audit(
+                "visible_binding_assignment_refused",
+                principal,
+                None,
+                {"target": target, "reason": reason, "automatic_retry": False},
+            )
+            return {"state": "unresolved", "target": target}
+
+        def authorized():
+            if principal != self.OWNER_PRINCIPAL:
+                return False
+            try:
+                for capability in ("session.open", "terminal.execute"):
+                    self.security.principal(principal, capability)
+            except BridgeError:
+                return False
+            return True
+
+        def active_reservation():
+            return self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs WHERE target=? AND state IN ('planned',"
+                "'inserting','inserted','submitting','return_sent','sent','confirmed') LIMIT 1",
+                (target,),
+            ).fetchone()
+
+        if not authorized():
+            return refused("owner_authority_required")
+        pane, shell, agent = (
+            started.get("pane_id"),
+            started.get("expected_pid"),
+            started.get("agent_pid"),
+        )
+        if not self._exact_row(current, target, pane, shell, agent):
+            return refused("started_handle_not_exact")
+        if active_reservation():
+            return refused("active_reservation")
+        updated = binding.model_copy(
+            update={
+                "pane_id": pane,
+                "expected_pid": shell,
+                "agent_pid": agent,
+                "codex_thread_id": None,
+                "codex_rollout_path": None,
+            }
+        )
+        pids = (shell, agent)
+        before = self.fresh_pair(updated)
+        if before is None:
+            return refused("generation_unverifiable")
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except BridgeError:
+            return refused("catalog_unavailable")
+        sessions = catalog.get("sessions") if isinstance(catalog, dict) else None
+        if (
+            not catalog_can_replace(catalog)
+            or not isinstance(sessions, list)
+            or not all(isinstance(r, dict) for r in sessions)
+        ):
+            return refused("catalog_incomplete")
+        if (
+            sum(self._exact_row(r, target, pane, shell, agent) for r in sessions) != 1
+            or sum(r.get("pane_id") == pane for r in sessions) != 1
+        ):
+            return refused("candidate_not_in_catalog")
+        if binding_still_present(binding, sessions):
+            return refused("old_target_still_present")
+        try:
+            final = await self.sessions.selected(principal, pane, shell)
+        except BridgeError:
+            return refused("candidate_changed")
+        if not self._exact_row(final, target, pane, shell, agent):
+            return refused("candidate_changed")
+        after = self.fresh_pair(updated)
+        if after is None or not all(same_generation(before.get(p), after.get(p)) for p in pids):
+            return refused("generation_changed")
+        # Compare-and-set: no await from here until the mapping is published.
+        if not authorized():
+            return refused("owner_authority_required")
+        if self.config.visible_handoffs.bindings.get(target) != binding:
+            return refused("binding_changed")
+        if active_reservation():
+            return refused("active_reservation")
+        handle = {pane, shell, agent}
+        if any(
+            other != target and handle & {item.pane_id, item.expected_pid, item.agent_pid}
+            for other, item in self.config.visible_handoffs.bindings.items()
+        ):
+            return refused("handle_assigned_to_other_target")
+        previous_source = self.generation_source(binding, target)
+        failure = self._persist_assignment(
+            target, binding, updated, after, "owner_started_assignment"
+        )
+        if failure is not None:
+            return refused(failure)
+        self.record_presence(
+            principal,
+            target,
+            "replaced",
+            updated,
+            {
+                "reason": "owner_started_assignment",
+                "previous_pane_id": binding.pane_id,
+                "previous_identity": previous_source or "unverified_legacy",
+                "provider_context": "not_carried",
+            },
+        )
+        self.store.audit(
+            "visible_binding_assigned",
+            principal,
+            None,
+            {
+                "target": target,
+                "mode": "owner_started_assignment",
+                "previous_pane_id": binding.pane_id,
+                "previous_expected_pid": binding.expected_pid,
+                "previous_agent_pid": binding.agent_pid,
+                "pane_id": updated.pane_id,
+                "expected_pid": updated.expected_pid,
+                "agent_pid": updated.agent_pid,
+                "automatic_retry": False,
+            },
+        )
+        return {
+            "state": "bound",
+            "target": target,
+            "pane_id": updated.pane_id,
+            "expected_pid": updated.expected_pid,
+            "agent_pid": updated.agent_pid,
+            "mode": "owner_started_assignment",
+        }
 
     async def started_binding(self, principal, target, started):
         """Bind a newly started CLI only after its exact live process is observed.
@@ -825,7 +1987,19 @@ class VisibleHandoffs:
             return {"state": "unresolved", "target": target}
         if self.sessions.binding_matches(current, binding, target):
             return {"state": "unchanged", "target": target}
-        updated, _ = await self.refreshed_binding(principal, target, binding)
+        if principal == self.OWNER_PRINCIPAL:
+            # The local owner's own launch: bind exactly this started handle as a new
+            # lineage (e.g. #581). No generic refresh runs first, so no other live
+            # same-CLI session can be adopted on the way.
+            return await self._owner_assignment(principal, target, binding, started, current)
+        # Unchanged compatibility path for other principals: the strict proven-dead
+        # refresh, restricted to this launch's own handle. No new override.
+        updated, _ = await self.refreshed_binding(
+            principal,
+            target,
+            binding,
+            only_candidate=(started["pane_id"], started["expected_pid"], started.get("agent_pid")),
+        )
         if updated == binding:
             return {"state": "unresolved", "target": target}
         if (
@@ -909,6 +2083,14 @@ class VisibleHandoffs:
             )
 
     async def check_target(self, principal, target, binding, *, ready=False):
+        unresolved = refresh_state(self.refresh_ambiguities.get(target))
+        if unresolved is not None:
+            self._refuse_unresolved_refresh(principal, target, binding, unresolved)
+        pids = (binding.expected_pid, binding.agent_pid)
+        try:
+            before = self.generation_observer(pids)
+        except Exception:  # noqa: BLE001 - unverifiable, never "same"
+            before = None
         row = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
         with self.sessions.observation_scope(principal, row):
             matches = [
@@ -920,6 +2102,28 @@ class VisibleHandoffs:
                 raise BridgeError(
                     "visible_target_changed", "Bound CLI process is not in this exact terminal"
                 )
+            if row.get("transport") == "terminal_app" and row.get("expected_pid") == pids[0]:
+                # Only a real native row is an authorized exact OS observation.
+                try:
+                    after = self.generation_observer(pids)
+                except Exception:  # noqa: BLE001
+                    after = None
+                try:
+                    self.verify_generation(target, binding, before, after)
+                except BridgeError as error:
+                    # A previously persisted "available" must not survive this.
+                    self.record_presence(
+                        principal,
+                        target,
+                        "stale",
+                        binding,
+                        {
+                            "reason": (getattr(error, "observation", None) or {}).get(
+                                "reason", error.code
+                            )
+                        },
+                    )
+                    raise
             output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
             if ready:
                 observation = await self.binding_readiness(
@@ -1004,99 +2208,6 @@ class VisibleHandoffs:
             },
         )
         await running({"handoff_id": identifier, "state": "sent", "agent_confirmed": False})
-
-    async def continue_unsubmitted(self, principal, identifier, running):
-        from kirabridge.bridge_core.config import VisibleTerminalBinding
-
-        status = self.status(principal, identifier)
-        binding = VisibleTerminalBinding.model_validate(status["binding"])
-        async with self.sessions.agent_selection(principal, status["target"], binding):
-            return await self._continue_unsubmitted(principal, identifier, running)
-
-    async def _continue_unsubmitted(self, principal, identifier, running):
-        """Explicit local reconciliation, no new paste and no repeat of a prior Return."""
-        from kirabridge.bridge_core.config import VisibleTerminalBinding
-
-        status = self.status(principal, identifier)
-        message = self.messages.get(principal, status["message_id"])
-        if message["acknowledged"]:
-            return self.reconcile(principal, identifier)
-        attempted_return = any(
-            e["state"] in {"submitting", "return_sent", "sent", "confirmed"}
-            for e in status["events"]
-        )
-        if (
-            status["state"] != "unknown"
-            or status["evidence"].get("reason") != "visible_insert_unknown"
-            or attempted_return
-        ):
-            raise BridgeError(
-                "return_reconciliation_required", "A Return may already have been sent"
-            )
-        binding = VisibleTerminalBinding.model_validate(status["binding"])
-        if self.config.visible_handoffs.bindings.get(status["target"]) != binding:
-            raise BridgeError("handoff_conflict", "Original binding changed")
-        view = await self.check_target(principal, status["target"], binding)
-        verified = next(
-            (
-                event["evidence"]
-                for event in reversed(status["events"])
-                if event["state"] == "inserted"
-                and event["evidence"].get("prompt_format") == "body_only_v1"
-                and event["evidence"].get("prompt_observed") is True
-            ),
-            None,
-        )
-        current_view = self.input_view(status["target"], view["text"])
-        if (
-            verified is None
-            or verified.get("expected_payload_sha256") != _text_sha256(message["body"])
-            or verified.get("verified_input_view_sha256") != _text_sha256(current_view)
-        ):
-            raise BridgeError(
-                "return_reconciliation_required",
-                "Original literal input was not verified; inspect it and use an explicit Return",
-            )
-        wait_for_reply = verified.get("wait_for_reply", True)
-        if type(wait_for_reply) is not bool or wait_for_reply != bool(message["request_reply"]):
-            raise BridgeError(
-                "return_reconciliation_required", "Original reply preference is not consistent"
-            )
-        observed = "same_previously_verified_literal_widget"
-        local_reply = verified.get("local_reply_observer")
-        if isinstance(local_reply, dict) and local_reply.get("state") == "ready":
-            local_reply = await self.codex_reply.before_submit(
-                local_reply["cursor"], binding, body=message["body"]
-            )
-        self.transition(
-            identifier,
-            "inserted",
-            {
-                "insertion_representation": observed,
-                "reconciled_without_paste": True,
-                "return_sent": False,
-                "agent_confirmed": False,
-                **({"local_reply_observer": local_reply} if isinstance(local_reply, dict) else {}),
-            },
-        )
-        try:
-            await self.submit_inserted(
-                identifier,
-                principal,
-                status["target"],
-                binding,
-                running,
-                expected_input_view=current_view,
-                wait_for_reply=wait_for_reply,
-            )
-        except BaseException as exc:
-            self.transition(
-                identifier,
-                "unknown",
-                {"reason": getattr(exc, "code", "interrupted"), "automatic_retry": False},
-            )
-            raise
-        return self.status(principal, identifier)
 
     async def execute(self, task, args, running, progress, *, binding_override=None):
         started = time.monotonic()
@@ -1233,7 +2344,9 @@ class VisibleHandoffs:
                 raise BridgeError(
                     "handoff_conflict", "Original visible handoff and target are immutable"
                 )
-            reconciled = self.reconcile(principal, identifier)
+            # request_hash includes this principal: the existing row is its own.
+            message_id = existing["message_id"]
+            reconciled = self._reconcile_owned(identifier, principal, target, message_id)
             local_reply = next(
                 (
                     event["evidence"]["local_reply_observer"]
@@ -1252,7 +2365,6 @@ class VisibleHandoffs:
                     "visible_handoff_unknown",
                     "Prior input must be reconciled; never repeat automatically",
                 )
-            message_id = existing["message_id"]
         else:
             before = await self.check_target(principal, target, binding, ready=True)
             await self.reconcile_target_reservations(
@@ -1342,10 +2454,18 @@ class VisibleHandoffs:
                         canonical({"agent_confirmed": False}),
                     ),
                 )
+                if "task.read" not in self.security.principal(principal).capabilities:
+                    self.transition(
+                        identifier,
+                        "planned",
+                        {"agent_confirmed": False, "task_read_at_admission": False},
+                    )
             input_attempted = False
 
             async def before_paste():
                 nonlocal input_attempted, local_reply
+                # Effect point: the recorded lineage (if any) must still hold now.
+                self.effect_generation_guard(target, binding)
                 if adapter_for(target).capabilities.bound_reply and args.wait_for_reply:
                     selection = self.sessions.current_selection()
                     expected_identity = (
@@ -1401,16 +2521,26 @@ class VisibleHandoffs:
                     and _needs_cwd_proof(before["text"])
                     else None
                 )
-                await self.sessions.insert(
-                    principal,
-                    SessionInput(
-                        pane_id=binding.pane_id,
-                        expected_pid=binding.expected_pid,
-                        text=prompt,
-                        submit=False,
-                    ),
-                    before_transport=before_paste,
-                )
+                try:
+                    await self.sessions.insert(
+                        principal,
+                        SessionInput(
+                            pane_id=binding.pane_id,
+                            expected_pid=binding.expected_pid,
+                            text=prompt,
+                            submit=False,
+                        ),
+                        before_transport=before_paste,
+                    )
+                except BridgeError as refusal:
+                    # These guards run in the native script strictly BEFORE the paste
+                    # action, so such a refusal proves nothing was sent: a definite,
+                    # retry-safe failure rather than a lock-holding unknown.
+                    if not isinstance(refusal, UncertainExecution) and (
+                        refusal.code in PRE_PASTE_REFUSALS
+                    ):
+                        input_attempted = False
+                    raise
                 inserted = await self.check_target(principal, target, binding)
                 observed = await self.verify_inserted_body(
                     principal, target, binding, prompt, before, inserted, before_cwd
@@ -1465,6 +2595,10 @@ class VisibleHandoffs:
                         },
                     )
                     raise  # Only a pre-input readiness error may be deferred by the receiver.
+                detail = getattr(exc, "provider_error", None)
+                paste_observation = (
+                    detail.get("paste_observation") if isinstance(detail, dict) else None
+                )
                 self.transition(
                     identifier,
                     "unknown",
@@ -1472,15 +2606,22 @@ class VisibleHandoffs:
                         "reason": getattr(exc, "code", "interrupted"),
                         "agent_confirmed": False,
                         "automatic_retry": False,
+                        # Content-free echo facts only (lengths/booleans), never text.
+                        **(
+                            {"paste_observation": paste_observation}
+                            if isinstance(paste_observation, dict)
+                            else {}
+                        ),
                     },
                 )
                 raise UncertainExecution(
                     "visible_handoff_unknown",
                     "Input outcome requires reconciliation; no automatic resend",
                 ) from exc
-        current = self.reconcile(principal, identifier)
+        # Post-effect bookkeeping of this execution's own handoff: no public read scope.
+        current = self._reconcile_owned(identifier, principal, target, message_id)
         cached_local = current["evidence"].get("local_reply_result")
-        original = self.messages.get(principal, message_id)
+        original = {"acknowledged": self._message_acknowledged(message_id, principal, target)}
         replied = self.store.db.execute(
             "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
             "AND kind IN ('answer','result') LIMIT 1",
@@ -1527,8 +2668,10 @@ class VisibleHandoffs:
             async with asyncio.timeout(args.timeout):
                 confirmed = False
                 while True:
-                    message = self.messages.get(principal, message_id)
-                    current = self.reconcile(principal, identifier)
+                    message = {
+                        "acknowledged": self._message_acknowledged(message_id, principal, target)
+                    }
+                    current = self._reconcile_owned(identifier, principal, target, message_id)
                     if current["state"] == "interrupted":
                         raise UncertainExecution(
                             "agent_turn_interrupted", "Interrupted turn must not be repeated"
@@ -1602,7 +2745,11 @@ class VisibleHandoffs:
                                 await self.check_target(principal, principal, reply_binding)
                             # A genuine mailbox return can arrive while the local
                             # descriptor is checked. It retains its existing priority.
-                            original = self.messages.get(principal, message_id)
+                            original = {
+                                "acknowledged": self._message_acknowledged(
+                                    message_id, principal, target
+                                )
+                            }
                             authenticated_reply = self.store.db.execute(
                                 "SELECT 1 FROM messages WHERE reply_to=? AND sender=? "
                                 "AND recipient=? AND kind IN ('answer','result') LIMIT 1",
@@ -1655,7 +2802,7 @@ class VisibleHandoffs:
             # Cancellation during input is still handled as uncertain input.
             raise
         except BaseException as exc:
-            current = self.status(principal, identifier)
+            current = self._owned_status(identifier, principal, target, message_id)
             evidence = (
                 {
                     **current["evidence"],

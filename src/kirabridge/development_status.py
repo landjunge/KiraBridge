@@ -212,7 +212,17 @@ async def agent_status(bridge, principal: str) -> dict:
     access["availability"] = catalog["status"]
     access["catalog_observed_at"] = time.time()
     access["transport_errors"] = catalog.get("transport_errors", {})
+    receivers = {}
+    handoffs = getattr(bridge, "visible_handoffs", None)
+    if handoffs is not None and hasattr(handoffs, "presence"):
+        for target in sorted(bridge.config.visible_handoffs.bindings):
+            receivers[target] = handoffs.presence(target)
     return {
+        "receivers": receivers,
+        "receivers_scope": (
+            "last persisted per-target presence (available/stale/absent/ambiguous/"
+            "replaced/unknown); reporting only, never starts an agent or re-sends"
+        ),
         "principal": principal,
         "at": time.time(),
         "runtime": _runtime_metadata(bridge.runtime),
