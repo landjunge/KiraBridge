@@ -384,3 +384,22 @@ def test_checkout_rejects_foreign_or_mutated_source(pinned_repo, kind):
         count = 276
     with pytest.raises(gate.GateError):
         gate.checkout(repo, pin, ["src"], src_count=count)
+
+
+def test_workflow_checkout_pins_match_the_gate_constants():
+    """A pin changed in only one place fails CI later with "Wrong checkout pin"."""
+    import re
+
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text()
+    pinned = {
+        repo.lower(): ref
+        for repo, ref in re.findall(
+            r"repository:\s*landjunge/(\S+)\s*\n\s*ref:\s*([0-9a-f]{40})", workflow
+        )
+        if repo.lower() != "threaddesk"
+    }
+    thread_desk = re.findall(
+        r"repository:\s*landjunge/ThreadDesk\s*\n\s*ref:\s*([0-9a-f]{40})", workflow
+    )
+    assert pinned == {"tollgate": gate.TOLLGATE}
+    assert thread_desk == [gate.LEGACY_TD, gate.REMOTE_TD]
