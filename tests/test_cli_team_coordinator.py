@@ -69,3 +69,9 @@ def test_role_with_explicit_revision_does_not_read_the_team_first(calls):
     run("role", "t1", "codex", "worker", "--revision", "3", "--key", "k-2")
     assert [tool for tool, _ in made] == ["team_set_role"]
     assert made[0][1]["request"]["expected_revision"] == 3
+
+
+def test_coordinator_without_a_name_means_the_calling_identity(calls):
+    run, made = calls
+    run("coordinator", "t1", "--key", "k-3")
+    assert made[1][1]["request"]["member"] == "local"  # the default --principal
