@@ -518,6 +518,7 @@ async def execute(args) -> None:
         action = args.action
         if action == "coordinator":
             action, args.role, args.revision, args.disable = "role", "coordinator", None, False
+            args.member = args.member or args.principal
         if action == "onboard":
             out = await _run_team_onboard(args, config)
             emit(out)
@@ -1151,7 +1152,7 @@ def main() -> None:
         "coordinator", help="Make a member the coordinator (reads the current revision itself)"
     )
     coordinator.add_argument("team_id")
-    coordinator.add_argument("member")
+    coordinator.add_argument("member", nargs="?", help="default: the calling identity")
     onboard = actions.add_parser("onboard")
     onboard.add_argument("team_id")
     onboard.add_argument("identity")
