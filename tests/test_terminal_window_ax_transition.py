@@ -59,4 +59,4 @@ async def test_detached_wrapper_requires_retained_own_native_identity(
         assert proof["own_identity_basis"] == ("same_cg_window" if same_cg else "same_selected_tab")
         await leaf.verify_opened(result, principal="chatgpt")
     # An unconfirmed observation never causes a second detach or new creation.
-    assert events == ["create", "receipt", "focus", "move"]
+    assert events == ["create", "receipt", "focus", "tag", "move"]

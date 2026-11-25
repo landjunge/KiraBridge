@@ -19,6 +19,7 @@ from kirabridge.keyboard_system import KeyboardSystemKeyInput
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
 from kirabridge.team_manager.models import (
+    TeamCoordinatorHandoff,
     TeamCreate,
     TeamMessageSend,
     TeamOnboardRegister,
@@ -30,6 +31,7 @@ from kirabridge.team_manager.models import (
     TeamWorkCreate,
     TeamWorkReprocess,
 )
+from kirabridge.visible_handoff import peer_route_status
 
 
 def inline_task_timeout(operation: str) -> float:
@@ -1267,8 +1269,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """Direct native terminal work with task-bound output and observed exit status.
 
-        Reuses one suitable empty existing Terminal.app shell or opens a separate visible
-        window under the same exact-task/standing grant. Busy agents are preserved.
+        Reuses one suitable empty existing Terminal.app shell or, when create_if_needed is
+        true, opens a separate controlled visible shell if no confirmed-empty shell exists.
+        Ambiguous existing prompts are preserved; busy agents are preserved. Window creation
+        remains under the same exact-task/standing grant.
         Optional pane_id/expected_pid binds an explicit current target. Inspect task_get
         for actual visible command completion; an uncertain outcome must never be replayed.
         On Linux, executes exact argv in a fresh short-lived owned PTY and closes it after
@@ -1402,7 +1406,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Wait for own durable completion notices, including already finished tasks.
 
         Pass source_id (the task id) to read that notice even when older unacked
-        notices still sit in the same target. Omit it to keep the oldest-first inbox.
+        notices still sit in the same target. Without source_id, notices are newest-first.
         Run a persistent consumer that rearms this bounded wait; no task-status polling.
         Receipts/IDs remain stable until completion_ack after consumer processing.
         A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.
@@ -1451,10 +1455,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         exact same message. Work/questions to CLI agents use their assigned visible terminal
         even with dispatch=false. One bounded visible attempt is observed before returning;
         busy/missing/changed targets fail without a waiting backlog or hidden fallback.
-        For guidance to an already-working cooperating agent, use a NEW note with
-        dispatch=false and request_reply=false on its agreed conversation_id.
-        The recipient must poll message_receive and deduplicate IDs before applying/ACK;
-        this inbox route does not wake or automatically steer the active session.
+        Set recipient='coordinator' to address the currently bound coordinator role. The
+        resolver uses persisted team-role/session records and requires one exact eligible
+        current identity; stale, changing or ambiguous roles fail closed. During handoff,
+        the current coordinator remains the route until acceptance is verified.
+        A concrete recipient such as 'codex' or 'grok' remains an explicit peer override.
+        The message keeps its original role target on idempotent replay; new messages resolve
+        the role again. A reply to a role-addressed message stays in that logical conversation.
+        For an addressed message to the assigned native Codex, use dispatch=true only
+        when the sender has the existing message-peer, agent.execute, session.inspect
+        and session.input grants. The verified native route steers the exact active turn
+        (or starts the assigned route when idle); accepted input is not proof of reading,
+        an ACK, or a reply. The recipient must process and ACK the original message ID.
+        dispatch=false is explicitly a passive inbox post: it does not wake or steer an
+        active session. Use it only when polling/reading later is intended.
         Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         Returned answers stay in the sender's client inbox; they do not automatically
@@ -1564,6 +1578,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                             and bridge.message_receiver.worker
                             and not bridge.message_receiver.worker.done()
                         ),
+                        "route": peer_route_status(bridge, config, peer),
                     }
                     for peer in policy.message_peers
                 },
@@ -1593,6 +1608,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "input_operation": "session.input",
                 },
                 "jobs": {row["state"]: row["count"] for row in states},
+                # Team replies are stored and pulled; no push to this caller exists.
+                "team_return_path": bridge.teams.return_path_status(principal),
                 "limits": config.messaging.model_dump(exclude={"receivers"}),
             }
 
@@ -1635,6 +1652,25 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.teams.get(identity(ctx), team_id))
 
     @server.tool(annotations=read)
+    def team_coordinator_status(team_id: str, ctx: Context) -> dict[str, Any]:
+        """Read the team coordinator, authorized session candidates and any pending handoff."""
+        return safe(lambda: bridge.teams.coordinator_status(identity(ctx), team_id))
+
+    # Publicly observed short name. Same function, identity, authorization and result;
+    # previously absent from the catalog (proxy: tool_unavailable).
+    server.add_tool(
+        team_coordinator_status,
+        name="coordinator_status",
+        annotations=read,
+        description="Alias of team_coordinator_status; identical authorization and result.",
+    )
+
+    @server.tool(annotations=write)
+    def team_coordinator_handoff(request: TeamCoordinatorHandoff, ctx: Context) -> dict[str, Any]:
+        """Offer a proven session the coordinator role, effective only after acceptance."""
+        return safe(lambda: bridge.teams.request_coordinator_handoff(identity(ctx), request))
+
+    @server.tool(annotations=read)
     def team_context(team_id: str, ctx: Context) -> dict[str, Any]:
         """Bounded current team context, recent results and this member's pending messages."""
         return safe(lambda: bridge.teams.context(identity(ctx), team_id))
@@ -1665,7 +1701,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
-        """Send addressed team data; sender is authenticated, never supplied.
+        """Send to a named member or to recipient 'coordinator'; sender comes from authentication.
 
         Kira and Eve need no special approval marker; normal team permissions apply.
         Historical buffers never release automatically.

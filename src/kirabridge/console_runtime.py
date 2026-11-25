@@ -198,7 +198,7 @@ def probe(client: httpx.Client, key: str) -> str | None:
     challenge = secrets.token_hex(16)
     try:
         response = client.get(ORIGIN + "/health", headers={"X-KiraBridge-Challenge": challenge})
-    except (httpx.ConnectError, httpx.TimeoutException):
+    except httpx.TransportError:
         return None
     try:
         payload = response.json()

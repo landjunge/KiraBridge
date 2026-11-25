@@ -28,8 +28,9 @@ class VisibleTerminalInput(TerminalInput):
     create_if_needed: bool = Field(
         default=True,
         description=(
-            "Allow a new visible macOS window. Linux direct argv always uses a fresh "
-            "short-lived owned PTY; this option does not select or create a persistent session."
+            "Allow a separate controlled macOS window when no confirmed-empty shell is "
+            "available; ambiguous existing prompts are preserved. Linux direct argv always "
+            "uses a fresh short-lived owned PTY, regardless of this option."
         ),
     )
 
@@ -46,6 +47,8 @@ class VisibleTerminalInput(TerminalInput):
 _VOLATILE = {"ui_window_count", "tab_selected", "visual_window_id", "tab_index", "tab_count"}
 # A candidate that vanished or became ambiguous between catalog and read is skipped, not fatal.
 _SKIPPABLE = {"session_selection_changed", "visible_target_ambiguous", "visible_target_changed"}
+_ACTIVE_TASK_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID"
+_ACTIVE_PRINCIPAL_ENV = "KIRABRIDGE_ACTIVE_TERMINAL_PRINCIPAL"
 
 
 def _same_target(left, right):
@@ -65,7 +68,9 @@ def _unsuitable_code(row):
     return "session_busy", "Selected window is not a confirmed empty shell"
 
 
-def build_command_script(tty, cwd, argv, nonce, folder, result_path):
+def build_command_script(
+    tty, cwd, argv, nonce, folder, result_path, *, task_id=None, task_principal=None
+):
     """The one-shot zsh script typed into the visible window (never run by KiraBridge itself)."""
     ok = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
     setup_failed = json.dumps({"nonce": nonce, "exit_code": 125, "phase": "setup"})
@@ -76,6 +81,16 @@ def build_command_script(tty, cwd, argv, nonce, folder, result_path):
     # window/cwd check or an interrupt is reported at once instead of after the timeout.
     script = (
         "#!/bin/zsh -f\numask 077\n"
+        + (
+            "export " + _ACTIVE_TASK_ENV + "=" + shlex.quote(task_id) + "\n"
+            if isinstance(task_id, str) and task_id
+            else ""
+        )
+        + (
+            "export " + _ACTIVE_PRINCIPAL_ENV + "=" + shlex.quote(task_principal) + "\n"
+            if isinstance(task_principal, str) and task_principal
+            else ""
+        )
         + "kb_done() { printf "
         + shlex.quote("%s\n")
         + ' "$1" > '
@@ -143,6 +158,23 @@ class VisibleTerminal:
             sessions,
             environment,
         )
+        self.open_lock = asyncio.Lock()
+        self.open_generation = 0
+
+    async def _select_candidate(self, principal, sessions):
+        unconfirmed_input, skipped = None, None
+        for candidate in sorted(sessions, key=lambda item: item["pane_id"]):
+            try:
+                if await self.suitable(principal, candidate):
+                    return candidate, unconfirmed_input, skipped
+            except BridgeError as error:
+                if error.code in _SKIPPABLE:
+                    skipped = skipped or error
+                    continue
+                if error.code != "visible_input_unknown":
+                    raise
+                unconfirmed_input = error
+        return None, unconfirmed_input, skipped
 
     async def suitable(self, principal, row, *, read_screen=True):
         if (
@@ -170,7 +202,14 @@ class VisibleTerminal:
         # final selection and native dispatch still verify input authority anew.
         with self.sessions.observation_scope(principal, row):
             output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
-        if not empty_shell_prompt(output["text"]):
+        if row.get("controlled_shell") is True:
+            readiness = getattr(self.sessions, "zle_readiness", None)
+            if readiness is None:
+                raise BridgeError(
+                    "zle_session_stale", "Controlled shell ZLE channel is unavailable"
+                )
+            await readiness.probe(row)
+        elif not empty_shell_prompt(output["text"]):
             error = BridgeError(
                 "visible_input_unknown",
                 "Selected process is an idle shell, but empty input is not confirmed; preserve it",
@@ -211,10 +250,13 @@ class VisibleTerminal:
             # Opening the directory is read-only and descriptor-bound. No session or
             # executable is created by readiness or before authorization above.
             with scope.directory(cwd) as cwd_fd:
+                task_environment = dict(self.environment)
+                task_environment[_ACTIVE_TASK_ENV] = task["id"]
+                task_environment[_ACTIVE_PRINCIPAL_ENV] = task["principal"]
                 result = await self.sessions.linux.execute_argv(
                     argv,
                     cwd_fd,
-                    self.environment,
+                    task_environment,
                     timeout=args.timeout,
                     max_output=args.max_output,
                     running=running,
@@ -227,6 +269,7 @@ class VisibleTerminal:
             argv = ["/usr/bin/sudo", "--", *argv]
         if any("\x00" in item for item in argv):
             raise BridgeError("invalid_arguments", "NUL in command")
+        unconfirmed_input, skipped, opened = None, None, None
         async with bridge.sessions.lock:
             if args.pane_id:
                 row = await bridge.sessions.selected(principal, args.pane_id, args.expected_pid)
@@ -234,32 +277,24 @@ class VisibleTerminal:
                     code, message = _unsuitable_code(row)
                     raise BridgeError(code, message)
             else:
+                selection_generation = self.open_generation
                 catalog = await bridge.sessions.catalog(principal)
                 error = catalog.get("transport_errors", {}).get("terminal_app")
                 if error:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
-                row, unconfirmed_input, skipped = None, None, None
                 # The lowest pane id with fresh empty-shell evidence is used, so checking
                 # stops at the first suitable window instead of reading every idle shell.
-                for candidate in sorted(catalog["sessions"], key=lambda item: item["pane_id"]):
-                    try:
-                        if await self.suitable(principal, candidate):
-                            row = candidate
-                            break
-                    except BridgeError as error:
-                        if error.code in _SKIPPABLE:
-                            skipped = skipped or error
-                            continue
-                        if error.code != "visible_input_unknown":
-                            raise
-                        unconfirmed_input = error
+                row, unconfirmed_input, skipped = await self._select_candidate(
+                    principal, catalog["sessions"]
+                )
                 if row is None:
                     if unconfirmed_input is None and skipped is not None:
                         # Nothing else was usable: name the real problem, never open a window.
                         raise skipped
-                    if unconfirmed_input is not None:
-                        # An ambiguous existing shell is not evidence that more
-                        # windows are needed. Preserve it and report input state.
+                    if unconfirmed_input is not None and not args.create_if_needed:
+                        # Never infer emptiness or overwrite a draft. An explicit
+                        # request to create a new shell may safely preserve this
+                        # target and continue in a separate controlled window.
                         raise unconfirmed_input
                     if not args.create_if_needed:
                         raise BridgeError(
@@ -283,49 +318,71 @@ class VisibleTerminal:
                     }
                 )
 
-            open_options = {"task_id": task["id"]}
-            if progress is not None:
-                open_options["on_created"] = window_created
-            opened = await bridge.sessions.open(
-                principal, SessionOpen(cwd=cwd, controlled_shell=True), **open_options
-            )
-            if opened.get("session_handle_pending"):
-                raise UncertainExecution(
-                    "visible_window_pending", "Window opened; reconcile this task"
-                )
-            reference = SessionReference(
-                pane_id=opened["pane_id"], expected_pid=opened["expected_pid"]
-            )
-            # A newly created shell must finish startup before its first command.
-            with timed("visible_shell_wait") as wait_fields:
-                for attempt in range(1, 41):
-                    wait_fields["attempts"] = attempt
-                    catalog = await bridge.sessions.catalog(principal)
-                    matches = [
-                        candidate
-                        for candidate in catalog["sessions"]
-                        if candidate["pane_id"] == opened["pane_id"]
-                        and candidate.get("tty") == opened.get("tty")
-                    ]
-                    if len(matches) == 1:
-                        row = matches[0]
-                        reference = SessionReference(
-                            pane_id=row["pane_id"], expected_pid=row["expected_pid"]
+            async with self.open_lock:
+                # Recheck only if another automatic open happened while we waited;
+                # a normal first open needs no extra native catalogue roundtrip.
+                if self.open_generation != selection_generation:
+                    async with bridge.sessions.lock:
+                        catalog = await bridge.sessions.catalog(principal)
+                        if catalog.get("transport_errors", {}).get("terminal_app"):
+                            error = catalog["transport_errors"]["terminal_app"]
+                            raise BridgeError(
+                                error["code"], error.get("message", "Terminal unavailable")
+                            )
+                        row, rechecked_input, _skipped = await self._select_candidate(
+                            principal, catalog["sessions"]
                         )
-                        try:
-                            if await self.suitable(principal, row):
-                                break
-                        except BridgeError as exc:
-                            if exc.code not in {
-                                "session_selection_changed",
-                                "visible_input_unknown",
-                            }:
-                                raise
-                    await asyncio.sleep(0.1)
-                else:
-                    raise BridgeError(
-                        "visible_shell_not_ready", "New window has no confirmed empty prompt"
+                        unconfirmed_input = unconfirmed_input or rechecked_input
+                        if row is not None:
+                            reference = SessionReference(
+                                pane_id=row["pane_id"], expected_pid=row["expected_pid"]
+                            )
+                if reference is None:
+                    open_options = {"task_id": task["id"]}
+                    if progress is not None:
+                        open_options["on_created"] = window_created
+                    opened = await bridge.sessions.open(
+                        principal, SessionOpen(cwd=cwd, controlled_shell=True), **open_options
                     )
+                    self.open_generation += 1
+                    if opened.get("session_handle_pending"):
+                        raise UncertainExecution(
+                            "visible_window_pending", "Window opened; reconcile this task"
+                        )
+                    reference = SessionReference(
+                        pane_id=opened["pane_id"], expected_pid=opened["expected_pid"]
+                    )
+                    # A newly created shell must finish startup before its first command.
+                    with timed("visible_shell_wait") as wait_fields:
+                        for attempt in range(1, 41):
+                            wait_fields["attempts"] = attempt
+                            catalog = await bridge.sessions.catalog(principal)
+                            matches = [
+                                candidate
+                                for candidate in catalog["sessions"]
+                                if candidate["pane_id"] == opened["pane_id"]
+                                and candidate.get("tty") == opened.get("tty")
+                            ]
+                            if len(matches) == 1:
+                                row = matches[0]
+                                reference = SessionReference(
+                                    pane_id=row["pane_id"], expected_pid=row["expected_pid"]
+                                )
+                                try:
+                                    if await self.suitable(principal, row):
+                                        break
+                                except BridgeError as exc:
+                                    if exc.code not in {
+                                        "session_selection_changed",
+                                        "visible_input_unknown",
+                                    }:
+                                        raise
+                            await asyncio.sleep(0.1)
+                        else:
+                            raise BridgeError(
+                                "visible_shell_not_ready",
+                                "New window has no confirmed empty prompt",
+                            )
         root = bridge.config.state_path / "visible-commands"
         from kirabridge.bridge_core.config import private_directory
 
@@ -341,7 +398,16 @@ class VisibleTerminal:
         # same final revalidation, adding a native roundtrip without authority.
         # A one-shot script in this window inherits its real TTY. No subprocess
         # daemon, tmux pane, detached session or provider adapter executes the command.
-        script = build_command_script(row["tty"], cwd, argv, nonce, folder, result_path)
+        script = build_command_script(
+            row["tty"],
+            cwd,
+            argv,
+            nonce,
+            folder,
+            result_path,
+            task_id=task["id"],
+            task_principal=task["principal"],
+        )
         write_private(script_path, script)
         async with bridge.sessions.lock:
             current = await bridge.sessions.selected(
@@ -358,7 +424,11 @@ class VisibleTerminal:
                 {"execution_route": "visible_terminal", **reference.model_dump(), "tty": row["tty"]}
             )
             await bridge.sessions.terminal_app.send_confirmed(
-                current, "/bin/zsh -f " + shlex.quote(str(script_path)), identity
+                current,
+                "/bin/zsh -f " + shlex.quote(str(script_path)),
+                identity,
+                require_physical_visibility=True,
+                principal=principal,
             )
         deadline = time.monotonic() + args.timeout
         while time.monotonic() < deadline:
@@ -392,6 +462,14 @@ class VisibleTerminal:
                     **reference.model_dump(),
                     "tty": row["tty"],
                     "execution_route": "visible_terminal",
+                    "terminal_target": {
+                        "route": "new_controlled_visible_shell"
+                        if opened is not None
+                        else "existing_visible_shell",
+                        "preserved_existing_input_issue": (
+                            unconfirmed_input.code if unconfirmed_input is not None else None
+                        ),
+                    },
                     "exit_code": result["exit_code"],
                     "success": result["exit_code"] == 0,
                     "terminal_output": output["text"],

@@ -19,6 +19,7 @@ from kirabridge.mcp_gateway.client import MCPClientPool
 
 class DirectDelivery:
     delivery_timeout = 30.0
+    native_host_prepare_delays = (2, 4, 8)
     PREINPUT_CODES = {
         "session_selection_changed",
         "session_busy",
@@ -51,6 +52,7 @@ class DirectDelivery:
         "native_codex_target_changed",
         "native_codex_rpc_rejected",
         "native_codex_scope_changed",
+        "coordinator_route_changed",
     }
 
     def __init__(self, receiver):
@@ -85,10 +87,14 @@ class DirectDelivery:
         event = self.ready[message_id] = asyncio.Event()
         deadline = asyncio.get_running_loop().time() + self.delivery_timeout
         task = asyncio.create_task(self._deliver(principal, message_id, event))
-        self.active[message_id] = task
         watchdog = asyncio.create_task(self._watch(message_id, task, event, deadline))
         self._watchdogs[message_id] = watchdog
         watchdog.add_done_callback(self._consume)
+        self._track(message_id, task, event)
+        return True
+
+    def _track(self, message_id, task, event):
+        self.active[message_id] = task
 
         def finished(result):
             self.active.pop(message_id, None)
@@ -105,7 +111,74 @@ class DirectDelivery:
             self.receiver.messages.wake.set()
 
         task.add_done_callback(finished)
-        return True
+
+    def native_reply_receipt(self, row):
+        """Only the durable acceptance event can authorize a restart read of a turn."""
+        evidence = json.loads(row["evidence"])
+        if (
+            row["recipient"] != "codex"
+            or not row["request_reply"]
+            or row["started"] is None
+            or not isinstance(evidence, dict)
+            or evidence.get("run_id") != row["run_id"]
+            or evidence.get("session_scope") != "existing_native_codex_root"
+            or evidence.get("completion_scope") != "native_input_delivery"
+            or evidence.get("operation") != "turn/start"
+            or evidence.get("native_input_attempted") is not True
+            or evidence.get("terminal_input_attempted") is not False
+            or not isinstance(evidence.get("turn_id"), str)
+            or not evidence["turn_id"]
+            or type(evidence.get("accepted_at")) not in {int, float}
+        ):
+            return None
+        receipts = self.receiver.bridge.store.db.execute(
+            "SELECT evidence FROM message_events WHERE message_id=? "
+            "AND kind='message.native_submitted' LIMIT 2",
+            (row["message_id"],),
+        ).fetchall()
+        if len(receipts) == 1 and receipts[0]["evidence"] == row["evidence"]:
+            return evidence
+        return None
+
+    def recover_native_reply(self, message, evidence):
+        """Recover observation only. The original input is never submitted here."""
+        identifier = message["id"]
+        if identifier in self.active:
+            return
+        event = self.ready[identifier] = asyncio.Event()
+        event.set()
+        self._claimed[identifier] = evidence["run_id"]
+        task = asyncio.create_task(self._recover_native_reply(message, evidence))
+        self._track(identifier, task, event)
+
+    async def _recover_native_reply(self, message, evidence):
+        bridge = self.receiver.bridge
+        binding = bridge.config.visible_handoffs.native_codex
+        receiver = bridge.config.messaging.receivers.get("codex")
+        try:
+            if (
+                binding is None
+                or receiver is None
+                or evidence["binding_sha256"] != digest(binding.model_dump())
+                or evidence["thread_id"] != binding.thread_id
+                or evidence["session_id"] != binding.session_id
+                or message["execution_cwd"] != receiver.cwd
+            ):
+                raise BridgeError("native_codex_binding_changed", "Native reply binding changed")
+            bridge.security.principal(message["sender"], "session.inspect")
+            # Allow one bounded read even after the original reply budget expired:
+            # the native turn can already have committed its answer.
+            remaining = max(3, evidence["accepted_at"] + receiver.timeout - time.time())
+            await self._observe_native_reply(
+                message,
+                binding,
+                {**evidence, "reconciled_without_input": True},
+                timeout=min(receiver.timeout, remaining),
+            )
+        except asyncio.CancelledError:
+            raise  # Keep the durable receipt available to the next process.
+        except Exception as failure:
+            self.fail(message["id"], failure)
 
     def _forget_recorded(self, message_id):
         # A durable claim/outcome still rejects submit via _pristine after the
@@ -165,6 +238,17 @@ class DirectDelivery:
             ).fetchone()
         )
 
+    def _claim_pristine(self, message_id, **options):
+        """Claim only a still-pristine record, with no await between check and claim.
+
+        An authenticated recipient may pull the same message (delivery receipt)
+        while this driver awaited a peer connection. That receipt belongs to the
+        recipient; the direct driver then must neither claim nor send input.
+        """
+        if not self._unclaimed(message_id):
+            return None
+        return self.receiver._claim(message_id, direct=True, **options)
+
     def _unclaimed(self, message_id):
         row = self.receiver.bridge.store.db.execute(
             "SELECT j.*,m.delivered,m.receipt,m.acknowledged "
@@ -172,6 +256,39 @@ class DirectDelivery:
             (message_id,),
         ).fetchone()
         return self._pristine(message_id, row)
+
+    def _verify_coordinator_route(self, message):
+        bridge = self.receiver.bridge
+        queued = bridge.store.db.execute(
+            "SELECT evidence FROM message_events WHERE message_id=? AND kind='message.queued' "
+            "ORDER BY seq LIMIT 1",
+            (message["id"],),
+        ).fetchone()
+        try:
+            metadata = json.loads(queued["evidence"]) if queued else {}
+        except (ValueError, TypeError):
+            metadata = {}
+        if metadata.get("recipient_role") != "coordinator":
+            return
+        resolver = bridge.messages.coordinator_resolver
+        if resolver is None:
+            raise BridgeError("coordinator_route_changed", "Coordinator routing is unavailable")
+        try:
+            current = resolver()
+        except BridgeError:
+            raise BridgeError(
+                "coordinator_route_changed", "Coordinator route is no longer eligible"
+            ) from None
+        if (
+            current.get("principal") != message["recipient"]
+            or digest(current.get("session")) != metadata.get("coordinator_session_sha256")
+            or current.get("team_id") != metadata.get("coordinator_scope_team_id")
+            or current.get("revision") != metadata.get("coordinator_role_revision")
+        ):
+            raise BridgeError(
+                "coordinator_route_changed",
+                "The persisted coordinator changed after this message was addressed",
+            )
 
     async def wait_delivery(self, message_id):
         """Caller cancellation cancels its observation, never the delivery task."""
@@ -222,7 +339,8 @@ class DirectDelivery:
         bridge = self.receiver.bridge
         with bridge.store.transaction():
             row = bridge.store.db.execute(
-                "SELECT j.*,m.sender,m.delivered,m.receipt,m.acknowledged "
+                "SELECT j.*,m.sender,m.recipient,m.request_reply,"
+                "m.delivered,m.receipt,m.acknowledged "
                 "FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE j.message_id=?",
                 (message_id,),
@@ -236,7 +354,7 @@ class DirectDelivery:
             elif not self._pristine(message_id, row):
                 return  # A concurrent owner changed this record, not this driver.
             if preserve_delivered and row["state"] == "running":
-                if self.receiver._reply_can_finish(row):
+                if self.receiver._reply_can_finish(row) or self.native_reply_receipt(row):
                     return  # The normal receiver recovers the delivered reply waiter.
             possible = uncertain or row["started"] is not None or row["acknowledged"] is not None
             native = None
@@ -297,8 +415,14 @@ class DirectDelivery:
                 }
             if observation:
                 evidence["observation"] = observation
+            assigned_native = (
+                row["recipient"] == "codex"
+                and bridge.config.visible_handoffs.native_codex is not None
+                and bridge.messages.interim_target(message_id) is None
+            )
             if (
                 not possible
+                and not assigned_native
                 and code in self.receiver.DEFER_UNSENT
                 and row["state"] == "queued"
                 and owned_run is None
@@ -344,6 +468,7 @@ class DirectDelivery:
             recipient = message["recipient"]
             if not self.accepting:
                 raise BridgeError("receiver_unavailable", "Direct receiver is not running")
+            self._verify_coordinator_route(message)
             interim = bridge.messages.interim_target(message_id)
             if interim is not None:
                 selected = await bridge.sessions.selected(
@@ -354,7 +479,7 @@ class DirectDelivery:
                     raise BridgeError("visible_target_changed", "Explicit message target changed")
                 async with MCPClientPool(call_timeout=15) as pool:
                     await pool.connect(peer(bridge.config, recipient))
-                    claimed = self.receiver._claim(message_id, direct=True, interim=True)
+                    claimed = self._claim_pristine(message_id, interim=True)
                     if claimed is not None:
                         self._claimed[message_id] = claimed[1]
                         await self.receiver._process(
@@ -403,7 +528,7 @@ class DirectDelivery:
                 await pool.connect(peer(bridge.config, recipient))
                 if not self._unclaimed(message_id):
                     return
-                claimed = self.receiver._claim(message_id, direct=True)
+                claimed = self._claim_pristine(message_id)
                 if claimed is None:
                     raise BridgeError("delivery_not_admitted", "Message was not admitted")
                 self._claimed[message_id] = claimed[1]
@@ -432,16 +557,30 @@ class DirectDelivery:
             raise BridgeError("agent_denied", "Codex is not granted to this identity")
         for capability in ("session.inspect", "session.input"):
             bridge.security.principal(principal, capability)
-        prepared = await self.codex_host.prepare(binding)
+        for delay in (*self.native_host_prepare_delays, None):
+            try:
+                prepared = await self.codex_host.prepare(binding)
+                break
+            except BridgeError as error:
+                if error.code != "native_codex_host_unavailable" or delay is None:
+                    raise
+                # This observation ran before a job claim or native input. Keep
+                # the original new-record admission and its watchdog deadline.
+                await asyncio.sleep(delay)
+                if not self._unclaimed(identifier):
+                    return
+                current = bridge.config.visible_handoffs.native_codex
+                if current != binding:
+                    raise BridgeError(
+                        "native_codex_scope_changed", "Native Codex binding changed"
+                    ) from error
         if (
             prepared["operation"] == "turn/steer"
             and not bridge.config.visible_handoffs.allow_interim_messages
         ):
             raise BridgeError("interim_messages_disabled", "Interim Codex input is disabled")
-        if not self._unclaimed(identifier):
-            return
-        claimed = self.receiver._claim(
-            identifier, direct=True, interim=prepared["operation"] == "turn/steer", native=True
+        claimed = self._claim_pristine(
+            identifier, interim=prepared["operation"] == "turn/steer", native=True
         )
         if claimed is None:
             return
@@ -449,6 +588,10 @@ class DirectDelivery:
         self._claimed[identifier] = run_id
 
         async def before_send(observation):
+            # Host preparation includes awaited RPCs. Revalidate the dynamic
+            # coordinator route at the native transport's final pre-send hook,
+            # after those observations and before recording/issuing the turn.
+            self._verify_coordinator_route(message)
             with bridge.store.transaction():
                 current = bridge.config.visible_handoffs.native_codex
                 receiver = bridge.config.messaging.receivers.get("codex")
@@ -514,15 +657,82 @@ class DirectDelivery:
             binding, prepared, identifier, message["body"], before_send
         )
         evidence.update(run_id=run_id, session_scope="existing_native_codex_root")
+        observe_reply = message["request_reply"] and prepared["operation"] == "turn/start"
+        reply_error = (
+            "native_codex_steer_reply_unverified"
+            if message["request_reply"] and not observe_reply
+            else None
+        )
         with bridge.store.transaction():
             row = bridge.store.db.execute(
                 "SELECT state,run_id FROM message_jobs WHERE message_id=?", (identifier,)
             ).fetchone()
             if row and row["state"] == "running" and row["run_id"] == run_id:
                 bridge.messages._event(identifier, "message.native_submitted", principal, evidence)
-                self.receiver._finish(identifier, "completed", evidence)
-        # Acceptance is transport evidence; never fabricate recipient fetch, ACK or reply.
+                bridge.store.db.execute(
+                    "UPDATE message_jobs SET evidence=? WHERE message_id=? AND run_id=?",
+                    (canonical(evidence), identifier, run_id),
+                )
+                if not observe_reply:
+                    self.receiver._finish(
+                        identifier,
+                        "unknown" if reply_error else "completed",
+                        evidence,
+                        reply_error,
+                    )
+            else:
+                return
+        # Wake the caller on submitted input while reply observation continues.
         event.set()
+        if observe_reply:
+            await self._observe_native_reply(message, binding, evidence)
+
+    async def _observe_native_reply(self, message, binding, evidence, *, timeout=None):
+        bridge = self.receiver.bridge
+        identifier = message["id"]
+        if timeout is None:
+            timeout = bridge.config.messaging.receivers["codex"].timeout
+        try:
+            text = await self.codex_host.wait_reply(
+                binding,
+                evidence["turn_id"],
+                message["body"],
+                timeout,
+                cwd=evidence.get("thread_cwd"),
+            )
+        except TimeoutError:
+            error = "native_codex_reply_timeout"
+        except BridgeError as failure:
+            error = failure.code
+        else:
+            error = None
+            evidence = {
+                **evidence,
+                "completion_scope": "local_agent_turn",
+                "reply_source": "bound_native_codex_turn",
+                "agent_turn_completed": True,
+                "request_reply_satisfied": True,
+                "response_sha256": digest(text),
+                "response_preview": text[:320],
+                "local_reply_result": {
+                    "scope": "local_agent_turn",
+                    "reply_source": "bound_native_codex_turn",
+                    "message_id": identifier,
+                    "thread_id": evidence["thread_id"],
+                    "turn_id": evidence["turn_id"],
+                    "text": text,
+                    "agent_confirmed": False,
+                    "request_reply_satisfied": True,
+                },
+            }
+        with bridge.store.transaction():
+            row = bridge.store.db.execute(
+                "SELECT state,run_id FROM message_jobs WHERE message_id=?", (identifier,)
+            ).fetchone()
+            if row and row["state"] == "running" and row["run_id"] == evidence["run_id"]:
+                self.receiver._finish(
+                    identifier, "unknown" if error else "completed", evidence, error
+                )
 
     async def stop(self):
         """Cancel only this instance's attempts; preserve delivered reply waiters."""

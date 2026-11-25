@@ -28,6 +28,7 @@ async def test_exact_match_is_returned(bridge, monkeypatch):
         ([], True, "session_catalog_incomplete", "catalog_truncated"),
         ([row("terminal:7:ttys004", 999, "/dev/ttys004")], False, None, "expected_pid_changed"),
         ([row("terminal:9:ttys004", 100, "/dev/ttys004")], False, None, "window_changed"),
+        ([row("terminal:9:ttys004", 999, "/dev/ttys004")], False, None, "tty_reused"),
         ([row("terminal:9:ttys005", 100, "/dev/ttys005")], False, None, "pane_missing"),
     ],
 )

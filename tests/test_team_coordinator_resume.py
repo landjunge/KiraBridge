@@ -195,6 +195,8 @@ for event in [{'type':'thread.started','thread_id':'01a1ce14-57d2-75f3-85c9-7208
  {'type':'item.completed','item':{'type':'agent_message','text':json.dumps(answer)}},
  {'type':'turn.completed'}]:
  print(json.dumps(event),flush=True)
+from pathlib import Path
+Path(sys.argv[sys.argv.index('--output-last-message')+1]).write_text(json.dumps(answer))
 """
 
 

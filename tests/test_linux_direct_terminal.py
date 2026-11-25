@@ -1,8 +1,10 @@
 """Native Linux direct argv and its admission/identity/output boundaries."""
 
 import asyncio
+import json
 import os
 import sys
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -59,6 +61,57 @@ async def test_native_argv_has_real_tty_cwd_output_exit_and_no_persistent_sessio
     assert not bridge.sessions.linux._sessions
     with pytest.raises(ProcessLookupError):
         os.kill(result["pid"], 0)
+
+
+async def test_owned_pty_receives_the_exact_active_task_id(direct):
+    bridge, policy = direct
+    task_id = "stable-task-id-123"
+    result = await bridge.visible_terminal.execute(
+        {"id": task_id, "principal": "local"},
+        command(
+            policy,
+            "import os; print(os.environ['KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID'])",
+        ),
+        AsyncMock(),
+    )
+    assert result["task_id"] == task_id
+    assert task_id in result["terminal_output"]
+    assert result["execution_route"] == "linux_owned_pty"
+
+
+async def test_owned_pty_installer_self_task_passes_real_store_idle_guard(direct, tmp_path):
+    bridge, policy = direct
+    policy.capabilities.append("session.inspect")
+    task_id = "linux-owned-installer-self-task"
+    source = Path(__file__).parents[1] / "installer/install.py"
+    config_path = tmp_path / "installer.toml"
+    config_path.write_text("data_dir = " + json.dumps(str(bridge.config.state_path)))
+    code = (
+        "import importlib.util,pathlib\n"
+        "p=pathlib.Path(" + repr(str(source)) + ")\n"
+        "s=importlib.util.spec_from_file_location('install_probe',p)\n"
+        "m=importlib.util.module_from_spec(s)\n"
+        "s.loader.exec_module(m)\n"
+        "with m.idle_guard(pathlib.Path(" + repr(str(config_path)) + ")):\n"
+        "    print('LINUX_SELF_TASK_GUARD_OK')\n"
+    )
+    value = request(
+        "terminal.visible",
+        {"argv": [sys.executable, "-c", code], "cwd": policy.roots[0]},
+        task_id=task_id,
+    )
+    bridge.prepare("local", value)
+    if bridge.store.get(task_id)["state"] == "created":
+        bridge.tasks.approve(task_id)
+    claimed = bridge.store.claim_exact(bridge.tasks.owner, 30, task_id)
+    assert claimed is not None
+    bridge.tasks.preflight = None
+
+    await bridge.tasks._execute(claimed)
+
+    completed = bridge.store.get(task_id)
+    assert completed["state"] == "completed", completed
+    assert "LINUX_SELF_TASK_GUARD_OK" in completed["result"]["terminal_output"]
 
 
 async def test_exact_argv_nonzero_and_output_limit(direct):

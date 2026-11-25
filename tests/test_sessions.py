@@ -236,8 +236,8 @@ async def test_native_open_checks_authority_and_quotes_command(
         if "const tab=app.doScript(" in call.args[0]
     ]
     assert len(creations) == 1 and json.dumps("cd -- " + shlex.quote(cwd)) in creations[0]
-    assert events == ["create", "receipt", "focus", "move", "argv"]
-    assert leaf.native.await_count == 3  # One creation, plus required focus/move calls.
+    assert events == ["create", "receipt", "focus", "tag", "move", "argv"]
+    assert leaf.native.await_count == 4  # One creation, then focus/tag/move on its exact TTY.
     leaf.send_confirmed.assert_awaited_once()
     assert {operation for operation, _ in scene.calls} >= {
         "apps.list",
@@ -247,7 +247,7 @@ async def test_native_open_checks_authority_and_quotes_command(
     }
     with pytest.raises(BridgeError) as exc:
         await manager.open("local", args, task_id="explicit-new-window")
-    assert exc.value.code == "window_already_dispatched" and leaf.native.await_count == 3
+    assert exc.value.code == "window_already_dispatched" and leaf.native.await_count == 4
     leaf.send_confirmed.assert_awaited_once()
 
 

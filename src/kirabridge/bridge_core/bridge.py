@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import time
 import uuid
@@ -10,7 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
-from kirabridge.agent_manager import AgentManager
+from kirabridge.agent_manager import AgentManager, codex_output_schema
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -247,6 +248,11 @@ class Bridge:
                 ),
             )
         )
+        if sys.platform == "darwin":
+            from kirabridge.platform_adapters.macos.zle_readiness import ZLEReadiness
+
+            self.sessions.zle_readiness = ZLEReadiness(self.sessions.terminal_app)
+            self.sessions.terminal_app.zle_readiness = self.sessions.zle_readiness
         self.visible_terminal = VisibleTerminal(
             config, self.security, self.sessions, self.terminal.environment
         )
@@ -335,6 +341,7 @@ class Bridge:
         from kirabridge.team_manager.dispatcher import TeamDispatcher
 
         self.teams = TeamManager(self)
+        self.messages.coordinator_resolver = self.teams.coordinator_roles.resolve_global
         self.agents.qwen_session_guard = self.teams.qwen_session_proof
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
@@ -939,19 +946,33 @@ class Bridge:
                     raise BridgeError("native_codex_unsupported", "Native route is Codex only")
                 from kirabridge.platform_adapters.codex_turn import NativeCodexTurns
 
+                schema_path = codex_output_schema(self.config.agents[worker.agent], team_turn=True)
+                try:
+                    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+                    if not isinstance(schema, dict):
+                        raise ValueError()
+                except (ValueError, OSError) as exc:
+                    raise BridgeError("agent_schema", "Codex output schema is invalid") from exc
+
                 note = await self.agents.budget_note(worker.agent)
                 await running({"evidence_type": "native_codex_turn_dispatch"})
                 result = await NativeCodexTurns().execute(
                     self.config.visible_handoffs.native_codex,
-                    args.cwd,
                     str(uuid.uuid5(uuid.NAMESPACE_URL, "kirabridge-native-" + task["id"])),
                     args.prompt,
                     min(args.timeout, worker.timeout),
                     progress,
+                    output_schema=schema,
                 )
                 return self.agents.with_budget_note(result, note, create=True)
             return await self.agents.execute(
-                task, args, policy, running, progress, separate_managed=managed
+                task,
+                args,
+                policy,
+                running,
+                progress,
+                separate_managed=managed,
+                team_turn=worker is not None,
             )
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
@@ -1114,10 +1135,9 @@ class Bridge:
     async def refresh_agent_bindings_once(self, principal="local"):
         """Re-check the configured agent windows against one fresh catalogue.
 
-        Read-only. Only a binding that is no longer in the catalogue goes through the
-        existing proven-absence and unique-live-agent replacement (refreshed_binding), so a
-        restart of KiraBridge, Terminal.app or an agent never leaves a dead binding behind.
-        Returns the targets that were replaced.
+        Rehome a moved tab only when the recorded process generations still match.
+        An absent binding can be replaced only after fresh proven absence and a unique
+        live candidate. Returns changed targets. No terminal input is sent.
         """
         from kirabridge.visible_binding import binding_still_present
 
@@ -1126,12 +1146,45 @@ class Bridge:
             return []
         try:
             catalog = await self.sessions.catalog(principal)
-        except Exception:  # noqa: BLE001 - an unavailable Terminal is retried next round
+        except Exception as error:  # noqa: BLE001 - an unavailable Terminal is retried next round
+            # A failed probe must not leave an older "available" standing.
+            for target, binding in bindings.items():
+                try:
+                    self.visible_handoffs.record_presence(
+                        principal,
+                        target,
+                        "unknown",
+                        binding,
+                        {"reason": "catalog_" + getattr(error, "code", "unavailable")},
+                    )
+                except Exception:  # noqa: BLE001 - reporting never stops the sweep
+                    pass
             return []
         sessions = catalog.get("sessions") or []
         replaced = []
         for target, binding in bindings.items():
             if binding_still_present(binding, sessions):
+                exact = any(self.sessions.binding_matches(r, binding, target) for r in sessions)
+                try:
+                    if not exact:
+                        moved = await self.visible_handoffs.rehome_binding(
+                            principal, target, binding, catalog
+                        )
+                        if moved is not None:
+                            replaced.append(target)
+                            continue
+                    if self.config.visible_handoffs.bindings.get(target) != binding:
+                        continue
+                    # Readiness and identity are re-validated at the effect point.
+                    self.visible_handoffs.record_presence(
+                        principal,
+                        target,
+                        "available" if exact else "stale",
+                        binding,
+                        {"reason": "matched" if exact else "original_pane_or_pid_in_catalog"},
+                    )
+                except Exception:  # noqa: BLE001 - reporting never stops the sweep
+                    pass
                 continue
             try:
                 updated, _ = await self.visible_handoffs.refreshed_binding(

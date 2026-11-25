@@ -134,6 +134,18 @@ def test_snapshot_and_catalog_do_not_probe_permissions_or_use_leaves():
     assert native.snapshot()["capabilities"]["terminal_app"]["available"]
 
 
+def test_passive_snapshot_never_falls_back_to_full_native_metadata():
+    def forbidden():
+        raise AssertionError("Passive epochs must not read or hash the native executable")
+
+    current = CapabilityProbe(
+        facts={"platform": "darwin", "os_version": "15.7.4"},
+        native_metadata=forbidden,
+    )
+    observed = current.snapshot(passive=True)
+    assert not observed["capabilities"]["system"]["available"]
+
+
 def test_manual_policy_is_submission_eligibility_not_execution_authorization():
     native = provider()
     rows = native.operation_catalog(lambda op: {"authorized": True, "approval_required": True})

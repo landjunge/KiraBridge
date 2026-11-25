@@ -65,7 +65,7 @@ def command(bridge, config, monkeypatch):
         state["identities"].append(pid)
         return "501 ttys004 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         assert all(selected[key] == value for key, value in row.items())
         assert observed_identity.startswith("501 ttys004 ")
         state["posts"].append(text)
@@ -219,16 +219,87 @@ async def test_idle_shell_unconfirmed_input_is_not_reported_as_process_busy(comm
     running.assert_not_awaited()
 
 
-async def test_unknown_input_without_safe_shell_does_not_open_replacement_window(command):
+async def test_unknown_input_creates_separate_controlled_shell_when_requested(command, monkeypatch):
     bridge, state, args = command
-    bridge.sessions.terminal_app.read = AsyncMock(return_value="host project%    ")
-    bridge.sessions.open = AsyncMock(side_effect=AssertionError("must preserve ambiguous input"))
+    transport = bridge.sessions.terminal_app
+    existing = copy.deepcopy(state["row"])
+    created = copy.deepcopy(existing)
+    created.update(
+        pane_id="terminal:124:ttys005",
+        expected_pid=346,
+        tty="/dev/ttys005",
+        processes=[{"pid": 346, "ppid": 343, "name": "zsh", "image": "/bin/zsh"}],
+    )
+
+    async def catalog():
+        rows = [existing, created] if bridge.sessions.open.await_count else [existing]
+        return copy.deepcopy(rows)
+
+    async def read(pane):
+        return "host project%    " if pane == existing["pane_id"] else "KiraBridge visible % "
+
+    async def identity(pid):
+        assert pid == created["expected_pid"]
+        return "501 ttys005 Wed Nov 4 12:00:00 2026"
+
+    async def send(selected, text, observed_identity, **kwargs):
+        assert selected["pane_id"] == created["pane_id"]
+        assert observed_identity.startswith("501 ttys005 ")
+        state["posts"].append((selected["pane_id"], text))
+        script = Path(shlex.split(text)[-1])
+        nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
+        write_private(script.parent / "result.json", json.dumps({"nonce": nonce, "exit_code": 0}))
+
+    monkeypatch.setattr(transport, "catalog", catalog)
+    monkeypatch.setattr(transport, "read", read)
+    monkeypatch.setattr(transport, "process_identity", identity)
+    monkeypatch.setattr(transport, "send_confirmed", send)
+    bridge.sessions.open = AsyncMock(
+        return_value={
+            "pane_id": created["pane_id"],
+            "expected_pid": created["expected_pid"],
+            "tty": created["tty"],
+        }
+    )
     args.pop("pane_id")
     args.pop("expected_pid")
     args["create_if_needed"] = True
+    result = await bridge.visible_terminal.execute(
+        {"id": "separate-controlled-shell", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    bridge.sessions.open.assert_awaited_once()
+    opened_args = bridge.sessions.open.await_args
+    assert opened_args.args[1].controlled_shell is True
+    assert result["pane_id"] == created["pane_id"] and result["success"]
+    assert result["terminal_target"] == {
+        "route": "new_controlled_visible_shell",
+        "preserved_existing_input_issue": "visible_input_unknown",
+    }
+    assert [pane for pane, _text in state["posts"]] == [created["pane_id"]]
+    state["posts"].clear()
+    reused = await bridge.visible_terminal.execute(
+        {"id": "reuse-controlled-shell", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert reused["pane_id"] == created["pane_id"] and reused["success"]
+    assert reused["terminal_target"]["route"] == "existing_visible_shell"
+    assert [pane for pane, _text in state["posts"]] == [created["pane_id"]]
+    bridge.sessions.open.assert_awaited_once()
+
+
+async def test_unknown_input_create_if_needed_false_does_not_open(command):
+    bridge, state, args = command
+    bridge.sessions.terminal_app.read = AsyncMock(return_value="host project%    ")
+    bridge.sessions.open = AsyncMock(side_effect=AssertionError("creation is disabled"))
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = False
     with pytest.raises(BridgeError) as failure:
         await bridge.visible_terminal.execute(
-            {"id": "no-window-loop", "principal": "local"},
+            {"id": "no-fallback", "principal": "local"},
             VisibleTerminalInput.model_validate(args),
             AsyncMock(),
         )
@@ -264,6 +335,10 @@ async def test_auto_selection_uses_existing_safe_shell_beside_unknown_input(comm
         AsyncMock(),
     )
     assert result["pane_id"] == safe["pane_id"] and result["exit_code"] == 0
+    assert result["terminal_target"] == {
+        "route": "existing_visible_shell",
+        "preserved_existing_input_issue": "visible_input_unknown",
+    }
     assert len(state["posts"]) == 1
     bridge.sessions.open.assert_not_awaited()
 
@@ -299,7 +374,7 @@ async def test_checking_stops_at_the_first_suitable_window(command, monkeypatch)
     async def identity(pid):
         return "501 ttys003 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         posts.append(selected["pane_id"])
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
@@ -385,7 +460,7 @@ async def test_a_vanishing_candidate_does_not_stop_the_choice_of_another(command
     async def identity(pid):
         return "501 ttys005 Wed Nov 4 12:00:00 2026"
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         posts.append(selected["pane_id"])
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
@@ -438,7 +513,16 @@ async def test_the_command_folder_is_removed_once_the_receipt_is_read(command):
     assert not [child for child in root.iterdir() if child.is_dir()]
 
 
-def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_after=None):
+def _run_script(
+    tmp_path,
+    *,
+    tty_override=None,
+    cwd=None,
+    argv=None,
+    interrupt_after=None,
+    task_id=None,
+    task_principal=None,
+):
     """Run the generated script with the real /bin/zsh on a pseudo-terminal."""
     import os
     import pty
@@ -460,6 +544,8 @@ def _run_script(tmp_path, *, tty_override=None, cwd=None, argv=None, interrupt_a
         "n0nce",
         folder,
         result,
+        task_id=task_id,
+        task_principal=task_principal,
     )
     path = folder / "command.zsh"
     path.write_text(script)
@@ -510,6 +596,26 @@ def test_script_receipts_an_interrupt(tmp_path):
     assert receipt == {"nonce": "n0nce", "exit_code": 130, "phase": "interrupted"}
 
 
+@needs_zsh
+def test_script_transports_the_exact_active_task_id(tmp_path):
+    marker = tmp_path / "task-id"
+    code, receipt = _run_script(
+        tmp_path,
+        argv=[
+            "/usr/bin/python3",
+            "-c",
+            "import os, pathlib; "
+            "pathlib.Path(" + repr(str(marker)) + ").write_text("
+            "os.environ['KIRABRIDGE_ACTIVE_TERMINAL_TASK_ID'] + '|' + "
+            "os.environ['KIRABRIDGE_ACTIVE_TERMINAL_PRINCIPAL'])",
+        ],
+        task_id="stable-task-id-123",
+        task_principal="codex",
+    )
+    assert code == 0 and receipt["exit_code"] == 0
+    assert marker.read_text() == "stable-task-id-123|codex"
+
+
 @pytest.mark.parametrize(
     ("phase", "code"),
     [("setup", "visible_target_changed"), ("interrupted", "visible_command_interrupted")],
@@ -518,7 +624,7 @@ async def test_setup_and_interrupt_receipts_fail_at_once(command, monkeypatch, p
     bridge, state, args = command
     transport = bridge.sessions.terminal_app
 
-    async def send(selected, text, observed_identity):
+    async def send(selected, text, observed_identity, **kwargs):
         script = Path(shlex.split(text)[-1])
         nonce = re.search(r'"nonce": "([a-f0-9]+)"', script.read_text())[1]
         receipt = {"nonce": nonce, "exit_code": 125 if phase == "setup" else 130, "phase": phase}

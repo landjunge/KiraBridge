@@ -220,6 +220,61 @@ async def test_ready_target_gets_exactly_one_paste_return_and_authenticated_answ
     assert transport["calls"] == ["insert", "return"]
 
 
+async def test_coordinator_handoff_during_visible_preinput_callback_is_refused(
+    delivery, monkeypatch
+):
+    bridge, transport, direct, connected, _ = delivery
+    current = {
+        "principal": "grok",
+        "session": {"principal": "grok", "session_id": "grok-session-1"},
+        "team_id": "team-one",
+        "revision": 3,
+    }
+    bridge.messages.coordinator_resolver = lambda: current
+    bridge.config.visible_handoffs.native_codex = None
+
+    async def dispatch_ready(*_args):
+        return None
+
+    async def execute(_task, _args, _policy, running, _progress, **_options):
+        # Model a handoff completing during awaited visible-session setup,
+        # immediately before the adapter's running/pre-input callback.
+        current.update(
+            principal="codex",
+            session={"principal": "codex", "session_id": "codex-session-2"},
+            revision=4,
+        )
+        await running({"terminal_input_attempted": True})
+        transport["calls"].append("input_should_not_run")
+        return {"success": True, "scope": "visible_input_delivery"}
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", dispatch_ready)
+    monkeypatch.setattr(bridge.agents, "execute", execute)
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="coordinator",
+            conversation_id="coordinator-visible-preinput-race",
+            idempotency_key="coordinator-visible-preinput-race",
+            body="Must remain queued if ownership changed before paste",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+
+    assert direct.submit("chatgpt", sent["id"])
+    await direct.wait_delivery(sent["id"])
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed"
+    assert result["error"] == "coordinator_route_changed"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert stored["delivered"] is not None and stored["receipt"] is not None
+    assert stored["acknowledged"] is None
+    assert connected == ["grok"]
+    assert not transport["calls"]
+
+
 @pytest.mark.parametrize(
     "code",
     [

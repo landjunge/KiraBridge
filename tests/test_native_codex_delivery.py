@@ -1,4 +1,4 @@
-"""Existing native root delivery with isolated stores and a Codex 0.169 protocol fixture.
+"""Existing native root delivery with isolated stores and 0.169/0.171 fixtures.
 
 No host Codex socket, installed config, TTY or provider is touched by these tests.
 """
@@ -37,7 +37,7 @@ def binding(tmp_path):
 
 
 class Protocol:
-    """The captured 0.169 request/response shapes, including steer.turnId."""
+    """Captured protocol shapes, including steer.turnId."""
 
     def __init__(self, binding):
         self.binding = binding
@@ -45,6 +45,7 @@ class Protocol:
             "id": ROOT,
             "sessionId": ROOT,
             "source": "vscode",
+            "cwd": binding.codex_home,
             "parentThreadId": None,
             "attachedToThreadId": None,
             "canAcceptDirectInput": True,
@@ -58,12 +59,16 @@ class Protocol:
         self.on_input = None
         self.failure = None
         self.sockets = []
+        self.reply_turns = []
 
     def response(self, request):
         method, params = request["method"], request.get("params", {})
         self.calls.append(request)
         if method == "initialize":
-            return {"codexHome": self.binding.codex_home, "userAgent": "codex-tui/0.169.0 fixture"}
+            return {
+                "codexHome": self.binding.codex_home,
+                "userAgent": f"codex-tui/{self.binding.protocol_version} fixture",
+            }
         if method == "initialized":
             return None
         if method == "thread/read":
@@ -73,7 +78,11 @@ class Protocol:
             assert params == {"threadId": ROOT, "includeTurns": False}
             return {"thread": self.thread}
         if method == "thread/turns/list":
-            assert params["threadId"] == ROOT and params["limit"] == 1
+            assert params["threadId"] == ROOT
+            if params["limit"] == 8:
+                assert params["itemsView"] == "full"
+                return {"data": self.reply_turns}
+            assert params["limit"] == 1
             active = self.thread["status"]["type"] == "active"
             return {"data": [{"id": self.turn, "status": "inProgress"}] if active else []}
         assert method in {"turn/steer", "turn/start"}
@@ -154,6 +163,83 @@ async def test_two_concurrent_threads_route_only_assigned_root_without_any_tty(b
     assert result["native_input_attempted"] and not result["terminal_input_attempted"]
     assert not result["agent_confirmed"] and not result["request_reply_satisfied"]
     assert all(sock.fileno() == -1 for sock in p.sockets)
+
+
+async def test_0171_protocol_prepares_only_the_assigned_active_turn(binding):
+    binding.protocol_version = "0.171.0"
+    p = Protocol(binding)
+    prepared = await p.host().prepare(binding)
+    assert prepared["operation"] == "turn/steer"
+    assert prepared["expected_turn_id"] == p.turn
+    assert [call["method"] for call in p.calls] == [
+        "initialize",
+        "initialized",
+        "thread/read",
+        "thread/turns/list",
+    ]
+
+
+async def test_0171_protocol_rejects_a_different_patch_user_agent(binding):
+    binding.protocol_version = "0.171.0"
+    p = Protocol(binding)
+    response = p.response
+
+    def changed_patch(request):
+        result = response(request)
+        if request["method"] == "initialize":
+            result["userAgent"] = "codex-tui/0.171.1 fixture"
+        return result
+
+    p.response = changed_patch
+    with pytest.raises(BridgeError) as exc:
+        await p.host().prepare(binding)
+    assert exc.value.code == "native_codex_host_unverified"
+    assert [call["method"] for call in p.calls] == ["initialize"]
+
+
+async def test_0172_protocol_prepares_assigned_active_turn_without_broadening_identity(binding):
+    binding.protocol_version = "0.172.0"
+    p = Protocol(binding)
+    prepared = await p.host().prepare(binding)
+    assert prepared["operation"] == "turn/steer"
+    assert prepared["expected_turn_id"] == p.turn
+    assert [call["method"] for call in p.calls] == [
+        "initialize",
+        "initialized",
+        "thread/read",
+        "thread/turns/list",
+    ]
+
+
+async def test_0172_protocol_rejects_a_different_assigned_root_without_input(binding):
+    binding.protocol_version = "0.172.0"
+    p = Protocol(binding)
+    p.thread["id"] = OTHER
+    with pytest.raises(BridgeError):
+        await p.host().prepare(binding)
+    assert not p.inputs()
+
+
+@pytest.mark.parametrize(
+    "user_agent",
+    ["codex-tui/0.172.1 fixture", "kirabridge/0.172.0 fixture", "codex-tui/0.173.0 fixture"],
+)
+async def test_0172_protocol_rejects_unexpected_user_agent(binding, user_agent):
+    binding.protocol_version = "0.172.0"
+    p = Protocol(binding)
+    response = p.response
+
+    def changed_user_agent(request):
+        result = response(request)
+        if request["method"] == "initialize":
+            result["userAgent"] = user_agent
+        return result
+
+    p.response = changed_user_agent
+    with pytest.raises(BridgeError) as exc:
+        await p.host().prepare(binding)
+    assert exc.value.code == "native_codex_host_unverified"
+    assert [call["method"] for call in p.calls] == ["initialize"]
 
 
 @pytest.mark.parametrize(
@@ -282,7 +368,8 @@ async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(d
     await settled(direct)
     outcome = job(bridge, sent)
     original = bridge.messages.get("chatgpt", sent["id"])
-    assert outcome["state"] == "completed"
+    assert outcome["state"] == "unknown"
+    assert outcome["error"] == "native_codex_steer_reply_unverified"
     assert outcome["evidence"]["completion_scope"] == "native_input_delivery"
     assert original["processing_route"] == "existing_native_codex_root"
     assert outcome["completion_scope"] == "native_input_delivery"
@@ -294,6 +381,189 @@ async def test_direct_rebind_bypasses_dead_tty_and_preserves_original_receipts(d
     new_message(bridge, key="native-root", recipient="codex")
     await settled(direct)
     assert len(p.inputs()) == 1
+
+
+async def test_direct_cold_host_retries_only_prepare_for_the_original(
+    delivery, binding, monkeypatch
+):
+    bridge, transport, direct, _, _ = delivery
+    protocol = Protocol(binding)
+    host = protocol.host()
+    prepare = host.prepare
+    checked = []
+
+    async def cold_then_ready(candidate):
+        checked.append(candidate.thread_id)
+        if len(checked) == 1:
+            raise BridgeError("native_codex_host_unavailable", "Host is starting")
+        return await prepare(candidate)
+
+    monkeypatch.setattr(host, "prepare", cold_then_ready)
+    monkeypatch.setattr(direct, "native_host_prepare_delays", (0,))
+    direct.codex_host = host
+    bridge.config.visible_handoffs.native_codex = binding
+    sent = new_message(bridge, key="direct-cold-host", recipient="codex")
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    assert checked == [ROOT, ROOT]
+    assert len(protocol.inputs()) == 1 and not transport["calls"]
+    assert job(bridge, sent)["evidence"]["completion_scope"] == "native_input_delivery"
+    assert bridge.messages.get("chatgpt", sent["id"])["acknowledged"] is None
+    assert not direct.submit("chatgpt", sent["id"])
+
+
+async def test_direct_cold_host_watchdog_does_not_fall_back_to_terminal(
+    delivery, binding, monkeypatch
+):
+    bridge, transport, direct, _, _ = delivery
+    protocol = Protocol(binding)
+    host = protocol.host()
+
+    async def unavailable(_):
+        raise BridgeError("native_codex_host_unavailable", "Host is starting")
+
+    monkeypatch.setattr(host, "prepare", unavailable)
+    monkeypatch.setattr(direct, "delivery_timeout", 0.03)
+    direct.codex_host = host
+    bridge.config.visible_handoffs.native_codex = binding
+    sent = new_message(bridge, key="direct-cold-host-timeout", recipient="codex")
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    result = job(bridge, sent)
+    assert result["state"] == "failed" and result["error"] == "delivery_timeout"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert not protocol.inputs() and not transport["calls"]
+
+
+async def test_unverified_native_host_fails_without_fallback_or_ack(delivery, binding, monkeypatch):
+    bridge, transport, direct, connected, _ = delivery
+    attempts = []
+
+    async def reject_unverified(_binding):
+        attempts.append("prepare")
+        raise BridgeError("native_codex_host_unverified", "Identity did not verify")
+
+    monkeypatch.setattr(direct.codex_host, "prepare", reject_unverified)
+    bridge.config.visible_handoffs.native_codex = binding
+    sent = new_message(bridge, key="native-unverified-no-fallback", recipient="codex")
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed"
+    assert result["error"] == "native_codex_host_unverified"
+    assert result["evidence"]["phase"] == "native_direct_delivery"
+    assert result["evidence"]["native_input_attempted"] is False
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert result["evidence"]["automatic_retry"] is False
+    assert stored["delivered"] is stored["receipt"] is stored["acknowledged"] is None
+    assert not bridge.store.db.execute(
+        "SELECT 1 FROM message_events WHERE message_id=? AND kind='message.acknowledged'",
+        (sent["id"],),
+    ).fetchone()
+    assert attempts == ["prepare"]
+    assert not transport["calls"] and not connected
+    assert not direct.submit("chatgpt", sent["id"])
+
+
+async def test_role_routed_delivery_refuses_a_coordinator_change_before_any_input(
+    delivery, binding
+):
+    from kirabridge.message_manager import MessageSend
+
+    bridge, transport, direct, connected, _ = delivery
+    protocol = Protocol(binding)
+    direct.codex_host = protocol.host()
+    bridge.config.visible_handoffs.native_codex = binding
+    current = {
+        "principal": "codex",
+        "session": {"principal": "codex", "session_id": ROOT},
+        "team_id": "team-one",
+        "revision": 4,
+    }
+    bridge.messages.coordinator_resolver = lambda: current
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="coordinator",
+            conversation_id="coordinator-route-change",
+            idempotency_key="coordinator-route-change",
+            body="This must not reach a replaced coordinator",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+    assert sent["recipient"] == "codex"
+    current.update(
+        {
+            "principal": "grok",
+            "session": {"principal": "grok", "session_id": "grok-new"},
+            "team_id": "team-one",
+            "revision": 5,
+        }
+    )
+
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed" and result["error"] == "coordinator_route_changed"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert stored["delivered"] is stored["receipt"] is stored["acknowledged"] is None
+    assert not protocol.inputs() and not transport["calls"] and not connected
+
+
+async def test_role_handoff_during_native_revalidation_is_refused_at_send_boundary(
+    delivery, binding
+):
+    """A role change during awaited host observation must be caught before RPC input."""
+    from kirabridge.message_manager import MessageSend
+
+    bridge, transport, direct, connected, _ = delivery
+    protocol = Protocol(binding)
+    direct.codex_host = protocol.host()
+    bridge.config.visible_handoffs.native_codex = binding
+    current = {
+        "principal": "codex",
+        "session": {"principal": "codex", "session_id": ROOT},
+        "team_id": "team-one",
+        "revision": 4,
+    }
+    bridge.messages.coordinator_resolver = lambda: current
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="coordinator",
+            conversation_id="coordinator-final-boundary-race",
+            idempotency_key="coordinator-final-boundary-race",
+            body="Must stop if the role changes during final host observation",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+
+    def handoff_during_delivery_observation(host):
+        if host.reads == 2:
+            current.update(
+                principal="grok",
+                session={"principal": "grok", "session_id": "grok-new"},
+                revision=5,
+            )
+
+    protocol.read_hook = handoff_during_delivery_observation
+    assert direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+
+    result = job(bridge, sent)
+    stored = bridge.messages.get("chatgpt", sent["id"])
+    assert result["state"] == "failed"
+    assert result["error"] == "coordinator_route_changed"
+    assert result["evidence"]["terminal_input_attempted"] is False
+    assert stored["delivered"] is stored["receipt"] is stored["acknowledged"] is None
+    assert not protocol.inputs() and not transport["calls"] and not connected
 
 
 @pytest.mark.parametrize(
@@ -395,6 +665,35 @@ async def test_restart_preserves_original_native_attempt_and_never_replays(deliv
         assert outcome["evidence"]["last_observation"] == evidence
         assert not direct.submit("chatgpt", sent["id"])
         assert not p.calls and not transport["calls"]
+    finally:
+        await bridge.message_receiver.stop()
+
+
+async def test_shutdown_during_reply_observation_preserves_accepted_turn(delivery, binding):
+    bridge, transport, direct, _, _ = delivery
+    p = Protocol(binding)
+    p.thread["status"] = {"type": "idle"}
+    bridge.config.visible_handoffs.native_codex = binding
+    direct.codex_host = p.host()
+    sent = new_message(bridge, key="native-shutdown-with-unfinished-reply", recipient="codex")
+    assert sent["request_reply"] is True
+    assert direct.submit("chatgpt", sent["id"])
+    await direct.wait_delivery(sent["id"])
+    assert job(bridge, sent)["state"] == "running"
+    assert job(bridge, sent)["evidence"]["turn_id"] == "new-root-turn"
+    await direct.stop()
+    result = job(bridge, sent)
+    assert result["state"] == "running" and result["error"] is None
+    assert result["evidence"]["turn_id"] == "new-root-turn"
+    bridge.config.messaging.receivers["codex"].timeout = 0.05
+    await bridge.message_receiver.start()
+    try:
+        await settled(direct)
+        assert job(bridge, sent)["state"] == "unknown"
+        assert job(bridge, sent)["error"] == "native_codex_reply_timeout"
+        assert job(bridge, sent)["evidence"]["turn_id"] == "new-root-turn"
+        assert not direct.submit("chatgpt", sent["id"])
+        assert len(p.inputs()) == 1 and not transport["calls"]
     finally:
         await bridge.message_receiver.stop()
 

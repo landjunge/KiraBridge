@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, TextContent
 
 from kirabridge.threaddesk_dynamic import call
 from kirabridge.threaddesk_manager import ThreadDeskManager
@@ -74,6 +74,35 @@ def test_read_size_error_keeps_valid_numeric_pair_without_write_contract(config)
     )
     assert not ok
     assert value["error"]["details"] == {"max_bytes": 3, "actual_bytes": 4}
+
+
+@pytest.mark.parametrize(
+    ("tool", "mutation", "code", "expected"),
+    [
+        ("library_search", False, "index_stale", "index_stale"),
+        ("library_search", False, "PRIVATE_UNKNOWN_CODE", "threaddesk_rejected"),
+        ("library_search", True, "index_stale", "threaddesk_rejected"),
+        ("library_query", False, "index_stale", "threaddesk_rejected"),
+        (None, False, "index_stale", "threaddesk_rejected"),
+    ],
+)
+def test_library_search_index_error_is_scoped_and_content_free(
+    config, tool, mutation, code, expected
+):
+    raw_error = {
+        "code": code,
+        "error": "PRIVATE_PEER_TEXT",
+        "details": {"path": "PRIVATE_PEER_PATH", "actual_revision": 3},
+    }
+    response = CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(raw_error))], isError=True
+    )
+    ok, value = ThreadDeskManager(config).decode(
+        response, mutation=mutation, verified_read_tool=tool
+    )
+    assert not ok and value["error"]["code"] == expected
+    assert value["error"]["details"] == {}
+    assert "PRIVATE" not in str(value)
 
 
 @pytest.mark.parametrize("mutation", [False, True])

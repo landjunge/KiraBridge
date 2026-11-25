@@ -10,8 +10,8 @@ const eventSource = slot?.dataset.statusSource === "control-events";
 let locale = document.documentElement.lang;
 try { const saved = localStorage.getItem("kirabridge.locale"); if (["de","en"].includes(saved)) locale = saved; } catch { /* Existing cosmetic preference is optional. */ }
 const labels = {
-  de:{tagline:"Deine Agenten. Ein Überblick.",protocol:"Protokoll ↗",processes:"Prozesse",overview:"Übersicht",terminals:"Terminals",keyboard:"Tastatur",doctor:"Doktor",permissions:"Rechte",identity:"Mit wem arbeitest du?",peers:"Agenten untereinander",currentPermission:"Aktuelle Freigabe",help:"Etwas funktioniert nicht?",openDoctor:"Doktor öffnen →",yourTerminals:"Deine Terminals",repairDoctor:"Reparatur-Doktor",protocolTitle:"Was tatsächlich passiert",older:"Ältere Einträge"},
-  en:{tagline:"Your agents. One overview.",protocol:"Activity log ↗",processes:"Processes",overview:"Overview",terminals:"Terminals",keyboard:"Keyboard",doctor:"Doctor",permissions:"Permissions",identity:"Who are you working with?",peers:"Agent communication",currentPermission:"Current permission",help:"Something not working?",openDoctor:"Open doctor →",yourTerminals:"Your terminals",repairDoctor:"Repair doctor",protocolTitle:"What actually happened",older:"Older entries"}
+  de:{tagline:"Deine Agenten. Ein Überblick.",protocol:"Protokoll ↗",processes:"Prozesse",overview:"Übersicht",terminals:"Terminals",keyboard:"Tastatur",doctor:"Doktor",permissions:"Rechte",identity:"Mit wem arbeitest du?",peers:"Agenten untereinander",currentPermission:"Aktuelle Freigabe",help:"Etwas funktioniert nicht?",openDoctor:"Doktor öffnen →",yourTerminals:"Deine Terminals",agents:"Agenten",agentSessions:"Agentensitzungen",coordinatorRefresh:"Aktualisieren",coordinatorTeam:"Team",repairDoctor:"Reparatur-Doktor",protocolTitle:"Was tatsächlich passiert",older:"Ältere Einträge"},
+  en:{tagline:"Your agents. One overview.",protocol:"Activity log ↗",processes:"Processes",overview:"Overview",terminals:"Terminals",keyboard:"Keyboard",doctor:"Doctor",permissions:"Permissions",identity:"Who are you working with?",peers:"Agent communication",currentPermission:"Current permission",help:"Something not working?",openDoctor:"Open doctor →",yourTerminals:"Your terminals",agents:"Agents",agentSessions:"Agent sessions",coordinatorRefresh:"Refresh",coordinatorTeam:"Team",repairDoctor:"Repair doctor",protocolTitle:"What actually happened",older:"Older entries"}
 };
 function setLanguage(value) {
   locale = value === "en" ? "en" : "de";
@@ -21,6 +21,7 @@ function setLanguage(value) {
   document.querySelectorAll("[data-kb-text]").forEach(element => {
     const value = labels[locale][element.dataset.kbText]; if (value) element.textContent = value;
   });
+  window.dispatchEvent(new Event("np-kirabridge-language"));
 }
 document.querySelectorAll("[data-kb-language]").forEach(button => button.addEventListener("click", () => setLanguage(button.dataset.kbLanguage)));
 if (document.querySelector("[data-kb-language]")) setLanguage(locale);

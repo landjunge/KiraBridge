@@ -317,7 +317,13 @@ class ThreadDeskManager:
                 ) from None
 
     def decode(
-        self, result, *, mutation: bool, expected: dict | None = None, management_request=None
+        self,
+        result,
+        *,
+        mutation: bool,
+        expected: dict | None = None,
+        management_request=None,
+        verified_read_tool: str | None = None,
     ):
         def invalid(code):
             cls = UncertainExecution if mutation else BridgeError
@@ -337,6 +343,8 @@ class ThreadDeskManager:
             invalid("threaddesk_result_limit")
         if result.isError:
             code = value.get("code") if isinstance(value, dict) else None
+            if code == "index_stale" and not mutation and verified_read_tool == "library_search":
+                return False, safe_peer_error(code, None)
             code = code if isinstance(code, str) and code in ERROR_CODES else "threaddesk_rejected"
             return False, safe_peer_error(
                 code,

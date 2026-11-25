@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from kirabridge.agent_manager import CodexAdapter
+from kirabridge.agent_manager import CodexAdapter, _read_codex_team_result
 from kirabridge.agent_manager.full_access import FullAccessAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
-from kirabridge.bridge_core.models import AgentInput
+from kirabridge.bridge_core.models import AgentInput, BridgeError
 
 
 class RecordingTerminal:
@@ -24,6 +24,31 @@ class RecordingTerminal:
 
 async def observe(value):
     pass
+
+
+@pytest.mark.parametrize(
+    "kind,code",
+    [
+        ("missing", "team_agent_no_text"),
+        ("empty", "team_agent_no_text"),
+        ("invalid_utf8", "team_agent_no_text"),
+        ("oversized", "team_payload_limit"),
+        ("symlink", "team_agent_no_text"),
+    ],
+)
+def test_codex_team_final_file_rejects_unusable_output(tmp_path, kind, code):
+    path = tmp_path / "final-message"
+    if kind == "symlink":
+        other = tmp_path / "unrelated"
+        other.write_text("Unrelated data")
+        path.symlink_to(other)
+    elif kind != "missing":
+        path.write_bytes(
+            {"empty": b"  ", "invalid_utf8": b"\xff", "oversized": b"x" * 262145}[kind]
+        )
+    with pytest.raises(BridgeError) as rejected:
+        _read_codex_team_result(path)
+    assert rejected.value.code == code
 
 
 @pytest.mark.asyncio

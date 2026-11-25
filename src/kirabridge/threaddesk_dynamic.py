@@ -510,6 +510,10 @@ async def _fresh_tools(manager: Any, *, operation: bool = False) -> dict[str, di
         raise BridgeError("threaddesk_tool_limit", "Tool catalog is too large")
     approved: dict[str, dict[str, Any]] = {}
     for tool in tools:
+        # A complete catalog can contain hundreds of independently bounded
+        # schemas. Validation is synchronous CPU work; yield between schemas so
+        # it cannot monopolize the MCP server's event loop for the whole list.
+        await asyncio.sleep(0)
         item = _validated_tool(tool)
         if item is not None:
             if item["name"] in approved:
@@ -592,7 +596,7 @@ async def read(bridge: Any, principal: str, name: str, arguments: dict[str, Any]
         _validate(tool, arguments)
     # The read runs outside the discovery lock: a hanging call must not block the catalog.
     result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
-    success, value = bridge.threaddesk.decode(result, mutation=False)
+    success, value = bridge.threaddesk.decode(result, mutation=False, verified_read_tool=name)
     return {
         "success": success,
         "value": value,
@@ -638,7 +642,7 @@ async def call(
             contract = digest(tool)
     if not mutation:
         result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
-        success, value = bridge.threaddesk.decode(result, mutation=False)
+        success, value = bridge.threaddesk.decode(result, mutation=False, verified_read_tool=name)
         return {
             "success": success,
             "value": value,

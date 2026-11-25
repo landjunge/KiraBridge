@@ -13,7 +13,7 @@ from kirabridge.chatgpt_service import (
     restore_chatgpt_service,
     service_definition,
 )
-from kirabridge.chatgpt_setup import runtime_status
+from kirabridge.chatgpt_setup import runtime_status, wait_for_tunnel_readiness
 from kirabridge.operator_control import OperatorControl
 
 
@@ -159,6 +159,47 @@ def test_live_managed_process_replaces_stale_alias_pid_but_not_failed_health(
     actual = runtime_status(service.binary, service.config)
     assert actual["connected"] is connected
     assert actual["chatgpt_tool_call"] == "unverified"
+
+
+def test_tunnel_readiness_waits_through_read_only_subprocess_timeout(monkeypatch):
+    calls = 0
+    sleeps = []
+
+    def status(binary, config):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise __import__("subprocess").TimeoutExpired("status", 15)
+        if calls == 2:
+            return {"connected": False}
+        return {"connected": True, "runtime_evidence": {"ready": True}}
+
+    monkeypatch.setattr("kirabridge.chatgpt_setup.runtime_status", status)
+    monkeypatch.setattr("kirabridge.chatgpt_setup.time.sleep", sleeps.append)
+    result = wait_for_tunnel_readiness("binary", Path("config"), timeout=10)
+    assert result["connected"] is True
+    assert calls == 3 and len(sleeps) == 2
+
+
+def test_tunnel_readiness_timeout_is_bounded_and_named(monkeypatch):
+    now = 0.0
+    calls = 0
+
+    def status(binary, config):
+        nonlocal calls
+        calls += 1
+        raise __import__("subprocess").TimeoutExpired("status", 15)
+
+    def sleep(duration):
+        nonlocal now
+        now += duration
+
+    monkeypatch.setattr("kirabridge.chatgpt_setup.runtime_status", status)
+    monkeypatch.setattr("kirabridge.chatgpt_setup.time.monotonic", lambda: now)
+    monkeypatch.setattr("kirabridge.chatgpt_setup.time.sleep", sleep)
+    with pytest.raises(BridgeError, match="ChatGPT tunnel readiness"):
+        wait_for_tunnel_readiness("binary", Path("config"), timeout=1, poll_interval=0.4)
+    assert calls == 3
 
 
 @pytest.mark.asyncio

@@ -21,7 +21,8 @@ case "$digest" in *[!0-9a-f]*) echo 'Invalid Ubuntu digest.' >&2; exit 2 ;; esac
 
 repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 artifacts=$(CDPATH='' cd -- "$1" && pwd -P)
-case "$repo$artifacts" in
+scratch_parent=$(CDPATH='' cd -- "${TMPDIR:-$artifacts}" && pwd -P)
+case "$repo$artifacts$scratch_parent" in
   *','*|*'
 '*) echo 'Docker bind paths must not contain commas or newlines.' >&2; exit 2 ;;
 esac
@@ -32,7 +33,14 @@ environment_evidence="$artifacts/smoke-container-Linux-x86_64.json"
   echo 'Existing smoke evidence is preserved; use fresh candidate artifacts.' >&2; exit 2;
 }
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/kirabridge-linux-smoke.XXXXXXXX")
+scratch_fs=$(findmnt -n -o FSTYPE --target "$scratch_parent")
+case "$scratch_fs" in
+  tmpfs|ramfs|devtmpfs|hugetlbfs)
+    echo 'Set TMPDIR to disk-backed storage for Linux release smoke.' >&2
+    exit 2
+    ;;
+esac
+scratch=$(mktemp -d "$scratch_parent/kirabridge-linux-smoke.XXXXXXXX")
 mkdir "$scratch/evidence"
 nonce=${scratch##*.}
 image="kirabridge-linux-smoke:$nonce-$$"
