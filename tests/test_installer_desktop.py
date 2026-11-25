@@ -470,6 +470,7 @@ def services(desktop, monkeypatch, tmp_path):
     monkeypatch.setattr(desktop, "job", lambda api, label, **kw: bool(kw.get("definition")))
     monkeypatch.setattr(desktop, "stop", lambda api, label, **kw: log.append(("stop", label)))
     monkeypatch.setattr(desktop, "start", lambda api, path: log.append(("start", path.name)))
+    monkeypatch.setattr(desktop, "service_disabled", lambda label: False)
     monkeypatch.setattr(desktop, "app_processes", lambda app: [])
     monkeypatch.setattr(desktop, "start_app", lambda api, app: [])
 
@@ -594,6 +595,32 @@ def recorded_previous_release(services):
 
 def plist(services, name):
     return plistlib.loads((services.agents / f"com.kirabridge.{name}.plist").read_bytes())
+
+
+def test_upgrade_does_not_start_services_that_were_off_or_are_disabled(
+    desktop, services, monkeypatch
+):
+    """A disabled/not-running aux service must not make the upgrade fail (launchd 119)."""
+    off = {"com.kirabridge.grok-app"}
+    disabled = {"com.kirabridge.chat-events"}
+    monkeypatch.setattr(
+        desktop, "job", lambda api, label, **kw: bool(kw.get("definition")) and label not in off
+    )
+    monkeypatch.setattr(desktop, "service_disabled", lambda label: label in disabled)
+    release = services.release("rc81")
+    active = services.transaction(release)
+    desktop.activate(services.api, services.args, release, active, release / "current.json")
+    started = [name for kind, name in services.log if kind == "start"]
+    assert "com.kirabridge.approvals.plist" in started
+    assert "com.kirabridge.grok-app.plist" not in started  # was not running before
+    assert "com.kirabridge.chat-events.plist" not in started  # disabled in launchd
+    rows = {row["name"]: row for row in active["desktop"]["services"]}
+    assert rows["grok-app"]["not_started"] == "was_not_loaded"
+    assert rows["chat-events"]["not_started"] == "disabled"
+    # The definitions are still updated on disk to the new release.
+    assert (
+        str(release / "source/.venv/bin/python") in plist(services, "grok-app")["ProgramArguments"]
+    )
 
 
 def test_install_moves_existing_services_to_release_venv_and_rollback_restores(desktop, services):

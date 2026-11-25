@@ -276,6 +276,26 @@ def stop(api, label, *, path=None, definition=None):
             wait_unloaded(api, label, path=path, definition=definition)
 
 
+def service_disabled(label):
+    """True when launchd has this label disabled (launchctl disable).
+
+    Bootstrapping a disabled label fails with 119 "Service is disabled", which launchctl
+    prints as "5: Input/output error"; the retry loop then burns its whole window and the
+    upgrade is rolled back although the operator deliberately switched the service off.
+    """
+    try:
+        out = subprocess.run(
+            ["/bin/launchctl", "print-disabled", f"gui/{os.getuid()}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return re.search(r'"' + re.escape(label) + r'"\s*=>\s*(?:disabled|true)\b', out) is not None
+
+
 def start(api, path):
     # Reuse the existing bounded bootstrap/EIO settling contract.
     from types import SimpleNamespace
@@ -547,8 +567,14 @@ def activate(api, args, release, active, current):
                 timeout=15,
             )
         row["installed_sha256"] = api.sha(path)
-        save(api, current, active)
-        start(api, path)
+        # Keep the operator's state: a service that was not running before the upgrade
+        # (or that launchd has disabled) is updated on disk but not started.
+        if (row["was_loaded"] or not row["existed"]) and not service_disabled(row["label"]):
+            save(api, current, active)
+            start(api, path)
+        else:
+            row["not_started"] = "disabled" if service_disabled(row["label"]) else "was_not_loaded"
+            save(api, current, active)
     # Authenticated console probe; does not print a login ticket or open a browser.
     _run_readiness_probe(
         api,
