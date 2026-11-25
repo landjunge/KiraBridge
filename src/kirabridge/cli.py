@@ -327,6 +327,9 @@ async def _serve_http(config, principal):
                 log_level="critical",
                 limit_concurrency=config.max_http_requests,
                 timeout_keep_alive=5,
+                # SIGTERM must not wait for open long-poll/tunnel connections forever:
+                # a stuck stop blocks upgrades (launchd keeps the label for a long time).
+                timeout_graceful_shutdown=10,
             )
         )
         async with bridge:
