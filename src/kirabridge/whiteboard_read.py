@@ -13,6 +13,7 @@ import re
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal, get_args
 from uuid import uuid4
 
 from kirabridge.bridge_core.models import BridgeError
@@ -25,27 +26,16 @@ _PAGE_CONTENT_CHARS = 48000
 _QUERY_LIMIT = 200
 _SNIPPET_LIMIT = 200
 _SEARCH_LIMIT = 20
-_ENTRY_TYPES = {
-    "note",
-    "task",
-    "claimed",
-    "progress",
-    "result",
-    "decision",
-    "problem",
-    "question",
-    "system",
-}
-_ACTOR_TYPES = {
-    "human",
-    "grok",
-    "claude",
-    "codex",
-    "chatgpt",
-    "gnom-hub-v1",
-    "local-assistant",
-    "system",
-}
+# The allowed values are part of the MCP tool schema (Literal -> JSON-schema enum), so a
+# client such as ChatGPT sees them instead of guessing "assistant" or "ai".
+WhiteboardEntryType = Literal[
+    "note", "task", "claimed", "progress", "result", "decision", "problem", "question", "system"
+]
+WhiteboardActorType = Literal[
+    "human", "grok", "claude", "codex", "chatgpt", "gnom-hub-v1", "local-assistant", "system"
+]
+_ENTRY_TYPES = set(get_args(WhiteboardEntryType))
+_ACTOR_TYPES = set(get_args(WhiteboardActorType))
 
 
 def read_whiteboard(
