@@ -437,9 +437,7 @@ def _current_tty():
         return None
 
 
-def _verified_terminal_task_id(
-    db, *, environ=None, tty=None, process_ids=None, now=None
-):
+def _verified_terminal_task_id(db, *, environ=None, tty=None, process_ids=None, now=None):
     """Authenticate the one active visible-terminal task running this installer process.
 
     The ID is carried only by the Core-generated one-shot terminal runner. It is not

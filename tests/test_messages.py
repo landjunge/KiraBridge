@@ -352,13 +352,12 @@ async def test_real_authenticated_mcp_receiver_roundtrip_is_finite(
 
 
 async def test_authenticated_mcp_projects_only_exact_native_request_reply(
-    channel, http_bridge  # noqa: F811
+    channel,
+    http_bridge,  # noqa: F811
 ):
     bridge, endpoint = http_bridge
     async with MCPClientPool() as pool:
-        await pool.connect(
-            Peer("codex", url=endpoint, token="codex-message-token-" + "x" * 40)
-        )
+        await pool.connect(Peer("codex", url=endpoint, token="codex-message-token-" + "x" * 40))
 
         def completed_native_request(message_id, *, request_reply=True):
             original = channel.send(
@@ -377,8 +376,7 @@ async def test_authenticated_mcp_projects_only_exact_native_request_reply(
                 (
                     message_id,
                     f"native-run-{message_id}",
-                    '{"completion_scope":"native_input_delivery",'
-                    '"native_input_attempted":true}',
+                    '{"completion_scope":"native_input_delivery","native_input_attempted":true}',
                 ),
             )
             return original
@@ -412,8 +410,7 @@ async def test_authenticated_mcp_projects_only_exact_native_request_reply(
         ).fetchone()
         assert stored["reply_id"] is None
         assert stored["evidence"] == (
-            '{"completion_scope":"native_input_delivery",'
-            '"native_input_attempted":true}'
+            '{"completion_scope":"native_input_delivery","native_input_attempted":true}'
         )
 
         # A linked but wrong-kind, wrong-direction or foreign-thread record is not a reply.

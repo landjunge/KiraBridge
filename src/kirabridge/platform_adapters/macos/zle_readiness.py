@@ -35,9 +35,11 @@ def _start_token(value: str) -> str:
     # detailed Darwin ps output: uid tty weekday month day hh:mm:ss year ppid comm
     if len(fields) < 9:
         raise BridgeError("zle_identity_unknown", "Shell process start time is unavailable")
-    if not re.fullmatch(r"[A-Z][a-z]{2}", fields[2]) or not re.fullmatch(
-        r"\d{2}:\d{2}:\d{2}", fields[5]
-    ) or not re.fullmatch(r"\d{4}", fields[6]):
+    if (
+        not re.fullmatch(r"[A-Z][a-z]{2}", fields[2])
+        or not re.fullmatch(r"\d{2}:\d{2}:\d{2}", fields[5])
+        or not re.fullmatch(r"\d{4}", fields[6])
+    ):
         raise BridgeError("zle_identity_unknown", "Shell process start time is malformed")
     return " ".join(fields[2:7])
 
@@ -88,7 +90,7 @@ def sys_platform():
 
 def _zshrc() -> str:
     """Private startup widget. Its protocol excludes all command-line text."""
-    return r'''zmodload zsh/net/socket 2>/dev/null || return
+    return r"""zmodload zsh/net/socket 2>/dev/null || return
 zmodload zsh/stat 2>/dev/null || return
 setopt extendedglob
 [[ -n $KB_ZLE_SOCKET && -n $KB_ZLE_NONCE && -n $KB_ZLE_GENERATION ]] || return
@@ -138,7 +140,7 @@ zle -N zle-line-pre-redraw _kb_zle_redraw
 zle -N zle-line-finish _kb_zle_finish
 zle -N _kb_zle_probe_fd
 zle -F -w "$KB_ZLE_FD" _kb_zle_probe_fd 2>/dev/null
-'''
+"""
 
 
 @dataclass
@@ -277,7 +279,8 @@ class ZLEReadiness:
                 or not start
                 or len(start) > 64
                 or len(challenge) > 48
-                or challenge and not _TOKEN.fullmatch(challenge)
+                or challenge
+                and not _TOKEN.fullmatch(challenge)
                 or challenge
                 and (
                     challenge != session.challenge
@@ -364,9 +367,7 @@ class ZLEReadiness:
             or latest.get("context") != "start"
         ):
             await self.close_session(session.generation)
-            raise BridgeError(
-                "zle_identity_unknown", "Initial ZLE state does not match the shell"
-            )
+            raise BridgeError("zle_identity_unknown", "Initial ZLE state does not match the shell")
 
     async def probe(self, row):
         tag = row.get("controlled_shell") is True
@@ -396,9 +397,7 @@ class ZLEReadiness:
         ):
             await self.close_session(session.generation)
             raise BridgeError("zle_identity_unknown", "Controlled shell pane/TTY/PID changed")
-        identity = await self.terminal_app.process_identity(
-            session.expected_pid, detailed=True
-        )
+        identity = await self.terminal_app.process_identity(session.expected_pid, detailed=True)
         parts = identity.split()
         if (
             len(parts) < 9
@@ -430,11 +429,7 @@ class ZLEReadiness:
             or latest.get("challenge") != challenge
         ):
             raise BridgeError("zle_report_replay", "Fresh ZLE response was not unique")
-        if (
-            latest.get("context") != "start"
-            or not latest.get("empty")
-            or latest.get("cursor") != 0
-        ):
+        if latest.get("context") != "start" or not latest.get("empty") or latest.get("cursor") != 0:
             raise BridgeError("zle_input_not_empty", "Zsh ZLE reports existing or non-start input")
         return {"ready": True, "generation": session.generation, "sequence": session.sequence}
 

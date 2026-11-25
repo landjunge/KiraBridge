@@ -1288,9 +1288,7 @@ class VisibleHandoffs:
                 ):
                     return current_binding or binding, None
                 self.verify_generation(target, binding, before, after)
-                if not clear_refresh(
-                    self.config, target, expected_entry=expected_overlay_entry
-                ):
+                if not clear_refresh(self.config, target, expected_entry=expected_overlay_entry):
                     current_binding = self.config.visible_handoffs.bindings.get(target)
                     current_entry = refresh_entry(self.config, target)
                     if current_binding != binding or current_entry != expected_overlay_entry:
@@ -1336,8 +1334,11 @@ class VisibleHandoffs:
                 )
                 and row.get("pane_id") == legacy_destination["pane_id"]
                 and self._exact_row(
-                    row, target, legacy_destination["pane_id"],
-                    legacy_destination["expected_pid"], legacy_destination["agent_pid"]
+                    row,
+                    target,
+                    legacy_destination["pane_id"],
+                    legacy_destination["expected_pid"],
+                    legacy_destination["agent_pid"],
                 )
             ]
             if len(destination_matches) != 1:
@@ -1530,13 +1531,10 @@ class VisibleHandoffs:
             "expected_pid": updated.expected_pid,
             "agent_pid": updated.agent_pid,
         }
-        if (
-            len(exact_rows) != 1
-            or (
-                replacement_binding(target, binding, sessions) != updated
-                if legacy_destination is None
-                else not destination_matches
-            )
+        if len(exact_rows) != 1 or (
+            replacement_binding(target, binding, sessions) != updated
+            if legacy_destination is None
+            else not destination_matches
         ):
             return None, "replacement_candidate_changed"
         if legacy_destination is not None and binding_still_present(binding, sessions):
@@ -1546,9 +1544,8 @@ class VisibleHandoffs:
             return None, "replacement_generation_changed_or_unverifiable"
         if legacy_destination is not None and binding.codex_thread_id is not None:
             recorded = self.recorded_generations(updated, target) or {}
-            if (
-                self.generation_source(updated, target) != "owner_started_assignment"
-                or not all(same_generation(recorded.get(pid), after.get(pid)) for pid in pids)
+            if self.generation_source(updated, target) != "owner_started_assignment" or not all(
+                same_generation(recorded.get(pid), after.get(pid)) for pid in pids
             ):
                 return None, "legacy_destination_lineage_changed"
         if self.config.visible_handoffs.bindings.get(target) != binding:
@@ -1588,8 +1585,7 @@ class VisibleHandoffs:
     def _unique_exact_catalog_row(rowset, target, pane_id, shell, agent):
         """Require one row across every independent destination identity axis."""
         if not isinstance(rowset, list) or not all(
-            isinstance(row, dict) and isinstance(row.get("processes", []), list)
-            for row in rowset
+            isinstance(row, dict) and isinstance(row.get("processes", []), list) for row in rowset
         ):
             return False
         tty = "/dev/" + pane_id.rsplit(":", 1)[-1]

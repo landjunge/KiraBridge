@@ -588,11 +588,7 @@ class MessageManager:
                         if recipient_role
                         else {}
                     ),
-                    **(
-                        {"coordinator_conversation": True}
-                        if recipient_role or role_parent
-                        else {}
-                    ),
+                    **({"coordinator_conversation": True} if recipient_role or role_parent else {}),
                     **(
                         {"interim_session": message.interim_session.model_dump()}
                         if message.interim_session

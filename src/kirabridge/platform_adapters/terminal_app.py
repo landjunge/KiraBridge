@@ -1145,9 +1145,7 @@ entries[0].click();JSON.stringify({detached:true});
         if result.get("detached") is not True:
             raise UncertainExecution("session_open_unknown", "Detach result unknown; never replay")
 
-    async def open(
-        self, command, *, on_created=None, principal="session_open", custom_title=None
-    ):
+    async def open(self, command, *, on_created=None, principal="session_open", custom_title=None):
         from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
 
         proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)

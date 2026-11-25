@@ -104,9 +104,7 @@ class CoordinatorRoles:
             )
         if not candidates:
             code = (
-                "coordinator_session_unavailable"
-                if configured_roles
-                else "coordinator_unassigned"
+                "coordinator_session_unavailable" if configured_roles else "coordinator_unassigned"
             )
             raise BridgeError(code, "No current coordinator has an eligible bound session")
         if len(candidates) != 1:
@@ -219,10 +217,7 @@ class CoordinatorRoles:
                 team_id, principal, "team.coordinator_bound", session_sha256=digest(session)
             )
             return
-        if (
-            team["coordinator"] != principal
-            or current_binding == session
-        ):
+        if team["coordinator"] != principal or current_binding == session:
             return
         current_handoff = self._handoff_view(self._latest(team_id))
         if current_handoff and current_handoff["state"] == "pending":

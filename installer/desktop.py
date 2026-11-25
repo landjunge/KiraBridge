@@ -109,10 +109,7 @@ def _verified_previous_approvals(api, args, previous, expected_source):
             return None
         for name, checksum in files.items():
             member = api.bundle_member(release, name)
-            if (
-                api.sha(member) != checksum
-                or stat.S_IMODE(member.stat().st_mode) != modes[name]
-            ):
+            if api.sha(member) != checksum or stat.S_IMODE(member.stat().st_mode) != modes[name]:
                 return None
 
         backup = Path(previous.get("backup", ""))

@@ -400,8 +400,15 @@ async def test_continuation_parallel_selection_restart_and_exactly_one_acknowled
 @pytest.mark.parametrize(
     "scenario",
     [
-        "empty", "unapproved", "changed_hash", "historical", "hold", "decision_default",
-        "decision_historical", "decision_changed_hash", "decision_wrong_type",
+        "empty",
+        "unapproved",
+        "changed_hash",
+        "historical",
+        "hold",
+        "decision_default",
+        "decision_historical",
+        "decision_changed_hash",
+        "decision_wrong_type",
     ],
 )
 async def test_continuation_without_a_current_authorized_source_creates_no_agent_work(

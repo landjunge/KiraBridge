@@ -1056,9 +1056,11 @@ class SessionManager:
                     "ZDOTDIR": zle_shell["zdotdir"],
                     "PS1": "KiraBridge visible %% ",
                 }
-                command += " && exec /usr/bin/env " + " ".join(
-                    shlex.quote(f"{name}={value}") for name, value in env.items()
-                ) + " /bin/zsh -d -i"
+                command += (
+                    " && exec /usr/bin/env "
+                    + " ".join(shlex.quote(f"{name}={value}") for name, value in env.items())
+                    + " /bin/zsh -d -i"
+                )
             try:
                 result = await self.terminal_app.open(
                     command,

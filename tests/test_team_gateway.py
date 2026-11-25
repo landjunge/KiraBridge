@@ -163,10 +163,13 @@ async def test_mcp_coordinator_self_demotion_retry_obeys_read_grant(http_bridge)
         replay = await pool.call("peer", "team_set_role", {"request": request})
         assert replay.structuredContent["coordinator"] == "local"
         assert replay.structuredContent["revision"] == 2
-        assert bridge.store.db.execute(
-            "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
-            ("gateway",),
-        ).fetchone()[0] == role_changes
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
+                ("gateway",),
+            ).fetchone()[0]
+            == role_changes
+        )
 
         # A real team the actor does not belong to remains invisible through
         # an idempotent role request, including when the key matches another team.
@@ -214,10 +217,13 @@ async def test_mcp_coordinator_self_demotion_retry_obeys_read_grant(http_bridge)
         denied = await pool.call("peer", "team_set_role", {"request": request})
         assert denied.structuredContent["error"]["code"] == "forbidden"
         assert not {"members", "revision", "coordinator"} & denied.structuredContent.keys()
-        assert bridge.store.db.execute(
-            "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
-            ("gateway",),
-        ).fetchone()[0] == role_changes
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id=? AND kind='team.role_changed'",
+                ("gateway",),
+            ).fetchone()[0]
+            == role_changes
+        )
         denied_read = await pool.call("peer", "team_get", {"team_id": "gateway"})
         assert denied_read.structuredContent["error"]["code"] == "forbidden"
     finally:

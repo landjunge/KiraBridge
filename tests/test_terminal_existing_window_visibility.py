@@ -125,9 +125,7 @@ async def test_offscreen_explicit_target_is_never_sent_input():
     native.system_transport = SimpleNamespace(request=observer(windows=[]))
     native.read = AsyncMock(return_value="KiraBridge visible % ")
     before_transport = AsyncMock()
-    native.native = AsyncMock(
-        return_value={"screen": "KiraBridge visible % ", "surface": SURFACE}
-    )
+    native.native = AsyncMock(return_value={"screen": "KiraBridge visible % ", "surface": SURFACE})
 
     with pytest.raises(BridgeError) as failure:
         await native.send_confirmed(
@@ -165,9 +163,7 @@ async def test_exact_visible_target_gets_last_surface_guard_before_one_input():
         events.append("focus")
         return {"screen": "KiraBridge visible % ", "surface": SURFACE}
 
-    native.native = AsyncMock(
-        side_effect=dispatch
-    )
+    native.native = AsyncMock(side_effect=dispatch)
 
     result = await native.send_confirmed(
         ROW,

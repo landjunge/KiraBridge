@@ -230,6 +230,7 @@ async def test_unknown_input_creates_separate_controlled_shell_when_requested(co
         tty="/dev/ttys005",
         processes=[{"pid": 346, "ppid": 343, "name": "zsh", "image": "/bin/zsh"}],
     )
+
     async def catalog():
         rows = [existing, created] if bridge.sessions.open.await_count else [existing]
         return copy.deepcopy(rows)

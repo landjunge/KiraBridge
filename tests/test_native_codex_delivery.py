@@ -437,9 +437,7 @@ async def test_direct_cold_host_watchdog_does_not_fall_back_to_terminal(
     assert not protocol.inputs() and not transport["calls"]
 
 
-async def test_unverified_native_host_fails_without_fallback_or_ack(
-    delivery, binding, monkeypatch
-):
+async def test_unverified_native_host_fails_without_fallback_or_ack(delivery, binding, monkeypatch):
     bridge, transport, direct, connected, _ = delivery
     attempts = []
 

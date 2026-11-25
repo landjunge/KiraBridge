@@ -596,9 +596,7 @@ def test_metadata_is_passive_and_pins_binary_commit(tmp_path, monkeypatch):
     assert worker.process is None
 
 
-def test_passive_metadata_fingerprints_binary_without_reading_or_hashing_it(
-    tmp_path, monkeypatch
-):
+def test_passive_metadata_fingerprints_binary_without_reading_or_hashing_it(tmp_path, monkeypatch):
     monkeypatch.setattr(native.sys, "platform", "darwin")
     app = make_app(tmp_path)
     binary_path = app / "Contents/MacOS/KiraBridge"

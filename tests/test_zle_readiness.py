@@ -83,6 +83,7 @@ class _PTYZsh:
             start_new_session=True,
         )
         try:
+
             async def shell_row():
                 ps = await asyncio.create_subprocess_exec(
                     "/bin/ps",
@@ -160,9 +161,7 @@ async def zsh_pty():
 
 async def test_empty_zle_state_is_fresh_and_buffer_contents_are_not_retained(zsh_pty):
     assert zsh_pty.session.peer_pid == zsh_pty.row["expected_pid"]
-    tty_fd = os.open(
-        zsh_pty.row["tty"], os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK
-    )
+    tty_fd = os.open(zsh_pty.row["tty"], os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK)
     try:
         terminal_flags = termios.tcgetattr(tty_fd)[3]
     finally:

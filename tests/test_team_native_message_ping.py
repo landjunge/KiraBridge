@@ -249,16 +249,22 @@ async def test_pre_attempt_host_unavailable_defers_then_retries_same_ping_id(
         await restarted._run_native_ping(item)
 
         assert len(recovered.deliveries) == 1 and recovered.deliveries[0][0] == message_id
-        assert bridge.store.db.execute(
-            "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
-            "AND kind='team.message_native_ping_queued'",
-            (message_id,),
-        ).fetchone()[0] == 1
-        assert bridge.store.db.execute(
-            "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
-            "AND kind='team.message_native_ping_submitting'",
-            (message_id,),
-        ).fetchone()[0] == 1
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
+                "AND kind='team.message_native_ping_queued'",
+                (message_id,),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
+                "AND kind='team.message_native_ping_submitting'",
+                (message_id,),
+            ).fetchone()[0]
+            == 1
+        )
         assert bridge.teams.pending_native_pings() == []
         assert bridge.teams._message("team-codex", message_id)["acknowledged"] is None
     finally:
@@ -321,7 +327,10 @@ async def test_native_ping_restart_does_not_reissue_durable_submitting(
         message = await _send_codex_ping(clients, key="crash-after-submitting")
         original = bridge.teams.pending_native_pings(limit=1)[0]
         bridge.teams._event(
-            "team-codex", "local", "team.message_native_ping_submitting", message["id"],
+            "team-codex",
+            "local",
+            "team.message_native_ping_submitting",
+            message["id"],
             native_input_attempted=True,
         )
         restarted = TeamDispatcher(bridge)
@@ -460,14 +469,10 @@ async def test_pre_attempt_retries_are_bounded_across_restarts(
             (message_id,),
         ).fetchall()
         deferred = [
-            row
-            for row in events
-            if row["kind"] == "team.message_native_ping_pre_attempt_deferred"
+            row for row in events if row["kind"] == "team.message_native_ping_pre_attempt_deferred"
         ]
         exhausted = [
-            row
-            for row in events
-            if row["kind"] == "team.message_native_ping_pre_attempt_exhausted"
+            row for row in events if row["kind"] == "team.message_native_ping_pre_attempt_exhausted"
         ]
         assert len(deferred) == 3 and len(exhausted) == 1
         assert json.loads(exhausted[0]["metadata"])["retry_count"] == 4
@@ -523,9 +528,7 @@ async def test_malformed_defer_does_not_spin_or_starve_later_queued_ping(
 
         pending = bridge.teams.pending_native_pings(limit=1)
         assert len(pending) == 1 and pending[0]["object_id"] == later["id"]
-        assert bridge.teams._native_ping_pre_attempt_defer_state(
-            json.dumps(state)
-        ) is None
+        assert bridge.teams._native_ping_pre_attempt_defer_state(json.dumps(state)) is None
     finally:
         await clients.__aexit__(None, None, None)
 
@@ -771,11 +774,14 @@ async def test_idle_codex_starts_exact_root_for_ping_without_ack(
         assert '"tollgate_unavailable":true' in outcome["metadata"]
         assert '"tollgate_decision":"unavailable"' in outcome["metadata"]
         assert '"reason"' not in outcome["metadata"] and '"limit_source"' not in outcome["metadata"]
-        assert bridge.store.db.execute(
-            "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
-            "AND kind='team.message_native_ping_idle_pending'",
-            (result["id"],),
-        ).fetchone() is None
+        assert (
+            bridge.store.db.execute(
+                "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
+                "AND kind='team.message_native_ping_idle_pending'",
+                (result["id"],),
+            ).fetchone()
+            is None
+        )
     finally:
         await bridge.team_dispatcher.stop()
         await clients.__aexit__(None, None, None)
@@ -863,11 +869,14 @@ async def test_idle_native_ping_user_budget_denial_prevents_start(
             (result["id"],),
         ).fetchone()
         assert denied is not None and '"error_code":"tollgate_budget_reached"' in denied["metadata"]
-        assert bridge.store.db.execute(
-            "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
-            "AND kind='team.message_native_ping_submitting'",
-            (result["id"],),
-        ).fetchone() is None
+        assert (
+            bridge.store.db.execute(
+                "SELECT 1 FROM team_events WHERE team_id='team-codex' AND object_id=? "
+                "AND kind='team.message_native_ping_submitting'",
+                (result["id"],),
+            ).fetchone()
+            is None
+        )
     finally:
         await clients.__aexit__(None, None, None)
 
@@ -904,11 +913,14 @@ async def test_idle_native_ping_unknown_is_attempted_once_without_replay(
         assert host.prepare_calls == 1
         assert len(host.deliveries) == 1 and host.deliveries[0][2] == "turn/start"
         assert bridge.teams._message("team-codex", result["id"])["acknowledged"] is None
-        assert bridge.store.db.execute(
-            "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
-            "AND kind='team.message_native_ping_submitting'",
-            (result["id"],),
-        ).fetchone()[0] == 1
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM team_events WHERE team_id='team-codex' AND object_id=? "
+                "AND kind='team.message_native_ping_submitting'",
+                (result["id"],),
+            ).fetchone()[0]
+            == 1
+        )
         unknown = bridge.store.db.execute(
             "SELECT metadata FROM team_events WHERE team_id='team-codex' AND object_id=? "
             "AND kind='team.message_native_ping_unknown'",

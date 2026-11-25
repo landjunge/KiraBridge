@@ -785,9 +785,7 @@ def test_desktop_chatgpt_activation_disables_followup_aux_tunnel_restart(
     plist = tmp_path / "service.plist"
     release = tmp_path / "release"
     release.mkdir()
-    (release / "release.json").write_text(
-        json.dumps({"version": "0.8.0rc1", "commit": "a" * 40})
-    )
+    (release / "release.json").write_text(json.dumps({"version": "0.8.0rc1", "commit": "a" * 40}))
     args = SimpleNamespace(
         prefix=prefix,
         config=config,
@@ -846,9 +844,7 @@ def test_persisted_checkpoint_rolls_back_after_partial_core_switch(
     launcher = tmp_path / "bin/kirabridge"
     launcher.parent.mkdir()
     old_launcher = (
-        "#!/bin/sh\nexec old-python -m kirabridge.cli --config "
-        + str(config)
-        + ' "$@"\n'
+        "#!/bin/sh\nexec old-python -m kirabridge.cli --config " + str(config) + ' "$@"\n'
     ).encode()
     launcher.write_bytes(old_launcher)
     plist = tmp_path / "service.plist"
@@ -856,17 +852,21 @@ def test_persisted_checkpoint_rolls_back_after_partial_core_switch(
         {
             "Label": installer.LABEL,
             "ProgramArguments": [
-                "old-python", "-m", "kirabridge.cli", "--config", str(config),
-                "serve", "--transport", "http",
+                "old-python",
+                "-m",
+                "kirabridge.cli",
+                "--config",
+                str(config),
+                "serve",
+                "--transport",
+                "http",
             ],
         }
     )
     plist.write_bytes(old_plist)
     release = prefix / "releases/new"
     release.mkdir(parents=True)
-    (release / "release.json").write_text(
-        json.dumps({"version": "0.6.0", "commit": "a" * 40})
-    )
+    (release / "release.json").write_text(json.dumps({"version": "0.6.0", "commit": "a" * 40}))
     args = SimpleNamespace(
         prefix=prefix,
         config=config,

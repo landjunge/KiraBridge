@@ -276,9 +276,12 @@ def test_coordinator_can_replay_exact_role_handoff_after_self_demotion(domain):
     replay = domain.set_role("chatgpt", request)
     assert replay["coordinator"] == "grok"
     assert replay["revision"] == 2
-    assert domain.store.db.execute(
-        "SELECT count(*) FROM team_events WHERE kind='team.role_changed'"
-    ).fetchone()[0] == event_count
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_events WHERE kind='team.role_changed'"
+        ).fetchone()[0]
+        == event_count
+    )
 
     # The receipt is actor- and request-bound: another member cannot use the
     # original actor's key to retrieve or repeat the role operation.
