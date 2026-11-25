@@ -13,7 +13,6 @@ from test_visible_handoff import visible  # noqa: F401
 from kirabridge.bridge_core.config import ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.message_manager import MessageSend
-from kirabridge.message_manager.receiver import MessageReceiver
 
 
 @pytest.fixture

@@ -31,7 +31,13 @@ def visible(bridge, config, monkeypatch):
         for target in ["codex", "grok"]
     }
     config.agents = {target: AgentConfig(kind="grok_acp") for target in ["codex", "grok"]}
-    transport = {"text": "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯", "calls": [], "ack": True, "reply": True, "fail": False}
+    transport = {
+        "text": "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯",
+        "calls": [],
+        "ack": True,
+        "reply": True,
+        "fail": False,
+    }
 
     async def selected(principal, pane, pid):
         if (pane, pid) == ("terminal:100:ttys001", 123):
@@ -64,8 +70,7 @@ def visible(bridge, config, monkeypatch):
         else:
             rows = args.text.split("\n")
             composer = "\n".join(
-                ("│ ❯ " if i == 0 else "│ ") + line + " │"
-                for i, line in enumerate(rows)
+                ("│ ❯ " if i == 0 else "│ ") + line + " │" for i, line in enumerate(rows)
             )
             transport["text"] = "╭──────╮\n" + composer + "\n╰────── Grok 1.0 ─╯"
         return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
@@ -79,7 +84,11 @@ def visible(bridge, config, monkeypatch):
             "SELECT message_id FROM visible_handoffs WHERE target=? AND state='submitting'",
             (target,),
         ).fetchone()
-        transport["text"] = "› " if transport.get("target") == "codex" else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
+        transport["text"] = (
+            "› "
+            if transport.get("target") == "codex"
+            else "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
+        )
         if transport["fail"]:
             raise UncertainExecution("uncertain_return", "Unknown return delivery")
         messages = bridge.messages.receive(target)["messages"]
