@@ -91,12 +91,20 @@ def test_two_distinct_coordinators_stay_ambiguous(domain):
     assert caught.value.code == "coordinator_ambiguous"
 
 
-def test_member_with_team_manage_can_claim_the_role_for_itself(domain):
+def test_member_with_team_manage_can_claim_the_role_only_when_listed_as_candidate(domain):
+    with pytest.raises(BridgeError) as unlisted:
+        set_coordinator(domain, "grok", "grok", "grok-unlisted")
+    assert unlisted.value.code == "team_role_denied"  # team.manage alone is not enough
+    domain.config.team.coordinator_candidates = ["grok"]
     view = set_coordinator(domain, "grok", "grok", "grok-claims")
     assert view["coordinator"] == "grok"
+    with pytest.raises(BridgeError) as other_member:
+        set_coordinator(domain, "codex", "codex", "codex-unlisted")
+    assert other_member.value.code == "team_role_denied"
 
 
 def test_claiming_needs_team_manage_and_only_works_for_oneself(domain):
+    domain.config.team.coordinator_candidates = ["grok", "codex"]
     with pytest.raises(BridgeError) as for_other:
         set_coordinator(domain, "grok", "codex", "grok-claims-for-codex")  # not itself
     assert for_other.value.code == "team_role_denied"
