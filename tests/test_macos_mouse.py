@@ -37,6 +37,9 @@ def native(bridge, *, mouse_protocol=1):
         metadata["mouse_protocol"] = mouse_protocol
     probe.native_metadata = lambda: metadata
     bridge.system_modules.execute = AsyncMock(return_value={"effect": "fixture_only"})
+    # Bind the system leaves explicitly: the provider only wires them on a real macOS host.
+    for leaf in set(SYSTEM_LEAVES.values()):
+        bridge.macos.leaves[leaf] = bridge.system_modules
 
 
 def task(operation):
