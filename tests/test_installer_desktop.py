@@ -510,6 +510,16 @@ def services(desktop, monkeypatch, tmp_path):
     )
 
 
+def fake_base_python(prefix):
+    """A real executable file as base interpreter, so the test needs no host Python path."""
+    home = prefix.parent / "base-python/bin"
+    home.mkdir(parents=True, exist_ok=True)
+    interpreter = home / "python3.11"
+    interpreter.write_text("#!/bin/sh\n")
+    interpreter.chmod(0o755)
+    return interpreter
+
+
 def recorded_previous_release(services):
     prefix = services.args.prefix
     releases = prefix / "releases"
@@ -524,9 +534,10 @@ def recorded_previous_release(services):
     (venv / "bin").mkdir(parents=True, mode=0o700)
     package.mkdir(parents=True, mode=0o700)
     (package / "__init__.py").write_text("__version__ = '0.8.0rc57'\n")
-    (venv / "bin/python").symlink_to("/usr/local/bin/python3.11")
+    base_python = fake_base_python(prefix)
+    (venv / "bin/python").symlink_to(base_python)
     (venv / "pyvenv.cfg").write_text(
-        "home = /usr/local/bin\nimplementation = CPython\nversion_info = 3.11.15\n"
+        f"home = {base_python.parent}\nimplementation = CPython\nversion_info = 3.11.15\n"
         "include-system-site-packages = false\n"
     )
     release.chmod(0o700)
@@ -577,7 +588,7 @@ def recorded_previous_release(services):
     }
     current_release = prefix / "releases/0.8.0rc59-945e3f3008e6"
     (current_release / "source/.venv/bin").mkdir(parents=True, mode=0o700)
-    (current_release / "source/.venv/bin/python").symlink_to("/usr/local/bin/python3.11")
+    (current_release / "source/.venv/bin/python").symlink_to(base_python)
     return current_release, previous, source, release
 
 
