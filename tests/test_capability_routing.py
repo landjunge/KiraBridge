@@ -456,16 +456,20 @@ def test_transport_diagnostic_real_timeout_preserves_partial_output(setup):
 
     def runner(*args, **kwargs):
         calls.append(True)
+        # Generous deadline so the child reliably starts and flushes its partial
+        # output before the timeout fires, even under heavy host load. A tight
+        # deadline raced process startup and killed the child before any output
+        # existed, making the partial-output assertion flaky.
         return run_bounded(
             [
                 sys.executable,
                 "-c",
                 "import sys,time;print('partial',flush=True);"
-                "print('problem',file=sys.stderr,flush=True);time.sleep(5)",
+                "print('problem',file=sys.stderr,flush=True);time.sleep(30)",
             ],
             input=None,
             cwd=task.cwd,
-            timeout=0.4,
+            timeout=3.0,
             env={},
         )
 

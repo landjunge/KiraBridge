@@ -195,6 +195,12 @@ class NativeSystemTransport:
                     and metadata["KiraBridgeKeyboardProtocol"] == 1
                     else 0
                 ),
+                "mouse_protocol": (
+                    1
+                    if type(metadata.get("KiraBridgeMouseProtocol")) is int
+                    and metadata["KiraBridgeMouseProtocol"] == 1
+                    else 0
+                ),
             }
             if verify_binary:
                 binary_sha256 = hashlib.sha256(binary).hexdigest()

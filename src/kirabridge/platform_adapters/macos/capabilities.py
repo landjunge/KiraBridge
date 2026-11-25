@@ -88,6 +88,7 @@ class CapabilityProbe:
             "notifications",
             "preferences",
             "keyboard",
+            "mouse",
         ):
             minimum = (14,) if name == "capture" else (12,)
             available = supported and version >= minimum and native.get("available") is True
@@ -96,6 +97,12 @@ class CapabilityProbe:
                     available
                     and type(native.get("keyboard_protocol")) is int
                     and native["keyboard_protocol"] == 1
+                )
+            if name == "mouse":
+                available = (
+                    available
+                    and type(native.get("mouse_protocol")) is int
+                    and native["mouse_protocol"] == 1
                 )
             result[name] = {
                 "available": available,
@@ -107,6 +114,8 @@ class CapabilityProbe:
                 if not supported or version < minimum
                 else "keyboard_protocol_unavailable"
                 if name == "keyboard" and native.get("available") is True
+                else "mouse_protocol_unavailable"
+                if name == "mouse" and native.get("available") is True
                 else native.get("reason", "native_app_protocol_unavailable"),
                 "minimum_os": "14.0" if name == "capture" else "12.0",
                 "permission_scope": "executing_native_app_worker; checked for every operation",

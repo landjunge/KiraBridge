@@ -330,6 +330,9 @@ async def test_eof_and_oversized_response_reap(monkeypatch):
         ("system.permissions", False),
         ("system.permission_request", True),
         ("capture.window", False),
+        ("mouse.click", True),
+        ("mouse.move", True),
+        ("mouse.scroll", True),
     ],
 )
 async def test_timeout_classifies_effect_and_never_replays(monkeypatch, operation, uncertain):
@@ -446,6 +449,42 @@ async def test_native_uncertainty_discards_worker(monkeypatch):
     assert child.killed and len(calls) == 1
 
 
+async def test_mouse_permission_denial_is_definite_and_keeps_worker_usable(monkeypatch):
+    error = {
+        "code": "macos_permission_denied",
+        "message": "private native text",
+        "effect_unknown": False,
+    }
+    worker, child, calls = transport(
+        monkeypatch, lambda req, proc: response(req, proc, error=error)
+    )
+    try:
+        with pytest.raises(BridgeError) as caught:
+            await worker.request(
+                "mouse.click", {"x": 1, "y": 2, "button": "left"}, principal="alice"
+            )
+        assert type(caught.value) is BridgeError
+        assert caught.value.code == "macos_permission_denied"
+        assert "private" not in str(caught.value) and not child.killed
+        child.respond = response
+        await worker.request("system.info", {}, principal="alice")
+        assert len(calls) == 1
+    finally:
+        await worker.close()
+
+
+async def test_mouse_uncertainty_discards_worker_without_replay(monkeypatch):
+    worker, child, calls = transport(
+        monkeypatch,
+        lambda req, proc: response(
+            req, proc, error={"code": "macos_mouse_unknown", "effect_unknown": True}
+        ),
+    )
+    with pytest.raises(UncertainExecution):
+        await worker.request("mouse.scroll", {"dx": 0, "dy": -3}, principal="alice")
+    assert child.killed and len(calls) == 1
+
+
 async def test_changed_app_contract_invalidates_worker_without_sending(monkeypatch):
     worker, child, calls = transport(monkeypatch)
     await worker.request("system.info", {}, principal="alice")
@@ -522,6 +561,24 @@ def test_keyboard_metadata_preserves_old_worker_compatibility(
     observed = worker.snapshot_metadata()
     assert observed["available"] is True
     assert observed["keyboard_protocol"] == expected
+    assert worker.process is None
+
+
+@pytest.mark.parametrize("protocol,expected", [(None, 0), (True, 0), (1, 1)])
+def test_mouse_metadata_preserves_old_worker_compatibility(
+    tmp_path, monkeypatch, protocol, expected
+):
+    monkeypatch.setattr(native.sys, "platform", "darwin")
+    app = make_app(tmp_path)
+    info = app / "Contents/Info.plist"
+    metadata = plistlib.loads(info.read_bytes())
+    if protocol is not None:
+        metadata["KiraBridgeMouseProtocol"] = protocol
+        info.write_bytes(plistlib.dumps(metadata))
+    worker = native.NativeSystemTransport(app, expected_commit=COMMIT)
+    observed = worker.snapshot_metadata()
+    assert observed["available"] is True
+    assert observed["mouse_protocol"] == expected
     assert worker.process is None
 
 
@@ -701,6 +758,11 @@ async def test_capture_reuses_strict_png_validator_and_checks_metadata():
         ("windows.focus", {"expected_pid": 1, "expected_start": "1.000000", "title": "guessed"}),
         ("capture.window", {"window_id": 1, "expected_pid": 2, "expected_start": "1.000000"}),
         ("system.info", {"_principal": "injected"}),
+        ("mouse.move", {"x": 1}),
+        ("mouse.move", {"x": True, "y": 2}),
+        ("mouse.click", {"x": 1, "y": 2, "button": "middle"}),
+        ("mouse.scroll", {"dx": 0, "dy": 0}),
+        ("mouse.scroll", {"dx": 1.5, "dy": 0}),
     ],
 )
 def test_models_enforce_exact_targets_allowlist_and_context_separation(operation, args):

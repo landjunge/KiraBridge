@@ -134,6 +134,9 @@ Check the app or `kirabridge status` for the version actually running on your
 computer. A source commit, a successful build and an installed version are
 separate pieces of evidence.
 
+In the macOS development build, the About window shows the app’s own build
+commit as **App-Build**, alongside the package version.
+
 **Earlier Windows development previews:** the [RC33 package report](docs/RC33-DELIVERY-20261104.md)
 and [Windows setup report](docs/WINDOWS-SETUP-20261104.md) describe their limited
 keyboard, shortcut and guarded-window support. They do not establish current

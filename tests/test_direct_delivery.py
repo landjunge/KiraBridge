@@ -839,7 +839,7 @@ async def test_public_busy_result_stays_queued_and_delivers_once_when_ready(deli
         "kirabridge.message_manager.receiver.peer", lambda config, recipient: recipient
     )
     receiver = bridge.message_receiver
-    transport["text"] = "Thinking…\n╭\n│ ❯ │\n╰"
+    transport["text"] = "Thinking…\n╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     await receiver.start()
     try:
         request = public_request("public-busy")
@@ -854,7 +854,7 @@ async def test_public_busy_result_stays_queued_and_delivers_once_when_ready(deli
         assert repeated["id"] == result["id"]
         assert repeated["processing"]["state"] == "queued"
         assert transport["calls"] == []
-        transport["text"] = "╭\n│ ❯ │\n╰"
+        transport["text"] = "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
         bridge.messages.wake.set()
         async with asyncio.timeout(3):
             while job(bridge, result)["state"] != "completed":
