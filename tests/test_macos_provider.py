@@ -71,6 +71,43 @@ def test_keyboard_requires_its_own_advertised_native_contract(protocol, availabl
         assert leaves["keyboard"]["reason"] == "keyboard_protocol_unavailable"
 
 
+@pytest.mark.parametrize(
+    "protocol,available", [(None, False), (True, False), (2, False), (1, True)]
+)
+def test_mouse_requires_its_own_advertised_native_contract(protocol, available):
+    current = probe()
+    current.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "mouse_protocol": protocol,
+    }
+    leaves = current.snapshot()["capabilities"]
+    assert leaves["mouse"]["available"] is available
+    assert leaves["keyboard"]["available"] is False
+    if not available:
+        assert leaves["mouse"]["reason"] == "mouse_protocol_unavailable"
+
+
+def test_mouse_operations_require_the_mouse_leaf_and_its_contract():
+    native = provider(system_modules=object())
+    native.capability_probe.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "keyboard_protocol": 1,
+        "mouse_protocol": 1,
+    }
+    for operation in ("mouse.move", "mouse.click", "mouse.scroll"):
+        assert native.require(operation).leaf == "mouse"
+    native.capability_probe.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "keyboard_protocol": 1,
+    }
+    with pytest.raises(BridgeError) as error:
+        native.require("mouse.click")
+    assert error.value.code == "macos_capability_unavailable"
+
+
 def test_internal_native_guard_is_available_but_not_advertised_as_public_execution():
     native = provider()
     assert native.require("terminal.native").leaf == "terminal_app"

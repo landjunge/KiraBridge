@@ -17,7 +17,7 @@ def become_busy_before_paste(monkeypatch, bridge, transport):
         if ready:
             checks.append(target)
             if len(checks) == 2:
-                transport["text"] = "╭\nThinking… [stop]\n│ ❯ │\n╰"
+                transport["text"] = "╭──────╮\nThinking… [stop]\n│ ❯      │\n╰────── Grok 1.0 ─╯"
         return await original(principal, target, binding, ready=ready)
 
     monkeypatch.setattr(bridge.visible_handoffs, "check_target", check)
@@ -96,7 +96,7 @@ async def test_proven_preinput_abort_can_resume_once_without_replaying_a_return(
 
     # Only the proved pre-input abort permits another observation and a new run.
     monkeypatch.setattr(bridge.visible_handoffs, "check_target", original)
-    transport["text"] = "╭\n│ ❯ │\n╰"
+    transport["text"] = "╭──────╮\n│ ❯      │\n╰────── Grok 1.0 ─╯"
     await bridge.visible_handoffs.dispatch_ready(sender, "grok")
     message, second_run = receiver._claim(sent["id"])
     assert second_run != first_run

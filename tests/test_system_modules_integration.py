@@ -68,6 +68,9 @@ SAMPLES = {
     "accessibility.inspect": APP,
     "accessibility.action": {**ELEMENT, "action": "press"},
     "accessibility.set": {**ELEMENT, "attribute": "focused", "value": True},
+    "mouse.move": {"x": 100, "y": 200},
+    "mouse.click": {"x": 100, "y": 200, "button": "left"},
+    "mouse.scroll": {"dx": 0, "dy": -3},
 }
 
 
@@ -81,6 +84,7 @@ def native(bridge):
         "available": True,
         "revision": "fixture-v1",
         "keyboard_protocol": 1,
+        "mouse_protocol": 1,
     }
     bridge.system_modules.execute = AsyncMock(return_value={"effect": "fixture_only"})
 

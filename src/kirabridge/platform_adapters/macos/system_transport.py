@@ -159,6 +159,10 @@ class NativeSystemTransport:
                 if type(metadata.get("KiraBridgeKeyboardProtocol")) is int
                 and metadata["KiraBridgeKeyboardProtocol"] == 1
                 else 0,
+                "mouse_protocol": 1
+                if type(metadata.get("KiraBridgeMouseProtocol")) is int
+                and metadata["KiraBridgeMouseProtocol"] == 1
+                else 0,
             }
         except (OSError, ValueError, TypeError, RecursionError, plistlib.InvalidFileException):
             return {"available": False, "reason": "native_app_protocol_unavailable"}
