@@ -254,6 +254,10 @@ class TeamManager:
         return self.security.principal(principal, capability)
 
     def _may_claim(self, principal):
+        # Self-claim is an explicit operator opt-in: without it any member holding
+        # team.manage could pull the role (and with it ChatGPT's messages) to itself.
+        if principal not in self.config.team.coordinator_candidates:
+            return False
         try:
             self._principal(principal, "team.manage")
         except BridgeError:
