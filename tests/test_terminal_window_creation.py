@@ -193,7 +193,7 @@ async def test_argv_for_all_principals_waits_for_full_binding_and_fresh_cwd(
     }
     events = []
 
-    async def opened(command, *, on_created, principal):
+    async def opened(command, *, on_created, principal, custom_title=None):
         assert sys.executable not in command and "&& /" not in command
         events.append("physical-bound")
         await on_created(dict(receipt))

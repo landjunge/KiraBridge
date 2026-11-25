@@ -155,7 +155,7 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
     config.principals["local"].capabilities.append("session.inspect")
     calls = []
 
-    async def opened(command, *, on_created=None, principal):
+    async def opened(command, *, on_created=None, principal, custom_title=None):
         assert principal == "local"
         calls.append(command)
         receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
@@ -187,7 +187,7 @@ async def test_manual_window_task_waits_for_exact_operator_approval(
 ):
     calls = []
 
-    async def opened(command, *, on_created=None, principal):
+    async def opened(command, *, on_created=None, principal, custom_title=None):
         assert principal == "local"
         calls.append(command)
         receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
