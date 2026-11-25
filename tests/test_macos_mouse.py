@@ -4,6 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
+from macos_provider_fixture import bind_macos_provider
 from pydantic import ValidationError
 
 from kirabridge.bridge_core.models import BridgeError
@@ -30,6 +31,7 @@ ARGS = {
 
 
 def native(bridge, *, mouse_protocol=1):
+    bind_macos_provider(bridge)
     probe = bridge.macos.capability_probe
     probe.facts.update(platform="darwin", os_version="15.7.4")
     metadata = {"available": True, "revision": "fixture-v1", "keyboard_protocol": 1}
@@ -37,9 +39,6 @@ def native(bridge, *, mouse_protocol=1):
         metadata["mouse_protocol"] = mouse_protocol
     probe.native_metadata = lambda: metadata
     bridge.system_modules.execute = AsyncMock(return_value={"effect": "fixture_only"})
-    # Bind the system leaves explicitly: the provider only wires them on a real macOS host.
-    for leaf in set(SYSTEM_LEAVES.values()):
-        bridge.macos.leaves[leaf] = bridge.system_modules
 
 
 def task(operation):
