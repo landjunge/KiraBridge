@@ -1246,8 +1246,12 @@ def test_launchctl_bootstrap_command_runtime_consumes_deadline(
         installer.time, "sleep", lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds)
     )
     expected_error = TimeoutExpired if timeout_failure else RuntimeError
-    with pytest.raises(expected_error):
+    with pytest.raises(expected_error) as failure:
         installer.start_service(SimpleNamespace(service="launchd", plist=path))
+    if not timeout_failure:
+        # The final message must carry launchctl's last error, not only "did not settle".
+        assert "did not settle within 30 seconds" in str(failure.value)
+        assert "last error: Input/output error" in str(failure.value)
     assert attempts == ([(0.0, 20)] if timeout_failure else [(0.0, 20), (21.0, 9.0)])
     assert elapsed[0] == (20 if timeout_failure else 30)
     assert all(start < 30 and 0 < budget <= min(20, 30 - start) for start, budget in attempts)

@@ -1405,15 +1405,20 @@ def start_service(args):
         # window. Keep both elapsed time and command count bounded; do not change
         # the operator's launchd exit/KeepAlive options or require root.
         deadline = time.monotonic() + 30
+        last_detail = ""
         for attempt in range(30):
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise RuntimeError("launchctl bootstrap did not settle within 30 seconds")
+                raise RuntimeError(
+                    "launchctl bootstrap did not settle within 30 seconds"
+                    + (f" (last error: {last_detail[:300]})" if last_detail else "")
+                )
             completed = subprocess.run(
                 command, capture_output=True, text=True, timeout=min(20, remaining), check=False
             )
             if completed.returncode == 0:
                 return
+            last_detail = completed.stderr.strip() or completed.stdout.strip()
             if completed.returncode != 5 or attempt == 29:
                 detail = completed.stderr.strip() or completed.stdout.strip()
                 raise RuntimeError(
