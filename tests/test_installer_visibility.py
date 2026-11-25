@@ -115,6 +115,15 @@ def test_native_inventory_rejects_background_and_malformed_responses(monkeypatch
     spec = importlib.util.spec_from_file_location("visible_inventory_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *a, **kw: SimpleNamespace(
+            returncode=0, stdout='{"frontmost":false,"windows":[]}', stderr=""
+        ),
+    )
+    with pytest.raises(module.VisibilityError, match="nicht die vordere Anwendung"):
+        module.inventory()
     for output in ('{"frontmost":false,"windows":[]}', "not json"):
         monkeypatch.setattr(
             module.subprocess,

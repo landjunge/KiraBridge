@@ -54,15 +54,18 @@ tabs:w.tabs().map((t,i)=>({tab_index:i,tty:t.tty(),selected:t.tty()===w.selected
         raise VisibilityError("Sichtbares Terminalfenster nicht nachgewiesen; nichts aktivieren")
     try:
         value = json.loads(result.stdout)
-        if (
-            not isinstance(value, dict)
-            or value.get("frontmost") is not True
-            or not isinstance(value.get("windows"), list)
-        ):
+        if not isinstance(value, dict) or not isinstance(value.get("windows"), list):
             raise ValueError
-        return value["windows"]
     except (ValueError, TypeError):
         raise VisibilityError("Ungültige Terminal-Fensterinventur; nichts aktivieren") from None
+    if value.get("frontmost") is not True:
+        # Valid inventory, but another application has the focus right now. Say so:
+        # "invalid inventory" sent the 4th rc81 Mac upgrade attempt on a wrong trail.
+        raise VisibilityError(
+            "Terminal ist nicht die vordere Anwendung (anderes Programm hat den Fokus); "
+            "Installation nur im sichtbaren Terminal, nichts aktivieren"
+        )
+    return value["windows"]
 
 
 def confirm_visible_terminal(expected=None):
