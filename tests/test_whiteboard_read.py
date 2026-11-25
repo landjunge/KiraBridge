@@ -333,3 +333,24 @@ def test_append_touches_thread_under_workspace_lock_not_inside_append_lock(tmp_p
     assert first["appended"] and again["duplicate"] and again["id"] == first["id"]
     # Same lock order as ThreadDesk; a duplicate never rewrites the thread.
     assert events == [[".management.lock"]]
+
+
+async def test_whiteboard_append_tool_schema_lists_the_allowed_actor_and_entry_types(bridge):
+    """ChatGPT guessed actor_type "assistant"/"ai" when the schema was a bare string."""
+    from kirabridge.mcp_gateway.server import create_server
+
+    tools = {tool.name: tool for tool in await create_server(bridge).list_tools()}
+    properties = tools["whiteboard_append"].inputSchema["properties"]
+    assert set(properties["actor_type"]["enum"]) == {
+        "human",
+        "grok",
+        "claude",
+        "codex",
+        "chatgpt",
+        "gnom-hub-v1",
+        "local-assistant",
+        "system",
+    }
+    assert "assistant" not in properties["actor_type"]["enum"]
+    assert {"note", "decision", "result"} <= set(properties["entry_type"]["enum"])
+    assert "chatgpt" in (tools["whiteboard_append"].description or "")
