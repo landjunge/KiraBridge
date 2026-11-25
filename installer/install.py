@@ -1379,6 +1379,17 @@ def stop_service(args):
         return
     if loaded(args):
         run(["launchctl", "bootout", f"gui/{os.getuid()}/{LABEL}"], capture=True, timeout=20)
+        # bootout can return while the old process is still draining connections; a
+        # bootstrap now fails with "37: Operation already in progress" (shown as
+        # "5: Input/output error"). Wait for the label to really disappear.
+        deadline = time.monotonic() + 90
+        while loaded(args):
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    "launchd still lists the old service 90 seconds after bootout; "
+                    "its process did not exit. Nothing switched."
+                )
+            time.sleep(1)
 
 
 def start_service(args):

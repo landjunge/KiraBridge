@@ -1257,6 +1257,39 @@ def test_launchctl_bootstrap_command_runtime_consumes_deadline(
     assert all(start < 30 and 0 < budget <= min(20, 30 - start) for start, budget in attempts)
 
 
+@pytest.mark.parametrize("lingers", [False, True], ids=["unloads-after-drain", "never-unloads"])
+def test_stop_service_waits_until_launchd_drops_the_label(
+    installer, monkeypatch, tmp_path, lingers
+):
+    """bootout may return while the old process drains; bootstrap would then hit EALREADY."""
+    path = tmp_path / "service.plist"
+    path.write_text("placeholder")
+    elapsed, state = [0.0], {"polls": 0, "bootout": 0}
+
+    def fake_loaded(args):
+        state["polls"] += 1
+        # polls: 1 = initial check in stop_service, then one per second after bootout
+        return True if lingers else state["polls"] <= 6
+
+    monkeypatch.setattr(installer, "loaded", fake_loaded)
+    monkeypatch.setattr(
+        installer, "run", lambda argv, **kwargs: state.__setitem__("bootout", state["bootout"] + 1)
+    )
+    monkeypatch.setattr(installer.time, "monotonic", lambda: elapsed[0])
+    monkeypatch.setattr(
+        installer.time, "sleep", lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds)
+    )
+    args = SimpleNamespace(service="launchd", plist=path)
+    if lingers:
+        with pytest.raises(RuntimeError, match="90 seconds after bootout"):
+            installer.stop_service(args)
+        assert elapsed[0] >= 90
+    else:
+        installer.stop_service(args)
+        assert elapsed[0] == 5  # polled once per second until the label was gone
+    assert state["bootout"] == 1
+
+
 def test_status_lines_fall_back_to_plain_text_without_presenter(installer, capsys, monkeypatch):
     monkeypatch.setattr(installer, "PRESENTER", None)
     monkeypatch.setattr(installer.Path, "home", classmethod(lambda cls: Path("/Users/example")))
