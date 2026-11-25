@@ -39,9 +39,7 @@ REAL_UNKNOWN = "╭\n│ kein Eingabefeld\n╰"
 GROK_BOX_TOP = "╭──────╮"
 GROK_BOX_BOTTOM = "╰────── Grok 1.0 ─╯"
 GROK_EMPTY_FULL = GROK_BOX_TOP + "\n│ ❯      │\n" + GROK_BOX_BOTTOM
-GROK_IDLE_FULL = (
-    "Alte Zeile Thinking… [stop]\nDie Antwort ist fertig.\n" + GROK_EMPTY_FULL
-)
+GROK_IDLE_FULL = "Alte Zeile Thinking… [stop]\nDie Antwort ist fertig.\n" + GROK_EMPTY_FULL
 
 
 def fullbox_grok_transport(bridge, transport):
