@@ -524,6 +524,7 @@ class TerminalAppTransport:
     const focusedWindow=app.windows()[0], focusedBounds=focusedWindow.bounds(),
      terminalOwner=se.processes.byName('Terminal');
     checkFocus();
+    if(tab.busy()) throw Error('Selected terminal is busy');
     JSON.stringify({screen:Array.from(tab.history().slice(-131072)).slice(-65536).join(''),
      surface:{window_id:focusedWindow.id(),tty:focusedWindow.selectedTab().tty(),
       owner_pid:terminalOwner.unixId(),title:focusedWindow.name(),
@@ -564,7 +565,14 @@ class TerminalAppTransport:
         ).prove_existing_target(row, surface)
 
     async def focus_and_prove_existing_target(
-        self, row, *, principal, identity_guard=None, expected_screen=None, shell_snapshot=None
+        self,
+        row,
+        *,
+        principal,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        verify_shell=True,
     ):
         target = self.native_target(row["pane_id"])
         surface = await self.native(
@@ -583,7 +591,10 @@ class TerminalAppTransport:
             raise BridgeError(
                 "visible_window_unconfirmed", "Focused Terminal window evidence is incomplete"
             )
-        if expected_screen is not None:
+        # The focus step can change what is in the input; check the screen read
+        # AFTER focus for every shell target, not only when a pre-focus screen
+        # was supplied. Agent composers use their own composer checks.
+        if verify_shell:
             await self.verify_shell_readiness(row, surface["screen"])
         return await self.prove_existing_target(row, surface["surface"], principal=principal)
 
@@ -853,6 +864,7 @@ class TerminalAppTransport:
                 identity_guard=identity_guard,
                 expected_screen=expected_screen,
                 shell_snapshot=shell_snapshot,
+                verify_shell=agent_target is None,
             )
             if before_transport is not None:
                 await before_transport()

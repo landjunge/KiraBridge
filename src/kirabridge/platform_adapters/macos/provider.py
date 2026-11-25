@@ -159,6 +159,7 @@ class MacOSProvider:
             "notifications",
             "preferences",
             "keyboard",
+            "mouse",
         ):
             capability = revision_payload["capabilities"].get(name)
             if isinstance(capability, dict):

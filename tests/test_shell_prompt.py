@@ -122,7 +122,16 @@ def direct_shell(bridge, config, monkeypatch):
     )
     # Executing this fallback would conceal a broken ChatGPT preflight path.
     monkeypatch.setattr(terminal, "send", AsyncMock(side_effect=AssertionError("raw send")))
-    monkeypatch.setattr(terminal, "native", AsyncMock(side_effect=["➜  ~ \n\n", {"sent": True}]))
+    monkeypatch.setattr(
+        terminal,
+        "native",
+        AsyncMock(
+            side_effect=[
+                {"screen": "➜  ~ \n\n", "surface": {"window_id": 123}},
+                {"sent": True},
+            ]
+        ),
+    )
     return bridge, row, identity
 
 
@@ -167,7 +176,11 @@ async def test_chatgpt_refusal_never_enters_native_dispatch(direct_shell, failur
         intent.side_effect = BridgeError("evidence_unavailable", "Cannot persist intent")
     with pytest.raises(BridgeError):
         await bridge.sessions.send("local", arguments(row), before_transport=intent)
-    terminal.native.assert_not_awaited()
+    if failure == "intent":
+        # The focus proof is the first native step; the intent record follows it.
+        assert terminal.native.await_count == 1
+    else:
+        terminal.native.assert_not_awaited()
     terminal.send.assert_not_awaited()
     if failure != "intent":
         intent.assert_not_awaited()
@@ -307,7 +320,7 @@ async def run_dispatch_js(source, state):
         ("none", None),
         ("before-input", "Selected terminal input changed"),
         ("before-prompt", "Selected terminal input changed"),
-        ("focus-input", "Focused shell input is not empty"),
+        ("focus-input", "Cannot verify an empty shell prompt"),
         ("focus-busy", "Selected terminal is busy"),
         ("busy", "Selected terminal is busy"),
         ("identity", "Selected target identity changed"),
@@ -318,6 +331,12 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
     terminal = bridge.sessions.terminal_app
     state = {"screen": terminal.read.return_value, "busy": False, "identity": identity}
     observed = []
+    # Focusing is the first native step, so these changes must already be present
+    # when the tab is activated; they are not a race after the proof.
+    if change == "focus-input":
+        state["focusScreen"] = "➜  ~ user command "
+    elif change == "focus-busy":
+        state["focusBusy"] = True
 
     async def intent():
         if change == "before-input":
@@ -325,10 +344,6 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
         elif change == "before-prompt":
             # Even another supported empty prompt is a changed observation.
             state["screen"] = "host% "
-        elif change == "focus-input":
-            state["focusScreen"] = "➜  ~ user command "
-        elif change == "focus-busy":
-            state["focusBusy"] = True
         elif change == "busy":
             state["busy"] = True
         elif change == "identity":
