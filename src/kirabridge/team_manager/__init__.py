@@ -188,6 +188,9 @@ def _native_evidence(value):
     return _safe_evidence({key: item for key, item in merged.items() if key in allowed})
 
 
+TICKET_PREFIX = "team:"
+
+
 class TeamManager:
     interface_version = "1"
 
@@ -1082,7 +1085,7 @@ class TeamManager:
         ):
             request = request.model_copy(update={"recipient": "coordinator"})
         self._size(request.body, self.config.team.max_body_bytes)
-        native_ping_enrolled = False
+        native_ping_enrolled = notified = False
         with self.store.transaction():
             team = self._team(principal, request.team_id, "team.write", write=True)
             addressed_role = request.recipient == "coordinator"
@@ -1171,17 +1174,75 @@ class TeamManager:
                     **({"coordinator_binding_sha256": digest(binding)} if binding else {}),
                 )
                 native_ping_enrolled = True
-            elif addressed_role and request.kind in {"question", "work", "note"}:
-                self.coordinator_roles.queue_notification(
+            elif (
+                addressed_role
+                and request.kind in {"question", "work", "note"}
+                and not self._ticket_target(principal, recipient, request.team_id)
+            ):
+                notified = self.coordinator_roles.queue_notification(
                     principal, message_id, request.team_id, recipient
                 )
         if native_ping_enrolled:
             self.bridge.team_dispatcher.wake_native_ping()
+        elif addressed_role and not notified:
+            self._delivery_ticket(principal, request, recipient, message_id)
         self.wake.set()
         stored = self._message(request.team_id, message_id)
         if notes:
             stored["limit_notes"] = notes
         return stored
+
+    def _ticket_target(self, principal, recipient, team_id=None):
+        """True when the visible handoff machine delivers to this recipient (never Codex)."""
+        from kirabridge.voice_channel import VOICE_PRINCIPALS
+
+        handoffs = self.config.visible_handoffs
+        # Codex keeps its existing wake (native ping / coordinator inbox notification).
+        native = recipient == "codex"
+        return (
+            principal != recipient
+            and {principal, recipient} != VOICE_PRINCIPALS
+            and recipient in self.config.principals
+            and recipient in handoffs.bindings
+            and not native
+        )
+
+    def _delivery_ticket(self, principal, request, recipient, message_id):
+        """Hand a new team message to the existing visible/native delivery machine.
+
+        The ticket is an internal row in messages (idem team:<id>) that no reader shows;
+        the machine reports back as team.message_delivered. Delivery is not an acknowledgement.
+        A recipient with an existing wake (native ping, coordinator notification) never gets one.
+        """
+        from kirabridge.message_manager import MessageSend
+
+        if not self._ticket_target(principal, recipient, request.team_id):
+            return
+        try:
+            ticket = self.bridge.messages.send(
+                principal,
+                MessageSend(
+                    recipient=recipient,
+                    conversation_id="team-" + message_id,
+                    idempotency_key=TICKET_PREFIX + message_id,
+                    body=f"{request.body}\n\n[Team {request.team_id}, Nachricht {message_id}; "
+                    "Antwort mit: team send]",
+                    kind=request.kind,
+                    dispatch=True,
+                    request_reply=False,
+                ),
+            )
+        except BridgeError as exc:
+            self._event(
+                request.team_id,
+                principal,
+                "team.message_delivery_unavailable",
+                message_id,
+                error_code=exc.code,
+            )
+            return
+        if "id" in ticket and not ticket.get("message_buffer"):
+            self.bridge.message_receiver.submit_threadsafe(principal, ticket["id"])
 
     def messages(self, principal, team_id, after=0, limit=50):
         self._team(principal, team_id)

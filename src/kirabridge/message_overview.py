@@ -71,7 +71,7 @@ def overview(db, *, after_direct=0, after_team=0, limit=50, body_chars=1200, rec
     direct = db.execute(
         "SELECT seq,id,conversation_id AS thread,sender,recipient,kind,body,created,acknowledged "
         "FROM messages WHERE seq>:after AND (:rcpt IS NULL OR recipient=:rcpt) "
-        "ORDER BY seq LIMIT :limit",
+        "AND idem NOT LIKE 'team:%' ORDER BY seq LIMIT :limit",
         {"after": int(after_direct), "rcpt": recipient, "limit": limit},
     ).fetchall()
     team = db.execute(

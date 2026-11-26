@@ -66,12 +66,14 @@ class MessageReceiver:
         self.worker = None
         self.stopping = False
         self.recovered_handoffs = set()
+        self.loop = None
         self._stops_in_progress = 0
         from kirabridge.message_manager.direct import DirectDelivery
 
         self.direct = DirectDelivery(self)
 
     async def start(self):
+        self.loop = asyncio.get_running_loop()
         if self._stops_in_progress:
             return
         if self.direct._stop_task is not None and not self.direct._stop_task.done():
@@ -166,6 +168,16 @@ class MessageReceiver:
             self.bridge.config, row["created"]
         ):
             self.direct.submit(principal, message_id)
+
+    def submit_threadsafe(self, principal, message_id):
+        """Admit one new internal ticket from sync or async callers; no-op while stopped."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            if self.loop is not None and not self.loop.is_closed():
+                self.loop.call_soon_threadsafe(self._submit_new, principal, message_id)
+            return
+        self._submit_new(principal, message_id)
 
     async def send(self, principal, message, *, completion_target=None):
         """Observe one new visible admission, never resubmit a recorded ID."""
@@ -735,6 +747,32 @@ class MessageReceiver:
             message_id,
             seq,
             payload,
+        )
+        self._report_team_delivery(row, state, error)
+
+    def _report_team_delivery(self, row, state, error):
+        """Write the ticket outcome back into the team log; never an acknowledgement."""
+        from kirabridge.team_manager import TICKET_PREFIX
+
+        idem = row["idem"] or ""
+        if not idem.startswith(TICKET_PREFIX):
+            return
+        team_message_id = idem[len(TICKET_PREFIX) :]
+        team = self.bridge.store.db.execute(
+            "SELECT team_id FROM team_messages WHERE id=?", (team_message_id,)
+        ).fetchone()
+        if team is None:
+            return
+        ok = state == "completed"
+        self.bridge.teams._event(
+            team["team_id"],
+            row["sender"],
+            "team.message_delivered" if ok else "team.message_delivery_failed",
+            team_message_id,
+            recipient=row["recipient"],
+            ticket=row["id"],
+            state=state,
+            **({"error_code": error} if error else {}),
         )
 
     def _claim(self, message_id, *, direct=False, interim=False, native=False):
