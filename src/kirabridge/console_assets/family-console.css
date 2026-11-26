@@ -77,6 +77,9 @@
    process sidebar and the details column natively, so the console keeps only its middle. */
 .native-shell .kb-wordmark,.native-shell .np-appbar-host,.native-shell .kb-language,.native-shell .panel-toggle{display:none}
 .native-shell .app-shell{min-height:0}
-.native-shell .workspace.family-workspace{grid-template-columns:minmax(670px,1fr)}
+.native-shell{--np-control:32px;--np-control-touch:32px}
+.native-shell button,.native-shell select,.native-shell input{min-height:28px}
+.native-shell button{padding:4px 10px}
+.native-shell .workspace.family-workspace{grid-template-columns:minmax(0,1fr);min-width:0;overflow:hidden}
 .native-shell .workspace.family-workspace>.process-panel,.native-shell .workspace.family-workspace>.panel-resizer,
 .native-shell .workspace.family-workspace>.details-panel,.native-shell .workspace.family-workspace.right-user-expanded>.details-panel{display:none}
