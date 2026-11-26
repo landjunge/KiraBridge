@@ -141,8 +141,8 @@ def test_coordinator_only_sender_reaches_only_the_coordinator_by_team_message(do
 
 
 def visible_route(domain, *, state="available", age=0.0, binding_ok=True):
-    from kirabridge.bridge_core.models import canonical
     from kirabridge.bridge_core.config import ReceiverConfig, VisibleTerminalBinding
+    from kirabridge.bridge_core.models import canonical
 
     cfg = domain.config
     cfg.visible_handoffs.enabled = True
