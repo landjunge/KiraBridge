@@ -125,6 +125,42 @@ def test_first_eligible_session_is_elected_once_under_concurrent_start_and_persi
         reopened.store.close()
 
 
+def test_coordinator_session_proofs_are_registered_and_unknown_routes_fail_closed(
+    domain, monkeypatch
+):
+    import kirabridge.team_manager.coordinator_roles as roles_module
+    from kirabridge.team_manager.coordinator_sessions import coordinator_session_proof
+
+    setup_team(domain, coordinator="codex")
+    record(domain, "codex", session="codex-registered")
+    worker = domain.config.team.workers["codex"]
+    assert coordinator_session_proof("separate_managed_session") is not None
+    assert coordinator_session_proof("existing_native_codex_root") is not None
+    assert coordinator_session_proof("unregistered-session-type") is None
+
+    # A new trusted host route uses the common identity/state/generation checks.
+    # Without its proof, even an active visible-terminal session remains ineligible.
+    worker.execution_scope = "existing_visible_terminal"
+    assert domain.coordinator_roles._eligible(TEAM, "codex") is None
+    monkeypatch.setattr(
+        roles_module,
+        "coordinator_session_proof",
+        lambda scope: (
+            (lambda _roles, row, _worker: row["session_id"] == "codex-registered")
+            if scope == "existing_visible_terminal"
+            else None
+        ),
+    )
+    assert domain.coordinator_roles._eligible(TEAM, "codex")["session_id"] == "codex-registered"
+
+
+def test_coordinator_session_proof_registry_rejects_replacement():
+    from kirabridge.team_manager.coordinator_sessions import register_coordinator_session_proof
+
+    with pytest.raises(ValueError, match="already registered"):
+        register_coordinator_session_proof("separate_managed_session", lambda *_: True)
+
+
 def test_direct_coordinator_alias_resolves_persisted_role_and_replay_stays_on_original(domain):
     setup_team(domain)
     allow_direct_messages(domain)
