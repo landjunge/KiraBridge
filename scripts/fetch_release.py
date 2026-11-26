@@ -19,15 +19,24 @@ from pathlib import Path
 
 REPO = "landjunge/KiraBridge"
 WORKFLOW = "macos-build-main.yml"
+POLL = 10
 
 
 def run(*cmd):
-    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip()
+    done = subprocess.run(cmd, capture_output=True, text=True)
+    if done.returncode:
+        raise SystemExit(f"{' '.join(cmd[:3])} failed: {done.stderr.strip()[:300]}")
+    return done.stdout.strip()
+
+
+def say(message):
+    print(message, file=sys.stderr, flush=True)
 
 
 def find_run(sha, wait):
-    """Return the successful run id for sha; with wait seconds, wait for a queued/running one."""
+    """Return the successful run id for sha; with wait seconds, poll queued/running runs."""
     deadline = time.time() + wait
+    last = None
     while True:
         rows = json.loads(
             run(
@@ -48,27 +57,17 @@ def find_run(sha, wait):
             if row["conclusion"] == "success":
                 return str(row["databaseId"])
         active = [row for row in rows if row["status"] != "completed"]
-        if active and time.time() < deadline:
-            # blocks until that run ends; the loop then re-reads its conclusion
-            subprocess.run(
-                [
-                    "gh",
-                    "run",
-                    "watch",
-                    str(active[0]["databaseId"]),
-                    "-R",
-                    REPO,
-                    "--interval",
-                    "15",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            continue
-        if not rows and wait and time.time() < deadline:
-            time.sleep(10)  # run not registered yet
-            continue
-        raise SystemExit(f"No successful {WORKFLOW} run for {sha}: {rows or 'none yet'}")
+        if not active and rows:
+            done = ", ".join(f"{r['databaseId']}={r['conclusion']}" for r in rows)
+            raise SystemExit(f"Build for {sha} did not succeed: {done}")
+        if time.time() >= deadline:
+            state = f"run {active[0]['databaseId']} {active[0]['status']}" if active else "no run"
+            raise SystemExit(f"Timeout for {sha}: {state} (wait {wait} s)")
+        state = f"run {active[0]['databaseId']} {active[0]['status']}" if active else "no run yet"
+        if state != last:
+            say(f"{sha[:7]}: {state}, polling every {POLL} s")
+            last = state
+        time.sleep(POLL)
 
 
 def main():
@@ -85,7 +84,10 @@ def main():
         help="wait for a queued/running build (bare flag: 900 s)",
     )
     args = parser.parse_args()
-    sha = args.sha or json.loads(run("gh", "api", f"repos/{REPO}/commits/main"))["sha"]
+    # `gh run list --commit` needs the full SHA; resolve short ones (or main) first.
+    sha = args.sha or "main"
+    if len(sha) != 40:
+        sha = json.loads(run("gh", "api", f"repos/{REPO}/commits/{sha}"))["sha"]
     run_id = find_run(sha, args.wait)  # nothing is created before a run exists
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / sha
