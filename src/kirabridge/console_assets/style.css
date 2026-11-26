@@ -34,5 +34,5 @@ pre { margin: var(--np-space-2) 0; background: var(--np-canvas); border: 1px sol
 footer { margin-top: var(--np-space-5); border-top: 1px solid var(--np-divider); padding-top: var(--np-space-4); }
 footer p + p { margin-top: var(--np-space-2); }
 @media (prefers-color-scheme: light) {
-  :root { color-scheme: light; --np-canvas: #f5f6f8; --np-surface: #ffffff; --np-hover: #e7eaf0; --np-divider: #c8cdd5; --np-control-border: #66717f; --np-text: #18202b; --np-muted: #526173; --np-action: #18202b; --np-action-text: #ffffff; --np-focus: #18202b; --np-success: #17613e; --np-warning: #76520b; --np-danger: #a1212b; }
+  :root:not([data-theme]) { color-scheme: light; --np-canvas: #f5f6f8; --np-surface: #ffffff; --np-hover: #e7eaf0; --np-divider: #c8cdd5; --np-control-border: #66717f; --np-text: #18202b; --np-muted: #526173; --np-action: #18202b; --np-action-text: #ffffff; --np-focus: #18202b; --np-success: #17613e; --np-warning: #76520b; --np-danger: #a1212b; }
 }

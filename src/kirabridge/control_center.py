@@ -22,6 +22,7 @@ class ControlCenter:
         self.routes = [
             Route("/protocol", self.protocol_page),
             Route("/api/control/status", self.status),
+            Route("/api/cli", self.agent_cards),
             Route("/api/control/action", self.action, methods=["POST"]),
             Route("/api/control/doctor", self.doctor, methods=["GET", "POST"]),
             Route("/api/control/permissions", self.permissions, methods=["POST"]),
@@ -51,6 +52,77 @@ class ControlCenter:
     async def terminals(self, request):
         self.authenticate(request)
         return JSONResponse(await self.service.rpc("session_catalog"))
+
+    async def agent_cards(self, request):
+        self.authenticate(request)
+        snapshot = await self.service.snapshot(fresh=request.query_params.get("fresh") == "1")
+        config = self.service.config()
+        try:
+            inventory = await self.service.rpc("agent_inventory", {})
+            cli_rows = inventory.get("cli_inventory", [])
+            inventory_error = None
+        except BridgeError as exc:
+            cli_rows = []
+            inventory_error = exc.code
+        services = {row["id"]: row for row in snapshot.get("services", [])}
+        aliases = {"codex": "codex", "claude": "claude_code", "qwen": "qwen_acp"}
+        agents = []
+        for cli in ("codex", "claude", "qwen"):
+            profile = config.agents.get(cli)
+            agent_id = cli
+            if profile is None:
+                match = next(
+                    (
+                        (name, candidate)
+                        for name, candidate in config.agents.items()
+                        if candidate.kind == aliases[cli]
+                    ),
+                    None,
+                )
+                if match:
+                    agent_id, profile = match
+            service = services.get(agent_id, {})
+            candidates = [row for row in cli_rows if row.get("cli") == cli]
+            preferred = next(
+                (row for row in candidates if row.get("agent_id") == agent_id), None
+            ) or next(iter(sorted(candidates, key=lambda row: row.get("search_order", 10**6))), {})
+            agents.append(
+                {
+                    "id": agent_id,
+                    "cli": cli,
+                    "name": {"codex": "Codex", "claude": "Claude", "qwen": "Qwen"}[cli],
+                    "configured": profile is not None,
+                    "installed": bool(service.get("installed")),
+                    "active": bool(service.get("active")),
+                    "state": service.get("state", "unconfigured"),
+                    "detail": service.get("detail", "Nicht konfiguriert"),
+                    "kind": getattr(profile, "kind", None),
+                    "model": getattr(profile, "model", None),
+                    "effort": (
+                        getattr(profile, "qwen_reasoning_effort", None)
+                        if cli == "qwen"
+                        else getattr(profile, "grok_reasoning_effort", None)
+                        if cli == "grok"
+                        else None
+                    ),
+                    "sandbox_mode": getattr(profile, "sandbox_mode", None),
+                    "version": preferred.get("version"),
+                    "executable": preferred.get("executable"),
+                    "probe_status": preferred.get("probe_status", "not_observed"),
+                    "compatibility": preferred.get("compatibility", {"status": "unknown"}),
+                }
+            )
+        return JSONResponse(
+            {
+                "agents": agents,
+                "cli_inventory_available": inventory_error is None,
+                "inventory_error": inventory_error,
+                "observed_at": snapshot.get("observed_at"),
+                "permission_level": config.principals.get("local").permission_level
+                if config.principals.get("local")
+                else "unknown",
+            }
+        )
 
     async def terminal_read(self, request):
         self.authenticate(request)

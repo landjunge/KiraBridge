@@ -125,7 +125,11 @@ async def test_control_requires_login_and_local_origin(bridge):
         assert result.status_code == 403
         assert (await client.get("/")).status_code == 200
         assert "center.js" in (await client.get("/")).text
+        assert "family-workspace" in (await client.get("/")).text
+        family_css = await client.get("/family-console.css")
+        assert family_css.status_code == 200 and "minmax(670px,1fr)" in family_css.text
         assert (await client.get("/protocol")).status_code == 200
+        assert (await client.get("/api/cli")).status_code == 401
 
 
 @pytest.mark.asyncio
@@ -205,6 +209,104 @@ async def test_action_retry_does_not_start_a_second_process(bridge, monkeypatch)
             "/api/control/action", headers=headers(), json={**value, "action": "restart"}
         )
         assert conflict.status_code == 409 and len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_agent_card_endpoint_uses_fresh_cli_inventory_without_exposing_credentials(
+    bridge, monkeypatch
+):
+    app = ApprovalConsole(operator_application(bridge), KEY)
+    control = app.control_center.service
+    bridge.config.agents.update(
+        {
+            "codex": AgentConfig(kind="codex", executable="/bin/echo", model="o3"),
+            "claude": AgentConfig(kind="claude_code", executable="/bin/echo"),
+            "qwen": AgentConfig(kind="qwen_acp", executable="/bin/echo", model="qwen3.8-flash"),
+        }
+    )
+
+    async def snapshot(*, fresh=False):
+        return {
+            "observed_at": 1,
+            "services": [
+                {"id": "codex", "active": False, "installed": True, "state": "inactive"},
+                {"id": "claude", "active": True, "installed": True, "state": "active"},
+                {"id": "qwen", "active": False, "installed": True, "state": "inactive"},
+            ],
+        }
+
+    async def rpc(tool, arguments):
+        assert tool == "agent_inventory" and arguments == {}
+        return {
+            "cli_inventory": [
+                {
+                    "cli": "qwen",
+                    "agent_id": "qwen",
+                    "executable": "/opt/qwen",
+                    "version": "0.28.0",
+                    "search_order": 0,
+                    "probe_status": "observed",
+                    "compatibility": {"status": "unsupported"},
+                }
+            ]
+        }
+
+    monkeypatch.setattr(control, "snapshot", snapshot)
+    monkeypatch.setattr(control, "rpc", rpc)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        assert (await client.get("/api/cli")).status_code == 401
+        response = await client.get("/api/cli", headers=headers())
+    assert response.status_code == 200
+    data = response.json()
+    assert [agent["cli"] for agent in data["agents"]] == ["codex", "claude", "qwen"]
+    assert data["agents"][1]["active"] is True
+    qwen = data["agents"][2]
+    assert (qwen["version"], qwen["compatibility"]["status"]) == ("0.28.0", "unsupported")
+    assert "credential" not in json.dumps(data).lower()
+
+
+@pytest.mark.asyncio
+async def test_agent_card_launch_options_are_restricted_and_applied_to_visible_terminal(
+    bridge, monkeypatch
+):
+    control = ApprovalConsole(operator_application(bridge), KEY).control_center.service
+    config = bridge.config
+    config.agents["claude"] = AgentConfig(
+        kind="claude_code", executable="/bin/echo", model="sonnet"
+    )
+    monkeypatch.setattr(control, "config", lambda: config)
+
+    async def snapshot(**_):
+        return {"services": [{"id": "claude", "active": False}]}
+
+    captured = {}
+
+    async def rpc(tool, arguments):
+        captured.update(tool=tool, arguments=arguments)
+        return {"state": "completed", "message": "Terminal geöffnet"}
+
+    monkeypatch.setattr(control, "snapshot", snapshot)
+    monkeypatch.setattr(control, "rpc", rpc)
+    await control.service_action(
+        "claude",
+        "start",
+        "family-card-start",
+        launch_options={"model": "configured", "effort": "high", "permission": "plan"},
+    )
+    argv = captured["arguments"]["argv"]
+    assert captured["tool"] == "session_open"
+    assert argv[0] == "/bin/echo"
+    assert argv[argv.index("--model") + 1] == "sonnet"
+    assert argv[argv.index("--effort") + 1] == "high"
+    assert argv[argv.index("--permission-mode") + 1] == "plan"
+    assert "bypassPermissions" not in argv
+    with pytest.raises(BridgeError, match="Denkstufe"):
+        await control.service_action(
+            "claude",
+            "start",
+            "family-card-invalid",
+            launch_options={"model": "configured", "effort": "turbo", "permission": "policy"},
+        )
 
 
 @pytest.mark.asyncio

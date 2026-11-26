@@ -92,7 +92,15 @@ class OperatorControl:
 
     async def action(self, value):
         async with self.lock:
-            result = await self.actions.execute(value, self.service_action)
+
+            async def dispatch(name, action, action_id):
+                if "launch_options" not in value:
+                    return await self.service_action(name, action, action_id)
+                return await self.service_action(
+                    name, action, action_id, launch_options=value["launch_options"]
+                )
+
+            result = await self.actions.execute(value, dispatch)
             self.cache = None
             return result
 
@@ -348,7 +356,7 @@ class OperatorControl:
             "message": "Neustart und geladener Stand bestätigt.",
         }
 
-    async def service_action(self, name, action, action_id):
+    async def service_action(self, name, action, action_id, *, launch_options=None):
         config = self.config()
         if (
             not isinstance(name, str)
@@ -402,6 +410,29 @@ class OperatorControl:
             from kirabridge.agent_manager.full_access import bridge_server
 
             argv = [profile.executable]
+            launch_options = launch_options or {}
+            if not isinstance(launch_options, dict) or set(launch_options) - {
+                "model",
+                "effort",
+                "permission",
+            }:
+                raise BridgeError("invalid_request", "Unbekannte Agentenvorgabe")
+            model_choice = launch_options.get("model", "configured")
+            if model_choice not in {"configured", "cli-default"}:
+                raise BridgeError("invalid_request", "Das Modell ist keine freigegebene Auswahl")
+            effort = launch_options.get("effort", "default")
+            effort_choices = {
+                "claude": {"default", "low", "medium", "high", "xhigh", "max"},
+                "codex": {"default", "low", "medium", "high", "xhigh"},
+                "qwen": {"default"},
+            }
+            if effort not in effort_choices.get(name, {"default"}):
+                raise BridgeError(
+                    "invalid_request", "Diese Denkstufe wird für die CLI nicht angeboten"
+                )
+            permission = launch_options.get("permission", "policy")
+            if permission not in {"policy", "plan"}:
+                raise BridgeError("invalid_request", "Unbekannter Berechtigungsmodus")
             if profile.bridge_tools:
                 spec = bridge_server(config._source_path, name)
                 servers = json.dumps({"mcpServers": {"kirabridge": spec}})
@@ -413,13 +444,13 @@ class OperatorControl:
                         "-c",
                         "mcp_servers.kirabridge.args=" + json.dumps(spec["args"]),
                     ]
-                    if full:
+                    if full and permission != "plan":
                         argv += ["--sandbox", "danger-full-access", "-c", 'approval_policy="never"']
                 elif name == "grok" and full:
                     argv += ["--permission-mode", "bypassPermissions"]
                 elif name == "claude":
                     argv += ["--mcp-config", servers]
-                    if full:
+                    if full and permission != "plan":
                         argv += ["--permission-mode", "bypassPermissions"]
                 elif name == "copilot":
                     argv += ["--additional-mcp-config", servers]
@@ -446,7 +477,20 @@ class OperatorControl:
                         environment += ["-u", profile.api_key_env]
                     argv = [*environment, "OPENCODE_CONFIG_CONTENT=" + json.dumps(native), *argv]
             if profile.model:
-                argv += ["--model", profile.model]
+                if model_choice == "configured":
+                    argv += ["--model", profile.model]
+            if effort != "default":
+                if name == "claude":
+                    argv += ["--effort", effort]
+                elif name == "codex":
+                    argv += ["-c", f'model_reasoning_effort="{effort}"']
+            if permission == "plan":
+                if name == "claude":
+                    argv += ["--permission-mode", "plan"]
+                elif name == "codex":
+                    argv += ["--sandbox", "read-only"]
+                elif name == "qwen":
+                    argv += ["--approval-mode", "plan"]
             from kirabridge.session_manager import SessionOpen
 
             window_task_id = "control-" + action_id
