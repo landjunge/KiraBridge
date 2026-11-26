@@ -100,7 +100,7 @@ and Git. Installation does not grant additional OS permissions.
 | `session_busy` | Inspect current work; do not interrupt a running agent. |
 | `session_selection_changed` | Read fresh window/tab/TTY/PID identities; do not replay the old request. |
 | `unknown` or lost response | Reconcile existing receipt, start, acknowledgement and late-reply evidence. |
-| Installer reports `BUSY` | Let actual work finish; do not bypass guards. |
+| Installer reports `BUSY` | Let actual work finish; do not bypass guards. Queued jobs with an `unknown` handoff or a withdrawal are reported as skipped reservations, not blocking, never resent. |
 | Start or rollback times out | Read logs, health and the responding version before claiming success. |
 
 [Repair evidence](QUEUE-DIRECT-ADMISSION-20261029.md) · [Intel report](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INTEL-RELEASE-20261029.md)

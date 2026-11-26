@@ -53,6 +53,8 @@ def _idle_guard_fixture(
         "CREATE TABLE events(seq INTEGER PRIMARY KEY, task_id TEXT, state TEXT, evidence TEXT);"
         "CREATE TABLE message_jobs(message_id TEXT PRIMARY KEY, state TEXT);"
         "CREATE TABLE queue_holds(queue_id TEXT, item_id TEXT);"
+        "CREATE TABLE queue_withdrawals(queue_id TEXT, item_id TEXT);"
+        "CREATE TABLE visible_handoffs(id TEXT, message_id TEXT, state TEXT);"
         "CREATE TABLE team_work(id TEXT PRIMARY KEY, state TEXT);"
     )
     task_id = "visible-install-attempt"
@@ -102,6 +104,45 @@ def _idle_guard_fixture(
     config = tmp_path / "config.toml"
     config.write_text("data_dir = " + json.dumps(str(state)))
     return config, task_id
+
+
+def _job_guard(installer, monkeypatch, tmp_path, job_state, *, handoff=None, withdrawn=False):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    db = sqlite3.connect(tmp_path / "state" / "bridge.sqlite3")
+    db.execute("INSERT INTO message_jobs VALUES('m1',?)", (job_state,))
+    if handoff:
+        db.execute("INSERT INTO visible_handoffs VALUES('h1','m1',?)", (handoff,))
+    if withdrawn:
+        db.execute("INSERT INTO queue_withdrawals VALUES('messages','m1')")
+    db.commit()
+    db.close()
+    _authorize_current_terminal_task(installer, monkeypatch, task_id)
+    return config
+
+
+def test_unknown_handoff_job_is_reported_not_busy(installer, monkeypatch, tmp_path):
+    config = _job_guard(installer, monkeypatch, tmp_path, "queued", handoff="unknown")
+    lines = []
+    monkeypatch.setattr(installer, "report", lambda kind, msg, **kw: lines.append((kind, msg)))
+    with installer.idle_guard(config):
+        pass
+    assert any(k == "warn" and "m1" in m and "kein Neuversand" in m for k, m in lines)
+
+
+def test_withdrawn_job_is_not_busy(installer, monkeypatch, tmp_path):
+    config = _job_guard(installer, monkeypatch, tmp_path, "queued", withdrawn=True)
+    with installer.idle_guard(config):
+        pass
+
+
+@pytest.mark.parametrize(
+    ("job_state", "handoff"), [("queued", None), ("queued", "sent"), ("running", "unknown")]
+)
+def test_real_job_work_still_busy(installer, monkeypatch, tmp_path, job_state, handoff):
+    config = _job_guard(installer, monkeypatch, tmp_path, job_state, handoff=handoff)
+    with pytest.raises(RuntimeError, match="BUSY"):
+        with installer.idle_guard(config):
+            pytest.fail("must block")
 
 
 def _authorize_current_terminal_task(installer, monkeypatch, task_id):

@@ -571,19 +571,38 @@ def idle_guard(config):
             if "tasks" in tables
             else 0
         )
-        jobs = (
-            db.execute(
-                "select count(*) from message_jobs where state in ('queued','running')"
-                + (
-                    " and (state='running' or not exists (select 1 from queue_holds h "
-                    "where h.queue_id='messages' and h.item_id=message_jobs.message_id))"
-                    if "queue_holds" in tables
-                    else ""
-                )
-            ).fetchone()[0]
-            if "message_jobs" in tables
-            else 0
-        )
+        # Queued jobs with an unresolved (unknown) handoff or a withdrawal are
+        # dead reservations: reported, never blocking. Nothing is changed.
+        dead = []
+        if "queue_holds" in tables:
+            dead.append(
+                "select 1 from queue_holds h "
+                "where h.queue_id='messages' and h.item_id=message_jobs.message_id"
+            )
+        if "queue_withdrawals" in tables:
+            dead.append(
+                "select 1 from queue_withdrawals w "
+                "where w.queue_id='messages' and w.item_id=message_jobs.message_id"
+            )
+        if "visible_handoffs" in tables:
+            dead.append(
+                "select 1 from visible_handoffs v "
+                "where v.state='unknown' and v.message_id=message_jobs.message_id"
+            )
+        skipped = []
+        jobs = 0
+        if "message_jobs" in tables:
+            where = "state in ('queued','running')"
+            if dead:
+                is_dead = " or ".join(f"exists ({d})" for d in dead)
+                skipped = [
+                    r[0]
+                    for r in db.execute(
+                        f"select message_id from message_jobs where state='queued' and ({is_dead})"
+                    )
+                ]
+                where += f" and (state='running' or not ({is_dead}))"
+            jobs = db.execute("select count(*) from message_jobs where " + where).fetchone()[0]
         team_work = (
             db.execute(
                 "select count(*) from team_work where state in "
@@ -596,6 +615,13 @@ def idle_guard(config):
             raise RuntimeError(
                 f"BUSY: {tasks} tasks, {jobs} receiver jobs, {team_work} team jobs. "
                 "Nothing switched."
+            )
+        if skipped:
+            report(
+                "warn",
+                f"{len(skipped)} unbekannte Reservierung(en) übersprungen: "
+                + ", ".join(skipped)
+                + "; kein Neuversand",
             )
         report(
             "ok",
