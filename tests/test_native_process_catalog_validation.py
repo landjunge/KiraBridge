@@ -146,7 +146,13 @@ QWEN_NODE = "/Users/landjunge/.local/lib/qwen-code/node/bin/node"
 
 @pytest.mark.parametrize(
     "image,name",
-    [(QWEN_NODE, "qwen"), ("/usr/local/bin/node", "node"), ("/opt/grok/bin/python3", "grok")],
+    [
+        (QWEN_NODE, "qwen"),
+        ("/usr/local/bin/node", "node"),
+        ("/Users/u/.local/share/grok/node/bin/node", "grok"),
+        ("/Users/u/projects/grok/node_modules/.bin/node", "node"),
+        ("/Users/u/projects/qwen-code/node", "node"),
+    ],
 )
 async def test_interpreter_in_cli_install_dir_is_named_after_cli(monkeypatch, image, name):
     uid = os.getuid()

@@ -59,7 +59,10 @@ def _process_observation_timeout(phase):
 
 
 _INTERPRETERS = {"node", "python", "python3"}
-_WRAPPED_CLI = re.compile(r"/(qwen|grok|opencode)(?:-code)?/")
+# Anchored on the CLIs' own install roots; a project dir named grok does not qualify.
+_WRAPPED_CLI = re.compile(
+    r"/(?:\.local/(?:lib|share)|usr/local/lib)/(qwen|grok|opencode)(?:-code)?/"
+)
 
 
 def _process_name(comm):
