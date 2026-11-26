@@ -129,7 +129,7 @@ async def test_control_requires_login_and_local_origin(bridge):
         family_css = await client.get("/family-console.css")
         assert family_css.status_code == 200 and "minmax(670px,1fr)" in family_css.text
         assert (await client.get("/protocol")).status_code == 200
-        assert (await client.get("/api/control/agent-cards")).status_code == 401
+        assert (await client.get("/api/cli")).status_code == 401
 
 
 @pytest.mark.asyncio
@@ -254,8 +254,8 @@ async def test_agent_card_endpoint_uses_fresh_cli_inventory_without_exposing_cre
     monkeypatch.setattr(control, "snapshot", snapshot)
     monkeypatch.setattr(control, "rpc", rpc)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
-        assert (await client.get("/api/control/agent-cards")).status_code == 401
-        response = await client.get("/api/control/agent-cards", headers=headers())
+        assert (await client.get("/api/cli")).status_code == 401
+        response = await client.get("/api/cli", headers=headers())
     assert response.status_code == 200
     data = response.json()
     assert [agent["cli"] for agent in data["agents"]] == ["codex", "claude", "qwen"]

@@ -92,6 +92,7 @@ class OperatorControl:
 
     async def action(self, value):
         async with self.lock:
+
             async def dispatch(name, action, action_id):
                 if "launch_options" not in value:
                     return await self.service_action(name, action, action_id)

@@ -78,8 +78,8 @@ async def run():
             TeamCreate(
                 team_id="kirabridge-team",
                 name="KiraBridge visual fixture",
-                members={"local": "worker", "codex": "coordinator"},
-                coordinator="codex",
+                members={"local": "coordinator", "codex": "worker"},
+                coordinator="local",
                 idempotency_key="family-console-fixture",
             ),
         )
@@ -249,10 +249,16 @@ async def run():
                 )
                 assert await page.locator(".np-appbar-button").count() == 5
                 assert (
+                    "Koordinator: local" in await page.locator("#coordinator-summary").inner_text()
+                )
+                assert (
+                    await page.locator('.cli-card .coordinator[aria-pressed="true"]').count() == 0
+                )
+                assert (
                     await page.locator(
-                        '.cli-card[data-agent="codex"] .coordinator[aria-pressed="true"]'
+                        '.cli-card .coordinator[title^="Als Koordinator wählen"]'
                     ).count()
-                    == 1
+                    == 3
                 )
                 assert (
                     "Kompatibilität nicht bestätigt"
@@ -269,6 +275,14 @@ async def run():
                 await page.locator('[data-go="settings"]').click()
                 assert await page.locator("#settings").is_visible()
                 assert "Darstellung" in await page.locator("#settings").inner_text()
+                await page.locator('[data-theme-choice="light"]').click()
+                assert await page.locator("html").get_attribute("data-theme") == "light"
+                assert (
+                    await page.locator("body").evaluate("e=>getComputedStyle(e).backgroundColor")
+                    == "rgb(237, 240, 244)"
+                )
+                await page.locator('[data-theme-choice="dark"]').click()
+                assert await page.locator("html").get_attribute("data-theme") == "dark"
                 await page.locator('#settings [data-go="overview"]').click()
                 left = page.locator('[data-resize="left"]')
                 await left.focus()
@@ -307,6 +321,17 @@ async def run():
                 ), geometry
                 assert geometry["bodyBg"] == "rgb(18, 19, 22)" and geometry["rounding"] == "0px", (
                     geometry
+                )
+                assert await page.locator("footer #notice").count() == 1
+                process_height = await page.locator(".process-card").first.evaluate(
+                    "e=>e.getBoundingClientRect().height"
+                )
+                assert process_height <= 40, process_height
+                assert (
+                    await page.locator('.cli-card[data-agent="codex"] .play').evaluate(
+                        "e=>getComputedStyle(e).backgroundColor"
+                    )
+                    != "rgb(237, 240, 244)"
                 )
                 assert not posts and not errors, {"posts": posts, "errors": errors}
                 screenshot = OUTPUT / "kirabridge-console-p1-1728x1240.png"

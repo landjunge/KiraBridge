@@ -13,10 +13,11 @@ The Agent Authority image is the archived app screenshot `docs/macos-app-design-
 ## Verified card behavior
 
 - ChatGPT and Grok cards render from the existing connection/status response. The screenshot distinguishes a recent confirmed ChatGPT call from a configured but not live-checked Grok connection.
-- Codex, Claude, and Qwen cards render service state and CLI version/compatibility from the Bridge snapshot and `agent_inventory`; the coordinator `K` is derived from the current team coordinator role.
+- Codex, Claude, and Qwen cards render service state and CLI version/compatibility from `/api/cli`; the coordinator summary and `K` controls use the exact team principal and confirmed session candidates. The fixture makes `local` coordinator, so no CLI card is falsely marked as current coordinator.
 - Model, reasoning effort, and permission selectors are present. Start calls the existing authenticated visible-terminal session-open path with validated options. The browser probe intentionally does not trigger this consequential action.
 - Refresh re-reads status and CLI inventory. Qwen's observed `0.28.0` is shown with compatibility unconfirmed when inventory says unsupported.
 - The two sidebars can be resized by pointer or keyboard, collapsed, and their layout preference persists locally.
+- Shared NP card, button, dropdown, and status-dot styles use explicit dark/light tokens. The selected appearance and layout are stored locally.
 
 ## Deliberate deviations / limits
 

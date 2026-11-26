@@ -38,3 +38,34 @@
 @media(max-width:1320px){.workspace.family-workspace:not(.right-user-expanded){--family-right:0px;grid-template-columns:minmax(176px,var(--family-left)) 4px minmax(670px,1fr) 0 0}.workspace.family-workspace:not(.right-user-expanded).left-collapsed{grid-template-columns:0 0 minmax(670px,1fr) 0 0}.workspace.family-workspace:not(.right-user-expanded)>.details-panel{visibility:hidden;overflow:hidden;padding:0;border:0}.workspace.family-workspace:not(.right-user-expanded) .panel-resizer[data-resize="right"]{visibility:hidden}}
 @media(max-width:1180px){.app-shell{min-width:0}.workspace.family-workspace{grid-template-columns:minmax(0,1fr);overflow:auto}.workspace.family-workspace>.panel-resizer{display:none}.workspace.family-workspace>.process-panel{max-height:220px}.workspace.family-workspace>.details-panel{display:none}.workspace.family-workspace .process-list{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto}.workspace.family-workspace .main-panel{min-height:650px}.family-overview{overflow:visible}}
 @media(max-width:760px){.workspace.family-workspace:not(.right-user-expanded),.workspace.family-workspace:not(.right-user-expanded).left-collapsed{grid-template-columns:minmax(0,1fr)}.family-overview{padding:10px;gap:12px}.cli-cards{grid-template-columns:1fr}.voice-cards{grid-template-columns:1fr}.family-workspace .process-list{grid-template-columns:repeat(2,minmax(0,1fr))}.family-workspace .process-card{min-height:60px}.cli-controls label{grid-template-columns:86px minmax(0,1fr)}.kb-header-actions{gap:4px}.kb-header-actions>p{display:none}}
+
+/* U0/U1 review: shared components, compact process rows, and one bottom status line. */
+.app-shell.family-console-shell{grid-template-rows:auto minmax(0,1fr) 32px}
+.workspace.family-workspace .process-list{display:flex;flex:0 0 auto;flex-direction:column;gap:6px;overflow:visible}
+.family-workspace .process-card{display:block;min-height:36px;padding:4px 6px}
+.process-compact-row{display:grid;grid-template-columns:minmax(0,1fr) 8px auto;align-items:center;gap:4px;min-height:26px}
+.process-compact-row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.process-compact-row .process-state{display:contents;font-size:0}
+.process-compact-row .process-state .dot{grid-column:2;grid-row:1;width:7px;height:7px}
+.process-compact-row .process-state span:last-child{display:none}
+.family-workspace .process-actions{grid-column:3;grid-row:1;gap:3px}
+.family-workspace .process-actions button{width:auto;min-width:0;min-height:24px;height:24px;padding:2px 4px;font-size:9px}
+.family-overview{gap:12px}
+.family-overview .family-section{gap:8px}
+.family-overview .summary-row{margin-top:0;gap:8px}
+.family-overview .summary-row>div{padding:8px 10px}
+.section-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+.coordinator-summary{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cli-card-actions .play{background:var(--np-gray-800);border-color:var(--np-control-border);color:var(--np-text)}
+.cli-card-actions .play:hover:not(:disabled){background:var(--np-hover)}
+.cli-card-actions .coordinator[aria-pressed="true"]{color:var(--np-gray-950);background:var(--np-green);border-color:var(--np-green);font-weight:700;box-shadow:inset 0 0 0 1px var(--np-green)}
+.cli-card-actions .coordinator[aria-disabled="true"]:not([aria-pressed="true"]){opacity:.5}
+.np-card{border-radius:var(--np-radius)}
+.np-status-dot{border-radius:50%;box-shadow:none}
+.np-button,.np-dropdown{border-radius:var(--np-radius)}
+.app-footer #notice{display:block;min-width:0;max-width:45vw;margin:0;padding:0;border:0;background:transparent;color:var(--np-muted);font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-footer #notice.error{color:var(--np-danger)}
+.app-footer .footer-hint{white-space:nowrap}
+@media(max-width:1180px){.app-shell.family-console-shell{grid-template-rows:auto minmax(0,1fr) 32px}}
+@media(max-width:760px){.process-compact-row{grid-template-columns:minmax(0,1fr) 8px auto}.family-overview .summary-row{grid-template-columns:1fr}.app-footer #notice{max-width:38vw}.kb-header-actions{flex-wrap:wrap}}
+@media(max-width:1180px){.workspace.family-workspace{position:relative}.workspace.family-workspace.right-user-expanded>.details-panel{display:flex;position:absolute;z-index:20;top:0;right:0;bottom:0;width:min(var(--family-right),90vw);box-shadow:0 0 0 9999px #0006}}

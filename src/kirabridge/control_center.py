@@ -22,7 +22,7 @@ class ControlCenter:
         self.routes = [
             Route("/protocol", self.protocol_page),
             Route("/api/control/status", self.status),
-            Route("/api/control/agent-cards", self.agent_cards),
+            Route("/api/cli", self.agent_cards),
             Route("/api/control/action", self.action, methods=["POST"]),
             Route("/api/control/doctor", self.doctor, methods=["GET", "POST"]),
             Route("/api/control/permissions", self.permissions, methods=["POST"]),
