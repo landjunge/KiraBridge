@@ -68,8 +68,25 @@ def _managed_session_proof(roles, row, worker):
     )
 
 
+def _visible_terminal_session_proof(roles, row, worker):
+    """Prove a visible CLI against the exact operator-bound terminal identity.
+
+    The session row stores a digest of the pane and both process identities that
+    were configured when the provider session was observed. A later terminal,
+    reused PID, or changed binding therefore cannot inherit the coordinator role.
+    """
+    binding = roles.manager.config.visible_handoffs.bindings.get(worker.agent)
+    return (
+        binding is not None
+        and row["adapter"] == roles.manager._worker_adapter(worker)
+        and json.loads(row["provider_binding"])
+        == {"visible_terminal_binding_sha256": digest(binding.model_dump())}
+    )
+
+
 register_coordinator_session_proof("existing_native_codex_root", _native_codex_session_proof)
 register_coordinator_session_proof("separate_managed_session", _managed_session_proof)
+register_coordinator_session_proof("existing_visible_terminal", _visible_terminal_session_proof)
 
 
 class CoordinatorRoles:
@@ -767,11 +784,16 @@ class CoordinatorRoles:
 
     def queue_notification(self, principal, message_id, team_id, recipient):
         session = self.binding(team_id)
+        worker = self.manager.config.team.workers.get(recipient)
+        current = self._eligible(team_id, recipient)
         if (
             session is None
             or session["principal"] != recipient
-            or self.manager.config.team.workers[recipient].execution_scope
-            != "separate_managed_session"
+            or worker is None
+            or worker.execution_scope
+            not in {"separate_managed_session", "existing_visible_terminal"}
+            or current is None
+            or self._reference(current) != session
         ):
             return
         try:

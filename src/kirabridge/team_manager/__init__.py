@@ -616,7 +616,10 @@ class TeamManager:
         adapter = native.get("adapter")
         if not isinstance(adapter, str) or not ERROR.fullmatch(adapter):
             adapter = self._worker_adapter(worker)
-        if adapter not in TRACKED_SESSION_ADAPTERS:
+        if (
+            adapter not in TRACKED_SESSION_ADAPTERS
+            and worker.execution_scope != "existing_visible_terminal"
+        ):
             # Only verified provider identities enter the existing session ledger.
             return
         if work["state"] in {"processing_result", "completed"}:
@@ -704,6 +707,16 @@ class TeamManager:
             ):
                 return
             provider_binding = self.coordinator_roles._native_scope(native_binding)
+        elif worker.execution_scope == "existing_visible_terminal":
+            # Persist the exact configured terminal/process identity that backs
+            # this observed session. Coordinator eligibility rechecks this
+            # digest against the current visible-terminal binding.
+            visible_binding = self.config.visible_handoffs.bindings.get(worker.agent)
+            if visible_binding is None:
+                return
+            provider_binding = {
+                "visible_terminal_binding_sha256": digest(visible_binding.model_dump())
+            }
         now = time.time()
         self.store.db.execute(
             "INSERT INTO team_sessions(team_id,principal,agent,adapter,session_id,cwd,state,"

@@ -77,6 +77,16 @@ Zum Wechseln dient `kirabridge team coordinator <team> [mitglied]`; ohne
 Mitgliedsname wird die authentifizierte Identität verwendet. Die Übernahme bleibt
 an die vorhandene bestätigte Handoff-Sequenz gebunden.
 
+Für `existing_visible_terminal` ist der Proof an die konfigurierte
+Terminalbindung des Agenten gebunden: Pane, Shell-PID und Agent-PID werden als
+Digest in der beobachteten Sitzung festgehalten und bei jeder Rollenprüfung mit
+der aktuellen Bindung verglichen. Ein fehlender oder geänderter Terminalbeleg
+macht die Sitzung für die Koordinatorrolle unzulässig. Neue Nachrichten an eine
+so gebundene Koordinatorrolle erzeugen eine idempotente Team-Inbox-Aufgabe, die
+den Team-Dispatcher weckt; die sichtbare Terminalroute prüft das konkrete Ziel
+erneut vor Eingabe. Das ist ein Weckruf an eine bestehende lokale CLI, kein
+Aufwecken eines ChatGPT-Chats.
+
 ## MCP-Aufrufe
 
 Alle Werkzeuge verwenden API-Version 1 und die bestehenden Authentifizierungswege.
@@ -328,8 +338,11 @@ ChatGPT uses its existing authenticated MCP connection. Read `team_list`,
 `team_get`, `team_messages` and `team_work_list`; assign work using
 `team_work_create`. External assignees explicitly use `team_work_claim` and
 `team_work_complete`. Automatic workers run separate bounded turns and may
-return the JSON action envelope above. The bridge does not attach to an existing
-interactive session or wake a closed ChatGPT chat.
+return the JSON action envelope above. The bridge only addresses an existing
+interactive terminal when its exact configured binding has a current session
+proof; it never chooses an arbitrary terminal. A queued coordinator inbox
+notification can wake that bound local CLI through the team dispatcher. This
+does not wake a closed ChatGPT chat.
 
 The default `strict_json` response framing does not extract actions from prose
 or code fences. The operator can explicitly select `response_framing="work_reply_header"`
