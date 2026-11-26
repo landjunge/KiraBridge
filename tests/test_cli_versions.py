@@ -276,7 +276,8 @@ def test_cli_version_history_is_read_once_for_many_cli_rows(tmp_path):
 
     store.db.set_trace_callback(None)
     history_queries = [
-        statement for statement in statements
+        statement
+        for statement in statements
         if statement.startswith("SELECT metadata FROM audit WHERE kind IN")
     ]
     assert len(history_queries) == 1

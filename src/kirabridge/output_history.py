@@ -75,9 +75,7 @@ class OutputHistory:
     def prune(self):
         with self.store.transaction():
             now = time.time()
-            self.store.db.execute(
-                "DELETE FROM output_snapshots WHERE expires<=?", (now,)
-            )
+            self.store.db.execute("DELETE FROM output_snapshots WHERE expires<=?", (now,))
             # Use the oldest-first index for the retention boundary as well as
             # budget eviction; avoid an OR predicate that can force a table scan.
             old_kinds = self.store.db.execute(

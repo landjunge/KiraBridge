@@ -141,12 +141,14 @@ def test_prune_batches_oldest_count_evictions_and_uses_oldest_index(bridge, monk
     bridge.outputs.prune()
     bridge.store.db.set_trace_callback(None)
 
-    retained = [row[0] for row in bridge.store.db.execute(
-        "SELECT id FROM output_snapshots ORDER BY created,rowid"
-    )]
+    retained = [
+        row[0]
+        for row in bridge.store.db.execute("SELECT id FROM output_snapshots ORDER BY created,rowid")
+    ]
     assert retained == ["snapshot-7", "snapshot-8", "snapshot-9"]
     deletes = [
-        statement for statement in statements
+        statement
+        for statement in statements
         if statement.startswith("DELETE FROM output_snapshots WHERE id IN")
     ]
     assert len(deletes) == 1
@@ -185,9 +187,10 @@ def test_prune_batches_byte_budget_evictions_in_oldest_first_order(bridge, monke
 
     bridge.outputs.prune()
 
-    remaining = [row[0] for row in bridge.store.db.execute(
-        "SELECT id FROM output_snapshots ORDER BY created,rowid"
-    )]
+    remaining = [
+        row[0]
+        for row in bridge.store.db.execute("SELECT id FROM output_snapshots ORDER BY created,rowid")
+    ]
     assert remaining == ["bytes-4"]
 
 
