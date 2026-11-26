@@ -1717,7 +1717,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """
         return safe(lambda: bridge.teams.send(identity(ctx), request))
 
-    @server.tool(annotations=read)
+    @server.tool(annotations=delivery)
     def team_messages(
         ctx: Context,
         team_id: str | None = None,
@@ -1728,13 +1728,18 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """The one inbox. With team_id: bounded team log (no private mailboxes).
 
+        Receive hook: a successful read acknowledges exactly the returned messages addressed
+        to you if you are in team.auto_ack_on_observe (default chatgpt) or the current
+        coordinator (then only from those principals). Every item has read/new; the result has
+        new_count, unread_count and total.
+
         Without team_id: your own mailbox over all teams plus the legacy direct store
         (read-only; "after" pages team messages, after_direct the legacy ones; see "next").
         """
-        if team_id:
-            return safe(lambda: bridge.teams.messages(identity(ctx), team_id, after, limit))
-        from kirabridge.message_overview import inbox
+        from kirabridge.message_overview import inbox, team_read
 
+        if team_id:
+            return safe(lambda: team_read(bridge, identity(ctx), team_id, after, limit))
         return safe(
             lambda: inbox(
                 bridge,
