@@ -28,8 +28,9 @@ for line in sys.stdin:
  m=json.loads(line);method=m.get('method')
  if method=='initialize':
   assert m['params']['clientCapabilities']=={}
-  version='0.28.0' if mode=='version' else '0.27.3' if mode=='patch_version' else '0.27.2'
-  r={'protocolVersion':1,'agentInfo':{'name':'qwen-code','version':version}}
+  version='0.99.9' if mode=='version' else '0.27.3' if mode=='patch_version' else '0.27.2'
+  name='other-agent' if mode=='identity' else 'qwen-code'
+  r={'protocolVersion':1,'agentInfo':{'name':name,'version':version}}
  elif method=='session/new':
   assert not m['params']['mcpServers']
   r={'sessionId':session}
@@ -129,10 +130,16 @@ async def test_unknown_never_reprompts(tmp_path, mode):
         )
 
 
-async def test_version_refuses_before_session_or_prompt(tmp_path):
+async def test_any_version_never_refuses(tmp_path):
+    result, started, _ = await turn(tmp_path, "version")
+    assert result["evidence"]["version"] == "0.99.9"
+    assert started.await_count == 1
+
+
+async def test_wrong_agent_identity_refuses_before_session_or_prompt(tmp_path):
     with pytest.raises(BridgeError) as error:
-        await turn(tmp_path, "version")
-    assert error.value.code == "agent_version"
+        await turn(tmp_path, "identity")
+    assert error.value.code == "agent_identity"
 
 
 async def test_new_session_model_mismatch_refuses_before_prompt(tmp_path):

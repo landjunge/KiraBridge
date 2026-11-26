@@ -280,9 +280,6 @@ def select(
         except (RoutingError, ValueError):
             rejected.append(f"{cli.id}: access evidence needs refresh")
             continue
-        if cli.installed_version != access.version:
-            rejected.append(f"{cli.id}: version mismatch")
-            continue
         if not set(task.required_capabilities) <= set(cli.capabilities):
             rejected.append(f"{cli.id}: required capability missing")
             continue

@@ -79,10 +79,8 @@ async def _probe(executable: str) -> dict:
 def compatibility(kind: str | None, version: str | None, *, cli: str | None = None) -> dict:
     if not version:
         return {"status": "unknown", "reason": "version_not_observed"}
-    if kind == "qwen_acp" or cli == "qwen":
-        if version in {"0.27.2", "0.27.3"}:
-            return {"status": "compatible", "reason": "qwen_acp_supported_version"}
-        return {"status": "unsupported", "reason": "qwen_acp_version_not_in_supported_set"}
+    # A CLI version is an observation only and never a compatibility verdict;
+    # adapters check concrete capabilities at runtime instead.
     if kind is None:
         return {"status": "unknown", "reason": "agent_adapter_not_configured"}
     return {"status": "unknown", "reason": "version_policy_not_declared_for_adapter"}

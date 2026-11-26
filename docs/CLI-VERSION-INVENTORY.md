@@ -16,15 +16,16 @@ versions, and compatibility states per CLI, so changing probe order does not
 look like an installation change. First observations and real set or
 compatibility changes are recorded in the existing chained audit store as
 `cli.version_observed`, `cli.version_changed`, or
-`cli.compatibility_changed`. Only the current observation is sent once to the
-current team coordinator as a deduplicated `result` when the authenticated
-inventory caller has a writable team route. Probe failures are reported as
-unknown; they do not stop the bridge or block work.
+`cli.compatibility_changed`. These are audit observations only: no team or
+coordinator message is sent. Probe failures are reported as unknown; they do
+not stop the bridge or block work.
 
-Qwen ACP currently declares only `0.27.2` and `0.27.3` supported. A detected
-`0.28.0` therefore reports `unsupported` with the adapter reason; this change
-does not claim compatibility or enable the version. Other adapters report
-`unknown` until they have an explicit version compatibility policy. The
+A CLI version never blocks, gates, or marks a CLI `unsupported` (CLIs update
+almost daily). Every CLI, including Qwen, reports compatibility `unknown` with
+the observed version. Adapters check concrete capabilities at runtime instead
+(Qwen ACP: agent name `qwen-code`, ACP `protocolVersion` 1, and `loadSession`
+for resume). Capability routing records the observed `--version` line but no
+longer requires it to equal the matrix version. The
 inventory covers the known command registry plus configured executable paths;
 it does not inspect arbitrary process command lines or infer a CLI from a
 generic `node` process.

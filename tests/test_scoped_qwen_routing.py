@@ -131,6 +131,14 @@ def scoped(tmp_path, monkeypatch):
     return source, runtime, task, config, args, scope, base, document, settings
 
 
+def test_changed_cli_version_never_blocks_scoped_delegation(scoped):
+    source, runtime, task, config, args, scope, *_ = scoped
+    scope["capability"]["installed_version"] = "9.9.9"
+    runtime.access[0].version = "0.99.9"
+    decision = DelegationGuard(source, runtime).validate_qwen_task(task, args=args, config=config)
+    assert decision["observed_version"] == "0.27.2"
+
+
 def test_explicit_qwen_scope_uses_real_hook_without_refreshing_global_matrix(scoped):
     source, runtime, task, config, args, _, base, *_ = scoped
     before = json.dumps(base)
@@ -179,7 +187,6 @@ def test_generic_native_prepare_cannot_consume_scoped_qwen(scoped):
         "write",
         "effort",
         "model",
-        "version",
         "auth",
         "prompt",
         "local_tools",
@@ -204,8 +211,6 @@ def test_scoped_qwen_negatives_fail_before_any_model_turn(scoped, change):
         config.qwen_reasoning_effort = "high"
     elif change == "model":
         config.model = "foreign"
-    elif change == "version":
-        scope["capability"]["installed_version"] = "0.27.3"
     elif change == "auth":
         (settings / "settings.json").write_text('{"security":{"auth":{"selectedType":"openai"}}}')
     elif change == "prompt":
