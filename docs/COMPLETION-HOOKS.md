@@ -78,9 +78,11 @@ Der Adapter ist ereignisunabhängig idempotent: gleiches Hook-JSON, gleiches Erg
   Zustellung, Abholung und Quittierung. Keine Warnungen, keine Ausnahmen, keine Verlängerung.
   Dauerhaft ist allein der ThreadDesk-Eintrag (Abschnitt 3, Schritt 6).
 - Empfangs-Hook: Eine an ChatGPT adressierte Nachricht wird beim erfolgreichen Auslesen
-  automatisch quittiert. Reihenfolge zwingend: erst Auslieferung (`receipt`/`delivered`),
-  dann Verarbeitung, dann `acknowledged` — nie vor der Auslieferung. Ein Lesefehler lässt
-  die Quittierung ausbleiben; die Nachricht bleibt unbearbeitet, bis 7 Tage abgelaufen sind.
+  automatisch quittiert. Ist umgesetzt in `messages_overview` (`src/kirabridge/message_overview.py`,
+  `observe`); konfigurierbar über `team.auto_ack_on_observe` (Standard `["chatgpt"]`).
+  Reihenfolge zwingend: erst Auslieferung (`receipt`/`delivered`), dann Verarbeitung,
+  dann `acknowledged` — nie vor der Auslieferung. Ein Lesefehler lässt die Quittierung
+  ausbleiben; die Nachricht bleibt unbearbeitet, bis 7 Tage abgelaufen sind.
 
 ## 7. Sicherheit
 

@@ -182,6 +182,9 @@ class TeamConfig(BaseModel):
     # Members allowed to claim the coordinator role for themselves (needs team.manage as well).
     # Empty = nobody self-claims; the owner and the current coordinator can always switch roles.
     coordinator_candidates: list[str] = Field(default_factory=list, max_length=16)
+    # Receive hook (docs/COMPLETION-HOOKS.md Abschnitt 6): principals whose messages_overview
+    # read acknowledges the returned messages addressed to them. Default: Kira alone.
+    auto_ack_on_observe: list[str] = Field(default_factory=lambda: ["chatgpt"], max_length=16)
     max_total_work: int = Field(default=10000, ge=1, le=1000000)
     max_messages: int = Field(default=10000, ge=1, le=1000000)
     max_body_bytes: int = Field(default=16384, ge=256, le=65536)

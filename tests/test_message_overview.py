@@ -113,13 +113,38 @@ def test_only_principals_with_the_observe_capability_may_read_everything(domain)
     assert observe(domain.bridge, "chatgpt")["count"] >= 1
 
 
-async def test_the_overview_is_published_as_a_read_only_mcp_tool(domain):
+async def test_the_overview_is_published_as_a_receiving_mcp_tool(domain):
     from kirabridge.mcp_gateway.server import create_server
 
     tools = {tool.name: tool for tool in await create_server(domain.bridge).list_tools()}
     tool = tools["messages_overview"]
-    assert tool.annotations.readOnlyHint is True
+    # The receive hook acknowledges on read, so the tool no longer claims to be read-only.
+    assert tool.annotations.readOnlyHint is False
+    assert tool.annotations.destructiveHint is False
+    assert tool.annotations.idempotentHint is True
     assert OBSERVE_CAPABILITY in tool.description
+    assert "acknowledges" in tool.description
     assert {"after_direct", "after_team", "limit", "body_chars"} <= set(
         tool.inputSchema["properties"]
+    )
+
+
+def test_observe_by_a_principal_outside_the_hook_list_changes_nothing(domain):
+    direct(domain, "codex", "chatgpt", "d-other")
+    team(domain, "codex", "chatgpt", "t-other")
+    domain.config.principals["local"].capabilities.append(OBSERVE_CAPABILITY)
+    result = observe(domain.bridge, "local")
+    assert result["read_only"] is True and "ack_error" not in result
+    assert result["acknowledged_by_read"] == {"direct": [], "team": []}
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM messages WHERE acknowledged IS NULL"
+        ).fetchone()[0]
+        == 1
+    )
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_messages WHERE acknowledged IS NULL"
+        ).fetchone()[0]
+        == 1
     )
