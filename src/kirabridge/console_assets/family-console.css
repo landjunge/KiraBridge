@@ -80,3 +80,7 @@
 .native-shell .workspace.family-workspace{grid-template-columns:minmax(670px,1fr)}
 .native-shell .workspace.family-workspace>.process-panel,.native-shell .workspace.family-workspace>.panel-resizer,
 .native-shell .workspace.family-workspace>.details-panel,.native-shell .workspace.family-workspace.right-user-expanded>.details-panel{display:none}
+/* Compact control override layer (networkpunkt.css stays unchanged): controls 32px, one source for min sizes. */
+:root{--np-control:32px;--np-control-touch:32px;--np-panel-pad:12px;--np-row:32px;--family-sidebar-min:176px;--family-main-min:670px;--family-inspector-min:292px}
+.np-button,.np-field input,.np-field select,.np-dropdown{min-height:var(--np-control);height:var(--np-control)}
+.np-tabs a,.np-disclosure>summary{min-height:var(--np-control)}

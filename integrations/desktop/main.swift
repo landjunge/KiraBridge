@@ -471,7 +471,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
             ? NSWindow(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
             : DesktopSnapshotWindow(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
         window.title = title
-        window.minSize = NSSize(width: 820, height: 620)
+        window.minSize = NSSize(width: FamilyLayout.minWindowWidth, height: FamilyLayout.minWindowHeight)
         window.contentViewController = content
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed

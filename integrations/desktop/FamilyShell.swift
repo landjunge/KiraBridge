@@ -15,6 +15,16 @@ import WebKit
 
 // MARK: Theme.swift
 
+/// Single source for column and window minimum sizes (window.minSize must be >= the column sum).
+enum FamilyLayout {
+    static let sidebarMin: CGFloat = 176, sidebarMax: CGFloat = 220
+    static let mainMin: CGFloat = 670
+    static let inspectorMin: CGFloat = 292, inspectorMax: CGFloat = 370
+    static let dividers: CGFloat = 4
+    static let minWindowWidth: CGFloat = sidebarMin + mainMin + inspectorMin + dividers
+    static let minWindowHeight: CGFloat = 560
+}
+
 enum Palette {
     static func adaptive(_ dark: String, _ light: String) -> NSColor {
         NSColor(name: nil) { appearance in
@@ -587,10 +597,10 @@ final class MainSplitController: NSSplitViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         let s = NSSplitViewItem(sidebarWithViewController: sidebar)
-        s.minimumThickness = 176; s.maximumThickness = 220; s.preferredThicknessFraction = 0.11; s.canCollapse = true
-        let m = NSSplitViewItem(viewController: main); m.minimumThickness = 670
+        s.minimumThickness = FamilyLayout.sidebarMin; s.maximumThickness = FamilyLayout.sidebarMax; s.preferredThicknessFraction = 0.11; s.canCollapse = true
+        let m = NSSplitViewItem(viewController: main); m.minimumThickness = FamilyLayout.mainMin
         let i = NSSplitViewItem(viewController: inspector)
-        i.minimumThickness = 292; i.maximumThickness = 370; i.canCollapse = true; i.preferredThicknessFraction = 0.18
+        i.minimumThickness = FamilyLayout.inspectorMin; i.maximumThickness = FamilyLayout.inspectorMax; i.canCollapse = true; i.preferredThicknessFraction = 0.18
         addSplitViewItem(s); addSplitViewItem(m); addSplitViewItem(i)
     }
     func localize() { sidebar.localize(); inspector.localize() }
