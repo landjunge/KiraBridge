@@ -191,7 +191,7 @@ async def inventory(bridge, principal):
     }
     cli_rows = await cli_inventory(bridge.config.agents, policy.agents, process_names)
     changes = _record_cli_versions(bridge, cli_rows)
-    _notify_cli_version_changes(bridge, changes, principal, cli_rows)
+    _notify_cli_version_changes(bridge, changes, principal)
     for agent in result["agents"]:
         binding = bridge.config.visible_handoffs.bindings.get(agent["id"])
         matches = [
@@ -223,14 +223,15 @@ async def inventory(bridge, principal):
 
 
 def _record_cli_versions(bridge, rows):
-    """Keep first observations and version/path changes in the existing audit chain."""
+    """Record one stable installation-set observation per CLI."""
     store = bridge.store
     changed = []
+    grouped = {}
+    for row in rows:
+        if row.get("version"):
+            grouped.setdefault(row["cli"], []).append(row)
     with store.transaction():
-        for row in rows:
-            version = row.get("version")
-            if not version:
-                continue
+        for cli, candidates in grouped.items():
             previous = store.db.execute(
                 "SELECT metadata FROM audit WHERE kind IN "
                 "('cli.version_observed','cli.version_changed','cli.compatibility_changed') "
@@ -242,29 +243,67 @@ def _record_cli_versions(bridge, rows):
                     metadata = json.loads(event["metadata"])
                 except (TypeError, ValueError):
                     continue
-                if metadata.get("cli") == row["cli"]:
+                if metadata.get("cli") == cli:
                     prior = metadata
                     break
+            primary = min(
+                candidates,
+                key=lambda row: (row.get("search_order", 0), row["executable"]),
+            )
+            installations = sorted(
+                (
+                    {
+                        "executable": row["executable"],
+                        "version": row["version"],
+                        "compatibility": row["compatibility"]["status"],
+                    }
+                    for row in candidates
+                ),
+                key=lambda row: (row["executable"], row["version"], row["compatibility"]),
+            )
             current = {
-                "cli": row["cli"],
-                "version": version,
-                "executable": row["executable"],
-                "probe_status": row["probe_status"],
-                "compatibility": row["compatibility"]["status"],
+                "cli": cli,
+                "version": primary["version"],
+                "executable": primary["executable"],
+                "probe_status": primary["probe_status"],
+                "compatibility": primary["compatibility"]["status"],
+                "installations": installations,
             }
-            same_version = prior and prior.get("version") == version
-            same_path = prior and prior.get("executable") == row["executable"]
-            same_compatibility = prior and prior.get("compatibility") == current["compatibility"]
-            if same_version and same_path and same_compatibility:
+            has_unsupported = any(item["compatibility"] == "unsupported" for item in installations)
+
+            # Upgrade old single-installation audit records silently. The new
+            # complete inventory becomes the baseline, preventing a one-time
+            # schema migration from looking like a CLI installation change.
+            legacy_prior = prior is not None and not isinstance(prior.get("installations"), list)
+            if legacy_prior:
+                store.audit("cli.version_observed", "service", None, current)
                 continue
-            if prior and (not same_version or not same_path):
-                kind = "cli.version_changed"
-            elif prior:
+
+            previous_installations = prior.get("installations", []) if prior else []
+            previous_identity = {
+                (item.get("executable"), item.get("version"))
+                for item in previous_installations
+                if isinstance(item, dict)
+            }
+            current_identity = {(item["executable"], item["version"]) for item in installations}
+            previous_compatibility = {
+                (item.get("executable"), item.get("compatibility"))
+                for item in previous_installations
+                if isinstance(item, dict)
+            }
+            current_compatibility = {
+                (item["executable"], item["compatibility"]) for item in installations
+            }
+            if prior and previous_identity == current_identity:
+                if previous_compatibility == current_compatibility:
+                    continue
                 kind = "cli.compatibility_changed"
+            elif prior:
+                kind = "cli.version_changed"
             else:
                 kind = "cli.version_observed"
             store.audit(kind, "service", None, current)
-            if prior or current["compatibility"] == "unsupported":
+            if prior or has_unsupported:
                 changed.append(
                     {
                         "event": kind if prior else "cli.compatibility",
@@ -275,7 +314,7 @@ def _record_cli_versions(bridge, rows):
     return changed
 
 
-def _notify_cli_version_changes(bridge, changes, principal, current_rows=()):
+def _notify_cli_version_changes(bridge, changes, principal):
     """Send one deduplicated result to current coordinator(s), without model execution here."""
     if not hasattr(bridge, "teams"):
         return
@@ -286,65 +325,36 @@ def _notify_cli_version_changes(bridge, changes, principal, current_rows=()):
         "WHERE m.principal=? AND m.active=1 AND t.coordinator<>'' ORDER BY t.id",
         (principal,),
     ).fetchall()
-    notifications = list(changes)
-    notifications.extend(
-        {
-            "event": "cli.compatibility",
-            "previous": None,
-            "current": {
-                "cli": row["cli"],
-                "version": row["version"],
-                "executable": row["executable"],
-                "compatibility": row["compatibility"]["status"],
-            },
-        }
-        for row in current_rows
-        if row["compatibility"]["status"] == "unsupported"
-    )
-    for row in current_rows:
-        latest = bridge.store.db.execute(
-            "SELECT kind,metadata FROM audit WHERE kind IN "
-            "('cli.version_changed','cli.compatibility_changed') ORDER BY seq DESC LIMIT 512"
-        ).fetchall()
-        for event in latest:
-            try:
-                metadata = json.loads(event["metadata"])
-            except (TypeError, ValueError):
-                continue
-            if metadata.get("cli") != row["cli"]:
-                continue
-            if (
-                metadata.get("version") == row["version"]
-                and metadata.get("executable") == row["executable"]
-            ):
-                notifications.append(
-                    {
-                        "event": event["kind"],
-                        "previous": None,
-                        "current": {
-                            "cli": row["cli"],
-                            "version": row["version"],
-                            "executable": row["executable"],
-                            "compatibility": row["compatibility"]["status"],
-                        },
-                    }
-                )
-            break
-    for change in notifications:
+    for change in changes:
         current = change["current"]
         for team in teams:
             previous_version = (change.get("previous") or {}).get("version")
+            installations = ", ".join(
+                f"{item['version']} ({item['compatibility']}) at {item['executable']}"
+                for item in current.get("installations", [])
+            )
             body = (
                 f"{change['event']}: {current['cli']} "
                 f"{previous_version + ' → ' if previous_version else ''}{current['version']} "
-                f"({current['compatibility']}); executable {current['executable']}"
+                f"({current['compatibility']}); primary {current['executable']}"
+                + (f"; installations: {installations}" if installations else "")
             )
             request = TeamMessageSend(
                 team_id=team["id"],
                 recipient="coordinator",
                 kind="result",
                 body=body,
-                idempotency_key=("cli-version-" + digest({"team": team["id"], **current})[:48]),
+                idempotency_key=(
+                    "cli-version-"
+                    + digest(
+                        {
+                            "team": team["id"],
+                            "event": change["event"],
+                            "previous": change.get("previous"),
+                            "current": current,
+                        }
+                    )[:48]
+                ),
             )
             try:
                 bridge.teams.send(principal, request)

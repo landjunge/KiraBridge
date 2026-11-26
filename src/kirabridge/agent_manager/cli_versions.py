@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import os
 import re
-import shutil
 from pathlib import Path
 
 VERSION = re.compile(r"(?<![0-9])v?(\d+\.\d+(?:\.\d+)?(?:[-+][A-Za-z0-9.-]+)?)(?![0-9])")
@@ -92,40 +91,63 @@ def compatibility(kind: str | None, version: str | None, *, cli: str | None = No
 async def inventory(
     configs: dict, allowed: list[str], running_process_names: set[str]
 ) -> list[dict]:
-    """Observe configured executables and known CLI names on PATH; never use a shell."""
-    configured: dict[str, dict] = {}
+    """Observe every configured/PATH executable without invoking a shell."""
+    configured_by_path: dict[str, dict] = {}
     for agent_id, config in configs.items():
         if agent_id not in allowed or not config.executable:
             continue
-        name = Path(config.executable).name.lower()
-        configured.setdefault(name, {"agent_id": agent_id, "kind": config.kind})
+        executable = str(Path(config.executable).expanduser())
+        try:
+            resolved = str(Path(executable).resolve(strict=True))
+        except OSError:
+            resolved = executable
+        profile = {"agent_id": agent_id, "kind": config.kind}
+        configured_by_path.setdefault(resolved, profile)
 
-    pending = []
-    seen = set()
+    search_path = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    pending_by_key: dict[tuple[str, str], tuple[str, str, str, dict, int]] = {}
     for canonical, aliases in CLI_COMMANDS.items():
-        paths = [(alias, shutil.which(alias)) for alias in aliases]
-        paths.extend(
-            (Path(config.executable).name.lower(), config.executable)
-            for agent_id, config in configs.items()
-            if (
-                agent_id in allowed
-                and config.executable
-                and Path(config.executable).name.lower() in aliases
-            )
-        )
-        for alias, executable in paths:
-            if not executable:
+        for path_index, directory in enumerate(search_path):
+            if not directory:
                 continue
-            resolved = str(Path(executable).expanduser())
+            for alias_index, alias in enumerate(aliases):
+                candidate = Path(directory) / alias
+                if not candidate.is_file() or not os.access(candidate, os.X_OK):
+                    continue
+                try:
+                    resolved = str(candidate.resolve(strict=True))
+                except OSError:
+                    continue
+                profile = configured_by_path.get(resolved, {})
+                search_order = path_index * max(len(aliases), 1) + alias_index
+                _remember_candidate(
+                    pending_by_key,
+                    canonical,
+                    alias,
+                    resolved,
+                    profile,
+                    search_order,
+                )
+
+        for agent_id, config in configs.items():
+            if agent_id not in allowed or not config.executable:
+                continue
+            executable = str(Path(config.executable).expanduser())
+            if Path(executable).name.lower() not in aliases:
+                continue
             try:
-                resolved = str(Path(resolved).resolve(strict=True))
+                resolved = str(Path(executable).resolve(strict=True))
             except OSError:
                 continue
-            if resolved in seen:
-                continue
-            seen.add(resolved)
-            profile = configured.get(Path(executable).name.lower(), {})
-            pending.append((canonical, alias, resolved, profile))
+            _remember_candidate(
+                pending_by_key,
+                canonical,
+                Path(executable).name.lower(),
+                resolved,
+                {"agent_id": agent_id, "kind": config.kind},
+                -1,
+            )
+
     for agent_id, config in configs.items():
         if agent_id not in allowed or not config.executable:
             continue
@@ -134,21 +156,26 @@ async def inventory(
             executable = str(Path(executable).resolve(strict=True))
         except OSError:
             continue
-        if executable in seen:
-            continue
-        seen.add(executable)
         canonical = KIND_CLI.get(config.kind, agent_id)
-        pending.append(
-            (
+        if (canonical, executable) not in pending_by_key:
+            _remember_candidate(
+                pending_by_key,
                 canonical,
                 Path(executable).name.lower(),
                 executable,
                 {"agent_id": agent_id, "kind": config.kind},
+                -1,
             )
-        )
-    probes = await asyncio.gather(*(_probe(executable) for _, _, executable, _ in pending))
+
+    pending = sorted(
+        pending_by_key.values(),
+        key=lambda item: (item[0], item[4], item[2]),
+    )
+    probes = await asyncio.gather(*(_probe(executable) for _, _, executable, _, _ in pending))
     candidates = []
-    for (canonical, _alias, executable, profile), probe in zip(pending, probes, strict=True):
+    for (canonical, _alias, executable, profile, search_order), probe in zip(
+        pending, probes, strict=True
+    ):
         aliases = set(CLI_COMMANDS.get(canonical, ()))
         candidates.append(
             {
@@ -156,6 +183,7 @@ async def inventory(
                 "agent_id": profile.get("agent_id"),
                 "adapter": profile.get("kind"),
                 "executable": executable,
+                "search_order": search_order,
                 "version": probe["version"],
                 "probe_status": probe["status"],
                 "running": bool(aliases.intersection(running_process_names))
@@ -166,3 +194,20 @@ async def inventory(
             }
         )
     return candidates
+
+
+def _remember_candidate(pending, canonical, alias, executable, profile, search_order):
+    key = (canonical, executable)
+    previous = pending.get(key)
+    if previous is None:
+        pending[key] = (canonical, alias, executable, profile, search_order)
+        return
+    _canonical, old_alias, _executable, old_profile, old_order = previous
+    preferred_profile = profile if search_order == -1 else old_profile
+    pending[key] = (
+        canonical,
+        old_alias if old_order <= search_order else alias,
+        executable,
+        preferred_profile,
+        min(old_order, search_order),
+    )
