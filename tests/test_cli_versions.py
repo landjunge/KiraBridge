@@ -253,3 +253,31 @@ def test_first_observation_reports_unsupported_secondary_installation(tmp_path):
     assert len(changes[0]["current"]["installations"]) == 2
     assert _record_cli_versions(bridge, rows) == []
     store.close()
+
+
+def test_cli_version_history_is_read_once_for_many_cli_rows(tmp_path):
+    store = Store(tmp_path / "bridge.sqlite3")
+    bridge = SimpleNamespace(store=store)
+    rows = [
+        {
+            "cli": f"tool-{index}",
+            "version": "1.2.3",
+            "executable": f"/opt/tool-{index}",
+            "search_order": 0,
+            "probe_status": "observed",
+            "compatibility": {"status": "unknown"},
+        }
+        for index in range(12)
+    ]
+    statements = []
+    store.db.set_trace_callback(statements.append)
+
+    assert _record_cli_versions(bridge, rows) == []
+
+    store.db.set_trace_callback(None)
+    history_queries = [
+        statement for statement in statements
+        if statement.startswith("SELECT metadata FROM audit WHERE kind IN")
+    ]
+    assert len(history_queries) == 1
+    store.close()
