@@ -795,7 +795,7 @@ class CoordinatorRoles:
             or current is None
             or self._reference(current) != session
         ):
-            return
+            return False
         try:
             work = self.manager.delegate(
                 principal,
@@ -817,8 +817,9 @@ class CoordinatorRoles:
                 message_id,
                 error_code=exc.code,
             )
-            return
+            return False
         self.db.execute(
             "INSERT INTO team_coordinator_notifications VALUES(?,?,?,?)",
             (message_id, work["id"], team_id, canonical(session)),
         )
+        return True

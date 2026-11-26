@@ -1,0 +1,102 @@
+"""team send is the one send path: it hands a ticket to the delivery machine, once."""
+
+import pytest
+from test_team_manager import domain as imported_domain
+from test_team_manager import message, role
+
+from kirabridge.bridge_core.config import (
+    AgentConfig,
+    ReceiverConfig,
+    VisibleHandoffConfig,
+    VisibleTerminalBinding,
+)
+from kirabridge.bridge_core.models import BridgeError
+from kirabridge.message_overview import inbox
+
+domain = imported_domain
+
+
+def wire(domain, *names):
+    domain.config.visible_handoffs = VisibleHandoffConfig(
+        bindings={
+            name: VisibleTerminalBinding(
+                pane_id="terminal:1:ttys001", expected_pid=1, agent_pid=2, ready_pattern="ready"
+            )
+            for name in names
+        }
+    )
+    for name in ("codex", "grok", "local", "chatgpt"):
+        domain.config.messaging.receivers[name] = ReceiverConfig(
+            cwd=domain.config.principals["local"].roots[0], timeout=3
+        )
+        domain.config.agents.setdefault(name, AgentConfig(kind="codex"))
+        policy = domain.config.principals[name]
+        policy.agents = sorted(set(policy.agents) | {name})
+        policy.capabilities = list(set(policy.capabilities) | {"message.send", "message.read"})
+        policy.capabilities = list(set(policy.capabilities) | {"agent.execute"})
+        policy.message_peers = ["chatgpt", "codex", "grok", "local"]
+
+
+def tickets(domain):
+    return domain.store.db.execute(
+        "SELECT * FROM messages WHERE idem LIKE 'team:%' ORDER BY seq"
+    ).fetchall()
+
+
+def to_coordinator(domain, key, sender="grok"):
+    return domain.send(sender, message(recipient="coordinator", idempotency_key=key))
+
+
+def test_message_to_the_coordinator_creates_exactly_one_hidden_ticket(domain):
+    wire(domain, "chatgpt")  # chatgpt is the coordinator of the test team
+    sent = to_coordinator(domain, "k1")
+    to_coordinator(domain, "k1")  # replay
+    rows = tickets(domain)
+    assert len(rows) == 1
+    assert rows[0]["idem"] == "team:" + sent["id"] and rows[0]["recipient"] == "chatgpt"
+    assert all(i["id"] != rows[0]["id"] for i in inbox(domain.bridge, "chatgpt")["items"])
+
+
+def test_role_change_moves_the_delivery_target(domain):
+    wire(domain, "chatgpt", "grok")
+    to_coordinator(domain, "k2", sender="codex")
+    role(domain, "grok", "coordinator")
+    to_coordinator(domain, "k3", sender="codex")
+    assert [r["recipient"] for r in tickets(domain)] == ["chatgpt", "grok"]
+
+
+def test_coordinator_without_a_terminal_binding_keeps_the_message_in_the_inbox(domain):
+    wire(domain, "grok")
+    sent = to_coordinator(domain, "k4")
+    assert tickets(domain) == []
+    assert domain.messages("chatgpt", "test-team")["messages"][-1]["id"] == sent["id"]
+
+
+def test_ticket_and_coordinator_notification_never_both_fire(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    calls = []
+    monkeypatch.setattr(
+        type(domain.coordinator_roles), "queue_notification", lambda *a, **k: calls.append(a)
+    )
+    to_coordinator(domain, "k5")
+    assert calls == [] and len(tickets(domain)) == 1
+
+
+def test_non_members_get_no_message_and_no_ticket(domain):
+    wire(domain, "chatgpt")
+    with pytest.raises(BridgeError):
+        domain.send("outsider", message(recipient="coordinator", idempotency_key="k6"))
+    assert tickets(domain) == []
+
+
+def test_delivery_outcome_is_written_back_to_the_team_log(domain):
+    wire(domain, "chatgpt")
+    sent = to_coordinator(domain, "k7")
+    ticket = tickets(domain)[0]
+    with domain.store.transaction():
+        domain.bridge.message_receiver._finish(ticket["id"], "completed", {})
+    event = domain.store.db.execute(
+        "SELECT kind,object_id FROM team_events WHERE kind LIKE 'team.message_deliver%'"
+    ).fetchone()
+    assert tuple(event) == ("team.message_delivered", sent["id"])
+    assert domain.messages("chatgpt", "test-team")["messages"][-1]["acknowledged"] is None
