@@ -592,6 +592,19 @@ def idle_guard(config):
                 "where a.message_id=v.message_id and a.state in "
                 "('planned','inserting','inserted','submitting','return_sent','sent','confirmed'))"
             )
+            # Jobs often link to the handoff only through their evidence
+            # (observation.handoff_id), whose message_id differs from the job's.
+            if "evidence" in {r[1] for r in db.execute("pragma table_info(message_jobs)")}:
+                dead.append(
+                    "select 1 from visible_handoffs v "
+                    "where v.state='unknown' and v.id=json_extract("
+                    "case when json_valid(message_jobs.evidence) then message_jobs.evidence "
+                    "else '{}' end,'$.observation.handoff_id') "
+                    "and not exists (select 1 from visible_handoffs a "
+                    "where a.message_id=v.message_id and a.state in "
+                    "('planned','inserting','inserted','submitting','return_sent','sent',"
+                    "'confirmed'))"
+                )
         skipped = []
         jobs = 0
         if "message_jobs" in tables:
