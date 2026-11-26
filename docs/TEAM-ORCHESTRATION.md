@@ -98,8 +98,8 @@ Nach dem Update muss ein Client die neue Werkzeugliste gegebenenfalls neu laden.
 | `team_list()` / `team_get(team_id)` | Eigene Teams, Mitglieder, Rollen und Revision lesen |
 | `team_context(team_id)` | Aktuelle Ergebnisse und bevorzugt eigene offene Nachrichten begrenzt lesen |
 | `team_set_role(request)` | Rolle oder Aktivität mit erwarteter Revision ändern |
-| `team_message_send(request)` | Adressierte Nachricht dauerhaft speichern |
-| `team_messages(team_id, after, limit)` | Geordneten gemeinsamen Verlauf lesen |
+| `team_message_send(request)` | Der eine Sendeweg; stellt an gebundene Worker/Koordinator sofort zu (siehe COMPLETION-HOOKS.md Abschnitt 8) |
+| `team_messages(team_id?, after, limit)` | Das eine Postfach (ohne Team-ID) oder den gemeinsamen Verlauf lesen; Lesen quittiert für `chatgpt`/Koordinator automatisch, Einträge tragen `read`/`new` |
 | `team_message_ack(team_id, message_id)` | Als tatsächlicher Empfänger quittieren |
 | `team_work_create(request)` | Mitglied beauftragen, optional als echten Unterauftrag |
 | `team_work_list(...)` / `team_work_get(...)` | Gemeinsame Arbeit und Ergebnisbelege lesen |
