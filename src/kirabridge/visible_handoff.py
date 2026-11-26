@@ -10,7 +10,7 @@ from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canon
 from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.process_lifecycle import fresh_generations, same_generation, valid_generation
-from kirabridge.session_manager import RECEIVER_OWNER, SessionInput
+from kirabridge.session_manager import RECEIVER_OWNER, SessionInput, process_is
 from kirabridge.team_manager.coordinator_prefix import matches_body
 from kirabridge.visible_binding import (
     binding_still_present,
@@ -835,7 +835,7 @@ class VisibleHandoffs:
             principal, binding.pane_id, binding.expected_pid
         )
         if not self.sessions.binding_matches(selected, binding, target) or not any(
-            p["pid"] == binding.agent_pid and p["name"] == target
+            p["pid"] == binding.agent_pid and process_is(p, target)
             for p in selected.get("processes", [])
         ):
             return {
@@ -2097,7 +2097,7 @@ class VisibleHandoffs:
             matches = [
                 p
                 for p in row.get("processes", [])
-                if p["pid"] == binding.agent_pid and p["name"] == target
+                if p["pid"] == binding.agent_pid and process_is(p, target)
             ]
             if len(matches) != 1:
                 raise BridgeError(

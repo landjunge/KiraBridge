@@ -1,5 +1,7 @@
 """team send is the one send path: it hands a ticket to the delivery machine, once."""
 
+import time
+
 import pytest
 from test_team_manager import domain as imported_domain
 from test_team_manager import message, role
@@ -100,3 +102,39 @@ def test_delivery_outcome_is_written_back_to_the_team_log(domain):
     ).fetchone()
     assert tuple(event) == ("team.message_delivered", sent["id"])
     assert domain.messages("chatgpt", "test-team")["messages"][-1]["acknowledged"] is None
+
+
+def test_the_local_binding_matches_the_claude_process(domain):
+    from kirabridge.session_manager import SessionManager
+
+    binding = VisibleTerminalBinding(
+        pane_id="terminal:1:ttys001", expected_pid=10, agent_pid=11, ready_pattern="❯"
+    )
+    selected = {
+        "pane_id": "terminal:1:ttys001",
+        "expected_pid": 10,
+        "processes": [{"pid": 11, "name": "claude"}],
+    }
+    assert SessionManager.binding_matches(selected, binding, "local")
+    assert not SessionManager.binding_matches(selected, binding, "grok")
+
+
+def test_message_to_the_live_coordinator_is_dispatched_but_stays_queued_when_dead(domain):
+    from kirabridge.bridge_core.models import canonical
+
+    wire(domain, "grok")
+    domain.config.team.coordinator_only_senders = ["chatgpt"]
+    role(domain, "grok", "coordinator")
+    # Dead or unobserved pane: the hidden ticket exists but drives nothing.
+    domain.send("chatgpt", message(recipient="coordinator", idempotency_key="live0"))
+    assert len(tickets(domain)) == 1
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 0
+    # A fresh, available presence of exactly the configured binding makes it a delivery.
+    binding = domain.config.visible_handoffs.bindings["grok"]
+    domain.store.db.execute(
+        "INSERT INTO receiver_presence VALUES(?,?,?,?,?)",
+        ("grok", "available", canonical(binding.model_dump()), "{}", time.time()),
+    )
+    domain.send("chatgpt", message(recipient="coordinator", idempotency_key="live1"))
+    assert len(tickets(domain)) == 2
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1

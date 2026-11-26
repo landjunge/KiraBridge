@@ -140,6 +140,15 @@ class SessionOpen(Input):
     window_authorization: str = Field(default="", max_length=128)
 
 
+# The local coordinator principal drives the Claude TUI, whose process is called "claude".
+PROCESS_ALIASES = {"local": "claude"}
+
+
+def process_is(process, target):
+    """True when this catalog process is the CLI bound to the visible target."""
+    return process["name"] in {target, PROCESS_ALIASES.get(target)}
+
+
 class SessionManager:
     def __init__(
         self,
@@ -331,7 +340,7 @@ class SessionManager:
             and binding.expected_pid
             in {selected.get("expected_pid"), selected.get("legacy_expected_pid")}
             and any(
-                p["pid"] == binding.agent_pid and p["name"] == target
+                p["pid"] == binding.agent_pid and process_is(p, target)
                 for p in selected.get("processes", [])
             )
         )
@@ -368,7 +377,7 @@ class SessionManager:
     async def agent_selection(self, principal, target, binding):
         selected = await self.selected(principal, binding.pane_id, binding.expected_pid)
         if not self.binding_matches(selected, binding, target) or not any(
-            p["pid"] == binding.agent_pid and p["name"] == target
+            p["pid"] == binding.agent_pid and process_is(p, target)
             for p in selected.get("processes", [])
         ):
             raise BridgeError("visible_target_changed", "Selected agent changed before dispatch")
