@@ -6,7 +6,11 @@
 // Names, measurements and colours are kept; only AuthorityCore dependencies are
 // replaced: AppState/Proof/Warning are absent, Localization becomes the small DE/EN
 // table below and FamilySwitchClient.productIDs becomes the fixed catalog list.
+// Block 2 adds KiraBridge-specific header state on top of the reused renderer:
+// installed products are coloured, missing ones grayed out, the active product keeps
+// a brand glow, and a polled bridge-status dot with a confirmed restart sits left of DE/EN.
 import AppKit
+import CoreImage
 import WebKit
 
 // MARK: Theme.swift
@@ -60,6 +64,17 @@ enum FamilyLocalization {
         "family.failed": ("Wechsel fehlgeschlagen.", "Switch failed."),
         "family.uncertain": ("Ausgang des Wechsels unklar.", "Switch outcome unknown."),
         "family.missing": ("Der Familienvermittler fehlt.", "The family broker is missing."),
+        "family.notInstalled": ("nicht installiert", "not installed"),
+        "status.running": ("KiraBridge läuft", "KiraBridge running"),
+        "status.unreachable": ("Bridge nicht erreichbar", "Bridge unreachable"),
+        "header.restart": ("Neustart", "Restart"),
+        "restart.title": ("KiraBridge-Dienst neu starten", "Restart the KiraBridge service"),
+        "restart.question": ("Der Hintergrunddienst wird sofort neu gestartet. Laufende Aufträge können unterbrochen werden.",
+                             "The background service restarts immediately. Running tasks may be interrupted."),
+        "restart.cancel": ("Abbrechen", "Cancel"),
+        "restart.confirm": ("Neustart", "Restart"),
+        "toolbar.permissions": ("Rechte", "Permissions"),
+        "toolbar.settings": ("Einstellungen", "Settings"),
     ]
 
     static func choose(_ code: String) {
@@ -125,6 +140,43 @@ class LayoutView: SurfaceView {
 
 // MARK: ProductHeader.swift
 
+/// Asynchronous reachability poll of the local bridge (127.0.0.1:8765). Any HTTP
+/// answer counts as live; the main thread is never blocked by the request.
+final class BridgeServiceProbe {
+    var onUpdate: ((Bool) -> Void)?
+    private var timer: Timer?
+    private lazy var session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 1.5
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration)
+    }()
+
+    func start() {
+        guard timer == nil else { return }
+        check()
+        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            self?.check()
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func check() {
+        guard let url = URL(string: "http://127.0.0.1:8765/") else { return }
+        session.dataTask(with: url) { [weak self] _, response, _ in
+            let live = response is HTTPURLResponse
+            DispatchQueue.main.async { self?.onUpdate?(live) }
+        }.resume()
+    }
+
+    deinit { stop() }
+}
+
 /// UI metadata only. No collector, process or transport state is inferred.
 final class ProductHeaderView: NSStackView {
     private let names = ["KiraBridge", "ThreadDesk", "4AllPass", "TollGate", "Agent Authority"]
@@ -133,6 +185,25 @@ final class ProductHeaderView: NSStackView {
     private let selfIndex = 0
     var onOpen: ((String) -> Void)?
     var onDetail: ((String) -> Void)?
+
+    /// An installed family app is one whose bundle sits in /Applications or ~/Applications.
+    static func isInstalled(bundleName: String) -> Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let directories = ["/Applications", home.appendingPathComponent("Applications").path]
+        return directories.contains {
+            FileManager.default.fileExists(atPath: $0 + "/" + bundleName + ".app")
+        }
+    }
+
+    /// CIColorControls at zero saturation; not-installed products render gray.
+    static func grayscale(_ image: NSImage) -> NSImage? {
+        guard let tiff = image.tiffRepresentation, let input = CIImage(data: tiff),
+              let filter = CIFilter(name: "CIColorControls", parameters: [
+                  kCIInputImageKey: input, kCIInputSaturationKey: 0.0,
+              ]), let output = filter.outputImage else { return nil }
+        guard let bitmap = CIContext().createCGImage(output, from: output.extent) else { return nil }
+        return NSImage(cgImage: bitmap, size: image.size)
+    }
 
     private var buttons: [ProductIconButton] = []
     private var observer: NSObjectProtocol?
@@ -147,6 +218,8 @@ final class ProductHeaderView: NSStackView {
             button.identifier = NSUserInterfaceItemIdentifier(ids[index])
             button.onFocus = { [weak self] text in self?.onDetail?(text) }
             button.tag = index; button.isBordered = false; button.focusRingType = .exterior
+            button.isInstalled = Self.isInstalled(bundleName: names[index])
+            button.isActive = index == selfIndex
             if let asset = assets.first(where: { $0.appId == ids[index] }), asset.viewport.count == 4,
                asset.viewport.allSatisfy({ $0.isFinite && $0 >= 0 }), asset.viewport[2] > 0, asset.viewport[3] > 0,
                let url = productHeaderResourceURL(asset.file, extension: nil) {
@@ -171,13 +244,14 @@ final class ProductHeaderView: NSStackView {
 
     func localize() {
         for index in buttons.indices {
-            // No collector runs in this app, so every product honestly reports "unknown".
+            let installed = buttons[index].isInstalled
+            // No collector runs in this app, so an installed product honestly reports "unknown".
             let version = index == selfIndex
                 ? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String : nil
-            buttons[index].stateText = "unknown"
-            let status = L("family.unknown")
-            let text = names[index] + " · " + status + " · "
-                + (version.map { L("family.version", ["version": $0]) } ?? L("family.versionUnknown"))
+            let text = installed
+                ? names[index] + " · " + L("family.unknown") + " · "
+                    + (version.map { L("family.version", ["version": $0]) } ?? L("family.versionUnknown"))
+                : names[index] + " · " + L("family.notInstalled")
             buttons[index].toolTip = text
             buttons[index].setAccessibilityLabel(text)
             buttons[index].needsDisplay = true
@@ -195,7 +269,9 @@ private final class ProductIconButton: NSButton {
     var onFocus: ((String) -> Void)?
     var original: NSImage?
     var crop = NSRect.zero
-    var stateText = "unknown"
+    var isInstalled = true { didSet { gray = nil; needsDisplay = true } }
+    var isActive = false { didSet { needsDisplay = true } }
+    private var gray: NSImage?
     override var acceptsFirstResponder: Bool { true }
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
@@ -212,23 +288,36 @@ private final class ProductIconButton: NSButton {
         let frame = NSRect(x: 3, y: 3, width: 38, height: 38)
         NSColor.clear.setStroke()
         let border = NSBezierPath(rect: frame.insetBy(dx: 0.5, dy: 0.5))
-        if stateText == "confirmed" {
+        if isActive {
+            // Active product: subtle brand-coloured outline, glow kept at a quarter intensity.
             NSGraphicsContext.saveGraphicsState()
-            let accent = NSColor(srgbRed: 59 / 255, green: 120 / 255, blue: 252 / 255, alpha: 1)
-            accent.withAlphaComponent(0.35).setStroke()
-            let shadow = NSShadow(); shadow.shadowColor = accent.withAlphaComponent(0.10); shadow.shadowBlurRadius = 4; shadow.set()
+            let shadow = NSShadow()
+            shadow.shadowColor = Palette.brand.withAlphaComponent(0.25)
+            shadow.shadowBlurRadius = 6
+            shadow.set()
+            Palette.brand.withAlphaComponent(0.9).setStroke()
+            border.lineWidth = 1.5
             border.stroke()
             NSGraphicsContext.restoreGraphicsState()
+        } else if isInstalled {
+            Palette.border.setStroke()
+            border.stroke()
         } else {
-            if stateText == "error" { NSColor.systemRed.setStroke() } else { border.setLineDash([1, 2], count: 2, phase: 0) }
+            Palette.muted.setStroke()
+            border.setLineDash([1, 2], count: 2, phase: 0)
             border.stroke()
         }
-        if let original, crop.width > 0, crop.height > 0 {
+        var icon = original
+        if !isInstalled, let original {
+            if gray == nil { gray = ProductHeaderView.grayscale(original) }
+            icon = gray ?? original
+        }
+        if let icon, crop.width > 0, crop.height > 0 {
             let scale = 32 / max(crop.width, crop.height)
             let target = NSRect(x: frame.midX - crop.width * scale / 2, y: frame.midY - crop.height * scale / 2,
                                 width: crop.width * scale, height: crop.height * scale)
             let source = NSRect(x: crop.minX, y: 256 - crop.maxY, width: crop.width, height: crop.height)
-            original.draw(in: target, from: source, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            icon.draw(in: target, from: source, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
         if window?.firstResponder === self {
             NSColor.labelColor.setStroke()
@@ -268,7 +357,13 @@ final class FamilyHeaderView: LayoutView {
     let wordmark = NSTextField(labelWithString: "")
     let language = NSSegmentedControl(labels: ["DE", "EN"], trackingMode: .selectOne, target: nil, action: nil)
     let detail = NSTextField(labelWithString: "")
+    /// Service state sits between the product icons and the DE/EN switch.
+    let statusDot = SurfaceView(frame: .zero)
+    let statusText = NSTextField(labelWithString: "")
+    let restartButton = NSButton(title: L("header.restart"), target: nil, action: nil)
     var onLanguage: ((String) -> Void)?
+    private let probe = BridgeServiceProbe()
+    private var bridgeRunning = false
     override init(frame: NSRect) {
         super.init(frame: frame)
         color = Palette.background
@@ -283,24 +378,72 @@ final class FamilyHeaderView: LayoutView {
         detail.font = .systemFont(ofSize: 11); detail.textColor = Palette.muted
         detail.lineBreakMode = .byTruncatingTail; detail.alignment = .center
         products.onDetail = { [weak self] text in self?.showDetail(text) }
-        [wordmark, products, language, detail].forEach { addSubview($0) }
+        statusDot.rounded = 4.5
+        statusText.font = .systemFont(ofSize: 11); statusText.textColor = Palette.muted
+        statusText.lineBreakMode = .byTruncatingTail
+        statusText.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        restartButton.target = self; restartButton.action = #selector(restartService)
+        restartButton.controlSize = .small
+        restartButton.font = .systemFont(ofSize: 11)
+        restartButton.toolTip = L("restart.title")
+        probe.onUpdate = { [weak self] live in self?.setBridgeRunning(live) }
+        [wordmark, products, statusDot, statusText, restartButton, language, detail].forEach { addSubview($0) }
         localize()
+        probe.start()
         arrange = { [weak self] rect in
             guard let self else { return }
             self.wordmark.frame = NSRect(x: 16, y: 8, width: 240, height: 30)
             self.products.frame = NSRect(x: (rect.width - 236) / 2, y: 0, width: 236, height: 44)
             self.language.frame = NSRect(x: rect.width - 112, y: 0, width: 96, height: 44)
+            let limit = rect.width - 120
+            let restartWidth: CGFloat = 74
+            self.statusDot.frame = NSRect(x: self.products.frame.maxX + 14, y: 17, width: 9, height: 9)
+            self.restartButton.frame = NSRect(x: limit - restartWidth, y: 10, width: restartWidth, height: 24)
+            let textX = self.products.frame.maxX + 29
+            self.statusText.frame = NSRect(x: textX, y: 13,
+                                           width: max(40, limit - restartWidth - 10 - textX), height: 16)
             self.detail.frame = NSRect(x: 16, y: 45, width: rect.width - 32, height: 16)
         }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+    deinit { probe.stop() }
     func localize() {
         language.selectedSegment = FamilyLocalization.language == "en" ? 1 : 0
         language.setAccessibilityLabel(L("family.language"))
-        products.localize(); showDetail(L("app.tagline"))
+        products.localize()
+        restartButton.title = L("header.restart")
+        restartButton.toolTip = L("restart.title")
+        setBridgeRunning(bridgeRunning)
+        showDetail(L("app.tagline"))
     }
     func showDetail(_ text: String) { detail.stringValue = text; detail.toolTip = text }
+    private func setBridgeRunning(_ running: Bool) {
+        bridgeRunning = running
+        statusDot.color = running ? Palette.green : Palette.muted
+        statusText.stringValue = L(running ? "status.running" : "status.unreachable")
+        statusText.toolTip = statusText.stringValue
+    }
+    @objc private func restartService() {
+        let alert = NSAlert()
+        alert.messageText = L("restart.title")
+        alert.informativeText = L("restart.question")
+        // Cancel is the default button; the restart only runs on explicit confirmation.
+        alert.addButton(withTitle: L("restart.cancel"))
+        alert.addButton(withTitle: L("restart.confirm"))
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        let uid = getuid()
+        DispatchQueue.global().async {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            task.arguments = ["kickstart", "-k", "gui/\(uid)/com.kirabridge.bridge"]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            do { try task.run() } catch {
+                DispatchQueue.main.async { self.showDetail(L("restart.title") + " · " + error.localizedDescription) }
+            }
+        }
+    }
     @objc private func changeLanguage() {
         let code = language.selectedSegment == 1 ? "en" : "de"
         FamilyLocalization.choose(code)
@@ -335,6 +478,10 @@ final class ProcessesViewController: NSViewController {
     private var heading: NSTextField!
     private var names: [NSTextField] = []
     private var dots: [SurfaceView] = []
+    var onSettings: (() -> Void)?
+    var onSystemHost: (() -> Void)?
+    private var hostButton: NSButton!
+    private var settingsButton: NSButton!
     override func loadView() {
         let root = LayoutView(); root.color = Palette.surface; view = root
         heading = label("family.processes", size: 18, weight: .semibold)
@@ -347,6 +494,11 @@ final class ProcessesViewController: NSViewController {
             root.addSubview(dot); root.addSubview(field)
             dots.append(dot); names.append(field)
         }
+        hostButton = navigationButton(L("toolbar.permissions"), symbol: "desktopcomputer",
+                                      action: #selector(systemHostPressed))
+        settingsButton = navigationButton(L("toolbar.settings"), symbol: "gearshape",
+                                          action: #selector(settingsPressed))
+        root.addSubview(hostButton); root.addSubview(settingsButton)
         root.arrange = { [weak self] rect in
             guard let self else { return }
             self.heading.frame = NSRect(x: 14, y: 14, width: max(0, rect.width - 28), height: 24)
@@ -356,9 +508,28 @@ final class ProcessesViewController: NSViewController {
                 self.names[index].frame = NSRect(x: 27, y: y + 2, width: max(0, rect.width - 41), height: 18)
                 y += 28
             }
+            self.hostButton.frame = NSRect(x: 10, y: max(430, rect.height - 84), width: max(0, rect.width - 20), height: 30)
+            self.settingsButton.frame = NSRect(x: 10, y: max(464, rect.height - 46), width: max(0, rect.width - 20), height: 30)
         }
     }
-    func localize() { if isViewLoaded { heading.stringValue = L("family.processes") } }
+    private func navigationButton(_ text: String, symbol: String, action: Selector) -> NSButton {
+        let button = NSButton(title: text, target: self, action: action)
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
+        button.imagePosition = .imageLeading
+        button.isBordered = false
+        button.alignment = .left
+        button.font = .systemFont(ofSize: 12)
+        button.contentTintColor = Palette.muted
+        return button
+    }
+    @objc private func systemHostPressed() { onSystemHost?() }
+    @objc private func settingsPressed() { onSettings?() }
+    func localize() {
+        guard isViewLoaded else { return }
+        heading.stringValue = L("family.processes")
+        hostButton.title = L("toolbar.permissions")
+        settingsButton.title = L("toolbar.settings")
+    }
 }
 
 /// Middle column: the existing console web view, unchanged.
