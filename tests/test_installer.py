@@ -685,6 +685,19 @@ def test_previous_health_waits_for_read_only_status_after_transient_timeout(
     assert calls == [5, 4.5]
 
 
+def test_previous_health_default_allows_slow_status_under_load(installer, monkeypatch, tmp_path):
+    seen = []
+
+    def status(release, config, *args, timeout):
+        seen.append(timeout)
+        return {"version": "0.8.0rc58"}  # answers after >8s in real life; 30s budget applies
+
+    monkeypatch.setattr(installer, "cli", status)
+    health = installer.wait_previous_health(tmp_path / "release", tmp_path / "config")
+    assert health["version"] == "0.8.0rc58"
+    assert seen == [30]
+
+
 def test_previous_health_timeout_is_bounded_and_does_not_switch(installer, monkeypatch, tmp_path):
     now = 0.0
     calls = []
