@@ -163,6 +163,6 @@ async def inventory(
                 "compatibility": compatibility(
                     profile.get("kind"), probe["version"], cli=canonical
                 ),
-                }
-            )
+            }
+        )
     return candidates

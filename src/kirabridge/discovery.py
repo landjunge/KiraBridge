@@ -344,9 +344,7 @@ def _notify_cli_version_changes(bridge, changes, principal, current_rows=()):
                 recipient="coordinator",
                 kind="result",
                 body=body,
-                idempotency_key=(
-                    "cli-version-" + digest({"team": team["id"], **current})[:48]
-                ),
+                idempotency_key=("cli-version-" + digest({"team": team["id"], **current})[:48]),
             )
             try:
                 bridge.teams.send(principal, request)

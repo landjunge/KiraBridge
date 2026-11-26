@@ -335,9 +335,7 @@ class Bridge:
             from kirabridge.discovery import _record_cli_versions
 
             try:
-                rows = await cli_inventory(
-                    self.config.agents, list(self.config.agents), set()
-                )
+                rows = await cli_inventory(self.config.agents, list(self.config.agents), set())
                 _record_cli_versions(self, rows)
             except Exception:
                 # A failed local version probe must not interrupt task/message maintenance.
