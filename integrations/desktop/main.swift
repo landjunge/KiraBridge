@@ -206,6 +206,51 @@ final class DesktopOpenRequests {
 import Cocoa
 import WebKit
 
+struct DesktopSnapshotFailure: Error {
+    let message: String
+}
+
+/// Self-screenshot mode: build the main window at the requested size, let it lay out
+/// for two seconds, cache the content view into a PNG and exit. cacheDisplay works
+/// without a Screen Recording grant; the web view centre may legitimately come out blank.
+struct DesktopSnapshotRequest {
+    let path: String
+    let width: CGFloat
+    let height: CGFloat
+
+    static func parse(_ arguments: [String]) throws -> DesktopSnapshotRequest? {
+        guard let index = arguments.firstIndex(of: "--snapshot") else { return nil }
+        guard index + 1 < arguments.count else {
+            throw DesktopSnapshotFailure(message: "--snapshot needs a .png path")
+        }
+        let path = arguments[index + 1]
+        guard !path.isEmpty, path.lowercased().hasSuffix(".png") else {
+            throw DesktopSnapshotFailure(message: "--snapshot path must end in .png")
+        }
+        var width: CGFloat = 1440
+        var height: CGFloat = 900
+        if let sizeIndex = arguments.firstIndex(of: "--size") {
+            guard sizeIndex + 1 < arguments.count else {
+                throw DesktopSnapshotFailure(message: "--size needs WIDTHxHEIGHT")
+            }
+            let parts = arguments[sizeIndex + 1].lowercased().split(separator: "x")
+            guard parts.count == 2, let w = Double(parts[0]), let h = Double(parts[1]),
+                  w.isFinite, h.isFinite, (820...4096).contains(w), (620...4096).contains(h) else {
+                throw DesktopSnapshotFailure(message: "--size must be WIDTHxHEIGHT within the window minimum 820x620 and 4096x4096")
+            }
+            width = CGFloat(w)
+            height = CGFloat(h)
+        }
+        return DesktopSnapshotRequest(path: path, width: width, height: height)
+    }
+}
+
+/// Snapshot windows keep their requested frame even when it exceeds the screen;
+/// cacheDisplay draws off-screen, so the usual screen constraint is counterproductive here.
+final class DesktopSnapshotWindow: NSWindow {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+}
+
 final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     /// The full release version (for example 0.8.0rc41); the bundle short version is numeric only.
     private static func aboutPanelOptions(
@@ -246,6 +291,8 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
     var mainNavigationGeneration: UInt64 = 0
     var navigationPolicy = DesktopNavigationPolicy()
     let openRequests = DesktopOpenRequests()
+    /// Set before application.run() by the --snapshot entry; suppresses the login bootstrap.
+    var snapshot: DesktopSnapshotRequest?
 
     /// Catalog-ID-only bridge. The renderer passes exactly one catalog ID and
     /// receives one of focused/failed/uncertain/missing; it never passes
@@ -365,11 +412,44 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         }
         let storedWidth = (preference("window_width") as? NSNumber)?.doubleValue ?? 1120
         let storedHeight = (preference("window_height") as? NSNumber)?.doubleValue ?? 780
-        let width = storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120
-        let height = storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780
+        let width = snapshot?.width ?? (storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120)
+        let height = snapshot?.height ?? (storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780)
         mainView = makeMainWindow(title: "KiraBridge", width: width, height: height)
+        if let snapshot {
+            // The screenshot pass never bootstraps: no launcher run, no login load.
+            // The view-controller fitting size shrinks the window on ordering; restore it.
+            windows.first?.setContentSize(NSSize(width: snapshot.width, height: snapshot.height))
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.finishSnapshot(snapshot)
+            }
+            return
+        }
         bootstrap()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func finishSnapshot(_ request: DesktopSnapshotRequest) {
+        func fail(_ message: String) -> Never {
+            FileHandle.standardError.write(Data("snapshot failed: \(message)\n".utf8))
+            exit(1)
+        }
+        guard let window = windows.first, let content = window.contentView else {
+            fail("the main window is missing")
+        }
+        guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
+            fail("the window cannot allocate a cache rep")
+        }
+        content.cacheDisplay(in: content.bounds, to: rep)
+        guard let data = rep.representation(using: .png, properties: [:]) else {
+            fail("PNG encoding failed")
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: request.path))
+        } catch {
+            fail("writing \(request.path): \(error.localizedDescription)")
+        }
+        exit(0)
     }
 
     /// The Agent Authority shell: native family header, native process sidebar, the
@@ -383,7 +463,13 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         let content = FamilyContentController(split: split)
         content.header.products.onOpen = { [weak self] target in self?.switchFamilyProduct(target) }
         content.header.onLanguage = { [weak self] code in self?.applyFamilyLanguage(code) }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        split.sidebar.onSettings = { [weak self] in self?.openConsoleView(named: "settings") }
+        split.sidebar.onSystemHost = { [weak self] in self?.openConsoleView(named: "permissions") }
+        let frame = NSRect(x: 0, y: 0, width: width, height: height)
+        let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
+        let window: NSWindow = snapshot == nil
+            ? NSWindow(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
+            : DesktopSnapshotWindow(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
         window.title = title
         window.minSize = NSSize(width: 820, height: 620)
         window.contentViewController = content
@@ -422,7 +508,8 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("toolbar.sidebar"), .flexibleSpace, .init("toolbar.inspector")]
+        [.init("toolbar.sidebar"), .flexibleSpace, .init("toolbar.permissions"),
+         .init("toolbar.settings"), .init("toolbar.inspector")]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -437,6 +524,12 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         case "toolbar.sidebar":
             item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: item.label)
             item.action = #selector(toggleSidebar)
+        case "toolbar.permissions":
+            item.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: item.label)
+            item.action = #selector(openConsolePermissions)
+        case "toolbar.settings":
+            item.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: item.label)
+            item.action = #selector(openConsoleSettings)
         case "toolbar.inspector":
             item.image = NSImage(systemSymbolName: "sidebar.right", accessibilityDescription: item.label)
             item.action = #selector(toggleInspector)
@@ -447,6 +540,19 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
 
     @objc func toggleSidebar() { mainSplit?.toggleSidebar() }
     @objc func toggleInspector() { mainSplit?.toggleInspector() }
+    @objc func openConsolePermissions() { openConsoleView(named: "permissions") }
+    @objc func openConsoleSettings() { openConsoleView(named: "settings") }
+
+    /// Drives the console's own data-go tab buttons through the existing showView
+    /// mechanism; no URL, no reload of the one-use login view.
+    func openConsoleView(named view: String) {
+        let selector = "[data-go=\"\(view)\"]"
+        guard view == "permissions" || view == "settings",
+              let web = mainView, !web.isLoading, Self.isConsoleURL(web.url) else {
+            familyContent?.header.showDetail(L("family.notReady")); return
+        }
+        web.evaluateJavaScript("document.querySelector('\(selector)')?.click();", completionHandler: nil)
+    }
 
     private func mainConsoleConfiguration() -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
@@ -529,7 +635,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         mainView?.window?.makeKeyAndOrderFront(nil)
         // A family Reopen must preserve the owned main view and its state.
         // Only an unfinished first login may need the existing bootstrap path.
-        if navigationPolicy.loginFile == nil && !bootstrapCleanupUnknown { bootstrap() }
+        if snapshot == nil, navigationPolicy.loginFile == nil && !bootstrapCleanupUnknown { bootstrap() }
         return true
     }
 
@@ -577,7 +683,18 @@ if CommandLine.arguments == [CommandLine.arguments[0], "--system-operation"] {
     runSystemOperationMode()
 }
 
+let snapshotRequest: DesktopSnapshotRequest?
+do {
+    snapshotRequest = try DesktopSnapshotRequest.parse(CommandLine.arguments)
+} catch let failure as DesktopSnapshotFailure {
+    FileHandle.standardError.write(Data("snapshot: \(failure.message)\n".utf8))
+    exit(1)
+} catch {
+    FileHandle.standardError.write(Data("snapshot: \(error.localizedDescription)\n".utf8))
+    exit(1)
+}
 let delegate = KiraBridgeApp()
+delegate.snapshot = snapshotRequest
 let application = NSApplication.shared
 application.delegate = delegate
 application.run()

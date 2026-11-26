@@ -46,6 +46,8 @@ Die Entwicklungskonsole hat einen kompakten Produktheader: originale zweifarbige
 
 Im Entwicklungsstand zeigt die Konsole Sprachassistenten und Agenten-CLIs als kompakte Karten in einem dreigeteilten, größenveränderbaren Arbeitsbereich. Status, erkannte CLI-Versionen und die Koordinatorrolle kommen aus dem lokalen Bridge-Bestand; Hell- und Dunkelansicht sowie Seitenleisten-Einstellungen werden lokal gespeichert. Die Kartenansicht ist Quellstand und nicht automatisch Teil einer installierten Version.
 
+Die Desktop-App fasst die Konsole in die Agent-Authority-Shell: Header mit den fünf Produkt-Icons (installierte Produkte farbig, andere grau, das aktive mit dezentem Glow), Statuspunkt der Bridge mit bestätigtem Neustart, Titelleiste mit Sidebar-, Berechtigungs- und Einstellungsschaltern sowie `--snapshot <datei.png>`, das den Fensterrahmen ohne Bildschirmaufnahme-Erlaubnis als Bild ausgibt.
+
 ## Den Computer direkt bedienen
 
 **KiraBridge ist mehr als eine Brücke zu KI-Agenten im Terminal.** Die Computersteuerung gehört zu ihren Kernfunktionen: Programme öffnen oder in den Vordergrund holen, zwischen Fenstern wechseln, Text unmittelbar eingeben, Notizen schreiben und bearbeiten, einzelne Tasten drücken und Tastenkombinationen (Shortcuts) ausführen. Die direkte Tasteneingabe kann ohne Umweg über die Zwischenablage erfolgen. Je nach freigegebenen Rechten und erreichbarer Oberfläche sind auch Maus-, Fenster- und Bildschirmfunktionen nutzbar. Damit kann die KI vorhandene Programme über deren normale Bedienoberfläche steuern, ohne dass für jede einzelne Anwendung erst eine besondere KI-Schnittstelle geschaffen werden muss.
