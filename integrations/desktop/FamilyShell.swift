@@ -462,7 +462,6 @@ final class FamilyContentController: NSViewController {
         addChild(split); root.addSubview(header); root.addSubview(split.view)
         root.arrange = { [weak self] rect in
             guard let self else { return }
-            self.split.adaptToFamilyWidth(rect.width)
             self.header.frame = NSRect(x: 0, y: 0, width: rect.width, height: FamilyLayout.headerHeight)
             self.split.view.frame = NSRect(x: 0, y: FamilyLayout.headerHeight, width: rect.width, height: max(0, rect.height - FamilyLayout.headerHeight))
         }
@@ -504,12 +503,13 @@ final class ProcessesViewController: NSViewController {
             self.heading.frame = NSRect(x: 14, y: 14, width: max(0, rect.width - 28), height: 24)
             var y: CGFloat = 48
             for index in self.names.indices {
-                self.dots[index].frame = NSRect(x: 14, y: y + 7, width: 7, height: 7)
-                self.names[index].frame = NSRect(x: 27, y: y + 2, width: max(0, rect.width - 41), height: 18)
-                y += 28
+                self.dots[index].frame = NSRect(x: 14, y: y + 11, width: 7, height: 7)
+                self.names[index].frame = NSRect(x: 27, y: y + 6, width: max(0, rect.width - 41), height: 18)
+                y += FamilyLayout.rowPitch
             }
-            self.hostButton.frame = NSRect(x: 10, y: max(430, rect.height - 84), width: max(0, rect.width - 20), height: 30)
-            self.settingsButton.frame = NSRect(x: 10, y: max(464, rect.height - 46), width: max(0, rect.width - 20), height: 30)
+            let w = max(0, rect.width - 20), h = FamilyLayout.rowHeight
+            self.settingsButton.frame = NSRect(x: 10, y: max(y, rect.height - h - 10), width: w, height: h)
+            self.hostButton.frame = NSRect(x: 10, y: max(y, rect.height - 2 * h - 15), width: w, height: h)
         }
     }
     private func navigationButton(_ text: String, symbol: String, action: Selector) -> NSButton {
@@ -577,7 +577,6 @@ final class MainSplitController: NSSplitViewController {
     let sidebar: ProcessesViewController
     let main: ConsoleViewController
     let inspector: InspectorPlaceholderController
-    private var narrowFamilyWidth = false, inspectorCollapsedForWidth = false
     init(webView: WKWebView) {
         sidebar = ProcessesViewController(); main = ConsoleViewController(webView: webView)
         inspector = InspectorPlaceholderController()
@@ -594,33 +593,7 @@ final class MainSplitController: NSSplitViewController {
         addSplitViewItem(s); addSplitViewItem(m); addSplitViewItem(i)
     }
     func localize() { sidebar.localize(); inspector.localize() }
-    func adaptToFamilyWidth(_ width: CGFloat) {
-        let narrow = width < 1150
-        if splitViewItems.count == 3 {
-            let inspectorMinimum = splitViewItems[2].minimumThickness
-            let dividerBudget = 2 * splitView.dividerThickness
-            splitViewItems[1].minimumThickness = narrow
-                ? min(670, max(600, width - inspectorMinimum - dividerBudget))
-                : 670
-        }
-        guard splitViewItems.count == 3, narrow != narrowFamilyWidth else { return }
-        narrowFamilyWidth = narrow
-        if narrow {
-            inspectorCollapsedForWidth = !splitViewItems[2].isCollapsed
-            if inspectorCollapsedForWidth { splitViewItems[2].isCollapsed = true }
-        } else if inspectorCollapsedForWidth {
-            splitViewItems[2].isCollapsed = false; inspectorCollapsedForWidth = false
-        }
-    }
-    func toggleSidebar() {
-        if narrowFamilyWidth && splitViewItems[0].isCollapsed {
-            splitViewItems[2].isCollapsed = true; inspectorCollapsedForWidth = false
-        }
-        splitViewItems[0].isCollapsed.toggle()
-    }
-    func toggleInspector() {
-        inspectorCollapsedForWidth = false
-        if narrowFamilyWidth && splitViewItems[2].isCollapsed { splitViewItems[0].isCollapsed = true }
-        splitViewItems[2].isCollapsed.toggle()
-    }
+    /// User-driven only: nothing in the layout path mutates thickness or collapse state.
+    func toggleSidebar() { splitViewItems[0].isCollapsed.toggle() }
+    func toggleInspector() { splitViewItems[2].isCollapsed.toggle() }
 }
