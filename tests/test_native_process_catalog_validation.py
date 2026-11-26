@@ -139,3 +139,18 @@ async def test_signed_system_uids_remain_foreign_and_keep_owned_tty_tree(monkeyp
     assert row["processes"][1]["image"].endswith("Example Name.app/Contents/MacOS/codex")
     assert transport.last_catalog_incomplete is True
     cleanup.assert_awaited_once_with(child, process_group=False)
+
+
+QWEN_NODE = "/Users/landjunge/.local/lib/qwen-code/node/bin/node"
+
+
+@pytest.mark.parametrize(
+    "image,name",
+    [(QWEN_NODE, "qwen"), ("/usr/local/bin/node", "node"), ("/opt/grok/bin/python3", "grok")],
+)
+async def test_interpreter_in_cli_install_dir_is_named_after_cli(monkeypatch, image, name):
+    uid = os.getuid()
+    output = f"{uid} 345 1 ttys004 /bin/zsh\n{uid} 346 345 ttys004 {image}\n".encode()
+    transport, _, _ = catalog_transport(monkeypatch, output)
+    [session] = await transport.catalog()
+    assert [p["name"] for p in session["processes"] if p["pid"] == 346] == [name]
