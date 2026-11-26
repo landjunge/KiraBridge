@@ -1264,7 +1264,10 @@ def main() -> None:
     readiness.add_argument("--workflow-id")
     connect = sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
     connect.add_argument("--agent-task-policy", help="Owner-only task restriction file")
-    message = sub.add_parser("message", help="Authenticated addressed agent messaging")
+    message = sub.add_parser(
+        "message",
+        help="Deprecated: there is only the team channel (team send / team inbox / team ack)",
+    )
     message_actions = message.add_subparsers(dest="action", required=True)
     send = message_actions.add_parser("send")
     send.add_argument("recipient")

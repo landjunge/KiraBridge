@@ -78,8 +78,8 @@ Der Adapter ist ereignisunabhängig idempotent: gleiches Hook-JSON, gleiches Erg
   Zustellung, Abholung und Quittierung. Keine Warnungen, keine Ausnahmen, keine Verlängerung.
   Dauerhaft ist allein der ThreadDesk-Eintrag (Abschnitt 3, Schritt 6).
 - Empfangs-Hook: Eine an ChatGPT adressierte Nachricht wird beim erfolgreichen Auslesen
-  automatisch quittiert. Ist umgesetzt in `messages_overview` (`src/kirabridge/message_overview.py`,
-  `observe`); konfigurierbar über `team.auto_ack_on_observe` (Standard `["chatgpt"]`).
+  automatisch quittiert. Ist umgesetzt für `team_messages` (mit und ohne Team-ID, `team inbox`) und `messages_overview` (`src/kirabridge/message_overview.py`,
+  `inbox`/`team_read`); jeder Eintrag trägt `read`/`new`, das Ergebnis `new_count`/`unread_count`/`total`; konfigurierbar über `team.auto_ack_on_observe` (Standard `["chatgpt"]`).
   Reihenfolge zwingend: erst Auslieferung (`receipt`/`delivered`), dann Verarbeitung,
   dann `acknowledged` — nie vor der Auslieferung. Ein Lesefehler lässt die Quittierung
   ausbleiben; die Nachricht bleibt unbearbeitet, bis 7 Tage abgelaufen sind.
@@ -114,3 +114,19 @@ Der Adapter ist ereignisunabhängig idempotent: gleiches Hook-JSON, gleiches Erg
 Das Eintragen der Hooks in `~/.qwen/settings.json`, `settings.json` der Claude-Projekte und
 Codex `hooks.json` erfordert ausdrückliche Nutzerfreigabe. Bis dahin bleibt diese Datei
 Dokumentation; es wird keine Hook-Konfiguration geändert und keine installed Runtime berührt.
+
+## 8. Ein Kanal
+
+Es gibt nur den Teamkanal: `team send <empfänger>` (MCP `team_message_send`) sendet, `team inbox`
+(MCP `team_messages`, ohne Team-ID das eine Postfach) liest, `team_message_ack` quittiert.
+`message send/receive/get/ack` sind veraltete Aliase. Eine neue Teamnachricht an einen Worker oder
+den aktuellen Koordinator mit gebundenem Terminal (nicht Codex) legt intern ein unsichtbares
+Zustell-Ticket (Schlüssel `team:<id>`) für die vorhandene Visible-Handoff-Maschine an; Ergebnis:
+Ereignis `team.message_delivered` bzw. `team.message_delivery_failed`, nie eine Quittung. Ist der
+Empfänger beschäftigt oder die Präsenz nicht frisch, bleibt die Nachricht im Postfach.
+
+Abschlussbericht des Koordinators an ChatGPT: kein zentraler Bridge-Pfad, weil der Abschluss eines
+Koordinator-Zuges nur im jeweiligen CLI sichtbar ist (Stop-Hook je CLI). Übergang bleibt der lokale
+Stop-Hook `~/.claude/hooks/chatgpt-report.sh`, der per `team send chatgpt` meldet; ein
+bridge-seitiger Weg wäre nur über das Zustell-Ticket-Ergebnis des Koordinator-Zuges möglich und ist
+nicht gebaut.
