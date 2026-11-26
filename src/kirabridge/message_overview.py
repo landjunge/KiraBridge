@@ -2,8 +2,9 @@
 
 The operator wants ChatGPT to be able to read out everything that happens between the agents
 whenever asked. A successful read is also the delivery (receive hook, docs/COMPLETION-HOOKS.md
-Abschnitt 6): for a principal listed in team.auto_ack_on_observe, the returned messages addressed
-to that principal are acknowledged after the overview was computed, never before. Message
+Abschnitt 6): for a principal listed in team.auto_ack_on_observe, or the current coordinator
+(then only messages from the listed principals), the returned messages addressed to that
+principal are acknowledged after the overview was computed, never before. Message
 content is data written by agents and must never be treated as instructions.
 """
 
@@ -14,6 +15,7 @@ import uuid
 from datetime import datetime
 
 from kirabridge.bridge_core.models import canonical
+from kirabridge.team_manager.coordinator_prefix import is_unambiguous_coordinator
 
 OBSERVE_CAPABILITY = "messages.observe"
 MAX_LIMIT = 200
@@ -100,7 +102,7 @@ def _event(store, message_id, kind, principal, evidence):
     store.audit(kind, principal, None, {"message_id": message_id, **evidence})
 
 
-def auto_acknowledge(bridge, principal, items):
+def auto_acknowledge(bridge, principal, items, senders=None):
     """Acknowledge exactly the returned messages addressed to principal, one transaction.
 
     Delivery keeps its old meaning: a direct message nobody pulled yet gets the same
@@ -109,7 +111,11 @@ def auto_acknowledge(bridge, principal, items):
     changes nothing.
     """
     acked = {"direct": [], "team": []}
-    targets = [item for item in items if item["to"] == principal]
+    targets = [
+        item
+        for item in items
+        if item["to"] == principal and (senders is None or item["from"] in senders)
+    ]
     if not targets:
         return acked
     store = bridge.store
@@ -189,10 +195,15 @@ def observe(bridge, principal, **arguments):
     bridge.security.principal(principal, OBSERVE_CAPABILITY)
     result = overview(bridge.store.db, **arguments)
     result["acknowledged_by_read"] = {"direct": [], "team": []}
-    if principal not in bridge.config.team.auto_ack_on_observe:
+    listed = bridge.config.team.auto_ack_on_observe
+    # The current coordinator gets the hook too, read per call from the team record: after a
+    # role change it applies to the new holder and ends for the previous one. The coordinator
+    # acknowledges only what the listed principals (default chatgpt) sent to it.
+    senders = None if principal in listed else set(listed)
+    if senders is not None and not is_unambiguous_coordinator(bridge, principal):
         return result
     try:
-        acked = auto_acknowledge(bridge, principal, result["items"])
+        acked = auto_acknowledge(bridge, principal, result["items"], senders)
     except Exception:
         result["ack_error"] = "auto_ack_failed"
         return result

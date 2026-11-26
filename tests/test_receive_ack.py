@@ -158,3 +158,83 @@ def test_message_body_never_reaches_events_or_audit(domain):
         secret not in row["metadata"]
         for row in domain.store.db.execute("SELECT metadata FROM audit")
     )
+
+
+def set_coordinator(domain, principal):
+    domain.store.db.execute("UPDATE teams SET coordinator=?", (principal,))
+
+
+def acked_keys(domain):
+    return {
+        row["idem"]
+        for row in domain.store.db.execute(
+            "SELECT idem FROM messages WHERE acknowledged IS NOT NULL"
+        ).fetchall()
+    }
+
+
+def test_hook_follows_the_current_coordinator_on_role_change(domain):
+    for name in ("codex", "grok"):
+        domain.config.principals[name].capabilities.append(OBSERVE_CAPABILITY)
+    direct(domain, "chatgpt", "codex", "to-a", body="Auftrag A")
+    direct(domain, "chatgpt", "grok", "to-b", body="Auftrag B")
+    set_coordinator(domain, "codex")
+    observe(domain.bridge, "grok")  # worker: no hook
+    assert acked_keys(domain) == set()
+    assert observe(domain.bridge, "codex")["acknowledged_by_read"]["direct"]
+    assert acked_keys(domain) == {"to-a"}
+
+    set_coordinator(domain, "grok")  # role moves A -> B
+    direct(domain, "chatgpt", "codex", "to-a2", body="Noch einer")
+    observe(domain.bridge, "codex")  # previous coordinator: hook is off
+    assert acked_keys(domain) == {"to-a"}
+    observe(domain.bridge, "grok")
+    assert acked_keys(domain) == {"to-a", "to-b"}
+
+
+def test_coordinator_acks_only_chatgpt_messages_and_default_is_unchanged(domain):
+    domain.config.principals["codex"].capabilities.append(OBSERVE_CAPABILITY)
+    kira(domain)
+    set_coordinator(domain, "codex")
+    direct(domain, "chatgpt", "codex", "from-kira")
+    direct(domain, "grok", "codex", "from-grok")
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == {"from-kira"}
+    direct(domain, "codex", "chatgpt", "to-kira")  # chatgpt stays listed, even as no coordinator
+    observe(domain.bridge, "chatgpt")
+    assert acked_keys(domain) == {"from-kira", "to-kira"}
+
+
+def test_no_hook_while_handoff_is_open_or_coordinator_is_ambiguous(domain):
+    domain.config.principals["codex"].capabilities.append(OBSERVE_CAPABILITY)
+    set_coordinator(domain, "codex")
+    direct(domain, "chatgpt", "codex", "held")
+    team_id = domain.store.db.execute("SELECT id FROM teams").fetchone()["id"]
+    domain.store.db.execute("INSERT INTO teams VALUES('t-other','other','chatgpt','grok',1,0)")
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == set()  # two distinct holders
+    domain.store.db.execute("DELETE FROM teams WHERE id='t-other'")
+    domain.store.db.execute("PRAGMA foreign_keys=OFF")
+    cols = [
+        r["name"] for r in domain.store.db.execute("PRAGMA table_info(team_coordinator_handoffs)")
+    ]
+    values = {"team_id": team_id, "previous_coordinator": "codex", "expected_revision": 1}
+    for col in cols:
+        if col not in values:
+            row = domain.store.db.execute("PRAGMA table_info(team_coordinator_handoffs)").fetchall()
+            info = next(r for r in row if r["name"] == col)
+            values[col] = (
+                None
+                if col in ("accepted", "outcome")
+                else (0 if "INT" in info["type"] or "REAL" in info["type"] else "x")
+            )
+    domain.store.db.execute(
+        f"INSERT INTO team_coordinator_handoffs({','.join(values)}) "
+        f"VALUES({','.join('?' * len(values))})",
+        list(values.values()),
+    )
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == set()  # open handoff
+    domain.store.db.execute("DELETE FROM team_coordinator_handoffs")
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == {"held"}
