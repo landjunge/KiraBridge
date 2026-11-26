@@ -7,6 +7,7 @@ import WebKit
 struct AgentInfo: Equatable {
     let id: String, name: String, state: String
     let active: Bool, retired: Bool, configured: Bool
+    var model = "", kind = "", version = ""
     var dotColor: NSColor {
         if retired || !configured { return Palette.muted }
         return active ? Palette.green : Palette.amber
@@ -20,6 +21,9 @@ struct AgentInfo: Equatable {
         self.init(id: id, name: (json["name"] as? String) ?? id, state: (json["state"] as? String) ?? "",
                   active: (json["active"] as? Bool) ?? false, retired: (json["retired"] as? Bool) ?? false,
                   configured: (json["configured"] as? Bool) ?? false)
+        model = (json["model"] as? String) ?? ""
+        kind = (json["kind"] as? String) ?? ""
+        version = (json["version"] as? String) ?? ""
     }
     static func parse(_ payload: Any?) -> [AgentInfo] {
         let rows = ((payload as? [String: Any])?["agents"] as? [[String: Any]]) ?? []

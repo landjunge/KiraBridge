@@ -79,6 +79,11 @@ enum FamilyLocalization {
         "center.advanced": ("Erweitert", "Advanced"), "center.refresh": ("Aktualisieren", "Refresh"),
         "center.bridge": ("Bridge", "Bridge"), "center.agents": ("Agenten aktiv", "Agents active"),
         "center.pending": ("Wartende Aufträge", "Pending requests"), "center.coordinator": ("Koordinator", "Coordinator"),
+        "inspector.state": ("Status", "State"), "inspector.model": ("Modell", "Model"),
+        "inspector.kind": ("Typ", "Type"), "inspector.version": ("Version", "Version"),
+        "inspector.none": ("Keinen Agenten gewählt.", "No agent selected."),
+        "inspector.permissions": ("Rechte und Freigaben", "Permissions and approvals"),
+        "inspector.terminals": ("Erweiterte Konsole", "Advanced console"),
         "center.noMessages": ("Keine Nachrichten.", "No messages."),
     ]
 
@@ -475,35 +480,13 @@ final class FamilyContentController: NSViewController {
 
 // MARK: MainSplitController.swift (three columns, KiraBridge content)
 
-/// Right column: placeholder until the detail slice arrives.
-final class InspectorPlaceholderController: NSViewController {
-    private var heading: NSTextField!
-    private var note: NSTextField!
-    override func loadView() {
-        let root = LayoutView(); root.color = Palette.surface; view = root
-        heading = label("family.details", size: 18, weight: .semibold)
-        note = wrapping(L("family.placeholder"))
-        root.addSubview(heading); root.addSubview(note)
-        root.arrange = { [weak self] rect in
-            guard let self else { return }
-            self.heading.frame = NSRect(x: 16, y: 16, width: max(0, rect.width - 32), height: 24)
-            self.note.frame = NSRect(x: 16, y: 46, width: max(0, rect.width - 32), height: 40)
-        }
-    }
-    func localize() {
-        guard isViewLoaded else { return }
-        heading.stringValue = L("family.details")
-        note.stringValue = L("family.placeholder")
-    }
-}
-
 final class MainSplitController: NSSplitViewController {
     let sidebar: AgentSidebarViewController
     let main: CenterViewController
-    let inspector: InspectorPlaceholderController
+    let inspector: InspectorViewController
     init(webView: WKWebView) {
         sidebar = AgentSidebarViewController(); main = CenterViewController(webView: webView)
-        inspector = InspectorPlaceholderController()
+        inspector = InspectorViewController()
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError() }

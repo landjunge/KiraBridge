@@ -46,6 +46,7 @@ def build(destination=None):
         root / "integrations/desktop/FamilyData.swift",
         root / "integrations/desktop/FamilySidebar.swift",
         root / "integrations/desktop/FamilyCenter.swift",
+        root / "integrations/desktop/FamilyInspector.swift",
         root / "integrations/desktop/FamilySwitchLogic.swift",
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",

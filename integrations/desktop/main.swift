@@ -467,9 +467,12 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         content.header.onLanguage = { [weak self] code in self?.applyFamilyLanguage(code) }
         split.sidebar.onSettings = { [weak self] in self?.openConsoleView(named: "settings") }
         split.sidebar.onSystemHost = { [weak self] in self?.openConsoleView(named: "permissions") }
+        split.sidebar.onSelect = { [weak split] agent in split?.inspector.show(agent) }
         split.sidebar.api = ConsoleAPI(webView: view)
         split.sidebar.startPolling(sample: snapshot != nil)
         split.main.api = split.sidebar.api
+        split.inspector.onPermissions = { [weak self] in self?.openConsoleView(named: "permissions") }
+        split.inspector.onAdvanced = { [weak split] in split?.main.show(.advanced) }
         split.main.startPolling(sample: snapshot != nil)
         let frame = NSRect(x: 0, y: 0, width: width, height: height)
         let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]

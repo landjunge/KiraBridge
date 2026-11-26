@@ -58,6 +58,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
             "FamilyData.swift",
             "FamilySidebar.swift",
             "FamilyCenter.swift",
+            "FamilyInspector.swift",
             "FamilySwitchLogic.swift",
             "SystemBridge.swift",
             "SystemControl.swift",
