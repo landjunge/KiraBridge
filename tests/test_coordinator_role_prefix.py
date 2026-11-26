@@ -76,7 +76,7 @@ def test_prefix_never_pushes_a_body_over_its_limit(delivery):
     text, prefix = with_role(bridge, "codex", "x" * 100, limit=16384)
     assert prefix and len(text) < 16384 and text.endswith("x" * 100)
     assert len(prefix) < 2000
-    assert "erweitert keine Rechte" in prefix
+    assert "Keine Rechteausweitung" in prefix
 
 
 def test_role_change_and_two_teams_bind_the_prefix_to_the_current_coordinator(delivery):
@@ -100,3 +100,9 @@ def test_prefixed_prompt_matches_its_original_body_only(delivery):
     assert matches_body(text, "Mach das.") and matches_body("Mach das.", "Mach das.")
     assert not matches_body("anderer Text\n\nMach das.", "Mach das.")
     assert "Daniel" not in ROLE_TEXT and "Kira" not in ROLE_TEXT
+
+
+def test_role_text_fixed_rules_short():
+    for term in ("Sonnet", "Opus nur", "schwierigen", "Teamkanal", "NICHTS selbst", "ChatGPT"):
+        assert term in ROLE_TEXT
+    assert len(ROLE_TEXT) < 1500
