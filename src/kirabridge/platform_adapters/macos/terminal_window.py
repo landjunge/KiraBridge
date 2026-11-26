@@ -192,9 +192,14 @@ class TerminalWindowProof:
             and window.get("on_screen") is True
             and window.get("owner_pid") == app_pid
             and window.get("application_start") == f"{self.app['started_at']:.6f}"
-            and window.get("title") == title
             and same_geometry(window.get("bounds"))
         ]
+        # The window title is not identity: the profile can show the active process
+        # and arguments, so it changes while the agent runs. Window id, TTY of the
+        # selected tab, owner process and geometry identify the window; the title
+        # only separates two on-screen windows that share the same geometry.
+        if len(matches) > 1:
+            matches = [window for window in matches if window.get("title") == title]
         if not matches:
             raise BridgeError(
                 "visible_target_not_on_screen",

@@ -395,6 +395,11 @@ async def execute(args) -> None:
             )
         )
         return
+    if args.command == "terminals":
+        from kirabridge.terminal_hygiene import report
+
+        emit(report(args.config, apply=args.apply))
+        return
     if args.command == "setup":
         from kirabridge.local_runtime import setup
 
@@ -1398,6 +1403,15 @@ def main() -> None:
         help="Include read-only live checks (daemon, services, ThreadDesk, relay) in the JSON",
     )
     doctor.add_argument("--json", action="store_true", help="Always print JSON, also in a terminal")
+    terminals = sub.add_parser(
+        "terminals",
+        help="Find orphaned agents on closed Terminal tabs and stale bindings (dry run by default)",
+    )
+    terminals.add_argument(
+        "--apply",
+        action="store_true",
+        help="SIGTERM orphaned agents and remove stale bindings (backups are written first)",
+    )
     reconcile = sub.add_parser("reconcile")
     reconcile.add_argument("task_id")
     reconcile.add_argument("--state", choices=["completed", "failed", "cancelled"], required=True)

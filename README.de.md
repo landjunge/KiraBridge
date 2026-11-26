@@ -48,6 +48,9 @@ Im Entwicklungsstand zeigt die Konsole Sprachassistenten und Agenten-CLIs als ko
 
 Die Desktop-App fasst die Konsole in die Agent-Authority-Shell: Header mit den fünf Produkt-Icons (installierte Produkte farbig, andere grau, das aktive mit dezentem Glow), Statuspunkt der Bridge mit bestätigtem Neustart, Titelleiste mit Sidebar-, Berechtigungs- und Einstellungsschaltern sowie `--snapshot <datei.png>`, das den Fensterrahmen ohne Bildschirmaufnahme-Erlaubnis als Bild ausgibt.
 
+
+Terminal-Tabs werden über das TTY des einzelnen Tabs und den Prozessbaum darauf erkannt, nie über den Fenstertitel (das Profil kann aktiven Prozess und Argumente anzeigen, der Titel ändert sich daher). `kirabridge terminals` listet Agenten, die auf einem geschlossenen Tab weiterlaufen (an launchd übergeben), Hintergrundagenten ohne TTY (bleiben unberührt) und Bindungen, deren Tab oder Prozesse fehlen; `--apply` sendet den verwaisten Agenten SIGTERM und entfernt die veralteten Bindungen, nachdem `config.toml` gesichert wurde. Siehe `docs/TERMINAL-TAB-IDENTITY-20261126.md`.
+
 ## Den Computer direkt bedienen
 
 **KiraBridge ist mehr als eine Brücke zu KI-Agenten im Terminal.** Die Computersteuerung gehört zu ihren Kernfunktionen: Programme öffnen oder in den Vordergrund holen, zwischen Fenstern wechseln, Text unmittelbar eingeben, Notizen schreiben und bearbeiten, einzelne Tasten drücken und Tastenkombinationen (Shortcuts) ausführen. Die direkte Tasteneingabe kann ohne Umweg über die Zwischenablage erfolgen. Je nach freigegebenen Rechten und erreichbarer Oberfläche sind auch Maus-, Fenster- und Bildschirmfunktionen nutzbar. Damit kann die KI vorhandene Programme über deren normale Bedienoberfläche steuern, ohne dass für jede einzelne Anwendung erst eine besondere KI-Schnittstelle geschaffen werden muss.
