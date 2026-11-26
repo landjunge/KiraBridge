@@ -463,8 +463,8 @@ final class FamilyContentController: NSViewController {
         root.arrange = { [weak self] rect in
             guard let self else { return }
             self.split.adaptToFamilyWidth(rect.width)
-            self.header.frame = NSRect(x: 0, y: 0, width: rect.width, height: 64)
-            self.split.view.frame = NSRect(x: 0, y: 64, width: rect.width, height: max(0, rect.height - 64))
+            self.header.frame = NSRect(x: 0, y: 0, width: rect.width, height: FamilyLayout.headerHeight)
+            self.split.view.frame = NSRect(x: 0, y: FamilyLayout.headerHeight, width: rect.width, height: max(0, rect.height - FamilyLayout.headerHeight))
         }
     }
 }
@@ -587,10 +587,10 @@ final class MainSplitController: NSSplitViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         let s = NSSplitViewItem(sidebarWithViewController: sidebar)
-        s.minimumThickness = 176; s.maximumThickness = 220; s.preferredThicknessFraction = 0.11; s.canCollapse = true
-        let m = NSSplitViewItem(viewController: main); m.minimumThickness = 670
+        s.minimumThickness = FamilyLayout.sidebarMin; s.maximumThickness = FamilyLayout.sidebarMax; s.preferredThicknessFraction = 0.11; s.canCollapse = true
+        let m = NSSplitViewItem(viewController: main); m.minimumThickness = FamilyLayout.mainMin
         let i = NSSplitViewItem(viewController: inspector)
-        i.minimumThickness = 292; i.maximumThickness = 370; i.canCollapse = true; i.preferredThicknessFraction = 0.18
+        i.minimumThickness = FamilyLayout.inspectorMin; i.maximumThickness = FamilyLayout.inspectorMax; i.canCollapse = true; i.preferredThicknessFraction = 0.18
         addSplitViewItem(s); addSplitViewItem(m); addSplitViewItem(i)
     }
     func localize() { sidebar.localize(); inspector.localize() }
