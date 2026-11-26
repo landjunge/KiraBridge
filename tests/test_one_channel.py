@@ -13,6 +13,7 @@ from kirabridge.bridge_core.config import (
     VisibleTerminalBinding,
 )
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.message_manager import MessageSend
 from kirabridge.message_overview import inbox
 
 domain = imported_domain
@@ -89,6 +90,43 @@ def test_non_members_get_no_message_and_no_ticket(domain):
     with pytest.raises(BridgeError):
         domain.send("outsider", message(recipient="coordinator", idempotency_key="k6"))
     assert tickets(domain) == []
+
+
+def test_message_to_a_bound_worker_creates_one_ticket_and_replay_none(domain):
+    wire(domain, "grok")
+    sent = domain.send("local", message(recipient="grok", idempotency_key="w1"))
+    domain.send("local", message(recipient="grok", idempotency_key="w1"))
+    rows = tickets(domain)
+    assert [r["idem"] for r in rows] == ["team:" + sent["id"]]
+    assert rows[0]["recipient"] == "grok"
+
+
+def test_worker_without_terminal_and_non_members_get_no_ticket(domain):
+    wire(domain, "grok")
+    domain.send("local", message(recipient="codex", idempotency_key="w2"))  # codex: own wake
+    with pytest.raises(BridgeError):
+        domain.send("outsider", message(recipient="grok", idempotency_key="w3"))
+    assert tickets(domain) == []
+
+
+def test_message_send_alias_lands_in_the_team_log_with_one_ticket(domain):
+    wire(domain, "grok")
+    request = MessageSend(
+        recipient="grok", conversation_id="c", idempotency_key="a1", body="hi", kind="note"
+    )
+    stored = domain.alias_send("local", request)
+    assert stored["deprecated"] and stored["team_id"] == "test-team"
+    assert domain.alias_send("local", request)["id"] == stored["id"]
+    assert len(tickets(domain)) == 1
+
+
+def test_message_send_alias_keeps_the_legacy_path_where_no_ticket_delivers(domain):
+    wire(domain, "grok")
+    for recipient in ("codex", "unknown", "local"):
+        request = MessageSend(
+            recipient=recipient, conversation_id="c", idempotency_key="a2", body="hi"
+        )
+        assert domain.alias_send("local", request) is None
 
 
 def test_delivery_outcome_is_written_back_to_the_team_log(domain):

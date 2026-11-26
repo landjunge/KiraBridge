@@ -1480,9 +1480,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         conversation_return and reply_message. Acknowledge the reply only after processing it.
         """
         try:
-            result = await bridge.message_receiver.send(
-                identity(ctx), message, completion_target=completion_target
+            result = (
+                None
+                if completion_target is not None
+                else bridge.teams.alias_send(identity(ctx), message)
             )
+            if result is None:
+                result = await bridge.message_receiver.send(
+                    identity(ctx), message, completion_target=completion_target
+                )
         except BridgeError as exc:
             result = {"error": {"code": exc.code, "message": str(exc)}}
         from kirabridge.grok_connector.conversation import message_for_conversation
