@@ -654,7 +654,9 @@ class DirectDelivery:
                 )
                 bridge.messages._event(identifier, "message.native_submitting", principal, evidence)
 
-        text, prefix = with_role(bridge, message["recipient"], message["body"])
+        text, prefix = message["body"], ""
+        if prepared["operation"] != "turn/steer":
+            text, prefix = with_role(bridge, message["recipient"], text)
         evidence = await self.codex_host.deliver(binding, prepared, identifier, text, before_send)
         evidence.update(run_id=run_id, session_scope="existing_native_codex_root")
         if prefix:

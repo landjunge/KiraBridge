@@ -1312,12 +1312,11 @@ class MessageReceiver:
             visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             # The body is the complete authorized input on every receiver route.
             # Routing, parent IDs and receipts stay in durable transport metadata.
-            prompt, _ = with_role(
-                self.bridge,
-                recipient,
-                message["body"],
-                limit=16384 if visible else 262144,
-            )
+            prompt = message["body"]
+            if interim is None:  # a steer is not a new message
+                prompt, _ = with_role(
+                    self.bridge, recipient, prompt, limit=16384 if visible else 262144
+                )
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
             args = AgentInput(

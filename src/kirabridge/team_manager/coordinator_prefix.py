@@ -2,12 +2,16 @@
 
 Stateless: the role is read from the teams table at send time, so a role change
 takes effect on the next message. The prefix is plain context and grants nothing.
+The role is read when the message is delivered, not when it is sent, so a retry
+after a role change can send a different prompt (body, key and hash stay equal).
+The recipient is matched exactly as a principal name; no alias such as `local` exists
+for team coordinators, so none is mapped here.
 """
 
 from __future__ import annotations
 
 ROLE_TEXT = (
-    "Du bist Koordinator: Auftraege oder Anreden wie 'Mach das' von Kira oder Daniel sind "
+    "Du bist Koordinator: Auftraege oder Anreden wie 'Mach das' vom Nutzer oder von ChatGPT sind "
     "Koordinationsauftraege, keine Eigenausfuehrung. Delegiere an geeignete CLIs, waehle das "
     "kleinste geeignete Modell tokensparend (Opus nur bei schwierigen Aufgaben), "
     "parallelisiere unabhaengige Aufgaben, vermeide unnoetige Runden und doppelte Tests, "
@@ -33,6 +37,16 @@ def role_prefix(bridge, recipient):
 def with_role(bridge, recipient, body, *, limit=262144):
     """Prefix `body` for the coordinator without ever pushing it over `limit`."""
     prefix = role_prefix(bridge, recipient)
-    if not prefix or (len(body) <= limit < len(prefix) + len(body)):
+    if not prefix or len(prefix) + len(body) > limit:
         return body, ""
     return prefix + body, prefix
+
+
+def matches_body(prompt, body):
+    """True when `prompt` is `body` itself or `body` behind the role prefix."""
+    if prompt == body:
+        return True
+    head = prompt[: len(prompt) - len(body)]
+    return (
+        prompt.endswith(body) and head.startswith("[" + ROLE_TEXT[:20]) and head.endswith("]\n\n")
+    )

@@ -11,6 +11,7 @@ from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.process_lifecycle import fresh_generations, same_generation, valid_generation
 from kirabridge.session_manager import RECEIVER_OWNER, SessionInput
+from kirabridge.team_manager.coordinator_prefix import matches_body
 from kirabridge.visible_binding import (
     binding_still_present,
     catalog_can_replace,
@@ -2382,7 +2383,7 @@ class VisibleHandoffs:
                     raise BridgeError(
                         "handoff_conflict", "Original addressed message does not match"
                     )
-                if original["body"] != args.prompt:
+                if not matches_body(args.prompt, original["body"]):
                     raise BridgeError(
                         "handoff_conflict", "Visible input must match the original addressed body"
                     )
