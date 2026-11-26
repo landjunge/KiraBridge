@@ -15,6 +15,7 @@ final class AgentSidebarViewController: NSViewController {
     private var rows: [SurfaceView] = [], names: [NSTextField] = [], states: [NSTextField] = []
     private var hostButton: NSButton!, settingsButton: NSButton!
     private var timer: Timer?
+    private var selectedFirst = false
 
     override func loadView() {
         let root = LayoutView(); root.color = Palette.surface; view = root
@@ -47,6 +48,7 @@ final class AgentSidebarViewController: NSViewController {
     func setAgents(_ list: [AgentInfo]) {
         guard isViewLoaded, list != agents else { return }
         agents = list
+        if let first = list.first, selectedFirst == false { selectedFirst = true; onSelect?(first) }
         rows.forEach { $0.removeFromSuperview() }
         rows = []; names = []; states = []
         for (i, agent) in list.enumerated() {
