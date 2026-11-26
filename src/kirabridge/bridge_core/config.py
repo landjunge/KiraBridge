@@ -4,6 +4,7 @@ import hashlib
 import os
 import sys
 import tomllib
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -12,6 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer
 
 from kirabridge.bridge_core.models import AgentToolGrant, BridgeError
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
+from kirabridge.openrouter_models import (
+    OPENROUTER_DEFAULT_FALLBACKS,
+    OPENROUTER_DEFAULT_MODEL,
+    OPENROUTER_FREE_MODELS,
+    OPENROUTER_PAID_MODELS,
+)
 
 _FULL_KEYBOARD_CAPABILITIES = frozenset(
     {
@@ -213,6 +220,12 @@ class AgentConfig(BaseModel):
     qwen_mcp_tools: list[str] = Field(default_factory=list, max_length=32)
     qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
     qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
+    openrouter_mcp_tools: list[str] = Field(default_factory=list, max_length=16)
+    openrouter_mcp_read_roots: list[str] = Field(default_factory=list, max_length=128)
+    openrouter_mcp_operations: list[str] = Field(default_factory=list, max_length=8)
+    openrouter_max_tool_calls: int = Field(default=8, ge=1, le=64)
+    openrouter_max_turns: int = Field(default=4, ge=1, le=16)
+    openrouter_max_tool_result_bytes: int = Field(default=32768, ge=1024, le=262144)
     qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
     grok_reasoning_effort: str | None = Field(default=None, pattern=r"^[a-z]{1,16}$")
     qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
@@ -234,6 +247,16 @@ class AgentConfig(BaseModel):
     # Launch arguments for the opt-in kind "acp_pap" (see agent_manager/acp_pap_host.py).
     acp_pap_args: list[str] = Field(default_factory=list)
     api_key_env: str = "XAI_API_KEY"
+    openrouter_credential_source: Literal["environment", "macos_keychain"] = "environment"
+    openrouter_fallback_models: list[str] = Field(default_factory=list, max_length=4)
+    openrouter_max_prompt_bytes: int = Field(default=262144, ge=1, le=1048576)
+    openrouter_max_output_tokens: int = Field(default=1024, ge=1, le=32768)
+    openrouter_allow_paid: bool = False
+    openrouter_paid_max_prompt_bytes: int | None = Field(default=None, ge=1, le=1048576)
+    openrouter_paid_max_output_tokens: int | None = Field(default=None, ge=1, le=32768)
+    openrouter_paid_max_cost_usd: Decimal | None = Field(
+        default=None, gt=Decimal("0"), max_digits=12, decimal_places=8
+    )
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
     bridge_tools: bool = False
     allow_local_tools: bool = False
@@ -249,6 +272,10 @@ class AgentConfig(BaseModel):
         if self.kind != "qwen_acp":
             for key in list(value):
                 if key.startswith("qwen_"):
+                    value.pop(key)
+        if self.kind != "openrouter_api":
+            for key in list(value):
+                if key.startswith("openrouter_"):
                     value.pop(key)
         if self.grok_reasoning_effort is None:
             value.pop("grok_reasoning_effort", None)
@@ -290,6 +317,7 @@ class AgentConfig(BaseModel):
         defaults = {
             "qwen_acp": "",
             "acp_pap": "",
+            "openrouter_api": "OPENROUTER_API_KEY",
             "opencode": "OPENCODE_API_KEY",
             "gemini_cli": "GEMINI_API_KEY",
             "claude_code": "ANTHROPIC_API_KEY",
@@ -300,8 +328,108 @@ class AgentConfig(BaseModel):
             and isinstance(value.get("kind"), str)
             and value["kind"] in defaults
         ):
-            return {"api_key_env": defaults[value["kind"]], **value}
+            normalized = {"api_key_env": defaults[value["kind"]], **value}
+            if value["kind"] == "openrouter_api":
+                normalized.setdefault("model", OPENROUTER_DEFAULT_MODEL)
+                normalized.setdefault(
+                    "openrouter_fallback_models", list(OPENROUTER_DEFAULT_FALLBACKS)
+                )
+                normalized.setdefault("openrouter_credential_source", "environment")
+            return normalized
         return value
+
+    @model_validator(mode="after")
+    def openrouter_provider_policy(self):
+        fields = (
+            self.openrouter_credential_source != "environment"
+            or self.openrouter_fallback_models
+            or self.openrouter_max_prompt_bytes != 262144
+            or self.openrouter_max_output_tokens != 1024
+            or self.openrouter_allow_paid
+            or self.openrouter_paid_max_prompt_bytes is not None
+            or self.openrouter_paid_max_output_tokens is not None
+            or self.openrouter_paid_max_cost_usd is not None
+            or self.openrouter_mcp_tools
+            or self.openrouter_mcp_read_roots
+            or self.openrouter_mcp_operations
+            or self.openrouter_max_tool_calls != 8
+            or self.openrouter_max_turns != 4
+            or self.openrouter_max_tool_result_bytes != 32768
+        )
+        if self.kind != "openrouter_api":
+            if fields:
+                raise ValueError("OpenRouter settings require kind openrouter_api")
+            return self
+        if not self.model:
+            raise ValueError("OpenRouter requires an explicit model")
+        if self.api_key_env != "OPENROUTER_API_KEY":
+            raise ValueError("OpenRouter credentials must use OPENROUTER_API_KEY")
+        if self.openrouter_credential_source == "macos_keychain" and sys.platform != "darwin":
+            raise ValueError("OpenRouter Keychain credentials are available on macOS only")
+        if not self.openrouter_allow_paid and (
+            self.model not in OPENROUTER_FREE_MODELS
+            or any(item not in OPENROUTER_FREE_MODELS for item in self.openrouter_fallback_models)
+        ):
+            raise ValueError("OpenRouter models must be in the verified free-model set")
+        if self.openrouter_allow_paid and self.model not in (
+            OPENROUTER_FREE_MODELS | OPENROUTER_PAID_MODELS
+        ):
+            raise ValueError("OpenRouter paid model is not in the explicitly reviewed set")
+        if self.openrouter_allow_paid and any(
+            item not in OPENROUTER_FREE_MODELS for item in self.openrouter_fallback_models
+        ):
+            raise ValueError("OpenRouter paid fallbacks are not enabled")
+        if self.openrouter_allow_paid and self.openrouter_fallback_models:
+            raise ValueError("Paid OpenRouter routing must not configure model fallbacks")
+        if not set(self.openrouter_mcp_tools) <= {
+            "task_request",
+            "task_get",
+            "task_events",
+            "read_query",
+            "bridge_epoch",
+            "bridge_health",
+            "operation_catalog",
+        }:
+            raise ValueError("OpenRouter MCP tools exceed the reviewed no-shell allowlist")
+        if not set(self.openrouter_mcp_operations) <= {
+            "file.read",
+            "file.list",
+            "file.write",
+            "file.mkdir",
+        }:
+            raise ValueError("OpenRouter task operations exceed the reviewed file-operation set")
+        if (self.openrouter_mcp_tools or self.openrouter_mcp_operations) and not self.bridge_tools:
+            raise ValueError("OpenRouter MCP tools require the explicit bridge_tools profile")
+        if any(
+            not Path(root).is_absolute() or ".." in Path(root).parts
+            for root in self.openrouter_mcp_read_roots
+        ):
+            raise ValueError("OpenRouter MCP read roots must be explicit absolute paths")
+        if (
+            set(self.openrouter_mcp_operations) & {"file.write", "file.mkdir"}
+            and not self.allow_local_tools
+        ):
+            raise ValueError(
+                "OpenRouter file writes require the explicit allow_local_tools profile"
+            )
+        if len(set(self.openrouter_mcp_tools)) != len(self.openrouter_mcp_tools):
+            raise ValueError("OpenRouter MCP tool allowlist contains duplicates")
+        if len(set(self.openrouter_mcp_operations)) != len(self.openrouter_mcp_operations):
+            raise ValueError("OpenRouter MCP operation allowlist contains duplicates")
+        paid_limits = (
+            self.openrouter_paid_max_prompt_bytes,
+            self.openrouter_paid_max_output_tokens,
+            self.openrouter_paid_max_cost_usd,
+        )
+        if self.openrouter_allow_paid and any(value is None for value in paid_limits):
+            raise ValueError("Paid OpenRouter models require prompt, output, and cost limits")
+        if not self.openrouter_allow_paid and any(value is not None for value in paid_limits):
+            raise ValueError("Paid OpenRouter limits require explicit paid-model opt-in")
+        if self.openrouter_paid_max_output_tokens is not None and (
+            self.openrouter_paid_max_output_tokens > self.openrouter_max_output_tokens
+        ):
+            raise ValueError("Paid output limit cannot exceed the global OpenRouter output limit")
+        return self
 
     @model_validator(mode="after")
     def local_provider_endpoint(self):

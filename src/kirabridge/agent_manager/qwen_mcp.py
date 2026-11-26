@@ -15,7 +15,19 @@ from kirabridge.private_files import write_private
 
 
 @contextmanager
-def task_server(bridge_config, task, args, timeout, *, team_scope=None):
+def task_server(
+    bridge_config,
+    task,
+    args,
+    timeout,
+    *,
+    team_scope=None,
+    operator_tools=None,
+    operator_operations=None,
+    operator_read_roots=None,
+    max_calls=None,
+    prefix="qwen",
+):
     owner = task["principal"]
     policy = bridge_config.principals.get(owner) if bridge_config else None
     if (
@@ -30,6 +42,15 @@ def task_server(bridge_config, task, args, timeout, *, team_scope=None):
         )
     if team_scope is not None and "team.read" not in policy.capabilities:
         raise BridgeError("agent_tools_denied", "Qwen resume needs the existing team read grant")
+    profile = bridge_config.agents[args.agent]
+    allowed_tools = profile.qwen_mcp_tools if operator_tools is None else operator_tools
+    allowed_operations = (
+        profile.qwen_mcp_operations if operator_operations is None else operator_operations
+    )
+    allowed_roots = (
+        profile.qwen_mcp_read_roots if operator_read_roots is None else operator_read_roots
+    )
+    call_budget = profile.qwen_max_tool_calls if max_calls is None else max_calls
     binding = AgentTaskPolicy(
         team_scope=team_scope,
         owner=owner,
@@ -41,16 +62,15 @@ def task_server(bridge_config, task, args, timeout, *, team_scope=None):
         grants=args.mcp_grants,
         operations=args.mcp_operations,
         read_roots=args.mcp_read_roots,
-        tools=bridge_config.agents[args.agent].qwen_mcp_tools,
+        tools=allowed_tools,
         capabilities=policy.capabilities,
         read_only=not args.local_tools,
         full_access=bridge_config.agents[args.agent].sandbox_mode == "danger-full-access",
-        max_calls=bridge_config.agents[args.agent].qwen_max_tool_calls,
+        max_calls=call_budget,
     )
-    profile = bridge_config.agents[args.agent]
-    if any(g.tool not in profile.qwen_mcp_tools for g in args.mcp_grants) or not set(
+    if any(g.tool not in allowed_tools for g in args.mcp_grants) or not set(
         args.mcp_operations
-    ) <= set(profile.qwen_mcp_operations):
+    ) <= set(allowed_operations):
         raise BridgeError("agent_tools_denied", "Task MCP grants exceed the operator profile")
     if any(
         op not in OPERATIONS
@@ -65,7 +85,7 @@ def task_server(bridge_config, task, args, timeout, *, team_scope=None):
         raise BridgeError(
             "agent_tools_denied", "Full MCP scope requires existing explicit full rights"
         )
-    operator_roots = [Path(r).resolve() for r in profile.qwen_mcp_read_roots]
+    operator_roots = [Path(r).resolve() for r in allowed_roots]
     principal_roots = [Path(r).resolve() for r in [*policy.roots, *policy.read_roots]]
     for root in args.mcp_read_roots:
         path = Path(root)
@@ -76,7 +96,7 @@ def task_server(bridge_config, task, args, timeout, *, team_scope=None):
         ):
             raise BridgeError("agent_tools_denied", "Task source root exceeds the existing profile")
     server = bridge_server(bridge_config._source_path, owner)
-    with TemporaryDirectory(prefix="kirabridge-qwen-mcp-") as temporary:
+    with TemporaryDirectory(prefix=f"kirabridge-{prefix}-mcp-") as temporary:
         path = Path(temporary) / "task-policy.json"
         encoded = binding.model_dump_json()
         if len(encoded) > 65536:
