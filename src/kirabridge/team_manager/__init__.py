@@ -1184,13 +1184,91 @@ class TeamManager:
                 )
         if native_ping_enrolled:
             self.bridge.team_dispatcher.wake_native_ping()
-        elif addressed_role and not notified:
+        elif not notified:
             self._delivery_ticket(principal, request, recipient, message_id)
         self.wake.set()
         stored = self._message(request.team_id, message_id)
         if notes:
             stored["limit_notes"] = notes
         return stored
+
+    DEFAULT_TEAM = "kirabridge-team"
+
+    def alias_team(self, principal, recipient):
+        """Team for the message_send alias: the one shared team, else the default room."""
+        rows = self.store.db.execute(
+            "SELECT m.team_id FROM team_members m JOIN team_members r ON r.team_id=m.team_id "
+            "WHERE m.principal=? AND m.active=1 AND r.active=1 "
+            "AND (r.principal=? OR ?='coordinator')",
+            (principal, recipient, recipient),
+        ).fetchall()
+        shared = sorted({row["team_id"] for row in rows})
+        if len(shared) == 1:
+            return shared[0]
+        known = self.store.db.execute("SELECT 1 FROM teams WHERE id=?", (self.DEFAULT_TEAM,))
+        return self.DEFAULT_TEAM if known.fetchone() else None
+
+    def alias_send(self, principal, message):
+        """message_send as a thin alias of team send; None keeps the legacy direct path.
+
+        Only messages the visible handoff machine delivers through a ticket move over; Codex,
+        managed receivers, replies, tasks, interim texts and completion routes stay legacy.
+        """
+        if (
+            not self.config.team.enabled
+            or message.interim_session is not None
+            or message.task_id
+            or message.reply_to
+            or message.dispatch is False
+        ):
+            return None
+        team_id = self.alias_team(principal, message.recipient)
+        if team_id is None:
+            return None
+        recipient = message.recipient
+        if recipient == "coordinator":
+            row = self.store.db.execute(
+                "SELECT coordinator FROM teams WHERE id=?", (team_id,)
+            ).fetchone()
+            recipient = row["coordinator"] if row else None
+        if not recipient or not self._ticket_target(principal, recipient):
+            return None
+        try:
+            stored = self.send(
+                principal,
+                TeamMessageSend(
+                    team_id=team_id,
+                    recipient=message.recipient,
+                    body=message.body,
+                    kind=message.kind,
+                    idempotency_key=message.idempotency_key,
+                ),
+            )
+        except BridgeError as exc:
+            if exc.code in {"team_member_denied", "not_found", "team_role_denied"}:
+                return None  # No usable shared team: the legacy direct path stays available.
+            raise
+        stored["deprecated"] = "message_send is an alias of team send (team_message_send)"
+        return stored
+
+    def alias_get(self, principal, message_id):
+        """message_get on a team message id reads the team message; tickets do not exist."""
+        if self.bridge.messages.is_ticket(message_id):
+            raise BridgeError("not_found", "Message not found")
+        row = self.store.db.execute(
+            "SELECT team_id FROM team_messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        self._team(principal, row["team_id"])
+        return self._message(row["team_id"], message_id)
+
+    def alias_ack(self, principal, message_id):
+        """message_ack on a team message id is team_message_ack; None means a legacy id."""
+        row = self.store.db.execute(
+            "SELECT team_id FROM team_messages WHERE id=?", (message_id,)
+        ).fetchone()
+        return None if row is None else self.ack(principal, row["team_id"], message_id)
 
     def _ticket_target(self, principal, recipient, team_id=None):
         """True when the visible handoff machine delivers to this recipient (never Codex)."""

@@ -157,6 +157,15 @@ class MessageManager:
         )
         self.store.audit(kind, principal, None, {"message_id": message_id, **evidence})
 
+    def is_ticket(self, message_id):
+        """Internal team delivery tickets are never a readable mailbox item."""
+        return (
+            self.store.db.execute(
+                "SELECT 1 FROM messages WHERE id=? AND idem LIKE 'team:%'", (message_id,)
+            ).fetchone()
+            is not None
+        )
+
     def get(self, principal, message_id):
         self._identity(principal, "message.read")
         pending = self.voice_policy.get(principal, message_id)
@@ -655,6 +664,7 @@ class MessageManager:
             rows = self.store.db.execute(
                 "SELECT id,seq,delivered FROM messages WHERE recipient=? AND seq>? "
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
+                "AND idem NOT LIKE 'team:%' "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                 "h.queue_id='messages' AND h.item_id=messages.id) "
                 "AND NOT EXISTS (SELECT 1 FROM message_jobs j WHERE j.message_id=messages.id "
