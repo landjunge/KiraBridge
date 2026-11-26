@@ -1251,6 +1251,25 @@ class TeamManager:
         stored["deprecated"] = "message_send is an alias of team send (team_message_send)"
         return stored
 
+    def alias_get(self, principal, message_id):
+        """message_get on a team message id reads the team message; tickets do not exist."""
+        if self.bridge.messages.is_ticket(message_id):
+            raise BridgeError("not_found", "Message not found")
+        row = self.store.db.execute(
+            "SELECT team_id FROM team_messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        self._team(principal, row["team_id"])
+        return self._message(row["team_id"], message_id)
+
+    def alias_ack(self, principal, message_id):
+        """message_ack on a team message id is team_message_ack; None means a legacy id."""
+        row = self.store.db.execute(
+            "SELECT team_id FROM team_messages WHERE id=?", (message_id,)
+        ).fetchone()
+        return None if row is None else self.ack(principal, row["team_id"], message_id)
+
     def _ticket_target(self, principal, recipient, team_id=None):
         """True when the visible handoff machine delivers to this recipient (never Codex)."""
         from kirabridge.voice_channel import VOICE_PRINCIPALS

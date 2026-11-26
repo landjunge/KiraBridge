@@ -176,3 +176,22 @@ def test_message_to_the_live_coordinator_is_dispatched_but_stays_queued_when_dea
     domain.send("chatgpt", message(recipient="coordinator", idempotency_key="live1"))
     assert len(tickets(domain)) == 2
     assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
+
+
+def test_tickets_never_appear_in_message_receive_get_or_overview(domain):
+    wire(domain, "chatgpt")
+    sent = to_coordinator(domain, "r1")
+    ticket = tickets(domain)[0]
+    assert domain.bridge.messages.receive("chatgpt")["messages"] == []
+    with pytest.raises(BridgeError):
+        domain.alias_get("chatgpt", ticket["id"])
+    assert all(i["id"] != ticket["id"] for i in inbox(domain.bridge, "chatgpt")["items"])
+    assert domain.alias_get("chatgpt", sent["id"])["id"] == sent["id"]
+
+
+def test_message_ack_on_a_team_message_is_the_team_ack(domain):
+    wire(domain, "chatgpt")
+    sent = to_coordinator(domain, "r2")
+    acked = domain.alias_ack("chatgpt", sent["id"])
+    assert acked["acknowledged"] is not None
+    assert domain.alias_ack("chatgpt", "legacy-uuid") is None

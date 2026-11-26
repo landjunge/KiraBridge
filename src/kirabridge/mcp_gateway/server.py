@@ -1506,7 +1506,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """
         from kirabridge.grok_connector.conversation import message_for_conversation
 
-        result = safe(lambda: bridge.messages.get(identity(ctx), message_id))
+        result = safe(
+            lambda: (
+                bridge.teams.alias_get(identity(ctx), message_id)
+                or bridge.messages.get(identity(ctx), message_id)
+            )
+        )
         return await message_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=delivery)
@@ -1535,8 +1540,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=delivery)
     def message_ack(message_id: str, receipt: str, ctx: Context) -> dict[str, Any]:
-        """Idempotently acknowledge an incoming message using its delivery receipt."""
-        return safe(lambda: bridge.messages.ack(identity(ctx), message_id, receipt))
+        """Deprecated alias: there is only the team channel; team messages use team_message_ack.
+
+        Idempotently acknowledge an incoming message using its delivery receipt.
+        """
+        return safe(
+            lambda: (
+                bridge.teams.alias_ack(identity(ctx), message_id)
+                or bridge.messages.ack(identity(ctx), message_id, receipt)
+            )
+        )
 
     @server.tool(annotations=read)
     def conversation_get(
