@@ -687,12 +687,12 @@ def cli(release, config, *args, timeout=30):
     )
 
 
-def wait_previous_health(release, config, *, seconds=20):
+def wait_previous_health(release, config, *, seconds=60):
     """Wait briefly for authenticated, read-only status before switching a service."""
     deadline = time.monotonic() + seconds
     while (remaining := deadline - time.monotonic()) > 0:
         try:
-            health = cli(release, config, "status", timeout=min(8, remaining))
+            health = cli(release, config, "status", timeout=min(30, remaining))
             if isinstance(health, dict) and isinstance(health.get("version"), str):
                 return health
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
