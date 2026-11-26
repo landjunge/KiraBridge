@@ -20,6 +20,7 @@ from kirabridge.bridge_core.models import (
 from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
 from kirabridge.message_manager import MessageSend
+from kirabridge.team_manager.coordinator_prefix import with_role
 
 
 def separate_managed_eligible(config, created: float) -> bool:
@@ -1311,7 +1312,12 @@ class MessageReceiver:
             visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             # The body is the complete authorized input on every receiver route.
             # Routing, parent IDs and receipts stay in durable transport metadata.
-            prompt = message["body"]
+            prompt, _ = with_role(
+                self.bridge,
+                recipient,
+                message["body"],
+                limit=16384 if visible else 262144,
+            )
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
             args = AgentInput(

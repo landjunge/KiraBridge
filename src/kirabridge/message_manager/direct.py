@@ -15,6 +15,7 @@ import time
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.team_manager.coordinator_prefix import with_role
 
 
 class DirectDelivery:
@@ -170,7 +171,7 @@ class DirectDelivery:
             # the native turn can already have committed its answer.
             remaining = max(3, evidence["accepted_at"] + receiver.timeout - time.time())
             await self._observe_native_reply(
-                message,
+                {**message, "body": evidence.get("role_prefix", "") + message["body"]},
                 binding,
                 {**evidence, "reconciled_without_input": True},
                 timeout=min(receiver.timeout, remaining),
@@ -653,10 +654,12 @@ class DirectDelivery:
                 )
                 bridge.messages._event(identifier, "message.native_submitting", principal, evidence)
 
-        evidence = await self.codex_host.deliver(
-            binding, prepared, identifier, message["body"], before_send
-        )
+        text, prefix = with_role(bridge, message["recipient"], message["body"])
+        evidence = await self.codex_host.deliver(binding, prepared, identifier, text, before_send)
         evidence.update(run_id=run_id, session_scope="existing_native_codex_root")
+        if prefix:
+            evidence["role_prefix"] = prefix
+            message = {**message, "body": text}
         observe_reply = message["request_reply"] and prepared["operation"] == "turn/start"
         reply_error = (
             "native_codex_steer_reply_unverified"
