@@ -190,8 +190,8 @@ async def inventory(bridge, principal):
         if isinstance(process, dict) and process.get("name")
     }
     cli_rows = await cli_inventory(bridge.config.agents, policy.agents, process_names)
-    changes = _record_cli_versions(bridge, cli_rows)
-    _notify_cli_version_changes(bridge, changes, principal)
+    # CLI versions are audit observations only; they never notify, gate or block.
+    _record_cli_versions(bridge, cli_rows)
     for agent in result["agents"]:
         binding = bridge.config.visible_handoffs.bindings.get(agent["id"])
         matches = [
@@ -313,52 +313,3 @@ def _record_cli_versions(bridge, rows):
                     }
                 )
     return changed
-
-
-def _notify_cli_version_changes(bridge, changes, principal):
-    """Send one deduplicated result to current coordinator(s), without model execution here."""
-    if not hasattr(bridge, "teams"):
-        return
-    from kirabridge.team_manager.models import TeamMessageSend
-
-    teams = bridge.store.db.execute(
-        "SELECT t.id FROM teams t JOIN team_members m ON m.team_id=t.id "
-        "WHERE m.principal=? AND m.active=1 AND t.coordinator<>'' ORDER BY t.id",
-        (principal,),
-    ).fetchall()
-    for change in changes:
-        current = change["current"]
-        for team in teams:
-            previous_version = (change.get("previous") or {}).get("version")
-            installations = ", ".join(
-                f"{item['version']} ({item['compatibility']}) at {item['executable']}"
-                for item in current.get("installations", [])
-            )
-            body = (
-                f"{change['event']}: {current['cli']} "
-                f"{previous_version + ' → ' if previous_version else ''}{current['version']} "
-                f"({current['compatibility']}); primary {current['executable']}"
-                + (f"; installations: {installations}" if installations else "")
-            )
-            request = TeamMessageSend(
-                team_id=team["id"],
-                recipient="coordinator",
-                kind="result",
-                body=body,
-                idempotency_key=(
-                    "cli-version-"
-                    + digest(
-                        {
-                            "team": team["id"],
-                            "event": change["event"],
-                            "previous": change.get("previous"),
-                            "current": current,
-                        }
-                    )[:48]
-                ),
-            )
-            try:
-                bridge.teams.send(principal, request)
-            except BridgeError:
-                # Audit remains authoritative when a team has no writable local route.
-                continue

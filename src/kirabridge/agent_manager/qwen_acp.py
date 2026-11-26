@@ -23,7 +23,6 @@ from kirabridge.platform_adapters import reap_process, spawn_process
 
 class QwenACPAdapter:
     interface_version = "1"
-    supported_versions = frozenset({"0.27.2", "0.27.3"})
 
     def __init__(self, terminal=None, bridge_config=None):
         self.terminal = terminal
@@ -247,14 +246,9 @@ class QwenACPAdapter:
                 if not isinstance(info, dict):
                     raise BridgeError("agent_version", "Qwen ACP agent identity is invalid")
                 version = info.get("version")
-                if (
-                    info.get("name") != "qwen-code"
-                    or not isinstance(version, str)
-                    or version not in self.supported_versions
-                ):
-                    raise BridgeError(
-                        "agent_version", "Qwen ACP requires verified version 0.27.2 or 0.27.3"
-                    )
+                # The version string is recorded only; capabilities decide.
+                if info.get("name") != "qwen-code":
+                    raise BridgeError("agent_identity", "ACP agent is not qwen-code")
                 await progress({**binding, "event": "acp_initialized", "version": version})
                 if recovery_binding is not None or owned_session_proof is not None:
                     if init.get("agentCapabilities", {}).get("loadSession") is not True:

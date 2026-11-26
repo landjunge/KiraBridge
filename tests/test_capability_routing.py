@@ -210,12 +210,19 @@ def test_unverified_access_never_inferred_from_installation(setup):
         select(matrix, runtime, task, now=NOW)
 
 
-def test_access_staleness_and_version_mismatch(setup):
+def test_access_staleness_refuses(setup):
     matrix, runtime, task = setup
-    runtime.access[0].version = "another"
-    runtime.access[1].verified_at = "2026-11-03T00:00:00Z"
+    for access in runtime.access:
+        access.verified_at = "2026-11-03T00:00:00Z"
     with pytest.raises(RoutingError):
         select(matrix, runtime, task, now=NOW)
+
+
+def test_version_mismatch_never_blocks(setup):
+    matrix, runtime, task = setup
+    for access in runtime.access:
+        access.version = "9.9.9"
+    assert select(matrix, runtime, task, now=NOW)
 
 
 def test_every_preflight_reads_live_thread(setup):

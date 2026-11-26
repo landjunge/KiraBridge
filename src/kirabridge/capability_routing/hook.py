@@ -69,15 +69,10 @@ def _before_delegation(source, runtime, task, *, probe, allow_scoped_qwen):
             timeout=10,
             env=subscription_environment(),
         )
-        # Complete first-line equality, not substring matching (0.166.01 != 0.166.0).
+        # The version line is recorded only; a changed CLI version never blocks.
         observed = (result.stdout or result.stderr).strip().splitlines()
-        if (
-            result.returncode
-            or not observed
-            or version_identity(decision["cli"], observed[0])
-            != version_identity(decision["cli"], decision["expected_version"])
-        ):
-            raise RoutingError("Installed CLI version changed; reverify matrix/runtime")
+        if result.returncode or not observed:
+            raise RoutingError("Trusted runtime executable did not start")
         decision["observed_version"] = observed[0]
         if decision["cli"] == "qwen" and decision["access_kind"] == "subscription":
             try:

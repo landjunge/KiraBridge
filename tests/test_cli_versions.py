@@ -17,9 +17,10 @@ def test_cli_version_parser_uses_only_bounded_version_text():
 @pytest.mark.parametrize(
     ("kind", "version", "status"),
     [
-        ("qwen_acp", "0.27.2", "compatible"),
-        ("qwen_acp", "0.28.0", "unsupported"),
-        (None, "0.28.0", "unsupported"),
+        ("qwen_acp", "0.27.2", "unknown"),
+        ("qwen_acp", "0.28.0", "unknown"),
+        ("qwen_acp", "0.99.9", "unknown"),
+        (None, "0.28.0", "unknown"),
         ("claude_code", "2.1.319", "unknown"),
         (None, "1.2.3", "unknown"),
         ("qwen_acp", None, "unknown"),
@@ -55,8 +56,8 @@ async def test_inventory_finds_path_cli_and_marks_running(monkeypatch, tmp_path)
     assert rows[0]["version"] == "0.28.0"
     assert rows[0]["search_order"] == -1  # Explicit configured executable wins over PATH.
     assert rows[0]["compatibility"] == {
-        "status": "unsupported",
-        "reason": "qwen_acp_version_not_in_supported_set",
+        "status": "unknown",
+        "reason": "version_policy_not_declared_for_adapter",
     }
 
 
@@ -282,3 +283,20 @@ def test_cli_version_history_is_read_once_for_many_cli_rows(tmp_path):
     ]
     assert len(history_queries) == 1
     store.close()
+
+
+def test_cli_version_change_never_sends_team_message(monkeypatch):
+    from kirabridge import discovery
+
+    sent = []
+    bridge = SimpleNamespace(teams=SimpleNamespace(send=lambda *a: sent.append(a)))
+    monkeypatch.setattr(
+        discovery, "_record_cli_versions", lambda *_: [{"event": "cli.version_changed"}]
+    )
+    assert not hasattr(discovery, "_notify_cli_version_changes")
+    for version in ("0.99.9", "9.9.9"):
+        assert cli_versions.compatibility("qwen_acp", version, cli="qwen")["status"] != (
+            "unsupported"
+        )
+    discovery._record_cli_versions(bridge, [])
+    assert sent == []
