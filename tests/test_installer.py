@@ -1437,3 +1437,40 @@ def test_final_check_is_compact_and_never_fails_the_installation(installer, caps
     monkeypatch.setattr(installer, "cli", broken)
     installer.final_check(SimpleNamespace(config="c"), "r")
     assert "-- Abschlussprüfung nicht möglich (daemon unreachable)" in capsys.readouterr().err
+
+
+def _evidence_linked_job(installer, monkeypatch, tmp_path, *, extra_active=False):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    db = sqlite3.connect(tmp_path / "state" / "bridge.sqlite3")
+    db.execute("ALTER TABLE message_jobs ADD COLUMN evidence TEXT NOT NULL DEFAULT '{}'")
+    db.execute(
+        "INSERT INTO message_jobs VALUES('job-msg','queued',?)",
+        (json.dumps({"observation": {"handoff_id": "h-ev", "message_id": "other-msg"}}),),
+    )
+    db.execute("INSERT INTO visible_handoffs VALUES('h-ev','other-msg','unknown')")
+    if extra_active:
+        db.execute("INSERT INTO visible_handoffs VALUES('h-2','other-msg','sent')")
+    db.commit()
+    db.close()
+    _authorize_current_terminal_task(installer, monkeypatch, task_id)
+    return config
+
+
+def test_job_linked_to_unknown_handoff_only_via_evidence_is_not_busy(
+    installer, monkeypatch, tmp_path
+):
+    config = _evidence_linked_job(installer, monkeypatch, tmp_path)
+    lines = []
+    monkeypatch.setattr(installer, "report", lambda kind, msg, **kw: lines.append((kind, msg)))
+    with installer.idle_guard(config):
+        pass
+    assert any(k == "warn" and "job-msg" in m for k, m in lines)
+
+
+def test_evidence_linked_unknown_handoff_with_active_sibling_is_busy(
+    installer, monkeypatch, tmp_path
+):
+    config = _evidence_linked_job(installer, monkeypatch, tmp_path, extra_active=True)
+    with pytest.raises(RuntimeError, match="BUSY"):
+        with installer.idle_guard(config):
+            pytest.fail("must block")
