@@ -108,7 +108,7 @@ with an old database backup. A responding previous daemon proves recovery; a
 restored pointer or timeout does not. [Actual focused rollback evidence and
 original failure](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/RC14-ROLLBACK-20261026.md).
 
-For BUSY, inspect the stated jobs; do not kill sessions or empty queues blindly.
+For BUSY, inspect the stated jobs; do not kill sessions or empty queues blindly. Queued receiver jobs whose handoff is `unknown` (or that were withdrawn) are reported as skipped unknown reservations, do not block, and are never resent.
 For visibility changes, check the owned window instead of using another agent.
 For checksum failure, stop and reacquire the authorized original. For403/404,
 check private GitHub access. Preserve foreign services/ports. A readiness timeout
