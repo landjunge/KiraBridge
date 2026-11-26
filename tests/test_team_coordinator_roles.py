@@ -8,7 +8,12 @@ from test_team_manager import core, create, message, work
 from test_team_manager import domain as imported_domain
 
 from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.config import AgentConfig, NativeCodexBinding, TeamWorkerConfig
+from kirabridge.bridge_core.config import (
+    AgentConfig,
+    NativeCodexBinding,
+    TeamWorkerConfig,
+    VisibleTerminalBinding,
+)
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.message_manager import MessageSend
 from kirabridge.team_manager.models import TeamCoordinatorHandoff, TeamSessionClear
@@ -136,6 +141,7 @@ def test_coordinator_session_proofs_are_registered_and_unknown_routes_fail_close
     worker = domain.config.team.workers["codex"]
     assert coordinator_session_proof("separate_managed_session") is not None
     assert coordinator_session_proof("existing_native_codex_root") is not None
+    assert coordinator_session_proof("existing_visible_terminal") is not None
     assert coordinator_session_proof("unregistered-session-type") is None
 
     # A new trusted host route uses the common identity/state/generation checks.
@@ -152,6 +158,68 @@ def test_coordinator_session_proofs_are_registered_and_unknown_routes_fail_close
         ),
     )
     assert domain.coordinator_roles._eligible(TEAM, "codex")["session_id"] == "codex-registered"
+
+
+def _bind_visible_codex(domain):
+    worker = domain.config.team.workers["codex"]
+    worker.execution_scope = "existing_visible_terminal"
+    domain.config.visible_handoffs.bindings["codex"] = VisibleTerminalBinding(
+        pane_id="terminal:1234:ttys001",
+        expected_pid=1001,
+        agent_pid=1002,
+        ready_pattern="Continue coding",
+    )
+
+
+def test_visible_terminal_coordinator_requires_exact_recorded_process_binding(domain):
+    setup_team(domain, coordinator="codex")
+    _bind_visible_codex(domain)
+    record(domain, "codex", session="codex-visible")
+
+    row = domain.coordinator_roles._eligible(TEAM, "codex")
+    assert row is not None and row["session_id"] == "codex-visible"
+    assert domain.coordinator_status("local", TEAM)["session"]["session_id"] == "codex-visible"
+
+    # PID/window replacement invalidates the observed proof without re-binding
+    # the team role to a different interactive session.
+    domain.config.visible_handoffs.bindings["codex"] = domain.config.visible_handoffs.bindings[
+        "codex"
+    ].model_copy(update={"expected_pid": 2001})
+    assert domain.coordinator_roles._eligible(TEAM, "codex") is None
+
+
+def test_visible_terminal_coordinator_inbox_message_is_queued_for_bound_session(domain):
+    setup_team(domain, coordinator="codex")
+    _bind_visible_codex(domain)
+    record(domain, "codex", session="codex-visible-inbox")
+    assert domain.coordinator_status("local", TEAM)["coordinator"] == "codex"
+
+    sent = role_message(domain, "visible-coordinator-inbox")
+    notification = domain.store.db.execute(
+        "SELECT n.work_id,n.session,w.assignee,w.state FROM team_coordinator_notifications n "
+        "JOIN team_work w ON w.id=n.work_id WHERE n.message_id=?",
+        (sent["id"],),
+    ).fetchone()
+    assert notification is not None
+    assert notification["assignee"] == "codex"
+    assert notification["state"] == "queued"
+    assert json.loads(notification["session"])["session_id"] == "codex-visible-inbox"
+    assert domain.wake.is_set()
+
+
+def test_stale_visible_terminal_binding_keeps_inbox_message_but_does_not_wake_old_target(domain):
+    setup_team(domain, coordinator="codex")
+    _bind_visible_codex(domain)
+    record(domain, "codex", session="codex-visible-stale")
+    domain.config.visible_handoffs.bindings["codex"] = domain.config.visible_handoffs.bindings[
+        "codex"
+    ].model_copy(update={"agent_pid": 3003})
+
+    sent = role_message(domain, "visible-coordinator-stale")
+    assert sent["recipient"] == "codex"
+    assert domain.store.db.execute(
+        "SELECT 1 FROM team_coordinator_notifications WHERE message_id=?", (sent["id"],)
+    ).fetchone() is None
 
 
 def test_coordinator_session_proof_registry_rejects_replacement():
