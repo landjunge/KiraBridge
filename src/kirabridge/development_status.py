@@ -19,7 +19,7 @@ PS_TIMEOUT = 3.0
 TASK_LIMIT = 100
 CONFIG_BYTE_LIMIT = 1048576
 SOURCE_BYTE_LIMIT = 8388608
-SOURCE_FILE_LIMIT = 256
+SOURCE_FILE_LIMIT = 512
 
 # Exact executable names only. Node/Python/shell arguments must never be inspected
 # to infer which agent they might host. Names are observation, not verified identity.

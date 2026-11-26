@@ -66,6 +66,17 @@ handelt als `local`; ChatGPT handelt als `chatgpt`. Der Koordinator kann nicht
 als Grok oder Codex auftreten. Die Rolle erlaubt keine zusätzlichen Datei-,
 Shell-, Administrations- oder Anbieterrechte.
 
+Die Sitzung wird getrennt von der Teamrolle geprüft. KiraBridge nimmt nur eine
+Sitzung an, deren aktiver Worker, Adapter, Sitzungskennung, Generation,
+Arbeitsverzeichnis, Zustand und Ausführungsrechte zusammenpassen. Zusätzliche
+Sitzungsarten müssen einen vertrauenswürdigen Host-seitigen Proof für ihren
+Ausführungsscope registrieren; unbekannte Scopes bleiben gesperrt. Dadurch kann
+ein Operator zwischen bereits eingerichteten, nachweislich geeigneten Mitgliedern
+wechseln, ohne Sitzungsart-Prüfungen an mehreren Routingstellen nachzupflegen.
+Zum Wechseln dient `kirabridge team coordinator <team> [mitglied]`; ohne
+Mitgliedsname wird die authentifizierte Identität verwendet. Die Übernahme bleibt
+an die vorhandene bestätigte Handoff-Sequenz gebunden.
+
 ## MCP-Aufrufe
 
 Alle Werkzeuge verwenden API-Version 1 und die bestehenden Authentifizierungswege.

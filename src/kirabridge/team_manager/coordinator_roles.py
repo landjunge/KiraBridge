@@ -9,6 +9,10 @@ import uuid
 
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 from kirabridge.permissions import automatic_for
+from kirabridge.team_manager.coordinator_sessions import (
+    coordinator_session_proof,
+    register_coordinator_session_proof,
+)
 from kirabridge.team_manager.models import TeamMessageSend, TeamWorkCreate
 
 SCHEMA = """
@@ -41,6 +45,31 @@ CREATE INDEX IF NOT EXISTS team_session_observation_team
 
 SESSION_KEYS = ("principal", "agent", "adapter", "session_id", "generation", "cwd")
 FINISHED = {"completed", "failed", "unknown", "cancelled", "blocked"}
+
+
+def _native_codex_session_proof(roles, row, worker):
+    binding = roles.manager.config.visible_handoffs.native_codex
+    return (
+        worker.agent == "codex"
+        and row["adapter"] == "codex"
+        and binding is not None
+        and binding.session_id == row["session_id"]
+        and json.loads(row["provider_binding"]) == roles._native_scope(binding)
+    )
+
+
+def _managed_session_proof(roles, row, worker):
+    from kirabridge.team_manager import RESUME_ADAPTERS
+
+    return (
+        not worker.local_tools
+        and row["adapter"] == roles.manager._worker_adapter(worker)
+        and row["adapter"] in RESUME_ADAPTERS
+    )
+
+
+register_coordinator_session_proof("existing_native_codex_root", _native_codex_session_proof)
+register_coordinator_session_proof("separate_managed_session", _managed_session_proof)
 
 
 class CoordinatorRoles:
@@ -167,8 +196,6 @@ class CoordinatorRoles:
         return {key: row[key] for key in SESSION_KEYS}
 
     def _eligible(self, team_id, principal, *, work_id=None):
-        from kirabridge.team_manager import RESUME_ADAPTERS
-
         worker = self.manager.config.team.workers.get(principal)
         row = self.manager._session_row(team_id, principal)
         if (
@@ -190,22 +217,8 @@ class CoordinatorRoles:
             return None
         if not automatic_for(policy, "agent.execute") or worker.agent not in policy.agents:
             return None
-        if worker.execution_scope == "existing_native_codex_root":
-            binding = self.manager.config.visible_handoffs.native_codex
-            if (
-                worker.agent != "codex"
-                or row["adapter"] != "codex"
-                or binding is None
-                or binding.session_id != row["session_id"]
-                or json.loads(row["provider_binding"]) != self._native_scope(binding)
-            ):
-                return None
-        elif (
-            worker.execution_scope != "separate_managed_session"
-            or worker.local_tools
-            or row["adapter"] != self.manager._worker_adapter(worker)
-            or row["adapter"] not in RESUME_ADAPTERS
-        ):
+        proof = coordinator_session_proof(worker.execution_scope)
+        if proof is None or not proof(self, row, worker):
             return None
         return row
 
