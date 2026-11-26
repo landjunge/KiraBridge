@@ -587,7 +587,10 @@ def idle_guard(config):
         if "visible_handoffs" in tables:
             dead.append(
                 "select 1 from visible_handoffs v "
-                "where v.state='unknown' and v.message_id=message_jobs.message_id"
+                "where v.state='unknown' and v.message_id=message_jobs.message_id "
+                "and not exists (select 1 from visible_handoffs a "
+                "where a.message_id=v.message_id and a.state in "
+                "('planned','inserting','inserted','submitting','return_sent','sent','confirmed'))"
             )
         skipped = []
         jobs = 0
@@ -620,7 +623,8 @@ def idle_guard(config):
             report(
                 "warn",
                 f"{len(skipped)} unbekannte Reservierung(en) übersprungen: "
-                + ", ".join(skipped)
+                + ", ".join(skipped[:10])
+                + (f" +{len(skipped) - 10} weitere" if len(skipped) > 10 else "")
                 + "; kein Neuversand",
             )
         report(
