@@ -23,12 +23,17 @@ ROLE_TEXT = (
 )
 
 
+def is_coordinator(bridge, principal):
+    """True while `principal` holds the coordinator role in any team (read per call)."""
+    row = bridge.store.db.execute(
+        "SELECT 1 FROM teams WHERE coordinator=? LIMIT 1", (principal,)
+    ).fetchone()
+    return row is not None
+
+
 def role_prefix(bridge, recipient):
     """Return the prefix for the current coordinator, else an empty string."""
-    row = bridge.store.db.execute(
-        "SELECT 1 FROM teams WHERE coordinator=? LIMIT 1", (recipient,)
-    ).fetchone()
-    if row is None:
+    if not is_coordinator(bridge, recipient):
         return ""
     clis = ", ".join(sorted(bridge.config.agents))
     return f"[{ROLE_TEXT} Verfuegbare CLIs: {clis}.]\n\n"
