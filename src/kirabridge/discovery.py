@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 
 from kirabridge import __version__
 from kirabridge.bridge_core.models import BridgeError, digest
@@ -179,6 +181,17 @@ async def inventory(bridge, principal):
     discovery = await live(bridge, principal)
     result = bridge.agents.inventory(policy.agents)
     rows = discovery["terminal_observation"].get("sessions", [])
+    from kirabridge.agent_manager.cli_versions import inventory as cli_inventory
+
+    process_names = {
+        Path(str(process.get("name", ""))).name.lower()
+        for row in rows
+        for process in row.get("processes", [])
+        if isinstance(process, dict) and process.get("name")
+    }
+    cli_rows = await cli_inventory(bridge.config.agents, policy.agents, process_names)
+    changes = _record_cli_versions(bridge, cli_rows)
+    _notify_cli_version_changes(bridge, changes, principal, cli_rows)
     for agent in result["agents"]:
         binding = bridge.config.visible_handoffs.bindings.get(agent["id"])
         matches = [
@@ -206,4 +219,137 @@ async def inventory(bridge, principal):
             "next_step": "Use terminal_control for direct shell work. Agent handoffs require "
             "the current operator-assigned agent window; grants alone do not confirm identity.",
         }
-    return {**result, "discovery": discovery}
+    return {**result, "cli_inventory": cli_rows, "discovery": discovery}
+
+
+def _record_cli_versions(bridge, rows):
+    """Keep first observations and version/path changes in the existing audit chain."""
+    store = bridge.store
+    changed = []
+    with store.transaction():
+        for row in rows:
+            version = row.get("version")
+            if not version:
+                continue
+            previous = store.db.execute(
+                "SELECT metadata FROM audit WHERE kind IN "
+                "('cli.version_observed','cli.version_changed','cli.compatibility_changed') "
+                "ORDER BY seq DESC LIMIT 512"
+            ).fetchall()
+            prior = None
+            for event in previous:
+                try:
+                    metadata = json.loads(event["metadata"])
+                except (TypeError, ValueError):
+                    continue
+                if metadata.get("cli") == row["cli"]:
+                    prior = metadata
+                    break
+            current = {
+                "cli": row["cli"],
+                "version": version,
+                "executable": row["executable"],
+                "probe_status": row["probe_status"],
+                "compatibility": row["compatibility"]["status"],
+            }
+            same_version = prior and prior.get("version") == version
+            same_path = prior and prior.get("executable") == row["executable"]
+            same_compatibility = prior and prior.get("compatibility") == current["compatibility"]
+            if same_version and same_path and same_compatibility:
+                continue
+            if prior and (not same_version or not same_path):
+                kind = "cli.version_changed"
+            elif prior:
+                kind = "cli.compatibility_changed"
+            else:
+                kind = "cli.version_observed"
+            store.audit(kind, "service", None, current)
+            if prior or current["compatibility"] == "unsupported":
+                changed.append(
+                    {
+                        "event": kind if prior else "cli.compatibility",
+                        "previous": prior,
+                        "current": current,
+                    }
+                )
+    return changed
+
+
+def _notify_cli_version_changes(bridge, changes, principal, current_rows=()):
+    """Send one deduplicated result to current coordinator(s), without model execution here."""
+    if not hasattr(bridge, "teams"):
+        return
+    from kirabridge.team_manager.models import TeamMessageSend
+
+    teams = bridge.store.db.execute(
+        "SELECT t.id FROM teams t JOIN team_members m ON m.team_id=t.id "
+        "WHERE m.principal=? AND m.active=1 AND t.coordinator<>'' ORDER BY t.id",
+        (principal,),
+    ).fetchall()
+    notifications = list(changes)
+    notifications.extend(
+        {
+            "event": "cli.compatibility",
+            "previous": None,
+            "current": {
+                "cli": row["cli"],
+                "version": row["version"],
+                "executable": row["executable"],
+                "compatibility": row["compatibility"]["status"],
+            },
+        }
+        for row in current_rows
+        if row["compatibility"]["status"] == "unsupported"
+    )
+    for row in current_rows:
+        latest = bridge.store.db.execute(
+            "SELECT kind,metadata FROM audit WHERE kind IN "
+            "('cli.version_changed','cli.compatibility_changed') ORDER BY seq DESC LIMIT 512"
+        ).fetchall()
+        for event in latest:
+            try:
+                metadata = json.loads(event["metadata"])
+            except (TypeError, ValueError):
+                continue
+            if metadata.get("cli") != row["cli"]:
+                continue
+            if (
+                metadata.get("version") == row["version"]
+                and metadata.get("executable") == row["executable"]
+            ):
+                notifications.append(
+                    {
+                        "event": event["kind"],
+                        "previous": None,
+                        "current": {
+                            "cli": row["cli"],
+                            "version": row["version"],
+                            "executable": row["executable"],
+                            "compatibility": row["compatibility"]["status"],
+                        },
+                    }
+                )
+            break
+    for change in notifications:
+        current = change["current"]
+        for team in teams:
+            previous_version = (change.get("previous") or {}).get("version")
+            body = (
+                f"{change['event']}: {current['cli']} "
+                f"{previous_version + ' → ' if previous_version else ''}{current['version']} "
+                f"({current['compatibility']}); executable {current['executable']}"
+            )
+            request = TeamMessageSend(
+                team_id=team["id"],
+                recipient="coordinator",
+                kind="result",
+                body=body,
+                idempotency_key=(
+                    "cli-version-" + digest({"team": team["id"], **current})[:48]
+                ),
+            )
+            try:
+                bridge.teams.send(principal, request)
+            except BridgeError:
+                # Audit remains authoritative when a team has no writable local route.
+                continue

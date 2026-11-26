@@ -782,7 +782,28 @@ async def execute(args) -> None:
             else:
                 emit(await daemon_health(config, args.principal))
         else:
-            emit(await daemon_health(config, args.principal))
+            report = await daemon_health(config, args.principal)
+            from kirabridge.local_runtime import peer
+            from kirabridge.mcp_gateway.client import MCPClientPool
+
+            try:
+                async with MCPClientPool(call_timeout=10) as pool:
+                    await pool.connect(peer(config, args.principal))
+                    response = await pool.call("daemon", "agent_inventory", {})
+                inventory = response.structuredContent or {}
+                report["cli_inventory"] = (
+                    {"status": "unavailable", "error": inventory["error"]}
+                    if inventory.get("error")
+                    else inventory.get("cli_inventory", [])
+                )
+            except BridgeError as exc:
+                report["cli_inventory"] = {"status": "unavailable", "error": exc.code}
+            except Exception as exc:
+                report["cli_inventory"] = {
+                    "status": "unavailable",
+                    "error": type(exc).__name__,
+                }
+            emit(report)
         return
     if args.command == "serve" and args.transport == "http":
         from kirabridge.local_runtime import load_service_credentials
@@ -902,10 +923,12 @@ async def execute(args) -> None:
             # A local operator attests an inspected external result. Does not execute or retry.
             emit(bridge.tasks.reconcile(args.task_id, State(args.state), args.evidence))
         elif args.command == "doctor":
+            from kirabridge.discovery import inventory as live_agent_inventory
             from kirabridge.platform_adapters import current_platform
 
+            observed_agents = await live_agent_inventory(bridge, args.principal)
+            agent_result = {"agents": observed_agents["agents"]}
             audit_result = verify(bridge.store)
-            agent_result = bridge.agents.inventory(list(config.agents))
             from kirabridge.local_runtime import default_config
 
             config_path = Path(args.config).expanduser() if args.config else default_config()
@@ -948,6 +971,7 @@ async def execute(args) -> None:
                 "schema": 2,
                 "audit": audit_result,
                 "agents": agent_result,
+                "cli_inventory": observed_agents["cli_inventory"],
                 "chatgpt_integration": "unverified",
                 "checks": {
                     "database": {"status": "OK", "detail": "Database opened"},

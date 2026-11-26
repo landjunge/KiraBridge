@@ -325,10 +325,31 @@ class Bridge:
         self.agents.visible_handoffs = self.visible_handoffs
 
         next_prune = 0.0
+        # Let the first explicit inventory/doctor request probe immediately;
+        # the periodic observer begins after one interval.
+        next_cli_version_probe = time.monotonic() + 30.0
+        self._cli_version_probe_task = None
+
+        async def refresh_cli_versions():
+            from kirabridge.agent_manager.cli_versions import inventory as cli_inventory
+            from kirabridge.discovery import _record_cli_versions
+
+            try:
+                rows = await cli_inventory(
+                    self.config.agents, list(self.config.agents), set()
+                )
+                _record_cli_versions(self, rows)
+            except Exception:
+                # A failed local version probe must not interrupt task/message maintenance.
+                return
 
         def maintain():
-            nonlocal next_prune
+            nonlocal next_prune, next_cli_version_probe
             self.messages.voice_policy.expire()
+            if time.monotonic() >= next_cli_version_probe:
+                next_cli_version_probe = time.monotonic() + 30.0
+                if self._cli_version_probe_task is None or self._cli_version_probe_task.done():
+                    self._cli_version_probe_task = asyncio.create_task(refresh_cli_versions())
             # Tidying runs often enough to stay current, not on every idle worker wake-up:
             # capture() still prunes before every write, so nothing is ever left expired.
             if time.monotonic() >= next_prune:

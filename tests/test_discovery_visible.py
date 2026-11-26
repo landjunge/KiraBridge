@@ -10,6 +10,7 @@ from conftest import request
 from test_mcp import http_bridge  # noqa: F401 -- shared real HTTP fixture
 
 from kirabridge import __version__
+from kirabridge.agent_manager import cli_versions
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.permissions import decision
@@ -23,6 +24,7 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
     monkeypatch,
 ):
     bridge, endpoint = http_bridge
+    monkeypatch.setattr(cli_versions, "inventory", AsyncMock(return_value=[]))
     policy = config.principals["local"]
     policy.capabilities += ["session.inspect"]
     policy.permission_level = "full"
