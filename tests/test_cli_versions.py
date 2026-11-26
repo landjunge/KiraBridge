@@ -1,3 +1,5 @@
+import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -30,14 +32,12 @@ def test_cli_compatibility_is_explicit_and_unknown_fails_open(kind, version, sta
 
 @pytest.mark.asyncio
 async def test_inventory_finds_path_cli_and_marks_running(monkeypatch, tmp_path):
-    executable = tmp_path / "qwen"
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    executable = bindir / "qwen"
     executable.write_text("fixture")
     executable.chmod(0o700)
-    monkeypatch.setattr(
-        cli_versions.shutil,
-        "which",
-        lambda name: str(executable) if name == "qwen" else None,
-    )
+    monkeypatch.setenv("PATH", str(bindir))
 
     async def probe(_path):
         return {"status": "observed", "version": "0.28.0"}
@@ -53,6 +53,7 @@ async def test_inventory_finds_path_cli_and_marks_running(monkeypatch, tmp_path)
     assert rows[0]["cli"] == "qwen"
     assert rows[0]["running"] is True
     assert rows[0]["version"] == "0.28.0"
+    assert rows[0]["search_order"] == -1  # Explicit configured executable wins over PATH.
     assert rows[0]["compatibility"] == {
         "status": "unsupported",
         "reason": "qwen_acp_version_not_in_supported_set",
@@ -64,7 +65,7 @@ async def test_inventory_keeps_custom_configured_cli_path(monkeypatch, tmp_path)
     executable = tmp_path / "claude-managed"
     executable.write_text("fixture")
     executable.chmod(0o700)
-    monkeypatch.setattr(cli_versions.shutil, "which", lambda _name: None)
+    monkeypatch.setenv("PATH", "")
 
     async def probe(_path):
         return {"status": "observed", "version": "2.1.319"}
@@ -82,6 +83,7 @@ async def test_inventory_keeps_custom_configured_cli_path(monkeypatch, tmp_path)
             "agent_id": "claude",
             "adapter": "claude_code",
             "executable": str(executable.resolve()),
+            "search_order": -1,
             "version": "2.1.319",
             "probe_status": "observed",
             "running": True,
@@ -91,6 +93,29 @@ async def test_inventory_keeps_custom_configured_cli_path(monkeypatch, tmp_path)
             },
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_inventory_observes_all_path_installations_in_search_order(monkeypatch, tmp_path):
+    first = tmp_path / "first" / "claude"
+    second = tmp_path / "second" / "claude"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    for executable in (first, second):
+        executable.write_text("fixture")
+        executable.chmod(0o700)
+    monkeypatch.setenv("PATH", os.pathsep.join((str(first.parent), str(second.parent))))
+
+    async def probe(executable):
+        version = "2.1.332" if executable == str(first) else "2.1.236"
+        return {"status": "observed", "version": version}
+
+    monkeypatch.setattr(cli_versions, "_probe", probe)
+    rows = await cli_versions.inventory({}, [], set())
+
+    assert [row["executable"] for row in rows] == [str(first.resolve()), str(second.resolve())]
+    assert [row["version"] for row in rows] == ["2.1.332", "2.1.236"]
+    assert [row["search_order"] for row in rows] == [0, 1]
 
 
 def test_version_observations_record_only_baseline_and_changes(tmp_path):
@@ -115,4 +140,116 @@ def test_version_observations_record_only_baseline_and_changes(tmp_path):
     assert changed[0]["current"]["version"] == "0.28.1"
     events = [row[0] for row in store.db.execute("SELECT kind FROM audit ORDER BY seq")]
     assert events == ["cli.version_observed", "cli.version_changed"]
+    store.close()
+
+
+def test_version_observation_compares_complete_set_not_probe_order(tmp_path):
+    store = Store(tmp_path / "bridge.sqlite3")
+    bridge = SimpleNamespace(store=store)
+    first = {
+        "cli": "claude",
+        "version": "2.1.332",
+        "executable": "/opt/claude-a",
+        "search_order": 0,
+        "probe_status": "observed",
+        "compatibility": {"status": "unknown"},
+    }
+    second = {
+        **first,
+        "version": "2.1.236",
+        "executable": "/opt/claude-b",
+        "search_order": 1,
+    }
+
+    assert _record_cli_versions(bridge, [first, second]) == []
+    # A different probe/iteration order still represents the same set; the
+    # deterministic PATH priority selects the primary executable each time.
+    assert _record_cli_versions(bridge, [second, first]) == []
+    observed = [
+        json.loads(row[0])
+        for row in store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='cli.version_observed' ORDER BY seq"
+        )
+    ]
+    assert len(observed) == 1
+    assert observed[0]["version"] == "2.1.332"
+    assert [row["version"] for row in observed[0]["installations"]] == [
+        "2.1.332",
+        "2.1.236",
+    ]
+
+    changed = _record_cli_versions(bridge, [first])
+    assert len(changed) == 1
+    assert changed[0]["event"] == "cli.version_changed"
+    assert len(changed[0]["previous"]["installations"]) == 2
+    assert len(changed[0]["current"]["installations"]) == 1
+    assert _record_cli_versions(bridge, [first]) == []
+    store.close()
+
+
+def test_legacy_single_path_record_is_silently_upgraded_to_set_baseline(tmp_path):
+    store = Store(tmp_path / "bridge.sqlite3")
+    bridge = SimpleNamespace(store=store)
+    store.audit(
+        "cli.version_observed",
+        "service",
+        None,
+        {
+            "cli": "claude",
+            "version": "2.1.332",
+            "executable": "/opt/claude-a",
+            "probe_status": "observed",
+            "compatibility": "unknown",
+        },
+    )
+    rows = [
+        {
+            "cli": "claude",
+            "version": version,
+            "executable": executable,
+            "search_order": priority,
+            "probe_status": "observed",
+            "compatibility": {"status": "unknown"},
+        }
+        for version, executable, priority in (
+            ("2.1.332", "/opt/claude-a", 0),
+            ("2.1.236", "/opt/claude-b", 1),
+        )
+    ]
+
+    assert _record_cli_versions(bridge, rows) == []
+    assert _record_cli_versions(bridge, rows) == []
+    events = [row[0] for row in store.db.execute("SELECT kind FROM audit ORDER BY seq")]
+    assert events == ["cli.version_observed", "cli.version_observed"]
+    store.close()
+
+
+def test_first_observation_reports_unsupported_secondary_installation(tmp_path):
+    store = Store(tmp_path / "bridge.sqlite3")
+    bridge = SimpleNamespace(store=store)
+    rows = [
+        {
+            "cli": "qwen",
+            "version": "0.27.3",
+            "executable": "/opt/qwen-supported",
+            "search_order": 0,
+            "probe_status": "observed",
+            "compatibility": {"status": "compatible"},
+        },
+        {
+            "cli": "qwen",
+            "version": "0.28.0",
+            "executable": "/opt/qwen-newer",
+            "search_order": 1,
+            "probe_status": "observed",
+            "compatibility": {"status": "unsupported"},
+        },
+    ]
+
+    changes = _record_cli_versions(bridge, rows)
+    assert len(changes) == 1
+    assert changes[0]["event"] == "cli.compatibility"
+    assert changes[0]["current"]["version"] == "0.27.3"
+    assert len(changes[0]["current"]["installations"]) == 2
+    assert _record_cli_versions(bridge, rows) == []
     store.close()
