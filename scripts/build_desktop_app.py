@@ -98,12 +98,13 @@ def build(destination=None):
         timeout=180,
     )
     binary.chmod(0o755)
-    # Bundle the original macOS icon from the approved design package; verify it
-    # against the pinned design checksum so a stray file is never signed in.
-    icon_source = root / "assets" / "design" / "icons" / "macos" / "KiraBridge-dark.icns"
+    # Bundle the Dock icon: the approved dark design icon resized to ~0.89 on a transparent
+    # margin so it matches the other family tools (design package bytes stay unchanged).
+    # Verify against the pinned checksum so a stray file is never signed in.
+    icon_source = root / "assets" / "dock" / "KiraBridge-dock.icns"
     icon_bytes = icon_source.read_bytes()
     if hashlib.sha256(icon_bytes).hexdigest() != (
-        "8933c33501f39cf0563e4c94989392f78e304a0457c5b835121ecb9015be55e3"
+        "081c45fd22dcd140a94a30485fe0716d8e854ef53da4368952859c9b754dcff9"
     ):
         raise RuntimeError("Unexpected macOS icon bytes")
     resources = bundle / "Contents" / "Resources"
