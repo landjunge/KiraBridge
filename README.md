@@ -291,6 +291,7 @@ written permission. The German license text governs.
 [Developer documentation](docs/DEVELOPERS.md): Python 3.11 or later, the locked uv
 environment, CLI quickstart, source directories and scoped checks. Start from a
 repository checkout; the published installer and development environment are separate.
+Every push to `main` is built on GitHub; fetch it with `python3 scripts/fetch_release.py` instead of building locally.
 
 Local CLI-module candidate: [Terminal/Codex/Grok adapter boundaries and test limits](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
 This development package is separate from the published RC49 download and still

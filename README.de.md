@@ -289,6 +289,7 @@ benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist ma
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md): Python ab 3.11, gelockte
 uv-Umgebung, CLI-Einstieg, Quellverzeichnisse und gezielte Prüfungen. Ausgangspunkt
 ist ein Repositorycheckout; veröffentlichter Installer und Entwicklungsumgebung sind getrennt.
+Jeder Push auf `main` wird auf GitHub gebaut; mit `python3 scripts/fetch_release.py` laden statt lokal bauen.
 
 Lokaler CLI-Modulkandidat: [Terminal-/Codex-/Grok-Grenzen und Prüfgrenzen](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
 Dieses Entwicklungspaket ist vom veröffentlichten RC49-Download getrennt; die

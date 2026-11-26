@@ -1,0 +1,39 @@
+name: macOS package on main
+# Every push to main builds the installable macOS package of that exact commit on
+# GitHub and keeps it as an artifact. Workers download it (scripts/fetch_release.py)
+# instead of building locally. The heavy install/upgrade/rollback acceptance stays
+# in "macOS package acceptance" (manual). Release assets are untouched, so
+# prune-old-installers.yml is not affected.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    runs-on: macos-15-intel   # the verified shipping architecture; one runner only
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: '0.11.6'
+      - run: uv sync --locked --dev
+      - name: Fetch ThreadDesk Git objects (outside the work tree, which must stay clean)
+        run: git clone --quiet https://github.com/landjunge/ThreadDesk.git "$RUNNER_TEMP/threaddesk"
+      - name: Build package of this exact commit
+        run: uv run python scripts/build_release.py --out dist/candidate --threaddesk-repo "$RUNNER_TEMP/threaddesk"
+      - name: Verify checksums
+        run: cd dist/candidate && shasum -a 256 -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: KiraBridge-macos-intel-${{ github.sha }}
+          path: dist/candidate/
+          retention-days: 14
