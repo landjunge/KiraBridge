@@ -105,7 +105,7 @@ def build(destination=None):
     icon_source = root / "assets" / "dock" / "KiraBridge-dock.icns"
     icon_bytes = icon_source.read_bytes()
     if hashlib.sha256(icon_bytes).hexdigest() != (
-        "081c45fd22dcd140a94a30485fe0716d8e854ef53da4368952859c9b754dcff9"
+        "7b81891dca24c85ca2d27265e54e75d05f1495ae185662981eb2b97ad39dcaa0"
     ):
         raise RuntimeError("Unexpected macOS icon bytes")
     resources = bundle / "Contents" / "Resources"
