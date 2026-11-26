@@ -72,7 +72,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     icon_source = Path(__file__).resolve().parents[1] / "assets/dock/KiraBridge-dock.icns"
     icon_bytes = icon_source.read_bytes()
     assert hashlib.sha256(icon_bytes).hexdigest() == (
-        "081c45fd22dcd140a94a30485fe0716d8e854ef53da4368952859c9b754dcff9"
+        "7b81891dca24c85ca2d27265e54e75d05f1495ae185662981eb2b97ad39dcaa0"
     )
     icon_fixture = root / "assets/dock/KiraBridge-dock.icns"
     icon_fixture.parent.mkdir(parents=True)
