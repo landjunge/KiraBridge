@@ -72,7 +72,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     )
     icon_bytes = icon_source.read_bytes()
     assert hashlib.sha256(icon_bytes).hexdigest() == (
-        "4afd22a0a76083b1e6ea820d010162558db7e9d79e518b42bbc29db6b263cdeb"
+        "8933c33501f39cf0563e4c94989392f78e304a0457c5b835121ecb9015be55e3"
     )
     icon_fixture = root / "assets/design/icons/macos/KiraBridge-dark.icns"
     icon_fixture.parent.mkdir(parents=True)
