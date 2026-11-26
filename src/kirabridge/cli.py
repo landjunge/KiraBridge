@@ -1160,8 +1160,11 @@ def main() -> None:
     team = sub.add_parser("team", help="Shared roles, addressed messages and delegated work")
     actions = team.add_subparsers(dest="action", required=True)
     actions.add_parser("list")
-    for action in ("show", "inbox", "events"):
+    for action in ("show", "events"):
         actions.add_parser(action).add_argument("team_id")
+    actions.add_parser(
+        "inbox", help="Your one inbox; give a team id for the team log"
+    ).add_argument("team_id", nargs="?")
     for action in ("session", "session-clear"):
         command = actions.add_parser(action)
         command.add_argument("team_id")
@@ -1275,7 +1278,9 @@ def main() -> None:
     send.add_argument("--task-id")
     send.add_argument("--inbox-only", action="store_true", help="Do not invoke a managed agent")
     send.add_argument("--no-reply", action="store_true")
-    receive = message_actions.add_parser("receive")
+    receive = message_actions.add_parser(
+        "receive", help="Deprecated alias path; the one inbox is: team inbox"
+    )
     receive.add_argument("--after", type=int, default=0)
     receive.add_argument("--limit", type=int, default=20)
     receive.add_argument("--wait", type=float, default=0)

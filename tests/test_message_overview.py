@@ -148,3 +148,16 @@ def test_observe_by_a_principal_outside_the_hook_list_changes_nothing(domain):
         ).fetchone()[0]
         == 1
     )
+
+
+def test_one_inbox_shows_only_the_own_mailbox_over_both_stores(domain):
+    from kirabridge.message_overview import inbox
+
+    direct(domain, "codex", "grok", "d-box")
+    team(domain, "codex", "grok", "t-box")
+    team(domain, "grok", "codex", "t-back")
+    result = inbox(domain.bridge, "grok")
+    assert result["read_only"] is True
+    assert {item["source"] for item in result["items"]} == {"direct", "team"}
+    assert all(item["to"] == "grok" for item in result["items"])
+    assert "team_messages" in result["notice"]
