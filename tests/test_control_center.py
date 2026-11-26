@@ -266,6 +266,35 @@ async def test_agent_card_endpoint_uses_fresh_cli_inventory_without_exposing_cre
 
 
 @pytest.mark.asyncio
+async def test_agent_cards_list_every_configured_agent_and_mark_grok_retired(bridge, monkeypatch):
+    app = ApprovalConsole(operator_application(bridge), KEY)
+    control = app.control_center.service
+    bridge.config.agents.update(
+        {
+            "codex": AgentConfig(kind="codex", executable="/bin/echo"),
+            "claude_review": AgentConfig(kind="claude_code", executable="/bin/echo"),
+            "gemini": AgentConfig(kind="gemini", executable="/bin/echo"),
+            "grok": AgentConfig(kind="grok", executable="/bin/echo"),
+        }
+    )
+
+    async def snapshot(*, fresh=False):
+        return {"observed_at": 1, "services": [{"id": "grok", "active": True, "state": "active"}]}
+
+    async def rpc(tool, arguments):
+        return {"cli_inventory": []}
+
+    monkeypatch.setattr(control, "snapshot", snapshot)
+    monkeypatch.setattr(control, "rpc", rpc)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        data = (await client.get("/api/cli", headers=headers())).json()
+    ids = [agent["id"] for agent in data["agents"]]
+    assert ids == ["codex", "claude_review", "qwen", "gemini", "grok"]
+    grok = next(agent for agent in data["agents"] if agent["id"] == "grok")
+    assert grok["retired"] is True and grok["active"] is False and grok["state"] == "retired"
+
+
+@pytest.mark.asyncio
 async def test_agent_card_launch_options_are_restricted_and_applied_to_visible_terminal(
     bridge, monkeypatch
 ):

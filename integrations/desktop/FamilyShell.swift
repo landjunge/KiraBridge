@@ -75,6 +75,11 @@ enum FamilyLocalization {
         "restart.confirm": ("Neustart", "Restart"),
         "toolbar.permissions": ("Rechte", "Permissions"),
         "toolbar.settings": ("Einstellungen", "Settings"),
+        "center.overview": ("Übersicht", "Overview"), "center.inbox": ("Postfach", "Inbox"),
+        "center.advanced": ("Erweitert", "Advanced"), "center.refresh": ("Aktualisieren", "Refresh"),
+        "center.bridge": ("Bridge", "Bridge"), "center.agents": ("Agenten aktiv", "Agents active"),
+        "center.pending": ("Wartende Aufträge", "Pending requests"), "center.coordinator": ("Koordinator", "Coordinator"),
+        "center.noMessages": ("Keine Nachrichten.", "No messages."),
     ]
 
     static func choose(_ code: String) {
@@ -470,87 +475,6 @@ final class FamilyContentController: NSViewController {
 
 // MARK: MainSplitController.swift (three columns, KiraBridge content)
 
-/// Left column: the native process list. The rows and status dots are placeholders;
-/// the live process data arrives with a later slice.
-final class ProcessesViewController: NSViewController {
-    private let titles = ["KiraBridge", "Codex", "Claude", "Qwen", "Konsole"]
-    private var heading: NSTextField!
-    private var names: [NSTextField] = []
-    private var dots: [SurfaceView] = []
-    var onSettings: (() -> Void)?
-    var onSystemHost: (() -> Void)?
-    private var hostButton: NSButton!
-    private var settingsButton: NSButton!
-    override func loadView() {
-        let root = LayoutView(); root.color = Palette.surface; view = root
-        heading = label("family.processes", size: 18, weight: .semibold)
-        root.addSubview(heading)
-        for title in titles {
-            let dot = SurfaceView(frame: .zero); dot.color = Palette.muted; dot.rounded = 3.5
-            let field = NSTextField(labelWithString: title)
-            field.font = .systemFont(ofSize: 12); field.textColor = Palette.accent
-            field.lineBreakMode = .byTruncatingTail
-            root.addSubview(dot); root.addSubview(field)
-            dots.append(dot); names.append(field)
-        }
-        hostButton = navigationButton(L("toolbar.permissions"), symbol: "desktopcomputer",
-                                      action: #selector(systemHostPressed))
-        settingsButton = navigationButton(L("toolbar.settings"), symbol: "gearshape",
-                                          action: #selector(settingsPressed))
-        root.addSubview(hostButton); root.addSubview(settingsButton)
-        root.arrange = { [weak self] rect in
-            guard let self else { return }
-            self.heading.frame = NSRect(x: 14, y: 14, width: max(0, rect.width - 28), height: 24)
-            var y: CGFloat = 48
-            for index in self.names.indices {
-                self.dots[index].frame = NSRect(x: 14, y: y + 11, width: 7, height: 7)
-                self.names[index].frame = NSRect(x: 27, y: y + 6, width: max(0, rect.width - 41), height: 18)
-                y += FamilyLayout.rowPitch
-            }
-            let w = max(0, rect.width - 20), h = FamilyLayout.rowHeight
-            self.settingsButton.frame = NSRect(x: 10, y: max(y, rect.height - h - 10), width: w, height: h)
-            self.hostButton.frame = NSRect(x: 10, y: max(y, rect.height - 2 * h - 15), width: w, height: h)
-        }
-    }
-    private func navigationButton(_ text: String, symbol: String, action: Selector) -> NSButton {
-        let button = NSButton(title: text, target: self, action: action)
-        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
-        button.imagePosition = .imageLeading
-        button.isBordered = false
-        button.alignment = .left
-        button.font = .systemFont(ofSize: 12)
-        button.contentTintColor = Palette.muted
-        return button
-    }
-    @objc private func systemHostPressed() { onSystemHost?() }
-    @objc private func settingsPressed() { onSettings?() }
-    func localize() {
-        guard isViewLoaded else { return }
-        heading.stringValue = L("family.processes")
-        hostButton.title = L("toolbar.permissions")
-        settingsButton.title = L("toolbar.settings")
-    }
-}
-
-/// Middle column: the existing console web view, unchanged.
-final class ConsoleViewController: NSViewController {
-    let webView: WKWebView
-    init(webView: WKWebView) { self.webView = webView; super.init(nibName: nil, bundle: nil) }
-    required init?(coder: NSCoder) { fatalError() }
-    override func loadView() {
-        let root = SurfaceView(frame: .zero); root.color = Palette.surface
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(webView)
-        NSLayoutConstraint.activate([
-            webView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            webView.topAnchor.constraint(equalTo: root.topAnchor),
-            webView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-        ])
-        view = root
-    }
-}
-
 /// Right column: placeholder until the detail slice arrives.
 final class InspectorPlaceholderController: NSViewController {
     private var heading: NSTextField!
@@ -574,11 +498,11 @@ final class InspectorPlaceholderController: NSViewController {
 }
 
 final class MainSplitController: NSSplitViewController {
-    let sidebar: ProcessesViewController
-    let main: ConsoleViewController
+    let sidebar: AgentSidebarViewController
+    let main: CenterViewController
     let inspector: InspectorPlaceholderController
     init(webView: WKWebView) {
-        sidebar = ProcessesViewController(); main = ConsoleViewController(webView: webView)
+        sidebar = AgentSidebarViewController(); main = CenterViewController(webView: webView)
         inspector = InspectorPlaceholderController()
         super.init(nibName: nil, bundle: nil)
     }
@@ -592,7 +516,7 @@ final class MainSplitController: NSSplitViewController {
         i.minimumThickness = FamilyLayout.inspectorMin; i.maximumThickness = FamilyLayout.inspectorMax; i.canCollapse = true; i.preferredThicknessFraction = 0.18
         addSplitViewItem(s); addSplitViewItem(m); addSplitViewItem(i)
     }
-    func localize() { sidebar.localize(); inspector.localize() }
+    func localize() { sidebar.localize(); main.localize(); inspector.localize() }
     /// User-driven only: nothing in the layout path mutates thickness or collapse state.
     func toggleSidebar() { splitViewItems[0].isCollapsed.toggle() }
     func toggleInspector() { splitViewItems[2].isCollapsed.toggle() }

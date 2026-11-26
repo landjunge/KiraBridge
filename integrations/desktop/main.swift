@@ -467,6 +467,10 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         content.header.onLanguage = { [weak self] code in self?.applyFamilyLanguage(code) }
         split.sidebar.onSettings = { [weak self] in self?.openConsoleView(named: "settings") }
         split.sidebar.onSystemHost = { [weak self] in self?.openConsoleView(named: "permissions") }
+        split.sidebar.api = ConsoleAPI(webView: view)
+        split.sidebar.startPolling(sample: snapshot != nil)
+        split.main.api = split.sidebar.api
+        split.main.startPolling(sample: snapshot != nil)
         let frame = NSRect(x: 0, y: 0, width: width, height: height)
         let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
         let window: NSWindow = snapshot == nil
@@ -555,6 +559,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
               let web = mainView, !web.isLoading, Self.isConsoleURL(web.url) else {
             familyContent?.header.showDetail(L("family.notReady")); return
         }
+        familyContent?.split.main.show(.advanced)
         web.evaluateJavaScript("document.querySelector('\(selector)')?.click();", completionHandler: nil)
     }
 
