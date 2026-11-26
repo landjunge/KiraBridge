@@ -203,3 +203,38 @@ def test_coordinator_acks_only_chatgpt_messages_and_default_is_unchanged(domain)
     direct(domain, "codex", "chatgpt", "to-kira")  # chatgpt stays listed, even as no coordinator
     observe(domain.bridge, "chatgpt")
     assert acked_keys(domain) == {"from-kira", "to-kira"}
+
+
+def test_no_hook_while_handoff_is_open_or_coordinator_is_ambiguous(domain):
+    domain.config.principals["codex"].capabilities.append(OBSERVE_CAPABILITY)
+    set_coordinator(domain, "codex")
+    direct(domain, "chatgpt", "codex", "held")
+    team_id = domain.store.db.execute("SELECT id FROM teams").fetchone()["id"]
+    domain.store.db.execute("INSERT INTO teams VALUES('t-other','other','chatgpt','grok',1,0)")
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == set()  # two distinct holders
+    domain.store.db.execute("DELETE FROM teams WHERE id='t-other'")
+    domain.store.db.execute("PRAGMA foreign_keys=OFF")
+    cols = [
+        r["name"] for r in domain.store.db.execute("PRAGMA table_info(team_coordinator_handoffs)")
+    ]
+    values = {"team_id": team_id, "previous_coordinator": "codex", "expected_revision": 1}
+    for col in cols:
+        if col not in values:
+            row = domain.store.db.execute("PRAGMA table_info(team_coordinator_handoffs)").fetchall()
+            info = next(r for r in row if r["name"] == col)
+            values[col] = (
+                None
+                if col in ("accepted", "outcome")
+                else (0 if "INT" in info["type"] or "REAL" in info["type"] else "x")
+            )
+    domain.store.db.execute(
+        f"INSERT INTO team_coordinator_handoffs({','.join(values)}) "
+        f"VALUES({','.join('?' * len(values))})",
+        list(values.values()),
+    )
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == set()  # open handoff
+    domain.store.db.execute("DELETE FROM team_coordinator_handoffs")
+    observe(domain.bridge, "codex")
+    assert acked_keys(domain) == {"held"}

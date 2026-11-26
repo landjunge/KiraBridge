@@ -31,6 +31,27 @@ def is_coordinator(bridge, principal):
     return row is not None
 
 
+def is_unambiguous_coordinator(bridge, principal):
+    """Like is_coordinator, but closed on an open handoff or several distinct holders.
+
+    Same rule as coordinator_roles._inbox_route: while the role is in transition or
+    ambiguous, no automatic hook may fire for anyone.
+    """
+    db = bridge.store.db
+    holders = {
+        row["coordinator"]
+        for row in db.execute("SELECT coordinator FROM teams WHERE coordinator<>''").fetchall()
+    }
+    if holders != {principal}:
+        return False
+    return (
+        db.execute(
+            "SELECT 1 FROM team_coordinator_handoffs WHERE accepted IS NULL AND outcome IS NULL"
+        ).fetchone()
+        is None
+    )
+
+
 def role_prefix(bridge, recipient):
     """Return the prefix for the current coordinator, else an empty string."""
     if not is_coordinator(bridge, recipient):

@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime
 
 from kirabridge.bridge_core.models import canonical
-from kirabridge.team_manager.coordinator_prefix import is_coordinator
+from kirabridge.team_manager.coordinator_prefix import is_unambiguous_coordinator
 
 OBSERVE_CAPABILITY = "messages.observe"
 MAX_LIMIT = 200
@@ -200,7 +200,7 @@ def observe(bridge, principal, **arguments):
     # role change it applies to the new holder and ends for the previous one. The coordinator
     # acknowledges only what the listed principals (default chatgpt) sent to it.
     senders = None if principal in listed else set(listed)
-    if senders is not None and not is_coordinator(bridge, principal):
+    if senders is not None and not is_unambiguous_coordinator(bridge, principal):
         return result
     try:
         acked = auto_acknowledge(bridge, principal, result["items"], senders)
