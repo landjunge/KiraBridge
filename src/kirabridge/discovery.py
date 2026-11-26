@@ -231,21 +231,22 @@ def _record_cli_versions(bridge, rows):
         if row.get("version"):
             grouped.setdefault(row["cli"], []).append(row)
     with store.transaction():
+        previous_events = store.db.execute(
+            "SELECT metadata FROM audit WHERE kind IN "
+            "('cli.version_observed','cli.version_changed','cli.compatibility_changed') "
+            "ORDER BY seq DESC LIMIT 512"
+        ).fetchall()
+        previous_by_cli = {}
+        for event in previous_events:
+            try:
+                metadata = json.loads(event["metadata"])
+            except (TypeError, ValueError):
+                continue
+            cli = metadata.get("cli")
+            if isinstance(cli, str):
+                previous_by_cli.setdefault(cli, metadata)
         for cli, candidates in grouped.items():
-            previous = store.db.execute(
-                "SELECT metadata FROM audit WHERE kind IN "
-                "('cli.version_observed','cli.version_changed','cli.compatibility_changed') "
-                "ORDER BY seq DESC LIMIT 512"
-            ).fetchall()
-            prior = None
-            for event in previous:
-                try:
-                    metadata = json.loads(event["metadata"])
-                except (TypeError, ValueError):
-                    continue
-                if metadata.get("cli") == cli:
-                    prior = metadata
-                    break
+            prior = previous_by_cli.get(cli)
             primary = min(
                 candidates,
                 key=lambda row: (row.get("search_order", 0), row["executable"]),

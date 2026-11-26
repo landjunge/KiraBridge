@@ -111,6 +111,122 @@ def test_count_and_byte_bounds_evict_raw_payloads_without_deleting_audit(bridge)
     assert verify(bridge.store)["valid"]
 
 
+def test_prune_batches_oldest_count_evictions_and_uses_oldest_index(bridge, monkeypatch):
+    monkeypatch.setattr("kirabridge.output_history.time", SimpleNamespace(time=lambda: 1000.0))
+    bridge.config.output_history.retention_seconds = 10_000
+    bridge.config.output_history.max_entries = 3
+    bridge.config.output_history.max_bytes = 1000
+    with bridge.store.transaction():
+        for index in range(10):
+            identifier = f"snapshot-{index}"
+            bridge.store.db.execute(
+                "INSERT INTO output_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    identifier,
+                    "local",
+                    "session_capture",
+                    f"pane-{index}",
+                    1000.0 + index,
+                    2000.0,
+                    str(index),
+                    b"x",
+                    1,
+                    1,
+                    0,
+                ),
+            )
+
+    statements = []
+    bridge.store.db.set_trace_callback(statements.append)
+    bridge.outputs.prune()
+    bridge.store.db.set_trace_callback(None)
+
+    retained = [
+        row[0]
+        for row in bridge.store.db.execute("SELECT id FROM output_snapshots ORDER BY created,rowid")
+    ]
+    assert retained == ["snapshot-7", "snapshot-8", "snapshot-9"]
+    deletes = [
+        statement
+        for statement in statements
+        if statement.startswith("DELETE FROM output_snapshots WHERE id IN")
+    ]
+    assert len(deletes) == 1
+    plan = bridge.store.db.execute(
+        "EXPLAIN QUERY PLAN SELECT id,bytes FROM output_snapshots "
+        "WHERE kind=? ORDER BY created,rowid LIMIT ?",
+        ("session_capture", 10),
+    ).fetchall()
+    assert any("output_snapshot_oldest" in row[3] for row in plan)
+    assert not any("TEMP B-TREE" in row[3] for row in plan)
+
+
+def test_prune_batches_byte_budget_evictions_in_oldest_first_order(bridge, monkeypatch):
+    monkeypatch.setattr("kirabridge.output_history.time", SimpleNamespace(time=lambda: 1000.0))
+    bridge.config.output_history.retention_seconds = 10_000
+    bridge.config.output_history.max_entries = 50
+    bridge.config.output_history.max_bytes = 7
+    with bridge.store.transaction():
+        for index, size in enumerate((1, 2, 3, 4, 5)):
+            bridge.store.db.execute(
+                "INSERT INTO output_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    f"bytes-{index}",
+                    "local",
+                    "task_result",
+                    f"task-{index}",
+                    1000.0 + index,
+                    2000.0,
+                    str(index),
+                    b"x" * size,
+                    size,
+                    size,
+                    0,
+                ),
+            )
+
+    bridge.outputs.prune()
+
+    remaining = [
+        row[0]
+        for row in bridge.store.db.execute("SELECT id FROM output_snapshots ORDER BY created,rowid")
+    ]
+    assert remaining == ["bytes-4"]
+
+
+def test_prune_expires_old_rows_before_budget_eviction(bridge, monkeypatch):
+    monkeypatch.setattr("kirabridge.output_history.time", SimpleNamespace(time=lambda: 1000.0))
+    bridge.config.output_history.retention_seconds = 60
+    bridge.config.output_history.max_entries = 1
+    bridge.config.output_history.max_bytes = 100
+    with bridge.store.transaction():
+        for identifier, created, expires in (
+            ("expired", 950.0, 999.0),
+            ("retained", 990.0, 1100.0),
+        ):
+            bridge.store.db.execute(
+                "INSERT INTO output_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    identifier,
+                    "local",
+                    "task_result",
+                    identifier,
+                    created,
+                    expires,
+                    identifier,
+                    b"x",
+                    1,
+                    1,
+                    0,
+                ),
+            )
+
+    bridge.outputs.prune()
+
+    remaining = [row[0] for row in bridge.store.db.execute("SELECT id FROM output_snapshots")]
+    assert remaining == ["retained"]
+
+
 def test_multibyte_truncation_is_explicit_and_hashes_the_retained_payload(bridge):
     bridge.config.output_history.max_item_bytes = 1024
     result = observed(bridge, "Anfang\n" + "🧡" * 1000 + "\nENDE")

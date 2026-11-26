@@ -39,6 +39,12 @@ class OutputHistory:
             store.db.execute(
                 "CREATE INDEX IF NOT EXISTS output_snapshot_expiry ON output_snapshots(expires)"
             )
+            # SQLite appends rowid to each secondary index. This index therefore
+            # serves ORDER BY created,rowid for the per-kind oldest-first budget.
+            store.db.execute(
+                "CREATE INDEX IF NOT EXISTS output_snapshot_oldest "
+                "ON output_snapshots(kind,created)"
+            )
 
     def _bounded(self, payload, *, tail=False):
         payload = dict(payload)
@@ -69,23 +75,46 @@ class OutputHistory:
     def prune(self):
         with self.store.transaction():
             now = time.time()
-            self.store.db.execute(
-                "DELETE FROM output_snapshots WHERE expires<=? OR created<=?",
-                (now, now - self.config.retention_seconds),
-            )
+            self.store.db.execute("DELETE FROM output_snapshots WHERE expires<=?", (now,))
+            # Use the oldest-first index for the retention boundary as well as
+            # budget eviction; avoid an OR predicate that can force a table scan.
+            old_kinds = self.store.db.execute(
+                "SELECT DISTINCT kind FROM output_snapshots"
+            ).fetchall()
+            retention_before = now - self.config.retention_seconds
+            for row in old_kinds:
+                self.store.db.execute(
+                    "DELETE FROM output_snapshots WHERE kind=? AND created<=?",
+                    (row["kind"], retention_before),
+                )
             # Each kind has its own budget: large task results never evict the
             # terminal captures that visible input depends on.
             for kind, count, size in self.store.db.execute(
                 "SELECT kind,count(*),COALESCE(sum(bytes),0) FROM output_snapshots GROUP BY kind"
             ).fetchall():
-                while count > self.config.max_entries or size > self.config.max_bytes:
-                    row = self.store.db.execute(
-                        "SELECT id,bytes FROM output_snapshots WHERE kind=? "
-                        "ORDER BY created,rowid LIMIT 1",
-                        (kind,),
-                    ).fetchone()
-                    self.store.db.execute("DELETE FROM output_snapshots WHERE id=?", (row["id"],))
-                    count, size = count - 1, size - row["bytes"]
+                excess_count = max(0, count - self.config.max_entries)
+                excess_bytes = max(0, size - self.config.max_bytes)
+                if not excess_count and not excess_bytes:
+                    continue
+                candidates = self.store.db.execute(
+                    "SELECT id,bytes FROM output_snapshots WHERE kind=? "
+                    "ORDER BY created,rowid LIMIT ?",
+                    (kind, count),
+                ).fetchall()
+                evict, removed_bytes = [], 0
+                for row in candidates:
+                    if len(evict) >= excess_count and removed_bytes >= excess_bytes:
+                        break
+                    evict.append(row["id"])
+                    removed_bytes += row["bytes"]
+                # SQLite versions commonly limit host parameters to 999. Keep
+                # each deletion batched while remaining below that limit.
+                for start in range(0, len(evict), 500):
+                    batch = evict[start : start + 500]
+                    placeholders = ",".join("?" for _ in batch)
+                    self.store.db.execute(
+                        f"DELETE FROM output_snapshots WHERE id IN ({placeholders})", batch
+                    )
 
     def capture(self, principal, kind, source_key, payload, metadata, *, task_id=None):
         raw, original_bytes = self._bounded(payload, tail=kind == "session_capture")
