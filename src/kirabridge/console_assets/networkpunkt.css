@@ -2,7 +2,6 @@
    Source and adoption contract: docs/usability/GOLDENRULES.MD §19.
    Prefix keeps the portable components out of host application styles. */
 :root {
-  color-scheme: dark;
   --np-gray-950: #121316;
   --np-gray-900: #1a1c20;
   --np-gray-800: #25282e;
@@ -42,33 +41,6 @@
   --np-radius: 0;
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --np-gray-950: #edf0f4;
-  --np-gray-900: #ffffff;
-  --np-gray-800: #dce1e8;
-  --np-gray-700: #c3cad4;
-  --np-gray-500: #687381;
-  --np-gray-300: #5e6672;
-  --np-gray-100: #20242b;
-  --np-green: #17613e;
-  --np-amber: #76520b;
-  --np-red: #a1212b;
-  --np-canvas: var(--np-gray-950);
-  --np-surface: var(--np-gray-900);
-  --np-hover: var(--np-gray-800);
-  --np-divider: var(--np-gray-700);
-  --np-control-border: var(--np-gray-500);
-  --np-text: var(--np-gray-100);
-  --np-muted: var(--np-gray-300);
-  --np-action: #353940;
-  --np-action-text: #edf0f4;
-  --np-focus: #174ea6;
-  --np-success: var(--np-green);
-  --np-warning: var(--np-amber);
-  --np-danger: var(--np-red);
-}
-
 .np-ui { font: 400 var(--np-body)/1.5 var(--np-font); color: var(--np-text); background: var(--np-canvas); }
 .np-ui *, .np-ui *::before, .np-ui *::after { box-sizing: border-box; }
 .np-ui :focus-visible { outline: 2px solid var(--np-focus); outline-offset: 3px; }
@@ -76,8 +48,6 @@
 .np-ui h1 { font-size: var(--np-title); line-height: 1.25; font-weight: 600; }
 .np-ui h2, .np-ui h3 { font-size: var(--np-heading); font-weight: 600; }
 .np-meta { font-size: var(--np-meta); color: var(--np-muted); }
-.np-card { min-width: 0; border: 1px solid var(--np-divider); border-radius: var(--np-radius); background: var(--np-surface); color: var(--np-text); }
-.np-dropdown { min-width: 0; min-height: var(--np-control); border: 1px solid var(--np-control-border); border-radius: var(--np-radius); padding: 0 var(--np-space-3); background: var(--np-canvas); color: var(--np-text); font: 500 var(--np-body)/1.4 var(--np-font); }
 .np-button, .np-field input, .np-field select {
   min-height: var(--np-control); height: var(--np-control); border: 1px solid var(--np-control-border);
   border-radius: var(--np-radius); padding: 0 var(--np-space-3); background: transparent;
@@ -114,12 +84,8 @@
 .np-status[data-state="success"] { color: var(--np-success); }
 .np-status[data-state="warning"] { color: var(--np-warning); }
 .np-status[data-state="danger"] { color: var(--np-danger); }
-.np-status-dot { display: inline-block; width: 8px; height: 8px; flex: none; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 16%, transparent); }
 .np-notice { border-left: 2px solid currentColor; padding: var(--np-space-3) var(--np-space-4); }
 .np-notice[role="alert"] { color: var(--np-danger); }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) { color-scheme: light; --np-canvas: #f5f6f8; --np-surface: #ffffff; --np-hover: #e7eaf0; --np-divider: #c8cdd5; --np-control-border: #66717f; --np-text: #18202b; --np-muted: #526173; --np-action: #18202b; --np-action-text: #ffffff; --np-focus: #18202b; --np-success: #17613e; --np-warning: #76520b; --np-danger: #a1212b; }
-}
 @media (prefers-reduced-motion: reduce) { .np-ui * { scroll-behavior: auto; transition: none; animation: none; } }
 @media (forced-colors: active) { .np-button, .np-field input, .np-field select, .np-field textarea { border-color: ButtonText; } .np-tabs [aria-current="page"] { border-color: Highlight; } }
 
