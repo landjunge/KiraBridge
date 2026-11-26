@@ -14,7 +14,7 @@ import time
 import uuid
 from datetime import datetime
 
-from kirabridge.bridge_core.models import canonical
+from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.team_manager.coordinator_prefix import is_unambiguous_coordinator
 
 OBSERVE_CAPABILITY = "messages.observe"
@@ -61,19 +61,24 @@ def _item(source, row, body_chars):
     }
 
 
-def overview(db, *, after_direct=0, after_team=0, limit=50, body_chars=1200):
-    """Return the next messages after the given per-store cursors, oldest first."""
+def overview(db, *, after_direct=0, after_team=0, limit=50, body_chars=1200, recipient=None):
+    """Return the next messages after the given per-store cursors, oldest first.
+
+    recipient limits both stores to one mailbox (the single inbox view, team_messages).
+    """
     limit = max(1, min(int(limit), MAX_LIMIT))
     body_chars = max(0, min(int(body_chars), MAX_BODY_CHARS))
     direct = db.execute(
         "SELECT seq,id,conversation_id AS thread,sender,recipient,kind,body,created,acknowledged "
-        "FROM messages WHERE seq>? ORDER BY seq LIMIT ?",
-        (int(after_direct), limit),
+        "FROM messages WHERE seq>:after AND (:rcpt IS NULL OR recipient=:rcpt) "
+        "ORDER BY seq LIMIT :limit",
+        {"after": int(after_direct), "rcpt": recipient, "limit": limit},
     ).fetchall()
     team = db.execute(
         "SELECT seq,id,team_id AS thread,sender,recipient,kind,body,created,acknowledged "
-        "FROM team_messages WHERE seq>? ORDER BY seq LIMIT ?",
-        (int(after_team), limit),
+        "FROM team_messages WHERE seq>:after AND (:rcpt IS NULL OR recipient=:rcpt) "
+        "ORDER BY seq LIMIT :limit",
+        {"after": int(after_team), "rcpt": recipient, "limit": limit},
     ).fetchall()
     merged = sorted(
         [("direct", row) for row in direct] + [("team", row) for row in team],
@@ -183,6 +188,24 @@ def auto_acknowledge(bridge, principal, items, senders=None):
                 )
                 acked["team"].append(item["seq"])
     return acked
+
+
+def inbox(bridge, principal, **arguments):
+    """The one read path: the principal's own mailbox over team and legacy direct messages.
+
+    Read-only; a principal holding messages.observe keeps the all-messages view of observe().
+    Acknowledgement stays with the addressed recipient (team_message_ack / message_ack).
+    """
+    try:
+        bridge.security.principal(principal, OBSERVE_CAPABILITY)
+    except BridgeError:
+        result = overview(bridge.store.db, recipient=principal, **arguments)
+    else:
+        result = observe(bridge, principal, **arguments)
+    result["notice"] = (
+        "one inbox: team_messages; message_receive/message_get/messages_overview are aliases"
+    )
+    return result
 
 
 def observe(bridge, principal, **arguments):
