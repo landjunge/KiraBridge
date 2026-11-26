@@ -104,6 +104,18 @@ async def wait_session(bridge, identity):
             await asyncio.sleep(0.01)
 
 
+async def stop_until_effective(control):
+    """Retry the same idempotent stop after an observed lock-contention PENDING."""
+    async with asyncio.timeout(5):
+        while True:
+            result = await control.stop("local", "h-synthetic", 1, "same-stop")
+            state = result["barrier"]["status"]
+            if state == "EFFECTIVE":
+                return result
+            assert state == "PENDING"
+            await asyncio.sleep(0.02)
+
+
 async def test_durable_pre_spawn_marker_and_actual_registered_process_then_restart_no_replay(
     bridge, control, monkeypatch
 ):
@@ -334,7 +346,7 @@ async def test_stop_during_actual_spawn_is_pending_until_registration_then_effec
         assert before["process"]["status"] == "not_observed"
         release.set()
         await wait_session(bridge, "turn1")
-        after = await control.stop("local", "h-synthetic", 1, "same-stop")
+        after = await stop_until_effective(control)
         assert after["barrier"]["status"] == "EFFECTIVE"
         assert after["process"]["items"] == [{"task_id": "turn1", "status": "exit_observed"}]
         assert (await pending)["terminated"]
