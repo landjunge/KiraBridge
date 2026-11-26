@@ -53,6 +53,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
         root / "integrations/desktop" / name
         for name in (
             "main.swift",
+            "FamilyShell.swift",
             "FamilySwitchLogic.swift",
             "SystemBridge.swift",
             "SystemControl.swift",
@@ -77,6 +78,21 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     icon_fixture = root / "assets/design/icons/macos/KiraBridge-dark.icns"
     icon_fixture.parent.mkdir(parents=True)
     icon_fixture.write_bytes(icon_bytes)
+    # The reused family header resolves its product icons from the bundle, driven by the
+    # pinned shared manifest; both must be bundled byte-identically.
+    asset_source = Path(__file__).resolve().parents[1] / "src/kirabridge/console_assets"
+    asset_bytes = {
+        name: (asset_source / name).read_bytes() for name in builder.PRODUCT_HEADER_ASSETS
+    }
+    assert hashlib.sha256(
+        b"".join(
+            name.encode() + b"\0" + asset_bytes[name] for name in builder.PRODUCT_HEADER_ASSETS
+        )
+    ).hexdigest() == ("4747099b99bc396c2c21f214e6eaea22e9e7b76d94006e4f93dadd72d0414acd")
+    asset_fixture = root / "src/kirabridge/console_assets"
+    asset_fixture.mkdir(parents=True)
+    for name, blob in asset_bytes.items():
+        (asset_fixture / name).write_bytes(blob)
     (root / "pyproject.toml").write_text('[project]\nversion = "0.8.0rc18"\n')
     monkeypatch.setattr(builder, "__file__", str(root / "scripts/build_desktop_app.py"))
     commit = "1" * 40
@@ -101,6 +117,8 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     assert info["KiraBridgeSourceCommit"] == commit
     assert info["CFBundleIconFile"] == "KiraBridge"
     assert (destination / "Contents/Resources/KiraBridge.icns").read_bytes() == icon_bytes
+    for name, blob in asset_bytes.items():
+        assert (destination / "Contents/Resources/ProductHeader" / name).read_bytes() == blob
     assert (
         info["KiraBridgeCompanionSourceSHA256"]
         == hashlib.sha256(
