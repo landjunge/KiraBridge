@@ -544,8 +544,6 @@ class TerminalAppTransport:
             + str(binding["terminal_window_id"])
             + "||tab.tty()!=="
             + json.dumps(binding["tty"])
-            + "||targetWindow.name()!=="
-            + json.dumps(binding["title"])
             + "||Math.abs(provenBounds.x-"
             + repr(bounds["x"])
             + ")>1||Math.abs(provenBounds.y-"

@@ -48,6 +48,9 @@ The development console presents voice assistants and agent CLIs as compact card
 
 The desktop app wraps the console in the Agent Authority shell: header with the five product icons (installed products in colour, others grey, the active product with a quiet glow), a bridge status dot with a confirmed restart, a title bar with sidebar, permissions and settings buttons, and `--snapshot <file.png>` to render the window chrome to an image without screen-recording permission.
 
+
+Terminal tabs are identified by the TTY of the single tab and the process tree on it, never by the window title (the profile may show the active process and arguments, so titles change). `kirabridge terminals` lists agents that still run on a closed tab (re-parented to launchd), background agents without a TTY (never touched) and bindings whose tab or processes are gone; `--apply` sends SIGTERM to the orphaned agents and removes the stale bindings after writing a backup of `config.toml`. See `docs/TERMINAL-TAB-IDENTITY-20261126.md`.
+
 ## Directly control your computer
 
 **KiraBridge is more than a gateway to terminal AI agents.** Direct computer control is a core capability: open or focus applications, switch windows, enter text directly, write and edit notes, press individual keys and use keyboard shortcuts. Direct typing can work without relying on the clipboard. With the necessary permissions and a compatible interface, mouse, window and screen operations are also available. This allows an AI to interact with existing applications through their ordinary user interfaces, without requiring a custom AI integration for every app.

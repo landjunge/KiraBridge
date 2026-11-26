@@ -87,7 +87,6 @@ async def test_exact_existing_terminal_surface_binds_both_window_id_spaces():
     "windows,code",
     [
         ([], "visible_target_not_on_screen"),
-        ([{**CG_WINDOW, "title": "another window"}], "visible_target_not_on_screen"),
         (
             [CG_WINDOW, {**CG_WINDOW, "window_id": 9922}],
             "visible_target_ambiguous",
@@ -101,6 +100,29 @@ async def test_unmatched_or_ambiguous_physical_window_is_not_proven(windows, cod
     with pytest.raises(BridgeError) as failure:
         await native.prove_existing_target(ROW, SURFACE, principal="chatgpt")
     assert failure.value.code == code
+
+
+async def test_changed_window_title_does_not_break_the_physical_proof():
+    # The profile shows the active process and arguments, so the title changes while
+    # the agent runs. Window id, TTY, owner process and geometry are the identity.
+    native = TerminalAppTransport(asyncio.Lock())
+    renamed = {**CG_WINDOW, "title": "ttys002 - caffeinate -i -t 300"}
+    native.system_transport = SimpleNamespace(request=observer(windows=[renamed]))
+
+    binding = await native.prove_existing_target(ROW, SURFACE, principal="chatgpt")
+
+    assert binding["terminal_window_id"] == 4390
+    assert binding["cg_window_id"] == CG_WINDOW["window_id"]
+
+
+async def test_title_only_separates_windows_with_identical_geometry():
+    native = TerminalAppTransport(asyncio.Lock())
+    other = {**CG_WINDOW, "window_id": 9922, "title": "another window"}
+    native.system_transport = SimpleNamespace(request=observer(windows=[other, CG_WINDOW]))
+
+    binding = await native.prove_existing_target(ROW, SURFACE, principal="chatgpt")
+
+    assert binding["cg_window_id"] == CG_WINDOW["window_id"]
 
 
 async def test_physical_observation_deadline_includes_wait_for_native_transport():
@@ -180,7 +202,7 @@ async def test_exact_visible_target_gets_last_surface_guard_before_one_input():
     final_source = native.native.await_args.args[0]
     assert "Physical Terminal window changed" in final_source
     assert "targetWindow.id()!==4390" in final_source
-    assert "KiraBridge terminal" in final_source
+    assert "KiraBridge terminal" not in final_source  # the title is not identity
     guard_position = final_source.index("Physical Terminal window changed")
     input_position = final_source.index("app.doScript(")
     assert guard_position < input_position
