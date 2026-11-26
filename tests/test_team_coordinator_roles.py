@@ -217,9 +217,12 @@ def test_stale_visible_terminal_binding_keeps_inbox_message_but_does_not_wake_ol
 
     sent = role_message(domain, "visible-coordinator-stale")
     assert sent["recipient"] == "codex"
-    assert domain.store.db.execute(
-        "SELECT 1 FROM team_coordinator_notifications WHERE message_id=?", (sent["id"],)
-    ).fetchone() is None
+    assert (
+        domain.store.db.execute(
+            "SELECT 1 FROM team_coordinator_notifications WHERE message_id=?", (sent["id"],)
+        ).fetchone()
+        is None
+    )
 
 
 def test_coordinator_session_proof_registry_rejects_replacement():
