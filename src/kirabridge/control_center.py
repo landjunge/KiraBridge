@@ -67,9 +67,31 @@ class ControlCenter:
         services = {row["id"]: row for row in snapshot.get("services", [])}
         aliases = {"codex": "codex", "claude": "claude_code", "qwen": "qwen_acp"}
         agents = []
-        for cli in ("codex", "claude", "qwen"):
+        fixed = ("codex", "claude", "qwen")
+        # Every configured agent is listed: the three known CLIs first (even when
+        # unconfigured, so their cards stay), then all others from config.agents.
+        claimed = set(fixed)
+        for cli in fixed:
             profile = config.agents.get(cli)
-            agent_id = cli
+            if profile is None:
+                match = next(
+                    (
+                        name
+                        for name, candidate in config.agents.items()
+                        if candidate.kind == aliases[cli]
+                    ),
+                    None,
+                )
+                if match:
+                    claimed.add(match)
+        extras = [
+            (config.agents[name].kind.removesuffix("_cli").removesuffix("_acp"), name)
+            for name in config.agents
+            if name not in claimed
+        ]
+        for cli, extra_id in [(cli, None) for cli in fixed] + extras:
+            profile = config.agents.get(extra_id or cli)
+            agent_id = extra_id or cli
             if profile is None:
                 match = next(
                     (
@@ -82,6 +104,7 @@ class ControlCenter:
                 if match:
                     agent_id, profile = match
             service = services.get(agent_id, {})
+            retired = cli == "grok"  # retired by the user: shown, never active or startable
             candidates = [row for row in cli_rows if row.get("cli") == cli]
             preferred = next(
                 (row for row in candidates if row.get("agent_id") == agent_id), None
@@ -90,11 +113,14 @@ class ControlCenter:
                 {
                     "id": agent_id,
                     "cli": cli,
-                    "name": {"codex": "Codex", "claude": "Claude", "qwen": "Qwen"}[cli],
+                    "name": {"codex": "Codex", "claude": "Claude", "qwen": "Qwen"}.get(
+                        cli, agent_id.replace("_", " ").title()
+                    ),
                     "configured": profile is not None,
                     "installed": bool(service.get("installed")),
-                    "active": bool(service.get("active")),
-                    "state": service.get("state", "unconfigured"),
+                    "active": bool(service.get("active")) and not retired,
+                    "retired": retired,
+                    "state": "retired" if retired else service.get("state", "unconfigured"),
                     "detail": service.get("detail", "Nicht konfiguriert"),
                     "kind": getattr(profile, "kind", None),
                     "model": getattr(profile, "model", None),

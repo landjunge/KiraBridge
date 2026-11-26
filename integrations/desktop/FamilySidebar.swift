@@ -1,0 +1,101 @@
+// Left column: native agent list (Agent Authority measurements: row 29, pitch 34).
+// Rows come from /api/cli, which lists every configured agent. One scroll view, only
+// when the rows do not fit; bottom buttons stay pinned.
+import AppKit
+
+final class AgentSidebarViewController: NSViewController {
+    private(set) var agents: [AgentInfo] = []
+    var api: ConsoleAPI?
+    var onSettings: (() -> Void)?
+    var onSystemHost: (() -> Void)?
+    var onSelect: ((AgentInfo) -> Void)?
+    private var heading: NSTextField!
+    private let scroll = NSScrollView()
+    private let document = SurfaceView(frame: .zero)
+    private var rows: [SurfaceView] = [], names: [NSTextField] = [], states: [NSTextField] = []
+    private var hostButton: NSButton!, settingsButton: NSButton!
+    private var timer: Timer?
+
+    override func loadView() {
+        let root = LayoutView(); root.color = Palette.surface; view = root
+        heading = label("family.processes", size: 18, weight: .semibold)
+        scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .overlay; scroll.documentView = document
+        document.color = Palette.surface
+        hostButton = navigationButton(L("toolbar.permissions"), symbol: "desktopcomputer", action: #selector(hostPressed))
+        settingsButton = navigationButton(L("toolbar.settings"), symbol: "gearshape", action: #selector(settingsPressed))
+        for v in [heading!, scroll, hostButton!, settingsButton!] as [NSView] { root.addSubview(v) }
+        root.arrange = { [weak self] rect in self?.arrange(rect) }
+    }
+
+    private func arrange(_ rect: NSRect) {
+        let h = FamilyLayout.rowHeight, w = max(0, rect.width - 20)
+        heading.frame = NSRect(x: 14, y: 14, width: max(0, rect.width - 28), height: 24)
+        settingsButton.frame = NSRect(x: 10, y: max(48, rect.height - h - 10), width: w, height: h)
+        hostButton.frame = NSRect(x: 10, y: max(48, rect.height - 2 * h - 15), width: w, height: h)
+        let top: CGFloat = 48
+        scroll.frame = NSRect(x: 0, y: top, width: rect.width, height: max(0, hostButton.frame.minY - 6 - top))
+        let content = CGFloat(rows.count) * FamilyLayout.rowPitch
+        document.frame = NSRect(x: 0, y: 0, width: rect.width, height: max(content, scroll.frame.height))
+        for i in rows.indices {
+            let y = CGFloat(i) * FamilyLayout.rowPitch
+            rows[i].frame = NSRect(x: 0, y: y, width: rect.width, height: FamilyLayout.rowHeight)
+            names[i].frame = NSRect(x: 27, y: 6, width: max(0, rect.width - 41), height: 17)
+        }
+    }
+
+    func setAgents(_ list: [AgentInfo]) {
+        guard isViewLoaded, list != agents else { return }
+        agents = list
+        rows.forEach { $0.removeFromSuperview() }
+        rows = []; names = []; states = []
+        for (i, agent) in list.enumerated() {
+            let row = SurfaceView(frame: .zero); row.color = Palette.surface
+            let dot = SurfaceView(frame: NSRect(x: 14, y: 11, width: 7, height: 7))
+            dot.color = agent.dotColor; dot.rounded = 3.5
+            let name = NSTextField(labelWithString: agent.name)
+            name.font = .systemFont(ofSize: 12); name.lineBreakMode = .byTruncatingTail
+            name.textColor = agent.retired ? Palette.muted : Palette.accent
+            name.toolTip = agent.retired ? agent.name + " (" + agent.state + ")" : agent.name + " · " + agent.state
+            row.addSubview(dot); row.addSubview(name)
+            row.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(rowClicked(_:))))
+            row.identifier = NSUserInterfaceItemIdentifier(String(i))
+            document.addSubview(row); rows.append(row); names.append(name)
+        }
+        view.needsLayout = true
+    }
+
+    @objc private func rowClicked(_ g: NSClickGestureRecognizer) {
+        guard let id = g.view?.identifier?.rawValue, let i = Int(id), agents.indices.contains(i) else { return }
+        onSelect?(agents[i])
+    }
+
+    func startPolling(sample: Bool = false) {
+        _ = view
+        if sample { setAgents(AgentInfo.sample); return }
+        refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.refresh() }
+    }
+    func stopPolling() { timer?.invalidate(); timer = nil }
+    private func refresh() {
+        api?.get("/api/cli") { [weak self] payload in
+            guard payload != nil else { return }
+            DispatchQueue.main.async { self?.setAgents(AgentInfo.parse(payload)) }
+        }
+    }
+
+    private func navigationButton(_ text: String, symbol: String, action: Selector) -> NSButton {
+        let b = NSButton(title: text, target: self, action: action)
+        b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
+        b.imagePosition = .imageLeading; b.isBordered = false; b.alignment = .left
+        b.font = .systemFont(ofSize: 12); b.contentTintColor = Palette.muted
+        return b
+    }
+    @objc private func hostPressed() { onSystemHost?() }
+    @objc private func settingsPressed() { onSettings?() }
+    func localize() {
+        guard isViewLoaded else { return }
+        heading.stringValue = L("family.processes")
+        hostButton.title = L("toolbar.permissions"); settingsButton.title = L("toolbar.settings")
+    }
+}
