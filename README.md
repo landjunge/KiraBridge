@@ -46,6 +46,8 @@ The development console has a compact product header: the original two-color wor
 
 The development console presents voice assistants and agent CLIs as compact cards in a three-pane, resizable workspace. Status, detected CLI versions, and the coordinator role come from the local Bridge inventory; light/dark appearance and sidebar preferences are stored locally. This describes source code and does not imply that an installed release contains the new view.
 
+The desktop app wraps the console in the Agent Authority shell: header with the five product icons (installed products in colour, others grey, the active product with a quiet glow), a bridge status dot with a confirmed restart, a title bar with sidebar, permissions and settings buttons, and `--snapshot <file.png>` to render the window chrome to an image without screen-recording permission.
+
 ## Directly control your computer
 
 **KiraBridge is more than a gateway to terminal AI agents.** Direct computer control is a core capability: open or focus applications, switch windows, enter text directly, write and edit notes, press individual keys and use keyboard shortcuts. Direct typing can work without relying on the clipboard. With the necessary permissions and a compatible interface, mouse, window and screen operations are also available. This allows an AI to interact with existing applications through their ordinary user interfaces, without requiring a custom AI integration for every app.
