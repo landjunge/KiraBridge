@@ -390,7 +390,8 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
+        // Snapshot runs are fully headless: no Dock icon, no ordered-in window.
+        NSApp.setActivationPolicy(snapshot == nil ? .regular : .prohibited)
         let menu = NSMenu()
         let item = NSMenuItem()
         menu.addItem(item)
@@ -419,7 +420,6 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
             // The screenshot pass never bootstraps: no launcher run, no login load.
             // The view-controller fitting size shrinks the window on ordering; restore it.
             windows.first?.setContentSize(NSSize(width: snapshot.width, height: snapshot.height))
-            NSApp.activate(ignoringOtherApps: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 self.finishSnapshot(snapshot)
             }
@@ -440,6 +440,8 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
             fail("the window cannot allocate a cache rep")
         }
+        window.layoutIfNeeded()
+        content.layoutSubtreeIfNeeded()
         content.cacheDisplay(in: content.bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else {
             fail("PNG encoding failed")
@@ -480,8 +482,10 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         toolbar.displayMode = .iconOnly
         window.toolbar = toolbar
         window.toolbarStyle = .unifiedCompact
-        window.center()
-        window.makeKeyAndOrderFront(nil)
+        if snapshot == nil {
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+        }
         mainSplit = split
         familyContent = content
         windows.append(window)
