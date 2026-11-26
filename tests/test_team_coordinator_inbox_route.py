@@ -136,3 +136,29 @@ def test_coordinator_only_sender_reaches_only_the_coordinator_by_team_message(do
         "SELECT recipient FROM team_messages WHERE sender='chatgpt'"
     ).fetchall()
     assert [row["recipient"] for row in rows] == ["codex"]
+
+
+def test_role_message_with_visible_binding_and_receiver_is_dispatched(domain):
+    from kirabridge.bridge_core.config import ReceiverConfig, VisibleTerminalBinding
+
+    set_coordinator(domain, "local", "codex", "to-codex")
+    allow_direct(domain)
+    cfg = domain.config
+    cfg.visible_handoffs.enabled = True
+    cfg.visible_handoffs.bindings["codex"] = VisibleTerminalBinding(
+        pane_id="terminal:1:ttys001",
+        expected_pid=1,
+        agent_pid=2,
+        ready_pattern="❯",
+        busy_pattern="esc to interrupt",
+    )
+    cfg.messaging.receivers.setdefault("codex", ReceiverConfig(cwd="/tmp"))
+    send_direct(domain, "inbox-visible")
+    row = stored(domain, "inbox-visible")
+    assert row["recipient"] == "codex"
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM message_jobs WHERE message_id=?", (row["id"],)
+        ).fetchone()[0]
+        == 1
+    )

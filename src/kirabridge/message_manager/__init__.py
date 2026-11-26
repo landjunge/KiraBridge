@@ -360,7 +360,16 @@ class MessageManager:
         if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
             if message.recipient not in limits.receivers:
                 dispatch = False
-        if coordinator_route and coordinator_route.get("delivery") == "inbox":
+        if (
+            coordinator_route
+            and coordinator_route.get("delivery") == "inbox"
+            and not (
+                self.config.visible_handoffs.enabled
+                and message.recipient in self.config.visible_handoffs.bindings
+                and message.recipient in limits.receivers
+                and message.recipient in self.config.agents
+            )
+        ):
             dispatch = False  # No bound session: store in the inbox, never drive an agent.
         if len(message.body.encode()) > limits.max_body_bytes:
             raise BridgeError("payload_limit", "Message exceeds configured byte limit")
