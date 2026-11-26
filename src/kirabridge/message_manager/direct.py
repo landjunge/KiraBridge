@@ -282,7 +282,9 @@ class DirectDelivery:
             ) from None
         if (
             current.get("principal") != message["recipient"]
-            or digest(current.get("session")) != metadata.get("coordinator_session_sha256")
+            # Same rule as at addressing: a terminal-bound coordinator has no session record.
+            or (digest(current["session"]) if current.get("session") else None)
+            != metadata.get("coordinator_session_sha256")
             or current.get("team_id") != metadata.get("coordinator_scope_team_id")
             or current.get("revision") != metadata.get("coordinator_role_revision")
         ):

@@ -195,3 +195,35 @@ def test_message_ack_on_a_team_message_is_the_team_ack(domain):
     acked = domain.alias_ack("chatgpt", sent["id"])
     assert acked["acknowledged"] is not None
     assert domain.alias_ack("chatgpt", "legacy-uuid") is None
+
+
+def test_terminal_bound_coordinator_route_validates_and_still_detects_a_change(domain):
+    import json
+
+    wire(domain, "grok")
+    domain.config.team.coordinator_only_senders = ["chatgpt"]
+    role(domain, "grok", "coordinator")
+    domain.send("chatgpt", message(recipient="coordinator", idempotency_key="v1"))
+    ticket = tickets(domain)[0]
+    queued = json.loads(
+        domain.store.db.execute(
+            "SELECT evidence FROM message_events WHERE message_id=? AND kind='message.queued'",
+            (ticket["id"],),
+        ).fetchone()[0]
+    )
+    assert queued["recipient_role"] == "coordinator"
+    assert queued["coordinator_session_sha256"] is None  # no session record: binding only
+    current = {
+        "principal": "grok",
+        "session": None,
+        "team_id": queued["coordinator_scope_team_id"],
+        "revision": queued["coordinator_role_revision"],
+    }
+    direct = domain.bridge.message_receiver.direct
+    domain.bridge.messages.coordinator_resolver = lambda: dict(current)
+    direct._verify_coordinator_route(dict(ticket))  # unchanged: accepted
+    for change in ({"principal": "codex"}, {"revision": current["revision"] + 1}):
+        domain.bridge.messages.coordinator_resolver = lambda change=change: {**current, **change}
+        with pytest.raises(BridgeError) as moved:
+            direct._verify_coordinator_route(dict(ticket))
+        assert moved.value.code == "coordinator_route_changed"
