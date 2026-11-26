@@ -71,9 +71,10 @@ class PersistedCodex:
         assert method == "turn/start" and "expectedTurnId" not in params
         body = params["input"][0]["text"]
         self.inputs.append((params["clientUserMessageId"], body))
-        if body in {"PING", "PING-BEFORE-RESTART"}:
+        core = body.rsplit("]\n\n", 1)[-1]  # direct coordinator messages carry the role prefix
+        if core in {"PING", "PING-BEFORE-RESTART"}:
             answer = "PONG"
-        elif body == "FAIL":
+        elif core == "FAIL":
             answer = None
         else:
             stage = "DECISION_RECORDED" if not past else "FOLLOWUP_DELIVERED"
@@ -398,7 +399,7 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
     before_ledger = asyncio.Event()
 
     async def pause_before_ledger(host, binding, turn_id, body, timeout, **kwargs):
-        if body == "PING-BEFORE-RESTART":
+        if body.endswith("PING-BEFORE-RESTART"):
             before_ledger.set()
             await asyncio.Event().wait()
         return await observe_reply(host, binding, turn_id, body, timeout, **kwargs)
@@ -516,8 +517,10 @@ async def test_team_and_both_routes_recover_exactly_after_restart(
         assert followup["result"] == "FOLLOWUP_DELIVERED"
         assert len(second.inputs) == 3
         assert order["id"] in second.inputs[-1][1] and "Open order finished" in second.inputs[-1][1]
-        assert second.inputs[0] == (sent["id"], "PING")
-        assert second.inputs[1] == (failed["id"], "FAIL")
+        assert second.inputs[0][0] == sent["id"]
+        assert second.inputs[0][1].startswith("[Du bist Koordinator")
+        assert second.inputs[0][1].endswith("]\n\nPING")
+        assert second.inputs[1][0] == failed["id"] and second.inputs[1][1].endswith("]\n\nFAIL")
         assert sum(method == "thread/resume" for method, _ in second.calls) == (
             ROOT not in initially_loaded
         )
