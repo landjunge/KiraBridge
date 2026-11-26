@@ -42,6 +42,7 @@ def build(destination=None):
     native_sources = [
         source,
         root / "integrations/desktop/FamilyShell.swift",
+        root / "integrations/desktop/FamilyComponents.swift",
         root / "integrations/desktop/FamilySwitchLogic.swift",
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",

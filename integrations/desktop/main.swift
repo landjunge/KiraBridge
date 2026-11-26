@@ -412,7 +412,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
         }
         let storedWidth = (preference("window_width") as? NSNumber)?.doubleValue ?? 1120
         let storedHeight = (preference("window_height") as? NSNumber)?.doubleValue ?? 780
-        let width = snapshot?.width ?? (storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120)
+        let width = snapshot?.width ?? (storedWidth.isFinite && (FamilyLayout.minWindowWidth...4096).contains(storedWidth) ? storedWidth : 1150)
         let height = snapshot?.height ?? (storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780)
         mainView = makeMainWindow(title: "KiraBridge", width: width, height: height)
         if let snapshot {
@@ -471,7 +471,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, W
             ? NSWindow(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
             : DesktopSnapshotWindow(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
         window.title = title
-        window.minSize = NSSize(width: 820, height: 620)
+        window.minSize = NSSize(width: FamilyLayout.minWindowWidth, height: FamilyLayout.minWindowHeight)
         window.contentViewController = content
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
