@@ -68,9 +68,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     ]
     for source in sources:
         source.write_text("// isolated fixture: " + source.name + "\n")
-    icon_source = (
-        Path(__file__).resolve().parents[1] / "assets/dock/KiraBridge-dock.icns"
-    )
+    icon_source = Path(__file__).resolve().parents[1] / "assets/dock/KiraBridge-dock.icns"
     icon_bytes = icon_source.read_bytes()
     assert hashlib.sha256(icon_bytes).hexdigest() == (
         "081c45fd22dcd140a94a30485fe0716d8e854ef53da4368952859c9b754dcff9"
