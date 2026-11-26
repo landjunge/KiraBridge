@@ -74,7 +74,7 @@ Der Adapter ist ereignisunabhängig idempotent: gleiches Hook-JSON, gleiches Erg
 
 ## 6. Aufbewahrung 7 Tage und Empfangs-Hook
 
-- KiraBridge löscht Nachrichten nach 7 Tagen (`retention_seconds=604800`), unabhängig von
+- SOLL-Zustand (Nutzerbeschluss, noch nicht umgesetzt; im Bestand gibt es nur die Retention von `output_history`, keinen Löschpfad für Nachrichten und `completion_notices`): KiraBridge löscht Nachrichten nach 7 Tagen (`retention_seconds=604800`), unabhängig von
   Zustellung, Abholung und Quittierung. Keine Warnungen, keine Ausnahmen, keine Verlängerung.
   Dauerhaft ist allein der ThreadDesk-Eintrag (Abschnitt 3, Schritt 6).
 - Empfangs-Hook: Eine an ChatGPT adressierte Nachricht wird beim erfolgreichen Auslesen
