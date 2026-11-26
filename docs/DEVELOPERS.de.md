@@ -25,6 +25,21 @@ sie belegt keinen aktuellen Funktionsgleichstand oder eigenständigen Windows-In
 RC17, RC16 und RC15 bleiben Entwürfe. Quelle, Artefakt und antwortenden Dienst
 getrennt prüfen; die Versionsnummer allein identifiziert keinen Build.
 
+## Paket von GitHub statt lokalem Bau
+
+Jeder Push auf `main` startet `.github/workflows/macos-build-main.yml`: ein
+`macos-15-intel`-Runner baut den exakten Commit mit `scripts/build_release.py` und lädt
+`KiraBridge-macos-intel-<Commit-SHA>` hoch (14 Tage). Install-/Upgrade-/Rollback-Abnahme
+bleibt manuell (`macOS package acceptance`). Worker laden nur herunter, bauen nicht:
+
+```sh
+python3 scripts/fetch_release.py            # neuester main; oder --sha <Commit>
+```
+
+Das Skript wartet auf einen laufenden Build, prüft `SHA256SUMS` und gibt das Verzeichnis
+mit `KiraBridge-macos.tar.gz` aus (authentifiziertes `gh` nötig). Manuell:
+`gh run download <run-id> -R landjunge/KiraBridge -n KiraBridge-macos-intel-<sha>`.
+
 ## Entwicklereinstieg
 
 Benötigt werden Git, Python **ab 3.11** (`requires-python`) und uv; CI pinnt uv **0.11.6**.
