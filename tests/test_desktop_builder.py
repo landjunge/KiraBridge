@@ -69,13 +69,13 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     for source in sources:
         source.write_text("// isolated fixture: " + source.name + "\n")
     icon_source = (
-        Path(__file__).resolve().parents[1] / "assets/design/icons/macos/KiraBridge-dark.icns"
+        Path(__file__).resolve().parents[1] / "assets/dock/KiraBridge-dock.icns"
     )
     icon_bytes = icon_source.read_bytes()
     assert hashlib.sha256(icon_bytes).hexdigest() == (
-        "8933c33501f39cf0563e4c94989392f78e304a0457c5b835121ecb9015be55e3"
+        "081c45fd22dcd140a94a30485fe0716d8e854ef53da4368952859c9b754dcff9"
     )
-    icon_fixture = root / "assets/design/icons/macos/KiraBridge-dark.icns"
+    icon_fixture = root / "assets/dock/KiraBridge-dock.icns"
     icon_fixture.parent.mkdir(parents=True)
     icon_fixture.write_bytes(icon_bytes)
     # The reused family header resolves its product icons from the bundle, driven by the
