@@ -49,6 +49,11 @@ def _item(source, row, body_chars):
         "kind": row["kind"],
         "thread": row["thread"],
         "acknowledged": row["acknowledged"] is not None,
+        "acknowledged_at": (
+            None
+            if row["acknowledged"] is None
+            else _local(row["acknowledged"]).isoformat(timespec="seconds")
+        ),
         "body": shown,
         "body_truncated": len(body) > len(shown),
         # One sentence the assistant can read aloud as it is.
@@ -190,33 +195,94 @@ def auto_acknowledge(bridge, principal, items, senders=None):
     return acked
 
 
+def _mark(items):
+    """Per item: read (acknowledged before this call) and new (delivered first by this call)."""
+    for item in items:
+        item["read"] = item["acknowledged"]
+        item["new"] = not item["acknowledged"]
+
+
+def _counts(db, principal):
+    """Mailbox size and what is still unacknowledged, after this call's own acknowledgements."""
+    total = unread = 0
+    for table, extra in (("messages", " AND idem NOT LIKE 'team:%'"), ("team_messages", "")):
+        row = db.execute(
+            f"SELECT count(*),count(*)-count(acknowledged) FROM {table} WHERE recipient=?{extra}",
+            (principal,),
+        ).fetchone()
+        total, unread = total + row[0], unread + row[1]
+    return total, unread
+
+
 def inbox(bridge, principal, **arguments):
     """The one read path: the principal's own mailbox over team and legacy direct messages.
 
-    Read-only; a principal holding messages.observe keeps the all-messages view of observe().
-    Acknowledgement stays with the addressed recipient (team_message_ack / message_ack).
+    A principal holding messages.observe sees everything. Receive hook: a finished read
+    acknowledges exactly the returned messages addressed to the caller (see _hook), and every
+    item says whether it was read before (read) or is delivered first by this call (new).
     """
     try:
         bridge.security.principal(principal, OBSERVE_CAPABILITY)
     except BridgeError:
         result = overview(bridge.store.db, recipient=principal, **arguments)
     else:
-        result = observe(bridge, principal, **arguments)
+        result = overview(bridge.store.db, **arguments)
+    _mark(result["items"])
+    result["new_count"] = sum(1 for i in result["items"] if i["new"] and i["to"] == principal)
+    _hook(bridge, principal, result)
+    result["total"], result["unread_count"] = _counts(bridge.store.db, principal)
     result["notice"] = (
         "one inbox: team_messages; message_receive/message_get/messages_overview are aliases"
     )
     return result
 
 
-def observe(bridge, principal, **arguments):
-    """Capability-checked entry point used by the MCP tool, including the receive hook.
+def team_read(bridge, principal, team_id, after=0, limit=50):
+    """Team log page with the same receive hook and read/new markers."""
+    result = bridge.teams.messages(principal, team_id, after, limit)
+    rows = result["messages"]
+    for row in rows:
+        row["read"] = row["acknowledged"] is not None
+        row["new"] = not row["read"]
+    shown = {
+        "items": [
+            {
+                "source": "team",
+                "seq": r["seq"],
+                "id": r["id"],
+                "to": r["recipient"],
+                "from": r["sender"],
+                "thread": r["team_id"],
+            }
+            for r in rows
+        ],
+        "read_only": True,
+    }
+    result["new_count"] = sum(1 for r in rows if r["new"] and r["recipient"] == principal)
+    _hook(bridge, principal, shown)
+    acked = set(shown.get("acknowledged_by_read", {}).get("team", []))
+    for row in rows:
+        row["acknowledged_now"] = row["seq"] in acked
+    result["acknowledged_by_read"] = shown.get("acknowledged_by_read")
+    if "ack_error" in shown:
+        result["ack_error"] = shown["ack_error"]
+    result["total"], result["unread_count"] = _counts(bridge.store.db, principal)
+    return result
 
-    The overview is computed first, exactly as before; only a finished read acknowledges.
+
+def observe(bridge, principal, **arguments):
+    """Capability-checked entry point used by the MCP tool, including the receive hook."""
+    bridge.security.principal(principal, OBSERVE_CAPABILITY)
+    result = overview(bridge.store.db, **arguments)
+    return _hook(bridge, principal, result)
+
+
+def _hook(bridge, principal, result):
+    """Acknowledge after the page was computed, never before.
+
     A failing acknowledgement never withholds the page and never leaves a partial ack:
     the transaction rolls back and the result carries the fixed ack_error notice instead.
     """
-    bridge.security.principal(principal, OBSERVE_CAPABILITY)
-    result = overview(bridge.store.db, **arguments)
     result["acknowledged_by_read"] = {"direct": [], "team": []}
     listed = bridge.config.team.auto_ack_on_observe
     # The current coordinator gets the hook too, read per call from the team record: after a

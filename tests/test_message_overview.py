@@ -161,3 +161,37 @@ def test_one_inbox_shows_only_the_own_mailbox_over_both_stores(domain):
     assert {item["source"] for item in result["items"]} == {"direct", "team"}
     assert all(item["to"] == "grok" for item in result["items"])
     assert "team_messages" in result["notice"]
+
+
+def test_reading_the_inbox_acknowledges_exactly_what_the_caller_received(domain):
+    from kirabridge.message_overview import inbox, team_read
+
+    direct(domain, "codex", "chatgpt", "d-ack")
+    team(domain, "codex", "chatgpt", "t-ack")
+    team(domain, "codex", "grok", "t-other")  # someone else's mail stays untouched
+    first = inbox(domain.bridge, "chatgpt")
+    assert {i["source"] for i in first["items"]} == {"direct", "team"}
+    assert all(i["new"] and not i["read"] for i in first["items"])
+    assert first["new_count"] == 2 and first["total"] == 2 and first["unread_count"] == 0
+    second = inbox(domain.bridge, "chatgpt")
+    assert all(i["read"] and not i["new"] and i["acknowledged_at"] for i in second["items"])
+    assert second["new_count"] == 0
+    other = domain.store.db.execute(
+        "SELECT acknowledged FROM team_messages WHERE recipient='grok'"
+    ).fetchone()
+    assert other["acknowledged"] is None
+    # The team-id path obeys the same rule and marks its rows.
+    team(domain, "codex", "chatgpt", "t-ack2")
+    page = team_read(domain.bridge, "chatgpt", "test-team")
+    fresh = [m for m in page["messages"] if m["recipient"] == "chatgpt" and m["new"]]
+    assert len(fresh) == 1 and page["new_count"] == 1 and page["unread_count"] == 0
+    assert team_read(domain.bridge, "chatgpt", "test-team")["new_count"] == 0
+
+
+def test_a_worker_reading_its_inbox_acknowledges_nothing(domain):
+    from kirabridge.message_overview import inbox
+
+    team(domain, "codex", "grok", "t-worker")
+    result = inbox(domain.bridge, "grok")
+    assert result["items"][0]["new"] and result["unread_count"] == 1
+    assert inbox(domain.bridge, "grok")["items"][0]["new"]
