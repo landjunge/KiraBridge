@@ -206,7 +206,7 @@ final class DesktopOpenRequests {
 import Cocoa
 import WebKit
 
-final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class KiraBridgeApp: NSObject, NSApplicationDelegate, NSToolbarDelegate, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     /// The full release version (for example 0.8.0rc41); the bundle short version is numeric only.
     private static func aboutPanelOptions(
         release: String?, sourceCommit: String?
@@ -237,6 +237,8 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
 
     var windows: [NSWindow] = []
     var mainView: WKWebView!
+    var mainSplit: MainSplitController?
+    var familyContent: FamilyContentController?
     var bootstrapInProgress = false
     var bootstrapCleanupUnknown = false
     var familySwitchInProgress = false
@@ -247,9 +249,11 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
 
     /// Catalog-ID-only bridge. The renderer passes exactly one catalog ID and
     /// receives one of focused/failed/uncertain/missing; it never passes
-    /// a URL, argv, PID or shell text.
+    /// a URL, argv, PID or shell text. `__kbNativeShell` only marks this window as
+    /// native-shelled so the login redirect keeps the console's shell=native query.
     private static let familyBridgeScript = """
     (() => {
+      window.__kbNativeShell = true;
       window.__kbFamilyCallbacks = Object.create(null);
       window.__kbFamilySwitch = (appId) => new Promise((resolve) => {
         const id = (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -291,12 +295,15 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
             && url.user == nil && url.password == nil
     }
 
-    func performFamilySwitch(id: String, appId: String, view: WKWebView, generation: UInt64) {
+    func performFamilySwitch(id: String, appId: String, view: WKWebView, generation: UInt64,
+                             completion: ((String) -> Void)? = nil) {
         guard !familySwitchUnknown else {
-            replyFamilySwitch(id: id, outcome: "uncertain", view: view, generation: generation); return
+            replyFamilySwitch(id: id, outcome: "uncertain", view: view, generation: generation)
+            completion?("uncertain"); return
         }
         guard !familySwitchInProgress else {
-            replyFamilySwitch(id: id, outcome: "failed", view: view, generation: generation); return
+            replyFamilySwitch(id: id, outcome: "failed", view: view, generation: generation)
+            completion?("failed"); return
         }
         familySwitchInProgress = true
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -321,6 +328,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
                 self.familySwitchInProgress = false
                 if outcome == "uncertain" { self.familySwitchUnknown = true }
                 self.replyFamilySwitch(id: id, outcome: outcome, view: view, generation: generation)
+                completion?(outcome)
             }
         }
     }
@@ -359,21 +367,100 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
         let storedHeight = (preference("window_height") as? NSNumber)?.doubleValue ?? 780
         let width = storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120
         let height = storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780
-        mainView = makeWindow(title: "KiraBridge", width: width, height: height)
+        mainView = makeMainWindow(title: "KiraBridge", width: width, height: height)
         bootstrap()
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func makeWindow(title: String, width: CGFloat, height: CGFloat, suppliedConfiguration: WKWebViewConfiguration? = nil) -> WKWebView {
-        let configuration = suppliedConfiguration ?? WKWebViewConfiguration()
-        if suppliedConfiguration == nil {
-            configuration.websiteDataStore = .default()
-            // Only the main console window bridges the catalog-ID family switch.
-            configuration.userContentController.add(self, name: "familySwitch")
-            configuration.userContentController.addUserScript(
-                WKUserScript(source: Self.familyBridgeScript, injectionTime: .atDocumentStart,
-                             forMainFrameOnly: true))
+    /// The Agent Authority shell: native family header, native process sidebar, the
+    /// console web view in the middle column and a native details placeholder on the right.
+    func makeMainWindow(title: String, width: CGFloat, height: CGFloat) -> WKWebView {
+        let configuration = mainConsoleConfiguration()
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.uiDelegate = self
+        view.navigationDelegate = self
+        let split = MainSplitController(webView: view)
+        let content = FamilyContentController(split: split)
+        content.header.products.onOpen = { [weak self] target in self?.switchFamilyProduct(target) }
+        content.header.onLanguage = { [weak self] code in self?.applyFamilyLanguage(code) }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        window.title = title
+        window.minSize = NSSize(width: 820, height: 620)
+        window.contentViewController = content
+        window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
+        let toolbar = NSToolbar(identifier: "KiraBridgeFamilyToolbar")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconOnly
+        window.toolbar = toolbar
+        window.toolbarStyle = .unifiedCompact
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        mainSplit = split
+        familyContent = content
+        windows.append(window)
+        return view
+    }
+
+    func applyFamilyLanguage(_ code: String) {
+        mainSplit?.localize()
+        for item in windows.first?.toolbar?.items ?? [] { item.label = L(item.itemIdentifier.rawValue) }
+        guard let view = mainView, !view.isLoading, Self.isConsoleURL(view.url) else { return }
+        view.evaluateJavaScript("window.kbSetLanguage && window.kbSetLanguage('\(code == "en" ? "en" : "de")');", completionHandler: nil)
+    }
+
+    /// The family header only ever passes one catalog ID into the existing switch path.
+    func switchFamilyProduct(_ appId: String) {
+        guard let view = mainView, !view.isLoading, Self.isConsoleURL(view.url) else {
+            familyContent?.header.showDetail(L("family.notReady")); return
         }
+        familyContent?.header.showDetail(L("family.switching"))
+        performFamilySwitch(id: "native-" + String(ProcessInfo.processInfo.systemUptime),
+                            appId: appId, view: view, generation: mainNavigationGeneration) { [weak self] outcome in
+            self?.familyContent?.header.showDetail(L("family." + outcome))
+        }
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.init("toolbar.sidebar"), .flexibleSpace, .init("toolbar.inspector")]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        let item = NSToolbarItem(itemIdentifier: id)
+        item.label = L(id.rawValue); item.toolTip = L(id.rawValue); item.target = self
+        switch id.rawValue {
+        case "toolbar.sidebar":
+            item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: item.label)
+            item.action = #selector(toggleSidebar)
+        case "toolbar.inspector":
+            item.image = NSImage(systemSymbolName: "sidebar.right", accessibilityDescription: item.label)
+            item.action = #selector(toggleInspector)
+        default: return nil
+        }
+        return item
+    }
+
+    @objc func toggleSidebar() { mainSplit?.toggleSidebar() }
+    @objc func toggleInspector() { mainSplit?.toggleInspector() }
+
+    private func mainConsoleConfiguration() -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .default()
+        // Only the main console window bridges the catalog-ID family switch.
+        configuration.userContentController.add(self, name: "familySwitch")
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: Self.familyBridgeScript, injectionTime: .atDocumentStart,
+                         forMainFrameOnly: true))
+        return configuration
+    }
+
+    func makeWindow(title: String, width: CGFloat, height: CGFloat, suppliedConfiguration: WKWebViewConfiguration? = nil) -> WKWebView {
+        let configuration = suppliedConfiguration ?? mainConsoleConfiguration()
         configuration.applicationNameForUserAgent = "KiraBridgeDesktop"
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.uiDelegate = self

@@ -10,6 +10,17 @@ import sys
 import tomllib
 from pathlib import Path
 
+# Bundle members of the reused Agent Authority product header: the pinned shared manifest
+# plus one dark 256 px icon per family product, copied verbatim from the console assets.
+PRODUCT_HEADER_ASSETS = (
+    "networkpunkt-appbar-assets.json",
+    "np-appbar-kirabridge-dark-256.png",
+    "np-appbar-threaddesk-dark-256.png",
+    "np-appbar-4allpass-dark-256.png",
+    "np-appbar-tollgate-dark-256.png",
+    "np-appbar-agent-authority-dark-256.png",
+)
+
 
 def build(destination=None):
     if sys.platform != "darwin":
@@ -30,6 +41,7 @@ def build(destination=None):
     source = root / "integrations/desktop/main.swift"
     native_sources = [
         source,
+        root / "integrations/desktop/FamilyShell.swift",
         root / "integrations/desktop/FamilySwitchLogic.swift",
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
@@ -97,6 +109,13 @@ def build(destination=None):
     resources = bundle / "Contents" / "Resources"
     resources.mkdir(parents=True, exist_ok=True)
     (resources / "KiraBridge.icns").write_bytes(icon_bytes)
+    # The reused family header resolves its five product icons through the pinned shared
+    # manifest, exactly where Agent Authority's productHeaderResourceURL looks for them.
+    console_assets = root / "src/kirabridge/console_assets"
+    product_header = resources / "ProductHeader"
+    product_header.mkdir(parents=True, exist_ok=True)
+    for name in PRODUCT_HEADER_ASSETS:
+        (product_header / name).write_bytes((console_assets / name).read_bytes())
     (bundle / "Contents/Info.plist").write_bytes(
         plistlib.dumps(
             {

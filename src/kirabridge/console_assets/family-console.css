@@ -72,3 +72,11 @@
 @media(max-width:1180px){.app-shell.family-console-shell{grid-template-rows:auto minmax(0,1fr) 32px}}
 @media(max-width:760px){.process-compact-row{grid-template-columns:minmax(0,1fr) 8px auto}.family-overview .summary-row{grid-template-columns:1fr}.app-footer #notice{max-width:38vw}.kb-header-actions{flex-wrap:wrap}}
 @media(max-width:1180px){.workspace.family-workspace{position:relative}.workspace.family-workspace.right-user-expanded>.details-panel{display:flex;position:absolute;z-index:20;top:0;right:0;bottom:0;width:min(var(--family-right),90vw);box-shadow:0 0 0 9999px #0006}}
+
+/* Native shell embedding (?shell=native): the desktop window draws the family header, the
+   process sidebar and the details column natively, so the console keeps only its middle. */
+.native-shell .kb-wordmark,.native-shell .np-appbar-host,.native-shell .kb-language,.native-shell .panel-toggle{display:none}
+.native-shell .app-shell{min-height:0}
+.native-shell .workspace.family-workspace{grid-template-columns:minmax(670px,1fr)}
+.native-shell .workspace.family-workspace>.process-panel,.native-shell .workspace.family-workspace>.panel-resizer,
+.native-shell .workspace.family-workspace>.details-panel,.native-shell .workspace.family-workspace.right-user-expanded>.details-panel{display:none}

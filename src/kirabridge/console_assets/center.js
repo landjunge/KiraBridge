@@ -1,4 +1,7 @@
 "use strict";
+// Native shell embedding: the desktop app draws the family header, the process sidebar and
+// the details column itself, so the console keeps only its middle part.
+if(new URLSearchParams(location.search).get("shell")==="native")document.documentElement.classList.add("native-shell");
 const $=id=>document.getElementById(id);
 function renderVersion(data){const tag=$("footer-version");if(!tag)return;const release=data.release||{};const version=(data.bridge&&data.bridge.version)||release.version;if(!version){tag.hidden=true;return;}const commit=release.source_commit?String(release.source_commit).slice(0,7):"";tag.textContent="v"+version+(commit?" · "+commit:"");const consoleNote=release.version&&release.version!==version?" · Steuerfenster "+release.version:"";tag.title="KiraBridge "+version+(release.source_commit?" · Quellstand "+release.source_commit:" · Entwicklungsstand")+consoleNote;tag.setAttribute("aria-label","Installierte Version "+tag.title);tag.hidden=false;}
 let statusData=null,connections=null,sessions=[],activeView="overview",busy=false,agentCatalog=null,coordinatorSnapshot=null,coordinatorPrincipal=null,coordinatorTeamId=null,coordinatorBusy=false;

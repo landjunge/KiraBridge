@@ -23,6 +23,8 @@ function setLanguage(value) {
   });
   window.dispatchEvent(new Event("np-kirabridge-language"));
 }
+// The native desktop shell owns the visible DE/EN segment and drives this one switcher.
+window.kbSetLanguage = setLanguage;
 document.querySelectorAll("[data-kb-language]").forEach(button => button.addEventListener("click", () => setLanguage(button.dataset.kbLanguage)));
 if (document.querySelector("[data-kb-language]")) setLanguage(locale);
 function metadata(data) {
