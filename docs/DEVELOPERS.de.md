@@ -36,7 +36,7 @@ bleibt manuell (`macOS package acceptance`). Worker laden nur herunter, bauen ni
 python3 scripts/fetch_release.py            # neuester main; oder --sha <Commit>
 ```
 
-Das Skript wartet auf einen laufenden Build, prüft `SHA256SUMS` und gibt das Verzeichnis
+Mit `--wait` wartet das Skript auf einen wartenden oder laufenden Build, prüft `SHA256SUMS` und gibt das Verzeichnis
 mit `KiraBridge-macos.tar.gz` aus (authentifiziertes `gh` nötig). Manuell:
 `gh run download <run-id> -R landjunge/KiraBridge -n KiraBridge-macos-intel-<sha>`.
 

@@ -11,8 +11,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # One group per commit, never cancelled: GitHub keeps only one pending run per
+  # group, so a shared group would drop queued commits. Every main commit gets its artifact.
+  group: ${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: false
 jobs:
   package:
     runs-on: macos-15-intel   # the verified shipping architecture; one runner only
