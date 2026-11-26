@@ -1,5 +1,7 @@
 """The coordinator role reaches the registered member's inbox even without a bound session."""
 
+import time
+
 import pytest
 from test_team_manager import create, message
 from test_team_manager import domain as imported_domain
@@ -136,3 +138,84 @@ def test_coordinator_only_sender_reaches_only_the_coordinator_by_team_message(do
         "SELECT recipient FROM team_messages WHERE sender='chatgpt'"
     ).fetchall()
     assert [row["recipient"] for row in rows] == ["codex"]
+
+
+def visible_route(domain, *, state="available", age=0.0, binding_ok=True):
+    from kirabridge.bridge_core.config import ReceiverConfig, VisibleTerminalBinding
+    from kirabridge.bridge_core.models import canonical
+
+    cfg = domain.config
+    cfg.visible_handoffs.enabled = True
+    binding = VisibleTerminalBinding(
+        pane_id="terminal:1:ttys001",
+        expected_pid=1,
+        agent_pid=2,
+        ready_pattern="❯",
+        busy_pattern="esc to interrupt",
+    )
+    cfg.visible_handoffs.bindings["codex"] = binding
+    cfg.messaging.receivers.setdefault("codex", ReceiverConfig(cwd="/tmp"))
+    shown = binding if binding_ok else binding.model_copy(update={"pane_id": "terminal:9:ttys009"})
+    domain.store.db.execute(
+        "CREATE TABLE IF NOT EXISTS receiver_presence (target TEXT PRIMARY KEY,state TEXT NOT NULL,"
+        "binding TEXT NOT NULL,evidence TEXT NOT NULL,observed_at REAL NOT NULL)"
+    )
+    domain.store.db.execute(
+        "INSERT OR REPLACE INTO receiver_presence VALUES('codex',?,?,'{}',?)",
+        (state, canonical(shown.model_dump()), time.time() - age),
+    )
+
+
+def jobs(domain, key):
+    row = stored(domain, key)
+    return domain.store.db.execute(
+        "SELECT count(*) FROM message_jobs WHERE message_id=?", (row["id"],)
+    ).fetchone()[0]
+
+
+@pytest.fixture
+def live(domain):
+    set_coordinator(domain, "local", "codex", "to-codex")
+    allow_direct(domain)
+    return domain
+
+
+@pytest.mark.parametrize("kind", ["work", "question", "note"])
+def test_live_visible_binding_dispatches_waking_kinds(live, kind):
+    visible_route(live)
+    send_direct(live, "k-" + kind, kind=kind)
+    assert stored(live, "k-" + kind)["recipient"] == "codex"
+    assert jobs(live, "k-" + kind) == 1
+
+
+def test_replay_with_same_idem_does_not_dispatch_twice(live):
+    visible_route(live)
+    first = send_direct(live, "replay")
+    again = send_direct(live, "replay")
+    assert first["id"] == again["id"] and jobs(live, "replay") == 1
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"state": "stale"}, {"state": "absent"}, {"age": 10_000.0}, {"binding_ok": False}],
+)
+def test_dead_stale_or_changed_binding_stays_in_inbox(live, kwargs):
+    visible_route(live, **kwargs)
+    send_direct(live, "dead")
+    assert stored(live, "dead")["recipient"] == "codex" and jobs(live, "dead") == 0
+
+
+@pytest.mark.parametrize("kind", ["answer", "result"])
+def test_answers_and_results_stay_in_inbox(live, kind):
+    visible_route(live)
+    send_direct(live, "r-" + kind, kind=kind)
+    assert jobs(live, "r-" + kind) == 0
+
+
+def test_non_automatic_agent_execute_requires_approval(live):
+    visible_route(live)
+    policy = live.config.principals["codex"]
+    policy.capabilities = [c for c in policy.capabilities if c != "agent.execute"]
+    with pytest.raises(BridgeError) as caught:
+        send_direct(live, "needs-approval")
+    assert caught.value.code == "approval_required"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 import time
 import uuid
 from typing import Literal
@@ -277,6 +278,38 @@ class MessageManager:
         value = json.loads(row[0]).get("interim_session") if row else None
         return InterimSession.model_validate(value) if value else None
 
+    def _live_visible_route(self, message, limits):
+        """A coordinator inbox route may wake a visible terminal only while it is live.
+
+        Needs the receiver and agent config, a waking kind (answers and results stay in the
+        inbox) and a fresh, available presence observation of exactly the configured binding.
+        """
+        from kirabridge.visible_handoff import PRESENCE_FRESH_SECONDS
+
+        recipient = message.recipient
+        binding = self.config.visible_handoffs.bindings.get(recipient)
+        if (
+            not self.config.visible_handoffs.enabled
+            or binding is None
+            or message.kind not in {"work", "question", "note"}
+            or recipient not in limits.receivers
+            or recipient not in self.config.agents
+        ):
+            return False
+        try:
+            row = self.store.db.execute(
+                "SELECT state,binding,observed_at FROM receiver_presence WHERE target=?",
+                (recipient,),
+            ).fetchone()
+        except sqlite3.Error:
+            return False
+        if row is None or row["state"] != "available":
+            return False
+        age = time.time() - float(row["observed_at"])
+        return row["binding"] == canonical(binding.model_dump()) and (
+            -5.0 <= age <= PRESENCE_FRESH_SECONDS
+        )
+
     def send(self, principal, message: MessageSend, *, completion_target=None):
         self._identity(principal, "message.send")
         message = self.voice_channel.route(principal, message)
@@ -360,7 +393,11 @@ class MessageManager:
         if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
             if message.recipient not in limits.receivers:
                 dispatch = False
-        if coordinator_route and coordinator_route.get("delivery") == "inbox":
+        if (
+            coordinator_route
+            and coordinator_route.get("delivery") == "inbox"
+            and not self._live_visible_route(message, limits)
+        ):
             dispatch = False  # No bound session: store in the inbox, never drive an agent.
         if len(message.body.encode()) > limits.max_body_bytes:
             raise BridgeError("payload_limit", "Message exceeds configured byte limit")

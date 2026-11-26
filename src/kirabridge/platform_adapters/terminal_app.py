@@ -58,6 +58,21 @@ def _process_observation_timeout(phase):
     return error
 
 
+_INTERPRETERS = {"node", "python", "python3"}
+# Anchored on the CLIs' own install roots; a project dir named grok does not qualify.
+_WRAPPED_CLI = re.compile(
+    r"/(?:\.local/(?:lib|share)|usr/local/lib)/(qwen|grok|opencode)(?:-code)?/"
+)
+
+
+def _process_name(comm):
+    """Executable name; an interpreter launched from a CLI's own install dir is that CLI."""
+    name = Path(comm).name
+    if name in _INTERPRETERS and (match := _WRAPPED_CLI.search(comm)):
+        return match.group(1)
+    return name
+
+
 def _parse_process_catalog(output, returncode):
     def invalid(reason):
         error = BridgeError(
@@ -219,7 +234,7 @@ class TerminalAppTransport:
                 detail = stderr.decode("utf-8", "replace")[:1024]
                 code = (
                     "session_automation_denied"
-                    if "1743" in detail
+                    if "1743" in detail or "assistive access" in detail
                     else "visible_target_changed"
                     if "Selected target identity changed" in detail
                     else "visible_focus_changed"
@@ -439,7 +454,7 @@ class TerminalAppTransport:
                     "busy": row["busy"],
                     "agent_identity_verified": False,
                     "processes": [
-                        {"pid": p, "ppid": parent, "name": Path(comm).name, "image": comm}
+                        {"pid": p, "ppid": parent, "name": _process_name(comm), "image": comm}
                         for owner, p, parent, comm in all_members
                         if owner == uid
                     ],
