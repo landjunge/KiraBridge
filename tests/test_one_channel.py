@@ -162,7 +162,6 @@ def test_ticket_to_the_coordinator_always_gets_a_job_even_when_presence_is_not_l
     from kirabridge.bridge_core.models import canonical
 
     wire(domain, "grok")
-    domain.config.team.coordinator_only_senders = ["chatgpt"]
     role(domain, "grok", "coordinator")
     # Dead or unobserved pane: presence flaps, so the ticket still gets its job and waits
     # unsent in the receiver (it observes the exact binding itself before any input).
@@ -202,7 +201,6 @@ def test_terminal_bound_coordinator_route_validates_and_still_detects_a_change(d
     import json
 
     wire(domain, "grok")
-    domain.config.team.coordinator_only_senders = ["chatgpt"]
     role(domain, "grok", "coordinator")
     domain.send("chatgpt", message(recipient="coordinator", idempotency_key="v1"))
     ticket = tickets(domain)[0]

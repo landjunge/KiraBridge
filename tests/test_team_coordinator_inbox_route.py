@@ -118,26 +118,24 @@ def test_claiming_needs_team_manage_and_only_works_for_oneself(domain):
     assert domain.get("local", TEAM)["coordinator"] == "chatgpt"
 
 
-def test_coordinator_only_sender_reaches_only_the_coordinator_by_direct_message(domain):
+def test_explicit_recipient_is_always_honored_by_direct_message(domain):
+    # An explicit recipient must never be silently substituted, regardless of sender,
+    # including for chatgpt (coordinator-only-senders rewrite removed).
     set_coordinator(domain, "local", "codex", "to-codex")
     allow_direct(domain)
-    domain.config.team.coordinator_only_senders = ["chatgpt"]
     send_direct(domain, "chatgpt-to-grok", recipient="grok", kind="note")
-    assert stored(domain, "chatgpt-to-grok")["recipient"] == "codex"
-    assert not domain.store.db.execute("SELECT 1 FROM messages WHERE recipient='grok'").fetchone()
-    # Other senders keep addressing peers directly.
+    assert stored(domain, "chatgpt-to-grok")["recipient"] == "grok"
     send_direct(domain, "codex-to-grok", recipient="grok", kind="note", sender="codex")
     assert stored(domain, "codex-to-grok")["recipient"] == "grok"
 
 
-def test_coordinator_only_sender_reaches_only_the_coordinator_by_team_message(domain):
+def test_explicit_recipient_is_always_honored_by_team_message(domain):
     set_coordinator(domain, "local", "codex", "to-codex")
-    domain.config.team.coordinator_only_senders = ["chatgpt"]
     domain.send("chatgpt", message(team_id=TEAM, recipient="grok", idempotency_key="team-1"))
     rows = domain.store.db.execute(
         "SELECT recipient FROM team_messages WHERE sender='chatgpt'"
     ).fetchall()
-    assert [row["recipient"] for row in rows] == ["codex"]
+    assert [row["recipient"] for row in rows] == ["grok"]
 
 
 def visible_route(domain, *, state="available", age=0.0, binding_ok=True):

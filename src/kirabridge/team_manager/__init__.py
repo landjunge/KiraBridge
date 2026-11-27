@@ -1079,11 +1079,6 @@ class TeamManager:
 
     def _send(self, principal, request, *, message_id=None, validate_only=False):
         self._automatic(principal)
-        if (
-            principal in self.config.team.coordinator_only_senders
-            and request.recipient != "coordinator"
-        ):
-            request = request.model_copy(update={"recipient": "coordinator"})
         self._size(request.body, self.config.team.max_body_bytes)
         native_ping_enrolled = notified = False
         wake = None
@@ -1190,7 +1185,9 @@ class TeamManager:
             self.bridge.team_dispatcher.wake_native_ping()
             wake = ("waking", "native_ping")
         elif wake is None:
-            wake = self._delivery_ticket(principal, request, recipient, message_id)
+            wake = self._delivery_ticket(
+                principal, request, recipient, message_id, addressed_role=addressed_role
+            )
         if wake is None:
             wake = ("inbox_only", self._inbox_only_reason(recipient, request.kind))
         self.wake.set()
@@ -1357,12 +1354,15 @@ class TeamManager:
             and not native
         )
 
-    def _delivery_ticket(self, principal, request, recipient, message_id):
+    def _delivery_ticket(self, principal, request, recipient, message_id, *, addressed_role=False):
         """Hand a new team message to the existing visible/native delivery machine.
 
         The ticket is an internal row in messages (idem team:<id>) that no reader shows;
         the machine reports back as team.message_delivered. Delivery is not an acknowledgement.
         A recipient with an existing wake (native ping, coordinator notification) never gets one.
+        When the original message addressed the coordinator role (not a fixed principal),
+        the ticket keeps that role address so message_manager resolves and tags it itself;
+        this is role resolution of an address the sender chose, never a rewrite of one it didn't.
         """
         from kirabridge.message_manager import MessageSend, internal_ticket_keys
 
@@ -1373,7 +1373,7 @@ class TeamManager:
         try:
             with internal_ticket_keys():
                 ticket_message = MessageSend(
-                    recipient=recipient,
+                    recipient="coordinator" if addressed_role else recipient,
                     conversation_id="team-" + message_id,
                     idempotency_key=TICKET_PREFIX + message_id,
                     body=f"{request.body}\n\n[Team {request.team_id}, Nachricht {message_id}; "
