@@ -86,8 +86,23 @@ def compatibility(kind: str | None, version: str | None, *, cli: str | None = No
     return {"status": "unknown", "reason": "version_policy_not_declared_for_adapter"}
 
 
+def _signature(executable: str) -> tuple | None:
+    """Path, mtime and size: a probe result stays valid while these are unchanged."""
+    try:
+        stat = Path(executable).stat()
+    except OSError:
+        return None
+    return (executable, stat.st_mtime_ns, stat.st_size)
+
+
 async def inventory(
-    configs: dict, allowed: list[str], running_process_names: set[str]
+    configs: dict,
+    allowed: list[str],
+    running_process_names: set[str],
+    *,
+    cache: dict | None = None,
+    force: bool = False,
+    sequential: bool = False,
 ) -> list[dict]:
     """Observe every configured/PATH executable without invoking a shell."""
     configured_by_path: dict[str, dict] = {}
@@ -169,7 +184,21 @@ async def inventory(
         pending_by_key.values(),
         key=lambda item: (item[0], item[4], item[2]),
     )
-    probes = await asyncio.gather(*(_probe(executable) for _, _, executable, _, _ in pending))
+    if cache is None and not sequential:
+        probes = await asyncio.gather(*(_probe(executable) for _, _, executable, _, _ in pending))
+    else:
+        probes = []
+        for _, _, executable, _, _ in pending:
+            signature = _signature(executable)
+            hit = cache.get(executable) if cache is not None and not force else None
+            if hit is not None and signature is not None and hit[0] == signature:
+                probes.append(hit[1])
+                continue
+            probe = await _probe(executable)
+            # Only a clean observation is reusable; failures are retried next time.
+            if cache is not None and signature is not None and probe["status"] == "observed":
+                cache[executable] = (signature, probe)
+            probes.append(probe)
     candidates = []
     for (canonical, _alias, executable, profile, search_order), probe in zip(
         pending, probes, strict=True

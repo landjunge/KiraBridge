@@ -768,6 +768,8 @@ class Config(BaseModel):
     output_history: OutputHistoryConfig = Field(default_factory=OutputHistoryConfig)
     live_logs: LiveLogsConfig = Field(default_factory=LiveLogsConfig)
     lease_seconds: float = Field(default=30, ge=2, le=600)
+    # Background CLI version re-probe (cached between runs; re-probed early if a binary changes).
+    cli_version_probe_seconds: float = Field(default=900, ge=30, le=86400)
     # Queued, never-started work older than this (since its last explicit queueing or
     # approval) is blocked and reported instead of being executed late.
     queue_stale_seconds: float = Field(default=3600, ge=60, le=604800)
