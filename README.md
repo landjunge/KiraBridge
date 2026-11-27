@@ -51,6 +51,8 @@ The desktop app wraps the console in the Agent Authority shell: header with the 
 
 Terminal tabs are identified by the TTY of the single tab and the process tree on it, never by the window title (the profile may show the active process and arguments, so titles change). `kirabridge terminals` lists agents that still run on a closed tab (re-parented to launchd), background agents without a TTY (never touched) and bindings whose tab or processes are gone; `--apply` sends SIGTERM to the orphaned agents and removes the stale bindings after writing a backup of `config.toml`. See `docs/TERMINAL-TAB-IDENTITY-20261126.md`.
 
+- Source only: the console's Terminals tab (Advanced → Terminals) no longer auto-displays a session when it opens. The dropdown is populated from `/api/control/terminals`, but a session is only read after an explicit choice (change event); a prior explicit choice is still restored and re-read when the tab is reopened. Previously the first catalog entry was shown unasked, which could be the user's own active terminal and look like a nested window.
+
 ## Directly control your computer
 
 **KiraBridge is more than a gateway to terminal AI agents.** Direct computer control is a core capability: open or focus applications, switch windows, enter text directly, write and edit notes, press individual keys and use keyboard shortcuts. Direct typing can work without relying on the clipboard. With the necessary permissions and a compatible interface, mouse, window and screen operations are also available. This allows an AI to interact with existing applications through their ordinary user interfaces, without requiring a custom AI integration for every app.

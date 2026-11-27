@@ -270,6 +270,11 @@ async def run_case(browser, engine, name):
         await page.goto(ORIGIN)
         await page.locator('[data-view="terminals"]').click()
         await page.wait_for_function(
+            "document.querySelector('#terminal-output').textContent==="
+            "'Wähle eine erreichbare Sitzung aus.'"
+        )
+        await page.locator("#terminal-select").select_option(PANE)
+        await page.wait_for_function(
             "document.querySelector('#terminal-output').textContent.startsWith('Displayed ')"
         )
         if name in {"freeze_displayed_view_before_queue", "freeze_selection_before_queue"}:
