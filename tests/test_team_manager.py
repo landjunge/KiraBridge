@@ -723,6 +723,7 @@ def test_context_selects_recent_results_and_prioritizes_old_own_pending_with_byt
         )
         for index in range(18)
     ]
+    own_pending = [{k: v for k, v in m.items() if not k.startswith("wake_")} for m in own_pending]
     latest = [
         domain.send("codex", message(body="ä" * 3000, idempotency_key=f"latest-{index}"))
         for index in range(16)

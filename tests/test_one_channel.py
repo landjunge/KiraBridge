@@ -367,3 +367,29 @@ def test_ack_closes_only_the_ticket_of_that_sender_and_recipient(domain):
         "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
     ).fetchone()
     assert row["acknowledged"] is None
+
+
+def test_wake_state_is_in_the_send_result_for_ticket_failure_and_inbox_only(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    ok = to_coordinator(domain, "w-ticket")
+    assert (ok["wake_state"], ok["wake_reason"]) == ("waking", "delivery_ticket")
+    real = _fail_ticket_once(domain, monkeypatch)
+    failed = to_coordinator(domain, "w-failed")
+    assert (failed["wake_state"], failed["wake_reason"]) == ("failed", "receiver_unavailable")
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    domain.config.team.workers["grok"].agent = None
+    quiet = domain.send(
+        "chatgpt", message(team_id="test-team", recipient="grok", idempotency_key="w-quiet")
+    )
+    assert (quiet["wake_state"], quiet["wake_reason"]) == ("inbox_only", "no_visible_binding")
+
+
+def test_codex_worker_message_reports_inbox_only_with_a_reason(domain):
+    wire(domain, "codex")
+    sent = domain.send(
+        "chatgpt", message(team_id="test-team", recipient="codex", idempotency_key="w-codex")
+    )
+    assert (sent["wake_state"], sent["wake_reason"]) == (
+        "inbox_only",
+        "codex_wakes_only_as_coordinator",
+    )
