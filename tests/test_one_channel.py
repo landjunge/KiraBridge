@@ -227,3 +227,32 @@ def test_terminal_bound_coordinator_route_validates_and_still_detects_a_change(d
         with pytest.raises(BridgeError) as moved:
             direct._verify_coordinator_route(dict(ticket))
         assert moved.value.code == "coordinator_route_changed"
+
+
+def test_team_ack_closes_the_delivery_ticket_so_it_is_never_typed_again(domain):
+    """Ticket waits (no live presence); the agent reads+acks the team message; the ticket ends."""
+    wire(domain, "chatgpt")
+    sent = to_coordinator(domain, "ack-closes")
+    ticket = tickets(domain)[0]
+    assert ticket["acknowledged"] is None
+    domain.alias_ack("chatgpt", sent["id"])
+    row = domain.store.db.execute(
+        "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
+    ).fetchone()
+    assert row["acknowledged"] is not None  # receiver._claim now finishes it as acknowledged
+
+
+def test_auto_ack_by_inbox_read_closes_the_delivery_ticket(domain):
+    wire(domain, "chatgpt")
+    domain.config.team.auto_ack_on_observe = ["grok"]
+    to_coordinator(domain, "auto-closes", sender="grok")
+    ticket = tickets(domain)[0]
+    from kirabridge.message_overview import auto_acknowledge
+
+    items = inbox(domain.bridge, "chatgpt")["items"]
+    assert items
+    auto_acknowledge(domain.bridge, "chatgpt", items)
+    row = domain.store.db.execute(
+        "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
+    ).fetchone()
+    assert row["acknowledged"] is not None
