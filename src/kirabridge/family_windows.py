@@ -17,6 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
+from kirabridge import paths as central_paths
 from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -43,7 +44,7 @@ class FamilyRequest(BaseModel):
 
 
 def registry_path() -> Path:
-    return Path.home() / ".config/kirabridge/family-windows.json"
+    return central_paths.family_windows_file()
 
 
 def read_registry() -> dict:

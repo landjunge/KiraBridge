@@ -360,3 +360,5 @@ remain separate from installation; current downloads are not changed by source.
 The native Postfach page shows the newest 30 team messages (it walks the 50-message pages to the end and keeps the tail) instead of the first page. Choosing the coordinator stays in the web console ("Erweitert"): it needs a handover with session, generation and revision, which the read-only native data access does not cover.
 
 The native sidebar rows are keyboard-operable (Up/Down/Home/End move, Return or Space select) with a selection bar and focus ring. Agent states are shown localized (active/inactive/retired), the overview list carries status dots and an empty state, and bridge reachability is shown once, in the header; the first overview card names the coordinator. The inbox poll re-reads the retained 30 messages, so acknowledgements update.
+
+The new central path module `kirabridge.paths` resolves the directory-architecture-v1 layout under `<FAMILY>/KiraBridge` but returns the legacy paths until a migration marks the layout active; `kirabridge paths` is read-only and `--write-manifests` only writes `tool.json`/`family.json`.

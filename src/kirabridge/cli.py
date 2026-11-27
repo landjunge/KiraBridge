@@ -17,6 +17,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from kirabridge import __version__
+from kirabridge import paths as central_paths
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
@@ -102,8 +103,8 @@ async def _run_team_onboard(args, config):
             }
         )
         return out
-    live_paths = config.credentials_file or str(Path.home() / ".config/kirabridge/credentials.json")
-    config_path = str(args.config or Path.home() / ".config/kirabridge/config.toml")
+    live_paths = config.credentials_file or str(central_paths.credentials_file())
+    config_path = str(args.config or central_paths.config_file())
     registered = await _onboard_call(
         config,
         args.principal,
@@ -370,6 +371,12 @@ async def execute(args) -> None:
             emit({"imported": import_from_hidden_tty()})
         else:
             emit({"present": credential_status()})
+        return
+    if args.command == "paths":
+        out = central_paths.describe()
+        if args.write_manifests:
+            out["manifests"] = central_paths.write_manifests(__version__)
+        emit(out)
         return
     if args.command == "family":
         from kirabridge.family_windows import execute_family, failure
@@ -1118,6 +1125,14 @@ def main() -> None:
     # Not required: --doctor/--repair are a flag-based entry point without a subcommand;
     # the fallback below defaults a missing command to "status".
     sub = parser.add_subparsers(dest="command")
+    paths_cmd = sub.add_parser(
+        "paths", help="Show resolved directories (read-only; manifests only with the flag)"
+    )
+    paths_cmd.add_argument(
+        "--write-manifests",
+        action="store_true",
+        help="Create <FAMILY>/KiraBridge with tool.json and family.json (layout stays inactive)",
+    )
     family = sub.add_parser("family", help="Fixed native five-product window adapter; no Store")
     family_actions = family.add_subparsers(dest="action", required=True)
     family_actions.add_parser("registration", help="Print disabled registration; no writes")

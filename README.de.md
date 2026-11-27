@@ -360,3 +360,5 @@ Downloads getrennt.
 Die native Postfach-Seite zeigt die neuesten 30 Team-Nachrichten (sie blättert die 50er-Seiten bis zum Ende und behält das Ende) statt der ersten Seite. Die Koordinatorwahl bleibt in der Web-Konsole („Erweitert“): sie braucht eine Übergabe mit Session, Generation und Revision, die der nur lesende native Datenzugriff nicht abdeckt.
 
 Die Zeilen der nativen Seitenleiste sind per Tastatur bedienbar (Auf/Ab/Pos1/Ende bewegen, Return oder Leertaste wählen) mit Auswahlbalken und Fokusring. Agentenstatus erscheint lokalisiert (aktiv/inaktiv/außer Betrieb), die Übersichtsliste hat Statuspunkte und einen Leerzustand, die Bridge-Erreichbarkeit steht nur im Header; die erste Übersichtskarte nennt den Koordinator. Der Postfach-Abruf liest die behaltenen 30 Nachrichten neu, Bestätigungen aktualisieren sich.
+
+Das neue zentrale Pfadmodul `kirabridge.paths` löst das Layout directory-architecture-v1 unter `<FAMILY>/KiraBridge` auf, liefert aber bis zur Aktivierung durch eine Migration die Altpfade; `kirabridge paths` liest nur, `--write-manifests` schreibt allein `tool.json`/`family.json`.
