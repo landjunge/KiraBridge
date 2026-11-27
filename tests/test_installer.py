@@ -1528,3 +1528,43 @@ def test_open_retry_or_attempted_input_is_still_busy(
     with pytest.raises(RuntimeError, match="BUSY"):
         with installer.idle_guard(config):
             pytest.fail("must block")
+
+
+def test_prune_install_history_keeps_five_backups_and_used_releases(installer, tmp_path):
+    prefix = tmp_path / "install"
+    names = [f"2026112{d}-100000-{d:08x}" for d in range(1, 9)]
+    for name in names:
+        (prefix / "backups" / name).mkdir(parents=True)
+        (prefix / "backups" / name / "bridge.before.sqlite3").write_text("db")
+    (prefix / "backups" / "manual-note").mkdir()
+    releases = []
+    for index in range(6):
+        path = prefix / "releases" / f"0.8-{index}"
+        path.mkdir(parents=True)
+        os.utime(path, (index + 1, index + 1))
+        releases.append(path)
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    plist = agents / "com.kirabridge.bridge.plist"
+    launcher = tmp_path / "kira"
+    plist.write_text("x")
+    launcher.write_text("x")
+    (agents / "com.kirabridge.relay.plist").write_text(str(releases[0]))
+    installer.AUX_PREFIX = "com.kirabridge."
+    args = SimpleNamespace(prefix=prefix, plist=plist, launcher=launcher)
+    # Active backup is the oldest name; it must survive, plus the four newest others.
+    record = {
+        "backup": str(prefix / "backups" / names[0]),
+        "release": str(releases[1]),
+        "previous": {"release": str(releases[2])},
+    }
+    result = installer.prune_install_history(args, record)
+    left = sorted(p.name for p in (prefix / "backups").iterdir())
+    assert left == sorted([names[0], *names[-4:], "manual-note"])
+    assert result["backups"] == 3
+    assert sorted(p.name for p in (prefix / "releases").iterdir()) == [
+        "0.8-0",  # referenced by a service definition
+        "0.8-1",  # current
+        "0.8-2",  # previous (rollback)
+        "0.8-5",  # newest spare
+    ]

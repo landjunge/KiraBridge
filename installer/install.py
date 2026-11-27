@@ -2221,6 +2221,8 @@ def activate(args, release):
     )
     for label, problem in aux_problems:
         report("warn", f"Zusatzdienst {label.removeprefix(AUX_PREFIX)}", detail=problem)
+    with contextlib.suppress(Exception):  # housekeeping never fails an upgrade
+        prune_install_history(args, json.loads(current.read_text()))
     report_summary(
         f"KiraBridge {manifest['version']} ist installiert",
         [
@@ -2240,6 +2242,71 @@ def activate(args, release):
             ("Rückweg", short(backup)),
         ],
     )
+
+
+KEEP_BACKUPS = 5
+KEEP_RELEASES_EXTRA = 1
+
+
+def _record_release(record):
+    value = (record or {}).get("release")
+    return Path(value) if value else None
+
+
+def prune_install_history(args, current_record):
+    """Bound future growth after a verified install; never touches data or running releases."""
+    removed = {"backups": 0, "releases": 0}
+    keep_backup = Path(current_record["backup"]) if current_record.get("backup") else None
+    backups = args.prefix / "backups"
+    if backups.is_dir() and not backups.is_symlink():
+        found = sorted(
+            (
+                p
+                for p in backups.iterdir()
+                if re.fullmatch(r"\d{8}-\d{6}-[0-9a-f]{8}", p.name)
+                and p.is_dir()
+                and not p.is_symlink()
+            ),
+            key=lambda p: p.name,
+            reverse=True,
+        )
+        keep = [p for p in found if p == keep_backup]
+        keep += [p for p in found if p != keep_backup][: max(KEEP_BACKUPS - len(keep), 0)]
+        for path in found:
+            if path not in keep:
+                shutil.rmtree(path, ignore_errors=True)
+                removed["backups"] += 1
+    releases = args.prefix / "releases"
+    if releases.is_dir() and not releases.is_symlink():
+        protected = {
+            _record_release(current_record),
+            _record_release(current_record.get("previous")),
+        }
+        # Anything a service definition or launcher still points at is in use.
+        references = [args.launcher, args.plist]
+        references += (
+            sorted(args.plist.parent.glob(f"{AUX_PREFIX}*")) if args.plist.parent.is_dir() else []
+        )
+        text = ""
+        for ref in references:
+            with contextlib.suppress(OSError):
+                text += ref.read_text(errors="ignore")
+        found = sorted(
+            (
+                p
+                for p in releases.iterdir()
+                if not p.name.startswith(".") and p.is_dir() and not p.is_symlink()
+            ),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        used = {p for p in found if p in protected or str(p) in text}
+        spare = [p for p in found if p not in used][:KEEP_RELEASES_EXTRA]
+        for path in found:
+            if path not in used and path not in spare:
+                shutil.rmtree(path, ignore_errors=True)
+                removed["releases"] += 1
+    return removed
 
 
 def rollback(args, *, _compensating=False):
