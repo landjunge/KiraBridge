@@ -10,6 +10,12 @@ import uuid
 
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 
+# Watch targets nobody ever acknowledges; their notices are marked acknowledged after a day.
+ORPHAN_TARGETS = ("default", "ki-gesamtabschluss-watch")
+ORPHAN_AFTER = 24 * 3600
+ACKED_KEEP = 7 * 24 * 3600
+MAINTENANCE_EVERY = 600
+MAINTENANCE_BATCH = 200
 TERMINAL = {"completed", "failed", "cancelled", "unknown", "blocked"}
 SOURCE_CAPABILITIES = {
     "task": "task.read",
@@ -224,12 +230,54 @@ def record_task_completion(store, task_id, event_seq):
 class CompletionManager:
     def __init__(self, store, security):
         self.store, self.security = store, security
+        self._next_maintenance = time.monotonic() + 60
+
+    def maintain(self):
+        """Tidy in small batches: acknowledged notices go 7 days after acknowledgement,
+        stale orphan-watch notices are marked acknowledged first. Never deletes unacknowledged."""
+        now = time.time()
+        marks = ",".join("?" for _ in ORPHAN_TARGETS)
+        with self.store.transaction():
+            ids = [
+                row[0]
+                for row in self.store.db.execute(
+                    "SELECT id FROM completion_notices WHERE acknowledged IS NULL "
+                    "AND source!='team' AND target IN (" + marks + ") AND created<? LIMIT ?",
+                    (*ORPHAN_TARGETS, now - ORPHAN_AFTER, MAINTENANCE_BATCH),
+                )
+            ]
+            if ids:
+                self.store.db.executemany(
+                    "UPDATE completion_notices SET acknowledged=? WHERE id=? "
+                    "AND acknowledged IS NULL",
+                    [(now, i) for i in ids],
+                )
+                self.store.audit(
+                    "completion.auto_acknowledged",
+                    "service",
+                    None,
+                    {"count": len(ids), "targets": list(ORPHAN_TARGETS), "after_s": ORPHAN_AFTER},
+                )
+            self.store.db.execute(
+                "DELETE FROM completion_notices WHERE id IN (SELECT id FROM completion_notices n "
+                "WHERE acknowledged IS NOT NULL AND acknowledged<? "
+                "AND NOT EXISTS (SELECT 1 FROM team_coordinator_resumes r WHERE r.notice_id=n.id) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE h.queue_id='completions' "
+                "AND h.item_id=n.id) LIMIT ?)",
+                (now - ACKED_KEEP, MAINTENANCE_BATCH),
+            )
 
     def _policy(self, principal, source):
         self.security.principal(principal, completion_capability(source))
 
     def receive(self, principal, target="default", limit=20, source_id=None):
         valid_target(target)
+        if time.monotonic() >= self._next_maintenance:
+            self._next_maintenance = time.monotonic() + MAINTENANCE_EVERY
+            try:
+                self.maintain()
+            except Exception:  # housekeeping must never block a receive
+                pass
         if not 1 <= limit <= 50:
             raise BridgeError("invalid_limit", "Use limit 1..50")
         if source_id is not None:
