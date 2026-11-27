@@ -460,3 +460,77 @@ async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_
         assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 1
         reply = bridge.messages.get("chatgpt", result["processing"]["reply_id"])
         assert reply["body"] == "independent review"
+
+
+async def test_team_ticket_is_read_back_internally_and_delivered_only_on_input(
+    visible,
+    http_bridge,
+    config,
+    monkeypatch,  # noqa: F811
+):
+    """Real constellation (N-1/N-7): readers hide `team:` tickets, the receiver must not."""
+    import asyncio
+
+    bridge, transport = visible
+    for identity in ["chatgpt", "grok"]:
+        config.principals[identity].token_env = "WAIT_TEST_" + identity.upper()
+        monkeypatch.setenv(config.principals[identity].token_env, identity + "-" + "x" * 48)
+    config.messaging.receivers["grok"] = ReceiverConfig(
+        cwd=config.principals["grok"].roots[0], timeout=3
+    )
+    fullbox_grok_insert(bridge, transport)
+    transport["text"] = GROK_EMPTY_FULL
+    await bridge.message_receiver.start()
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="grok",
+            conversation_id="team-tm-ticket1",
+            idempotency_key="team:tm-ticket1",
+            kind="note",
+            body="Team ticket body",
+            dispatch=True,
+            request_reply=False,
+        ),
+    )
+    assert bridge.messages.receive("grok")["messages"] == []  # readers still never see it
+    async with asyncio.timeout(10):
+        while bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] in {
+            "queued",
+            "running",
+        }:
+            await asyncio.sleep(0.02)
+    done = bridge.messages.get("chatgpt", sent["id"])
+    # The agent never answers in this fixture, so the handoff ends unconfirmed; the point is
+    # that the readback no longer fails with receiver_delivery and the input was typed.
+    assert done["processing"]["error"] != "receiver_delivery", dict(done["processing"])
+    assert done["delivered"] is not None and done["receipt"]
+    assert transport["calls"] == ["insert", "return"]
+    assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 1
+
+
+def test_ticket_readback_does_not_mark_delivered_before_input(visible):
+    bridge, _ = visible
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient="grok",
+            conversation_id="team-tm-ticket2",
+            idempotency_key="team:tm-ticket2",
+            kind="note",
+            body="x",
+            dispatch=False,
+        ),
+    )
+    row = bridge.messages.claim_receipt("grok", sent["id"])
+    assert row["receipt"] and row["delivered"] is None
+    assert bridge.messages.claim_receipt("grok", sent["id"])["receipt"] == row["receipt"]
+    stored = bridge.store.db.execute(
+        "SELECT delivered FROM messages WHERE id=?", (sent["id"],)
+    ).fetchone()
+    assert stored["delivered"] is None
+    bridge.messages.mark_input_started("grok", sent["id"])
+    stored = bridge.store.db.execute(
+        "SELECT delivered FROM messages WHERE id=?", (sent["id"],)
+    ).fetchone()
+    assert stored["delivered"] is not None
