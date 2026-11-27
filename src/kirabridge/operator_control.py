@@ -17,6 +17,9 @@ from kirabridge.bridge_core.models import BridgeError
 from kirabridge.operator_actions import action_identity
 from kirabridge.permissions import LEVELS, level_for, permission_summary
 
+# Status polling reuses one ps/launchctl observation for this long; actions and
+# fresh=True (explicit refresh) always observe again.
+SNAPSHOT_TTL_SECONDS = 30
 SERVICE_LABELS = {
     "bridge": "com.kirabridge.bridge",
     "grok_app": "com.kirabridge.grok-app",
@@ -120,7 +123,7 @@ class OperatorControl:
             return await self._snapshot(fresh=fresh)
 
     async def _snapshot(self, *, fresh=False):
-        if not fresh and self.cache and time.monotonic() - self.cache_at < 2:
+        if not fresh and self.cache and time.monotonic() - self.cache_at < SNAPSHOT_TTL_SECONDS:
             return self.cache
         config = self.config()
         rows = await self.processes()
