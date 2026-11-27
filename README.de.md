@@ -350,3 +350,5 @@ die 4AllPass-Sperrregeln gelten weiter. UNKNOWN blockiert blinde Wiederholung;
 fehlende oder mehrdeutige Ziele bleiben Fehler. [Registrierung, JSON-ABI und
 Abnahme](docs/FAMILY-WINDOW-BROKER.md) sind von Installation und bestehenden
 Downloads getrennt.
+
+Die native Postfach-Seite zeigt die neuesten 30 Team-Nachrichten (sie blättert die 50er-Seiten bis zum Ende und behält das Ende) statt der ersten Seite. Die Koordinatorwahl bleibt in der Web-Konsole („Erweitert“): sie braucht eine Übergabe mit Session, Generation und Revision, die der nur lesende native Datenzugriff nicht abdeckt.

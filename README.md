@@ -350,3 +350,5 @@ family windows. Processes and UI state remain; 4AllPass lock policy is unchanged
 Unknown effects are durably blocked from blind retry. Missing or ambiguous targets
 are errors. [Registration, exact JSON ABI and acceptance](docs/FAMILY-WINDOW-BROKER.md)
 remain separate from installation; current downloads are not changed by source.
+
+The native Postfach page shows the newest 30 team messages (it walks the 50-message pages to the end and keeps the tail) instead of the first page. Choosing the coordinator stays in the web console ("Erweitert"): it needs a handover with session, generation and revision, which the read-only native data access does not cover.
