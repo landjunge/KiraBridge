@@ -179,6 +179,31 @@ final class CenterViewController: NSViewController {
         timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.refresh() }
     }
 
+    /// The API pages oldest-first (limit 50), so walk the cursor to the end and keep the newest
+    /// `inboxLimit` rows. Later polls continue from the stored cursor instead of starting over.
+    private static let inboxLimit = 30
+    private var inboxTeam = "", inboxCursor = 0
+    private var inboxRows: [[String: Any]] = []
+    private func newestMessages(_ api: ConsoleAPI, teamID: String, pages: Int = 0,
+                                completion: @escaping (Any?) -> Void) {
+        DispatchQueue.main.async {
+            if teamID != self.inboxTeam { self.inboxTeam = teamID; self.inboxCursor = 0; self.inboxRows = [] }
+            api.get("/api/team/" + teamID + "/messages?limit=50&after=" + String(self.inboxCursor)) { payload in
+                DispatchQueue.main.async {
+                    let dict = payload as? [String: Any]
+                    guard let rows = dict?["messages"] as? [[String: Any]] else {
+                        return completion(self.inboxRows.isEmpty ? nil : ["messages": self.inboxRows])
+                    }
+                    self.inboxRows = Array((self.inboxRows + rows).suffix(Self.inboxLimit))
+                    self.inboxCursor = (dict?["next_cursor"] as? Int) ?? self.inboxCursor
+                    if rows.count == 50 && pages < 200 {
+                        self.newestMessages(api, teamID: teamID, pages: pages + 1, completion: completion)
+                    } else { completion(["messages": self.inboxRows]) }
+                }
+            }
+        }
+    }
+
     func refresh() {
         guard let api else { return }
         api.get("/api/control/status") { [weak self] status in
@@ -199,7 +224,7 @@ final class CenterViewController: NSViewController {
                             if next != self.state { self.apply(next) }
                         }
                     }
-                    if let teamID { api.get("/api/team/" + teamID + "/messages?limit=30", completion: finish) } else { finish(nil) }
+                    if let teamID { self?.newestMessages(api, teamID: teamID, completion: finish) } else { finish(nil) }
                 }
             }
         }
