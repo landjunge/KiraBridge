@@ -300,17 +300,35 @@ class DirectDelivery:
             await event.wait()
 
     async def _watch(self, message_id, task, event, deadline):
-        try:
-            async with asyncio.timeout_at(deadline):
-                await event.wait()
-        except TimeoutError:
-            if not event.is_set() and not task.done():
-                self._expired.add(message_id)
-                task.cancel()
-                # Settle synchronously before signalling the bounded observer. Native
-                # cleanup may continue, but an ambiguous attempt is never retried.
-                self._settle(message_id, "delivery_timeout", uncertain=False)
-                event.set()
+        # The original deadline bounds how long an unclaimed message may wait
+        # for a ready target; most of it can be spent on that readiness check
+        # alone. Once _deliver actually claims the job (self._claimed gains
+        # the message), the clock restarts once so the typing/confirmation
+        # phase gets its own full window instead of racing the leftovers of
+        # the readiness check. A still-unclaimed job gets no such extension
+        # and keeps its original, unchanged deadline.
+        loop = asyncio.get_running_loop()
+        extended = False
+        while True:
+            try:
+                async with asyncio.timeout_at(deadline):
+                    await event.wait()
+                return
+            except TimeoutError:
+                if event.is_set():
+                    return
+                if not extended and message_id in self._claimed:
+                    deadline = loop.time() + self.delivery_timeout
+                    extended = True
+                    continue
+                break
+        if not event.is_set() and not task.done():
+            self._expired.add(message_id)
+            task.cancel()
+            # Settle synchronously before signalling the bounded observer. Native
+            # cleanup may continue, but an ambiguous attempt is never retried.
+            self._settle(message_id, "delivery_timeout", uncertain=False)
+            event.set()
 
     @staticmethod
     def _observation(error):
