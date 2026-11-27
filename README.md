@@ -367,3 +367,4 @@ The new central path module `kirabridge.paths` resolves the directory-architectu
 
 After a verified install the installer keeps at most 5 rollback backups (the active one plus the 4 newest) and the active, previous and one spare release, never a release a service still uses.
 Completion notices are tidied in small batches: acknowledged notices are deleted 7 days after acknowledgement (never unacknowledged ones), and notices of the unattended watch targets `default` and `ki-gesamtabschluss-watch` are marked acknowledged after 24 h with an audit entry holding the count.
+The diagnostic overflow archive now closes its segment daily, removes rotated segments older than 7 days (each removal anchored in the audit chain) and caps archive writes at 32 MiB per day and process; existing audit rows are untouched.

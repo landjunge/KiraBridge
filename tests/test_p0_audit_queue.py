@@ -188,3 +188,37 @@ def test_compaction_is_backed_up_reversible_and_keeps_unknown(bridge, tmp_path):
         assert rows == original
     finally:
         reopened.store.close()
+
+
+def test_archive_segments_expire_by_age_and_daily_write_cap(bridge, config, monkeypatch):
+    config.diagnostics.max_records = 10
+    observer = AuditObserver(config, "local", bridge.runtime, bridge.store)
+    for _ in range(30):
+        assert observer("connection", {"phase": "connect.started"})
+    current = config.state_path / diagnostics.ARCHIVE
+    # Close the day-old current segment, then age it past the 7 day limit.
+    old = time.time() - 9 * 86400
+    lines = [json.loads(x) for x in current.read_text().splitlines()]
+    assert lines
+    monkeypatch.setattr(diagnostics, "ARCHIVE_SEGMENT_AGE", -1)
+    assert observer("connection", {"phase": "connect.started"})
+    rotated = sorted(config.state_path.glob("diagnostic-archive.*.jsonl"))
+    assert len(rotated) == 1
+    import os
+
+    os.utime(rotated[0], (old, old))
+    monkeypatch.setattr(diagnostics, "ARCHIVE_SEGMENT_AGE", 10**9)
+    assert observer("connection", {"phase": "connect.started"})
+    assert not list(config.state_path.glob("diagnostic-archive.*.jsonl"))
+    anchors = [
+        json.loads(a[0])
+        for a in bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='audit.diagnostic_archive_rotated'"
+        )
+    ]
+    assert any(a.get("reason") == "age" and a["removed_segments"] for a in anchors)
+    assert verify(bridge.store)["valid"] and verify_archive(config.state_path)["valid"]
+    monkeypatch.setattr(diagnostics, "ARCHIVE_DAILY_BYTES", 1)
+    before = observer.dropped
+    assert not observer("connection", {"phase": "connect.started"})
+    assert observer.dropped == before + 1
