@@ -541,6 +541,76 @@ def test_ticket_readback_does_not_mark_delivered_before_input(visible):
     assert stored["delivered"] is not None
 
 
+def _ticket(bridge, key="team:tm-wait1"):
+    bridge.config.messaging.receivers["grok"] = ReceiverConfig(
+        cwd=bridge.config.principals["grok"].roots[0], timeout=3
+    )
+    return bridge.messages.send(
+        "chatgpt",
+        _ticket_message(
+            recipient="grok",
+            conversation_id="team-" + key[5:],
+            idempotency_key=key,
+            body="Ticket",
+            kind="note",
+            dispatch=True,
+            request_reply=False,
+        ),
+    )
+
+
+async def test_ticket_with_unproven_presence_waits_unsent_then_delivers_once(visible, monkeypatch):
+    bridge, transport = visible
+    sent = _ticket(bridge)
+    processed = []
+    fake_receiver(monkeypatch, bridge, processed)
+    real = bridge.visible_handoffs.dispatch_ready
+    stale = {"on": True}
+
+    async def ready(principal, target):
+        if stale["on"]:
+            error = BridgeError("session_selection_changed", "not proven")
+            error.observation = {"state": "stale", "reason": "visible_absence_unproven"}
+            raise error
+        return await real(principal, target)
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", ready)
+    for _ in range(2):
+        assert not await bridge.message_receiver._dispatch_next()
+    job = bridge.messages.get("chatgpt", sent["id"])["processing"]
+    assert job["state"] == "queued" and job["evidence"]["waiting_for_visible_target"]
+    assert not bridge.store.db.execute("SELECT 1 FROM queue_holds").fetchone()
+    assert not processed and not transport["calls"]
+    stale["on"] = False
+    transport["text"] = GROK_EMPTY_FULL
+    assert await bridge.message_receiver._dispatch_next()
+    assert not await bridge.message_receiver._dispatch_next()
+    assert processed == [sent["id"]]  # exactly one delivery
+
+
+async def test_preflight_failure_keeps_a_waiting_job_deferred_and_the_deadline_applies(
+    visible, monkeypatch
+):
+    bridge, _ = visible
+    receiver = bridge.message_receiver
+    sent = _ticket(bridge, "team:tm-wait2")
+    receiver._waiting(sent["id"], "visible_target_working")
+    row = {"evidence": bridge.messages.get("chatgpt", sent["id"])["processing"]["evidence"]}
+    receiver._preflight_failed(sent["id"], "grok", "peer_connection")
+    job = bridge.messages.get("chatgpt", sent["id"])["processing"]
+    assert job["state"] == "queued" and job["evidence"]["waiting_for_receiver"]
+    assert receiver._deferred_unsent({"evidence": canonical(job["evidence"])})
+    assert row["evidence"]["waiting_for_visible_target"]
+    # The deadline is evaluated again: after it the job fails visibly.
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=json_set(evidence,'$.receiver_retry.deadline',1) "
+        "WHERE message_id=?",
+        (sent["id"],),
+    )
+    receiver._preflight_failed(sent["id"], "grok", "peer_connection")
+    assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "failed"
+
+
 async def test_ack_between_readback_and_input_means_no_input(
     visible, http_bridge, config, monkeypatch
 ):

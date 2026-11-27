@@ -522,3 +522,32 @@ time.sleep(30)
         assert payload["state"] == "unknown" and payload["execution_outcome_unknown"]
         assert payload["outcome"] == "cancelled"
         assert payload["process_id"] and payload["session_id"] == "SIMULATED-cancelled-session"
+
+
+def test_ack_all_marks_only_own_notices_up_to_the_cutoff_and_deletes_nothing(bridge):
+    from kirabridge.completion_manager import record_notice
+
+    for index in range(10):
+        with bridge.store.transaction():
+            record_notice(
+                bridge.store, "local", "default", "task", f"t{index}", index, {"n": index}
+            )
+    with bridge.store.transaction():
+        record_notice(bridge.store, "chatgpt", "default", "task", "foreign", 99, {"n": 99})
+    cutoff = bridge.store.db.execute(
+        "SELECT seq FROM completion_notices WHERE source_id='t6'"
+    ).fetchone()[0]
+    done = bridge.completions.ack_all("local", cutoff)
+    assert done["acknowledged_count"] == 7
+    assert bridge.completions.ack_all("local", cutoff)["acknowledged_count"] == 0
+    open_rows = bridge.store.db.execute(
+        "SELECT principal,source_id FROM completion_notices WHERE acknowledged IS NULL ORDER BY seq"
+    ).fetchall()
+    assert [r["source_id"] for r in open_rows] == ["t7", "t8", "t9", "foreign"]
+    assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 11
+    audit = bridge.store.db.execute(
+        "SELECT count(*) FROM audit WHERE kind='completion.bulk_acknowledged'"
+    ).fetchone()[0]
+    assert audit == 2
+    with pytest.raises(BridgeError):
+        bridge.completions.ack_all("local", -1)

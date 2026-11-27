@@ -592,19 +592,29 @@ def idle_guard(config):
                 "where a.message_id=v.message_id and a.state in "
                 "('planned','inserting','inserted','submitting','return_sent','sent','confirmed'))"
             )
+        has_evidence = "evidence" in {r[1] for r in db.execute("pragma table_info(message_jobs)")}
+        if "visible_handoffs" in tables and has_evidence:
             # Jobs often link to the handoff only through their evidence
             # (observation.handoff_id), whose message_id differs from the job's.
-            if "evidence" in {r[1] for r in db.execute("pragma table_info(message_jobs)")}:
-                dead.append(
-                    "select 1 from visible_handoffs v "
-                    "where v.state='unknown' and v.id=json_extract("
-                    "case when json_valid(message_jobs.evidence) then message_jobs.evidence "
-                    "else '{}' end,'$.observation.handoff_id') "
-                    "and not exists (select 1 from visible_handoffs a "
-                    "where a.message_id=v.message_id and a.state in "
-                    "('planned','inserting','inserted','submitting','return_sent','sent',"
-                    "'confirmed'))"
-                )
+            dead.append(
+                "select 1 from visible_handoffs v "
+                "where v.state='unknown' and v.id=json_extract("
+                "case when json_valid(message_jobs.evidence) then message_jobs.evidence "
+                "else '{}' end,'$.observation.handoff_id') "
+                "and not exists (select 1 from visible_handoffs a "
+                "where a.message_id=v.message_id and a.state in "
+                "('planned','inserting','inserted','submitting','return_sent','sent',"
+                "'confirmed'))"
+            )
+        if has_evidence:
+            # The receiver fails a job itself once its stored retry deadline has
+            # passed; without any terminal input that is no delivery in progress.
+            dead.append(
+                "select 1 where json_valid(message_jobs.evidence) "
+                "and json_extract(message_jobs.evidence,'$.terminal_input_attempted')=0 "
+                "and json_extract(message_jobs.evidence,'$.receiver_retry.deadline')"
+                " <= cast(strftime('%s','now') as real)"
+            )
         skipped = []
         jobs = 0
         if "message_jobs" in tables:

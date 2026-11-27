@@ -312,6 +312,17 @@ class MessageManager:
         value = json.loads(row[0]).get("interim_session") if row else None
         return InterimSession.model_validate(value) if value else None
 
+    def _visible_route_eligible(self, message, limits):
+        """Configured visible receiver and a waking kind (answers and results stay inbox)."""
+        recipient = message.recipient
+        return bool(
+            self.config.visible_handoffs.enabled
+            and self.config.visible_handoffs.bindings.get(recipient) is not None
+            and message.kind in {"work", "question", "note"}
+            and recipient in limits.receivers
+            and recipient in self.config.agents
+        )
+
     def _live_visible_route(self, message, limits):
         """A coordinator inbox route may wake a visible terminal only while it is live.
 
@@ -431,6 +442,13 @@ class MessageManager:
             coordinator_route
             and coordinator_route.get("delivery") == "inbox"
             and not self._live_visible_route(message, limits)
+            and not (
+                # A team delivery ticket always gets its job when the receiver is a configured
+                # visible terminal: presence flaps, so the receiver waits unsent and observes
+                # the exact binding before any input (never a busy pane).
+                message.idempotency_key.startswith("team:")
+                and self._visible_route_eligible(message, limits)
+            )
         ):
             dispatch = False  # No bound session: store in the inbox, never drive an agent.
         if len(message.body.encode()) > limits.max_body_bytes:
