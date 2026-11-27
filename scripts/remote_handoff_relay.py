@@ -14,6 +14,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import logging.handlers
 import os
 import subprocess
 import sys
@@ -30,6 +31,39 @@ TERMINAL = {"completed", "failed", "cancelled", "unknown", "blocked"}
 AGENT_TARGETS = {"codex": "codex", "claude": "claude", "grok": "grok"}
 MAX_RESULT_CHARS = 8000
 log = logging.getLogger("remote-relay")
+BACKOFF_START = 60
+BACKOFF_MAX = 1800
+LOG_BYTES = 5 * 1024 * 1024
+LOG_KEEP = 3
+
+
+def is_unauthorized(exc: BaseException) -> bool:
+    """True when the failure (also inside an exception group) is an HTTP 401."""
+    response = getattr(exc, "response", None)
+    if getattr(response, "status_code", None) == 401:
+        return True
+    if any(is_unauthorized(inner) for inner in getattr(exc, "exceptions", ())):
+        return True
+    return "401" in str(exc) and "Unauthorized" in str(exc)
+
+
+def next_backoff(current: int) -> int:
+    return BACKOFF_START if current <= 0 else min(current * 2, BACKOFF_MAX)
+
+
+def setup_logging(path: str | None) -> None:
+    handlers: list[logging.Handler] = []
+    if path:
+        file = Path(path).expanduser()
+        file.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(
+            logging.handlers.RotatingFileHandler(file, maxBytes=LOG_BYTES, backupCount=LOG_KEEP)
+        )
+    if not handlers or sys.stderr.isatty():
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=handlers
+    )
 
 
 def sha256(value) -> str:
@@ -370,15 +404,23 @@ class Relay:
                     log.error("report of %s failed: %s", handoff_id, exc)
 
     async def run(self, once: bool) -> None:
+        backoff = 0
         try:
             while True:
                 try:
                     await self.tick()
+                    backoff = 0
                 except Exception as exc:  # offline server or Mac sleep: retry next round
-                    log.warning("round failed: %s", exc)
+                    if is_unauthorized(exc):
+                        # Not authorised: retrying every minute cannot help; back off to 30 min.
+                        backoff = next_backoff(backoff)
+                        log.warning("round failed (401), next try in %ss: %s", backoff, exc)
+                    else:
+                        backoff = 0
+                        log.warning("round failed: %s", exc)
                 if once:
                     return
-                await asyncio.sleep(int(self.config.get("poll_seconds", 60)))
+                await asyncio.sleep(max(backoff, int(self.config.get("poll_seconds", 60))))
         finally:
             await self.td.close()
 
@@ -389,8 +431,8 @@ def main() -> int:
     parser.add_argument("--state", default="~/.local/state/kirabridge-remote-relay/state.json")
     parser.add_argument("--once", action="store_true", help="Run one round and exit")
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config = json.loads(Path(args.config).expanduser().read_text())
+    setup_logging(config.get("log_file", "~/Library/Logs/kirabridge-remote-relay.log"))
     relay = Relay(config, Path(args.state).expanduser())
     asyncio.run(relay.run(args.once))
     return 0
