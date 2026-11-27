@@ -2,6 +2,10 @@
 
 from .contract import Capabilities, ProgramAdapter, inventory
 
+# The local coordinator principal drives the Claude TUI. Single alias table for
+# adapter lookup and for matching the catalog process name (session_manager.process_is).
+PROCESS_ALIASES = {"local": "claude"}
+
 
 class UnsupportedAdapter:
     capabilities = Capabilities()
@@ -67,7 +71,11 @@ class AdapterRegistry:
         self._adapters[adapter.name] = adapter
 
     def get(self, name):
-        return self._adapters.get(name) or UnsupportedAdapter(name)
+        return (
+            self._adapters.get(name)
+            or self._adapters.get(PROCESS_ALIASES.get(name))
+            or UnsupportedAdapter(name)
+        )
 
     def describe(self, name):
         return inventory(self.get(name))

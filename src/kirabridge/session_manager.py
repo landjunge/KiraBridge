@@ -16,6 +16,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution, digest
+from kirabridge.cli_adapters import PROCESS_ALIASES
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters.linux.owned_terminal import LinuxOwnedTerminal
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
@@ -141,7 +142,7 @@ class SessionOpen(Input):
 
 
 # The local coordinator principal drives the Claude TUI, whose process is called "claude".
-PROCESS_ALIASES = {"local": "claude"}
+# One alias table, shared with adapter_for (kirabridge.cli_adapters.PROCESS_ALIASES).
 
 
 def process_is(process, target):
