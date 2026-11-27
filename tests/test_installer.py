@@ -1568,3 +1568,18 @@ def test_prune_install_history_keeps_five_backups_and_used_releases(installer, t
         "0.8-2",  # previous (rollback)
         "0.8-5",  # newest spare
     ]
+def test_db_backup_only_when_schema_version_changes(installer, tmp_path, monkeypatch):
+    db = tmp_path / "bridge.sqlite3"
+    with sqlite3.connect(db) as conn:
+        conn.execute("PRAGMA user_version=2")
+    monkeypatch.setattr(installer, "python", lambda release: "python")
+    monkeypatch.setattr(installer, "run", lambda *a, **k: b"2\n")
+    assert installer.db_backup_needed(db, object()) is False
+    monkeypatch.setattr(installer, "run", lambda *a, **k: b"3\n")
+    assert installer.db_backup_needed(db, object()) is True
+
+    def unknown(*a, **k):
+        raise RuntimeError("probe failed")
+
+    monkeypatch.setattr(installer, "run", unknown)
+    assert installer.db_backup_needed(db, object()) is True
