@@ -1944,6 +1944,30 @@ def validate_launcher_owner(args):
         raise RuntimeError("Unrecognized existing launcher preserved; manual migration required")
 
 
+def db_backup_needed(dbpath, release):
+    """Back the database up only when the target release changes its schema_version.
+
+    Rollback never restores a database backup (see require_queue_compatibility), so an
+    unchanged schema needs no copy. Unknown on either side means: back up.
+    """
+    try:
+        with sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True) as db:
+            current = db.execute("PRAGMA user_version").fetchone()[0]
+        target = run(
+            [
+                python(release),
+                "-c",
+                "from kirabridge.task_manager.store import SCHEMA_VERSION; print(SCHEMA_VERSION)",
+            ],
+            capture=True,
+            timeout=10,
+        )
+        text = target.decode() if isinstance(target, bytes) else str(target)
+        return int(text.strip().splitlines()[-1]) != current
+    except Exception:  # noqa: BLE001 - fail safe: unknown schema -> keep the backup
+        return True
+
+
 def require_queue_compatibility(config, release):
     """Old runtimes ignore delivery holds: never resume their worker on such a store."""
     path = state_file(config)
@@ -2097,7 +2121,7 @@ def activate(args, release):
         with idle_guard(args.config):
             require_queue_compatibility(args.config, release)
             dbpath = state_file(args.config)
-            if dbpath.exists():
+            if dbpath.exists() and db_backup_needed(dbpath, release):
                 with (
                     sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True) as reader,
                     sqlite3.connect(backup / "bridge.before.sqlite3") as writer,
