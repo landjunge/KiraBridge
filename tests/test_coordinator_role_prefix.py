@@ -105,8 +105,7 @@ def test_prefixed_prompt_matches_its_original_body_only(delivery):
 def test_role_text_fixed_rules_short():
     for term in (
         "Sonnet",
-        "Opus nur",
-        "schwierigen",
+        "Kein Opus",
         "Teamkanal",
         "NICHTS selbst",
         "ChatGPT",
@@ -116,4 +115,5 @@ def test_role_text_fixed_rules_short():
         assert term in ROLE_TEXT
     assert "optional" in ROLE_TEXT and "kein Muss" in ROLE_TEXT
     assert "zuerst die Skills" not in ROLE_TEXT
+    assert "Opus nur" not in ROLE_TEXT and "schwierigen" not in ROLE_TEXT
     assert len(ROLE_TEXT) < 1500
