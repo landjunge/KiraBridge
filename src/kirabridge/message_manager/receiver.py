@@ -180,8 +180,17 @@ class MessageReceiver:
                 continue  # already observed or waiting: the loop owns it
             try:
                 self._submit_new(row["sender"], row["id"])
-            except Exception:  # noqa: BLE001
-                continue
+            except Exception as error:  # noqa: BLE001 - visible, never silent
+                with self.bridge.store.transaction():
+                    self.bridge.store.audit(
+                        "message.ticket_admit_failed",
+                        row["sender"],
+                        None,
+                        {
+                            "message_id": row["id"],
+                            "error": f"{type(error).__name__}: {error}"[:300],
+                        },
+                    )
 
     def _submit_new(self, principal, message_id):
         row = self.bridge.store.db.execute(
@@ -1355,6 +1364,16 @@ class MessageReceiver:
                     "UPDATE message_jobs SET started=COALESCE(started,?) WHERE message_id=?",
                     (time.time(), message_id),
                 )
+            if str(message["idem"]).startswith("team:"):
+                # An acknowledgement (auto-ack, team ack) between the read-back and the input
+                # ends this delivery: the agent already handled the message.
+                current = self.bridge.store.db.execute(
+                    "SELECT acknowledged FROM messages WHERE id=?", (message_id,)
+                ).fetchone()
+                if current is not None and current["acknowledged"] is not None:
+                    raise BridgeError(
+                        "acknowledged_before_input", "Acknowledged before any input; not typed"
+                    )
             await progress(evidence)
             self.messages.mark_input_started(recipient, message_id)
             if delivery_event is not None:

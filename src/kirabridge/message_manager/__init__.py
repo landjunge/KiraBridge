@@ -7,9 +7,11 @@ import json
 import sqlite3
 import time
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, canonical, digest
 
@@ -22,12 +24,35 @@ class InterimSession(Input):
     expected_agent_pid: int = Field(gt=0)
 
 
+_TICKET_KEYS: ContextVar = ContextVar("internal_ticket_keys", default=False)
+
+
+@contextmanager
+def internal_ticket_keys():
+    """Only the team layer may build a MessageSend with the reserved `team:` key."""
+    token = _TICKET_KEYS.set(True)
+    try:
+        yield
+    finally:
+        _TICKET_KEYS.reset(token)
+
+
 class MessageSend(Input):
     recipient: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
     conversation_id: str = Field(min_length=1, max_length=128, pattern=r"^[\w-]+$")
     idempotency_key: str = Field(min_length=1, max_length=128)
     body: str = Field(min_length=1, max_length=65536)
     kind: Literal["question", "answer", "work", "result", "note"] = "question"
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def _reserved_prefix(cls, value):
+        # `team:` is the internal delivery-ticket namespace: tickets are hidden from every
+        # reader and delivery is reported into the team log, so callers must not use it.
+        if value.startswith("team:") and not _TICKET_KEYS.get():
+            raise ValueError("The idempotency key prefix 'team:' is reserved")
+        return value
+
     message_id: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[\w-]+$")
     reply_to: str | None = Field(default=None, min_length=1, max_length=128)
     task_id: str | None = Field(default=None, min_length=1, max_length=128)

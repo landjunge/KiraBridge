@@ -1289,7 +1289,8 @@ class TeamManager:
             or row["kind"] not in {"question", "work", "note"}
             or row["created"] < time.time() - self.bridge.config.queue_stale_seconds
             or self.store.db.execute(
-                "SELECT 1 FROM messages WHERE idem=?", (TICKET_PREFIX + message_id,)
+                "SELECT 1 FROM messages WHERE idem=? AND sender=?",
+                (TICKET_PREFIX + message_id, principal),
             ).fetchone()
             or not self._ticket_target(principal, row["recipient"], request.team_id)
         ):
@@ -1314,8 +1315,16 @@ class TeamManager:
                     SimpleNamespace(team_id=row["team_id"], body=row["body"], kind=row["kind"]),
                     row["id"],
                 )
-            except Exception:  # noqa: BLE001 - one bad row must not stop the rest
-                continue
+            except Exception as error:  # noqa: BLE001 - one bad row must not stop the rest
+                with self.store.transaction():
+                    self._event(
+                        row["team_id"],
+                        row["sender"],
+                        "team.message_delivery_failed",
+                        row["id"],
+                        error_code="ticket_restore_failed",
+                        error=f"{type(error).__name__}: {error}"[:300],
+                    )
 
     def _ticket_target(self, principal, recipient, team_id=None):
         """True when the visible handoff machine delivers to this recipient (never Codex)."""
@@ -1339,14 +1348,13 @@ class TeamManager:
         the machine reports back as team.message_delivered. Delivery is not an acknowledgement.
         A recipient with an existing wake (native ping, coordinator notification) never gets one.
         """
-        from kirabridge.message_manager import MessageSend
+        from kirabridge.message_manager import MessageSend, internal_ticket_keys
 
         if not self._ticket_target(principal, recipient, request.team_id):
             return
         try:
-            ticket = self.bridge.messages.send(
-                principal,
-                MessageSend(
+            with internal_ticket_keys():
+                ticket_message = MessageSend(
                     recipient=recipient,
                     conversation_id="team-" + message_id,
                     idempotency_key=TICKET_PREFIX + message_id,
@@ -1355,8 +1363,8 @@ class TeamManager:
                     kind=request.kind,
                     dispatch=True,
                     request_reply=False,
-                ),
-            )
+                )
+            ticket = self.bridge.messages.send(principal, ticket_message)
         except BridgeError as exc:
             self._event(
                 request.team_id,
@@ -1627,8 +1635,9 @@ class TeamManager:
                 )
                 # The delivery ticket is the same message: a later wake must not type it again.
                 self.store.db.execute(
-                    "UPDATE messages SET acknowledged=? WHERE idem=? AND acknowledged IS NULL",
-                    (now, "team:" + message_id),
+                    "UPDATE messages SET acknowledged=? WHERE idem=? AND sender=? "
+                    "AND recipient=? AND acknowledged IS NULL",
+                    (now, "team:" + message_id, message["sender"], principal),
                 )
                 self._event(team_id, principal, "team.message_acknowledged", message_id)
         return self._message(team_id, message_id)

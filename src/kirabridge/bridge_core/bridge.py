@@ -1234,8 +1234,14 @@ class Bridge:
             await self.team_dispatcher.start()
             try:
                 self.teams.restore_tickets()
-            except Exception:  # noqa: BLE001 - a restore fault never blocks start
-                pass
+            except Exception as error:  # noqa: BLE001 - a restore fault never blocks start
+                with self.store.transaction():
+                    self.store.audit(
+                        "team.ticket_restore_failed",
+                        "local",
+                        None,
+                        {"error": f"{type(error).__name__}: {error}"[:300]},
+                    )
             if self.config.visible_handoffs.bindings and sys.platform == "darwin":
                 self._binding_task = asyncio.create_task(self._binding_refresher())
         except BaseException:

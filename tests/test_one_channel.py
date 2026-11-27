@@ -314,3 +314,56 @@ def test_start_admits_a_pristine_queued_ticket_once_not_a_waiting_one(domain, mo
     monkeypatch.setattr(receiver, "_submit_new", lambda p, m: submitted.append(m))
     receiver._admit_pristine_tickets()
     assert submitted == [pristine["id"]]
+
+
+def test_team_prefix_idempotency_key_is_reserved_for_internal_tickets(domain):
+    with pytest.raises(ValueError):
+        MessageSend(
+            recipient="grok", conversation_id="c", idempotency_key="team:x", body="b", kind="note"
+        )
+    # the internal ticket path still works
+    wire(domain, "chatgpt")
+    to_coordinator(domain, "reserved-ok")
+    assert len(tickets(domain)) == 1
+
+
+def test_restore_tickets_failure_is_visible_not_swallowed(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    _fail_ticket_once(domain, monkeypatch)
+    sent = to_coordinator(domain, "restore-boom")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setattr(domain, "_delivery_ticket", boom)
+    domain.restore_tickets()
+    event = domain.store.db.execute(
+        "SELECT metadata FROM team_events WHERE kind='team.message_delivery_failed' "
+        "AND object_id=?",
+        (sent["id"],),
+    ).fetchone()
+    assert event is not None and "disk on fire" in event["metadata"]
+
+
+def test_double_start_restores_exactly_one_ticket_and_one_job(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    real = _fail_ticket_once(domain, monkeypatch)
+    to_coordinator(domain, "double")
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    domain.restore_tickets()
+    domain.restore_tickets()
+    assert len(tickets(domain)) == 1
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
+
+
+def test_ack_closes_only_the_ticket_of_that_sender_and_recipient(domain):
+    wire(domain, "chatgpt")
+    sent = to_coordinator(domain, "scoped")
+    ticket = tickets(domain)[0]
+    # a legacy message that merely uses the same idem text from another sender stays untouched
+    domain.store.db.execute("UPDATE messages SET sender='codex' WHERE id=?", (ticket["id"],))
+    domain.alias_ack("chatgpt", sent["id"])
+    row = domain.store.db.execute(
+        "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
+    ).fetchone()
+    assert row["acknowledged"] is None
