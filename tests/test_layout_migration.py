@@ -1,4 +1,3 @@
-import json
 import plistlib
 import subprocess
 import sys
