@@ -8,6 +8,7 @@ import shlex
 import sqlite3
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1484,6 +1485,46 @@ def test_evidence_linked_unknown_handoff_with_active_sibling_is_busy(
     installer, monkeypatch, tmp_path
 ):
     config = _evidence_linked_job(installer, monkeypatch, tmp_path, extra_active=True)
+    with pytest.raises(RuntimeError, match="BUSY"):
+        with installer.idle_guard(config):
+            pytest.fail("must block")
+
+
+def _retry_job(installer, monkeypatch, tmp_path, *, deadline_offset, attempted=False):
+    config, task_id = _idle_guard_fixture(tmp_path)
+    db = sqlite3.connect(tmp_path / "state" / "bridge.sqlite3")
+    db.execute("ALTER TABLE message_jobs ADD COLUMN evidence TEXT NOT NULL DEFAULT '{}'")
+    evidence = {
+        "phase": "receiver_connect",
+        "terminal_input_attempted": attempted,
+        "waiting_for_receiver": True,
+        "receiver_retry": {"deadline": time.time() + deadline_offset},
+    }
+    db.execute("INSERT INTO message_jobs VALUES('retry-job','queued',?)", (json.dumps(evidence),))
+    db.commit()
+    db.close()
+    _authorize_current_terminal_task(installer, monkeypatch, task_id)
+    return config
+
+
+def test_expired_receiver_retry_without_input_is_reported_not_busy(
+    installer, monkeypatch, tmp_path
+):
+    config = _retry_job(installer, monkeypatch, tmp_path, deadline_offset=-60)
+    lines = []
+    monkeypatch.setattr(installer, "report", lambda kind, msg, **kw: lines.append((kind, msg)))
+    with installer.idle_guard(config):
+        pass
+    assert any(k == "warn" and "retry-job" in m for k, m in lines)
+
+
+@pytest.mark.parametrize(("offset", "attempted"), [(300, False), (-60, True)])
+def test_open_retry_or_attempted_input_is_still_busy(
+    installer, monkeypatch, tmp_path, offset, attempted
+):
+    config = _retry_job(
+        installer, monkeypatch, tmp_path, deadline_offset=offset, attempted=attempted
+    )
     with pytest.raises(RuntimeError, match="BUSY"):
         with installer.idle_guard(config):
             pytest.fail("must block")
