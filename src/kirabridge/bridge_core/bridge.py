@@ -328,26 +328,62 @@ class Bridge:
         # Let the first explicit inventory/doctor request probe immediately;
         # the periodic observer begins after one interval.
         next_cli_version_probe = time.monotonic() + 30.0
+        next_cli_version_force = time.monotonic() + self.config.cli_version_probe_seconds
         self._cli_version_probe_task = None
+        cli_probe_cache: dict = {}
+        cli_stable: dict[str, frozenset] = {}
+        cli_pending: dict[str, frozenset] = {}
 
-        async def refresh_cli_versions():
+        async def refresh_cli_versions(force=False):
             from kirabridge.agent_manager.cli_versions import inventory as cli_inventory
             from kirabridge.discovery import _record_cli_versions
 
             try:
-                rows = await cli_inventory(self.config.agents, list(self.config.agents), set())
-                _record_cli_versions(self, rows)
+                rows = await cli_inventory(
+                    self.config.agents,
+                    list(self.config.agents),
+                    set(),
+                    cache=cli_probe_cache,
+                    force=force,
+                    sequential=True,
+                )
+                # Debounce: a changed installation set is recorded only after two equal
+                # observations in a row; the first observation of a CLI is the baseline.
+                seen: dict[str, set] = {}
+                for row in rows:
+                    if row.get("version"):
+                        seen.setdefault(row["cli"], set()).add((row["executable"], row["version"]))
+                confirmed = set()
+                for cli, identity in seen.items():
+                    identity = frozenset(identity)
+                    if cli not in cli_stable:
+                        cli_stable[cli] = identity
+                        confirmed.add(cli)
+                    elif identity == cli_stable[cli]:
+                        cli_pending.pop(cli, None)
+                    elif cli_pending.get(cli) == identity:
+                        cli_stable[cli] = identity
+                        cli_pending.pop(cli, None)
+                        confirmed.add(cli)
+                    else:
+                        cli_pending[cli] = identity
+                _record_cli_versions(self, [row for row in rows if row["cli"] in confirmed])
             except Exception:
                 # A failed local version probe must not interrupt task/message maintenance.
                 return
 
         def maintain():
-            nonlocal next_prune, next_cli_version_probe
+            nonlocal next_prune, next_cli_version_probe, next_cli_version_force
             self.messages.voice_policy.expire()
             if time.monotonic() >= next_cli_version_probe:
                 next_cli_version_probe = time.monotonic() + 30.0
+                force = time.monotonic() >= next_cli_version_force
+                if force:
+                    next_cli_version_force = (
+                        time.monotonic() + self.config.cli_version_probe_seconds
+                    )
                 if self._cli_version_probe_task is None or self._cli_version_probe_task.done():
-                    self._cli_version_probe_task = asyncio.create_task(refresh_cli_versions())
+                    self._cli_version_probe_task = asyncio.create_task(refresh_cli_versions(force))
             # Tidying runs often enough to stay current, not on every idle worker wake-up:
             # capture() still prunes before every write, so nothing is ever left expired.
             if time.monotonic() >= next_prune:
