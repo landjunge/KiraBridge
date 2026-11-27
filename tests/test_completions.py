@@ -551,3 +551,37 @@ def test_ack_all_marks_only_own_notices_up_to_the_cutoff_and_deletes_nothing(bri
     assert audit == 2
     with pytest.raises(BridgeError):
         bridge.completions.ack_all("local", -1)
+
+
+def test_maintain_auto_acks_orphan_targets_and_prunes_only_old_acknowledged(bridge):
+    import time
+
+    now = time.time()
+    day = 24 * 3600
+    rows = [
+        ("n-old-default", "default", now - 2 * day, None),
+        ("n-new-default", "default", now - 3600, None),
+        ("n-old-other", "mine", now - 30 * day, None),
+        ("n-old-watch", "ki-gesamtabschluss-watch", now - 2 * day, None),
+        ("n-acked-old", "mine", now - 30 * day, now - 8 * day),
+        ("n-acked-new", "mine", now - 30 * day, now - day),
+    ]
+    for i, (nid, target, created, acked) in enumerate(rows):
+        bridge.store.db.execute(
+            "INSERT INTO completion_notices(id,principal,target,source,source_id,event_seq,"
+            "payload,created,acknowledged) VALUES(?,?,?,?,?,?,?,?,?)",
+            (nid, "local", target, "task", "t", i + 1000, "{}", created, acked),
+        )
+    bridge.completions.maintain()
+    state = {
+        r[0]: r[1]
+        for r in bridge.store.db.execute("SELECT id,acknowledged FROM completion_notices")
+    }
+    assert "n-acked-old" not in state
+    assert state["n-old-default"] is not None and state["n-old-watch"] is not None
+    assert state["n-new-default"] is None and state["n-old-other"] is None
+    assert state["n-acked-new"] is not None
+    audit = bridge.store.db.execute(
+        "SELECT metadata FROM audit WHERE kind='completion.auto_acknowledged'"
+    ).fetchall()
+    assert len(audit) == 1 and json.loads(audit[0][0])["count"] == 2
