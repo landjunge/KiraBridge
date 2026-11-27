@@ -1574,8 +1574,14 @@ class TeamManager:
             if message["recipient"] != principal:
                 raise BridgeError("not_found", "Incoming team message not found")
             if message["acknowledged"] is None:
+                now = time.time()
                 self.store.db.execute(
-                    "UPDATE team_messages SET acknowledged=? WHERE id=?", (time.time(), message_id)
+                    "UPDATE team_messages SET acknowledged=? WHERE id=?", (now, message_id)
+                )
+                # The delivery ticket is the same message: a later wake must not type it again.
+                self.store.db.execute(
+                    "UPDATE messages SET acknowledged=? WHERE idem=? AND acknowledged IS NULL",
+                    (now, "team:" + message_id),
                 )
                 self._event(team_id, principal, "team.message_acknowledged", message_id)
         return self._message(team_id, message_id)

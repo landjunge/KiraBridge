@@ -173,6 +173,11 @@ def auto_acknowledge(bridge, principal, items, senders=None):
                 db.execute(
                     "UPDATE team_messages SET acknowledged=? WHERE id=?", (time.time(), item["id"])
                 )
+                # Close the delivery ticket too, so a later wake cannot type it again.
+                db.execute(
+                    "UPDATE messages SET acknowledged=? WHERE idem=? AND acknowledged IS NULL",
+                    (time.time(), "team:" + item["id"]),
+                )
                 db.execute(
                     "INSERT INTO team_events(team_id,at,kind,principal,object_id,metadata) "
                     "VALUES(?,?,?,?,?,?)",
