@@ -52,6 +52,9 @@ FIELDS = {
 ARCHIVE = "diagnostic-archive.jsonl"
 ARCHIVE_SEGMENT_BYTES = 16 * 1024 * 1024
 ARCHIVE_SEGMENTS = 8  # rotated segments kept; each removal is anchored in the audit chain
+ARCHIVE_MAX_AGE = 7 * 24 * 3600  # rotated segments older than this are removed (anchored)
+ARCHIVE_SEGMENT_AGE = 24 * 3600  # the current segment is closed after a day, so age is exact
+ARCHIVE_DAILY_BYTES = 32 * 1024 * 1024  # per observer and day; a data limit, not a message limit
 
 
 def _tail(path: Path):
@@ -74,6 +77,32 @@ def archive_segments(directory: Path) -> list[Path]:
     return rotated + ([current] if current.exists() else [])
 
 
+def _first_at(path: Path, default: float) -> float:
+    with open(path, "rb") as handle:
+        first = handle.readline(65536)
+    try:
+        return json.loads(first)["at"]
+    except (ValueError, KeyError, TypeError):
+        return default
+
+
+def _remove_segments(store, paths, last) -> None:
+    """Age expiry of whole rotated segments, anchored like every other removal."""
+    store.audit(
+        "audit.diagnostic_archive_rotated",
+        "local",
+        None,
+        {
+            "reason": "age",
+            "last_seq": last["seq"] if last else None,
+            "last_hash": last["hash"] if last else None,
+            "removed_segments": [x.name for x in paths],
+        },
+    )
+    for path in paths:
+        path.unlink(missing_ok=True)
+
+
 def append_archive(store, directory: Path, kind, principal, task_id, metadata) -> None:
     """Overflow hash chain. Caller holds the SQLite write lock, which serializes
     appends across processes; hot SQLite rows are never deleted or rewritten."""
@@ -91,7 +120,15 @@ def append_archive(store, directory: Path, kind, principal, task_id, metadata) -
     }
     record["hash"] = digest(record)
     line = (canonical(record) + "\n").encode()
-    if current.exists() and current.stat().st_size + len(line) > ARCHIVE_SEGMENT_BYTES:
+    expired = [
+        x for x in segments if x != current and x.stat().st_mtime < record["at"] - ARCHIVE_MAX_AGE
+    ]
+    if expired:
+        _remove_segments(store, expired, last)
+    if current.exists() and (
+        current.stat().st_size + len(line) > ARCHIVE_SEGMENT_BYTES
+        or _first_at(current, record["at"]) < record["at"] - ARCHIVE_SEGMENT_AGE
+    ):
         rotated = directory / f"diagnostic-archive.{last['seq']:012d}.jsonl"
         os.replace(current, rotated)
         old = sorted(directory.glob("diagnostic-archive.*.jsonl"))[:-ARCHIVE_SEGMENTS]
@@ -153,6 +190,7 @@ class AuditObserver:
         self.config, self.principal, self.runtime = config, principal, runtime_ref(runtime)
         self.store, self.owned = store, store is None
         self.dropped = self.archived = 0
+        self._day = self._day_bytes = 0
 
     def status(self) -> dict:
         policy = self.config.diagnostics
@@ -212,6 +250,13 @@ class AuditObserver:
             )
             with self.store.transaction():
                 if routine or self.status()["recording"] != "available":
+                    day = int(time.time() // 86400)
+                    if day != self._day:
+                        self._day, self._day_bytes = day, 0
+                    self._day_bytes += len(canonical(data)) + 200
+                    if self._day_bytes > ARCHIVE_DAILY_BYTES:
+                        self.dropped += 1
+                        return False
                     append_archive(
                         self.store,
                         self.config.state_path,

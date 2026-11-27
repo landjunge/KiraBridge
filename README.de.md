@@ -364,3 +364,4 @@ Die Zeilen der nativen Seitenleiste sind per Tastatur bedienbar (Auf/Ab/Pos1/End
 
 Nach verifizierter Installation behält der Installer höchstens 5 Rollback-Backups (das aktive plus die 4 jüngsten) und das aktive, das vorherige und ein weiteres Release, nie ein von einem Dienst genutztes.
 Completion-Notices werden in kleinen Batches aufgeräumt: quittierte Notices werden 7 Tage nach der Quittierung gelöscht (nie unquittierte); Notices der unbeaufsichtigten Watch-Ziele `default` und `ki-gesamtabschluss-watch` gelten nach 24 h als quittiert, mit Audit-Eintrag samt Anzahl.
+Das Diagnose-Überlaufarchiv schließt sein Segment täglich, entfernt rotierte Segmente nach 7 Tagen (jede Entfernung als Anker in der Audit-Kette) und begrenzt Archiv-Schreibvorgänge auf 32 MiB pro Tag und Prozess; vorhandene Audit-Zeilen bleiben unberührt.
