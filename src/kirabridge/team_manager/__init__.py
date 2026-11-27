@@ -1334,12 +1334,21 @@ class TeamManager:
                     )
 
     def _ticket_target(self, principal, recipient, team_id=None):
-        """True when the visible handoff machine delivers to this recipient (never Codex)."""
+        """True when the visible handoff machine delivers to this recipient.
+
+        Exception: the Codex coordinator keeps its native ping / inbox notification.
+        """
         from kirabridge.voice_channel import VOICE_PRINCIPALS
 
         handoffs = self.config.visible_handoffs
-        # Codex keeps its existing wake (native ping / coordinator inbox notification).
-        native = recipient == "codex"
+        # The Codex COORDINATOR keeps its existing wake (native ping / coordinator inbox
+        # notification). Codex as a worker is woken like every bound worker: by a ticket.
+        native = False
+        if recipient == "codex" and team_id is not None:
+            row = self.store.db.execute(
+                "SELECT coordinator FROM teams WHERE id=?", (team_id,)
+            ).fetchone()
+            native = row is not None and row["coordinator"] == "codex"
         return (
             principal != recipient
             and {principal, recipient} != VOICE_PRINCIPALS
@@ -1357,6 +1366,8 @@ class TeamManager:
         """
         from kirabridge.message_manager import MessageSend, internal_ticket_keys
 
+        if request.kind not in {"question", "work", "note"}:
+            return None  # answers and results never wake
         if not self._ticket_target(principal, recipient, request.team_id):
             return None
         try:
@@ -1388,8 +1399,6 @@ class TeamManager:
     def _inbox_only_reason(self, recipient, kind):
         if kind not in {"question", "work", "note"}:
             return "kind_not_waking"
-        if recipient == "codex":
-            return "codex_wakes_only_as_coordinator"
         if recipient not in self.config.visible_handoffs.bindings:
             return "no_visible_binding"
         return "no_wake_route"

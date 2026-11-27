@@ -3,6 +3,7 @@
 import time
 
 import pytest
+from test_team_manager import create as create_team
 from test_team_manager import domain as imported_domain
 from test_team_manager import message, role
 
@@ -384,12 +385,92 @@ def test_wake_state_is_in_the_send_result_for_ticket_failure_and_inbox_only(doma
     assert (quiet["wake_state"], quiet["wake_reason"]) == ("inbox_only", "no_visible_binding")
 
 
-def test_codex_worker_message_reports_inbox_only_with_a_reason(domain):
-    wire(domain, "codex")
+def _worker_team(domain, worker):
+    """A team whose coordinator is chatgpt and whose worker is the given bound principal."""
+    from kirabridge.bridge_core.config import TeamWorkerConfig
+
+    wire(domain)  # message capabilities and receivers of the four standard principals
+    cfg = domain.config
+    if worker not in cfg.principals:
+        cfg.principals[worker] = cfg.principals["local"].model_copy(deep=True)
+    root = cfg.principals["local"].roots[0]
+    policy = cfg.principals[worker]
+    policy.capabilities = list(set(policy.capabilities) | {"message.send", "message.read"})
+    policy.capabilities = list(set(policy.capabilities) | {"agent.execute", "team.write"})
+    policy.message_peers = ["chatgpt", "codex", "grok", "local", "qwen"]
+    policy.agents = sorted(set(policy.agents) | {worker})
+    cfg.team.workers[worker] = TeamWorkerConfig(agent=worker, cwd=root)
+    cfg.agents.setdefault(worker, AgentConfig(kind="codex"))
+    cfg.messaging.receivers[worker] = ReceiverConfig(cwd=root, timeout=3)
+    for name in ("chatgpt", "local"):
+        cfg.principals[name].message_peers = sorted(
+            set(cfg.principals[name].message_peers) | {worker}
+        )
+        cfg.principals[name].agents = sorted(set(cfg.principals[name].agents) | {worker})
+    cfg.visible_handoffs.enabled = True
+    cfg.visible_handoffs.bindings[worker] = VisibleTerminalBinding(
+        pane_id="terminal:7:ttys00" + str(len(worker) % 9),
+        expected_pid=11,
+        agent_pid=12,
+        ready_pattern="ready",
+        busy_pattern="esc to interrupt",
+    )
+    team_id = "wteam-" + worker
+    domain.create(
+        "local",
+        create_team(
+            team_id=team_id,
+            members={"local": "worker", "chatgpt": "coordinator", worker: "worker"},
+            idempotency_key="create-" + worker,
+        ),
+    )
+    return team_id
+
+
+@pytest.mark.parametrize("worker", ["codex", "qwen"])
+def test_worker_with_a_bound_terminal_gets_the_hidden_ticket_and_one_job(domain, worker):
+    team_id = _worker_team(domain, worker)
     sent = domain.send(
-        "chatgpt", message(team_id="test-team", recipient="codex", idempotency_key="w-codex")
+        "chatgpt", message(team_id=team_id, recipient=worker, idempotency_key="wk-" + worker)
     )
-    assert (sent["wake_state"], sent["wake_reason"]) == (
-        "inbox_only",
-        "codex_wakes_only_as_coordinator",
+    assert (sent["wake_state"], sent["wake_reason"]) == ("waking", "delivery_ticket")
+    rows = tickets(domain)
+    assert [r["idem"] for r in rows] == ["team:" + sent["id"]]
+    assert rows[0]["recipient"] == worker
+    job_count = domain.store.db.execute(
+        "SELECT count(*) FROM message_jobs WHERE message_id=?", (rows[0]["id"],)
+    ).fetchone()[0]
+    assert job_count == 1
+    # replay: no second ticket, no second job
+    domain.send(
+        "chatgpt", message(team_id=team_id, recipient=worker, idempotency_key="wk-" + worker)
     )
+    assert len(tickets(domain)) == 1
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
+    # answers and results never wake
+    answer = domain.send(
+        "chatgpt",
+        message(team_id=team_id, recipient=worker, kind="answer", idempotency_key="ans-" + worker),
+    )
+    assert "wake_state" not in answer and len(tickets(domain)) == 1
+    # the worker's team ack closes the ticket (no double delivery later)
+    domain.ack(worker, team_id, sent["id"])
+    closed = domain.store.db.execute(
+        "SELECT acknowledged FROM messages WHERE id=?", (rows[0]["id"],)
+    ).fetchone()
+    assert closed["acknowledged"] is not None
+
+
+def test_worker_without_a_binding_is_inbox_only_and_nobody_outside_the_team_is_woken(domain):
+    team_id = _worker_team(domain, "qwen")
+    del domain.config.visible_handoffs.bindings["qwen"]
+    sent = domain.send(
+        "chatgpt", message(team_id=team_id, recipient="qwen", idempotency_key="wk-nobinding")
+    )
+    assert (sent["wake_state"], sent["wake_reason"]) == ("inbox_only", "no_visible_binding")
+    assert tickets(domain) == []
+    with pytest.raises(BridgeError):  # not a member of this team: nothing is created at all
+        domain.send(
+            "chatgpt", message(team_id=team_id, recipient="grok", idempotency_key="wk-stranger")
+        )
+    assert tickets(domain) == []
