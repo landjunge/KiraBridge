@@ -1432,6 +1432,17 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """
         return safe(lambda: bridge.completions.ack(identity(ctx), notice_id, receipt))
 
+    @server.tool(annotations=delivery)
+    def completion_ack_all(
+        before_seq: int, ctx: Context, target: str = "default"
+    ) -> dict[str, Any]:
+        """Acknowledge ALL your own unacknowledged completion notices up to before_seq at once.
+
+        For a large backlog. Only your own notices; nothing is deleted. The count is audited.
+        Notices newer than before_seq (see their seq in completion_receive) stay open.
+        """
+        return safe(lambda: bridge.completions.ack_all(identity(ctx), before_seq, target))
+
     @server.tool(annotations=write)
     async def message_release(message_id: str, token: str, ctx: Context) -> dict[str, Any]:
         """Release your exact waiting voice message with Daniel's later go-go-go token.

@@ -343,3 +343,44 @@ class CompletionManager:
             "ack_scope": "consumer_processed",
             "chatgpt_chat_delivery": "unverified",
         }
+
+    def ack_all(self, principal, before_seq, target="default"):
+        """Mark the caller's OWN unacknowledged notices up to `before_seq` as acknowledged.
+
+        One step for a large backlog. Nothing is deleted, no limit applies, receipts are not
+        required (this is an explicit consumer decision, audited with the count). Only notices
+        of the calling principal and of sources its capabilities allow are touched.
+        """
+        valid_target(target)
+        if type(before_seq) is not int or before_seq < 0:
+            raise BridgeError("invalid_arguments", "before_seq must be a nonnegative integer")
+        policy = self.security.principal(principal)
+        allowed = [
+            source for source, cap in SOURCE_CAPABILITIES.items() if cap in policy.capabilities
+        ]
+        if not allowed:
+            raise BridgeError(
+                "capability_denied", "Own task.read, message.read or team.read required"
+            )
+        marks = ",".join("?" for _ in allowed)
+        now = time.time()
+        with self.store.transaction():
+            count = self.store.db.execute(
+                "UPDATE completion_notices SET acknowledged=? WHERE principal=? AND target=? "
+                "AND seq<=? AND acknowledged IS NULL AND source IN (" + marks + ") "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE h.queue_id='completions' "
+                "AND h.item_id=completion_notices.id)",
+                (now, principal, target, before_seq, *allowed),
+            ).rowcount
+            self.store.audit(
+                "completion.bulk_acknowledged",
+                principal,
+                None,
+                {"target": target, "before_seq": before_seq, "count": count},
+            )
+        return {
+            "acknowledged_count": count,
+            "before_seq": before_seq,
+            "ack_scope": "consumer_bulk_decision",
+            "chatgpt_chat_delivery": "unverified",
+        }
