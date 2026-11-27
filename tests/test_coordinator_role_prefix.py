@@ -114,4 +114,6 @@ def test_role_text_fixed_rules_short():
         "design-taste-frontend",
     ):
         assert term in ROLE_TEXT
+    assert "optional" in ROLE_TEXT and "kein Muss" in ROLE_TEXT
+    assert "zuerst die Skills" not in ROLE_TEXT
     assert len(ROLE_TEXT) < 1500
