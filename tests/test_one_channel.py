@@ -102,9 +102,21 @@ def test_message_to_a_bound_worker_creates_one_ticket_and_replay_none(domain):
     assert rows[0]["recipient"] == "grok"
 
 
-def test_worker_without_terminal_and_non_members_get_no_ticket(domain):
+def test_automatic_worker_without_a_terminal_still_gets_the_headless_ticket(domain):
+    """codex is an automatic worker (team.workers + messaging.receivers) with no visible
+    binding here; it must still get exactly one ticket, delivered through the headless
+    (separate_managed_session) receiver lane, not left inbox-only like a true manual member.
+    """
     wire(domain, "grok")
-    domain.send("local", message(recipient="codex", idempotency_key="w2"))  # codex: own wake
+    sent = domain.send("local", message(recipient="codex", idempotency_key="w2"))
+    assert (sent["wake_state"], sent["wake_reason"]) == ("waking", "delivery_ticket")
+    rows = tickets(domain)
+    assert [r["idem"] for r in rows] == ["team:" + sent["id"]]
+    assert rows[0]["recipient"] == "codex"
+
+
+def test_non_member_gets_no_ticket_and_no_new_message(domain):
+    wire(domain, "grok")
     with pytest.raises(BridgeError):
         domain.send("outsider", message(recipient="grok", idempotency_key="w3"))
     assert tickets(domain) == []
@@ -123,11 +135,25 @@ def test_message_send_alias_lands_in_the_team_log_with_one_ticket(domain):
 
 def test_message_send_alias_keeps_the_legacy_path_where_no_ticket_delivers(domain):
     wire(domain, "grok")
-    for recipient in ("codex", "unknown", "local"):
+    for recipient in ("unknown", "local"):
         request = MessageSend(
             recipient=recipient, conversation_id="c", idempotency_key="a2", body="hi"
         )
         assert domain.alias_send("local", request) is None
+
+
+def test_message_send_alias_now_routes_an_automatic_worker_through_team_send(domain):
+    """codex is automatic-execution (team.workers + messaging.receivers); the alias must
+    route it through team send and its headless ticket, not silently drop to no-op.
+    """
+    wire(domain, "grok")
+    request = MessageSend(
+        recipient="codex", conversation_id="c", idempotency_key="a3", body="hi", kind="note"
+    )
+    stored = domain.alias_send("local", request)
+    assert stored is not None and stored["deprecated"] and stored["team_id"] == "test-team"
+    assert len(tickets(domain)) == 1
+    assert tickets(domain)[0]["recipient"] == "codex"
 
 
 def test_delivery_outcome_is_written_back_to_the_team_log(domain):
@@ -355,6 +381,30 @@ def test_double_start_restores_exactly_one_ticket_and_one_job(domain, monkeypatc
     assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
 
 
+def test_automatic_worker_ticket_survives_restart_restore_as_exactly_one_job(domain, monkeypatch):
+    """A team send to an automatic (headless, unbound) worker must drive exactly one
+    message_jobs row end to end: the lost-ticket replay and the restart restore give it
+    the same single-dispatch guarantee the visible/bound lane already has, with no
+    second ticket and no second job appearing from either path.
+    """
+    wire(domain, "grok")
+    real = _fail_ticket_once(domain, monkeypatch)
+    sent = domain.send("local", message(recipient="codex", idempotency_key="auto-once"))
+    assert tickets(domain) == []  # ticket write failed (simulated drain); message is stored
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    again = domain.send(
+        "local", message(recipient="codex", idempotency_key="auto-once")
+    )  # caller retries with the same key
+    assert again["id"] == sent["id"]
+    assert len(tickets(domain)) == 1
+    domain.send("local", message(recipient="codex", idempotency_key="auto-once"))
+    assert len(tickets(domain)) == 1  # never a second one
+    domain.restore_tickets()
+    domain.restore_tickets()
+    assert len(tickets(domain)) == 1
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
+
+
 def test_ack_closes_only_the_ticket_of_that_sender_and_recipient(domain):
     wire(domain, "chatgpt")
     sent = to_coordinator(domain, "scoped")
@@ -459,16 +509,36 @@ def test_worker_with_a_bound_terminal_gets_the_hidden_ticket_and_one_job(domain,
     assert closed["acknowledged"] is not None
 
 
-def test_worker_without_a_binding_is_inbox_only_and_nobody_outside_the_team_is_woken(domain):
+def test_automatic_worker_without_a_binding_still_gets_the_headless_ticket(domain):
+    """qwen is both bound and automatic in _worker_team. Removing only the visible binding
+    must not drop it to inbox-only: its automatic (messaging.receivers) lane still wakes it,
+    exactly the incident this step fixes (team send to an automatic worker going unanswered).
+    """
     team_id = _worker_team(domain, "qwen")
     del domain.config.visible_handoffs.bindings["qwen"]
     sent = domain.send(
         "chatgpt", message(team_id=team_id, recipient="qwen", idempotency_key="wk-nobinding")
     )
-    assert (sent["wake_state"], sent["wake_reason"]) == ("inbox_only", "no_visible_binding")
-    assert tickets(domain) == []
+    assert (sent["wake_state"], sent["wake_reason"]) == ("waking", "delivery_ticket")
+    rows = tickets(domain)
+    assert [r["idem"] for r in rows] == ["team:" + sent["id"]]
+    assert rows[0]["recipient"] == "qwen"
     with pytest.raises(BridgeError):  # not a member of this team: nothing is created at all
         domain.send(
             "chatgpt", message(team_id=team_id, recipient="grok", idempotency_key="wk-stranger")
         )
+    assert len(tickets(domain)) == 1
+
+
+def test_truly_manual_worker_without_binding_or_receiver_stays_inbox_only(domain):
+    """A genuinely manual member (no agent/cwd, no messaging.receivers entry) must keep
+    today's behavior: no wake route at all, message stays inbox-only.
+    """
+    team_id = _worker_team(domain, "qwen")
+    domain.config.team.workers["qwen"].agent = None
+    del domain.config.visible_handoffs.bindings["qwen"]
+    sent = domain.send(
+        "chatgpt", message(team_id=team_id, recipient="qwen", idempotency_key="wk-manual")
+    )
+    assert (sent["wake_state"], sent["wake_reason"]) == ("inbox_only", "no_visible_binding")
     assert tickets(domain) == []

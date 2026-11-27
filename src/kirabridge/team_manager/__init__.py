@@ -1330,8 +1330,29 @@ class TeamManager:
                         error=f"{type(error).__name__}: {error}"[:300],
                     )
 
+    def _automatic_execution_receiver(self, recipient):
+        """True when this recipient is the operator's automatic-execution worker.
+
+        ``execution: "automatic"`` (see ``_view_team``) means ``config.team.workers``
+        names an agent and a fixed cwd for this principal. That alone is only a
+        work/delegate consent; the headless message_jobs receiver channel also needs
+        its own ``config.messaging.receivers`` entry to actually dispatch a ticket
+        without a visible terminal. Both together are the existing automatic lane;
+        either one missing leaves this recipient without a wake route, same as today.
+        """
+        worker = self.config.team.workers.get(recipient)
+        return bool(
+            worker and worker.agent and worker.cwd and recipient in self.config.messaging.receivers
+        )
+
     def _ticket_target(self, principal, recipient, team_id=None):
-        """True when the visible handoff machine delivers to this recipient.
+        """True when an existing delivery machine (visible or automatic) wakes this recipient.
+
+        Two existing machines qualify: the visible handoff terminal binding (manual/
+        visible-terminal recipients) and the headless receiver channel that message_jobs
+        already runs for an operator-configured automatic worker. Either one makes a
+        ticket meaningful; without either, there is still no wake route and the message
+        stays inbox-only, exactly as before.
 
         Exception: the Codex coordinator keeps its native ping / inbox notification.
         """
@@ -1339,7 +1360,8 @@ class TeamManager:
 
         handoffs = self.config.visible_handoffs
         # The Codex COORDINATOR keeps its existing wake (native ping / coordinator inbox
-        # notification). Codex as a worker is woken like every bound worker: by a ticket.
+        # notification). Codex as a worker is woken like every bound or automatic worker:
+        # by a ticket.
         native = False
         if recipient == "codex" and team_id is not None:
             row = self.store.db.execute(
@@ -1350,7 +1372,7 @@ class TeamManager:
             principal != recipient
             and {principal, recipient} != VOICE_PRINCIPALS
             and recipient in self.config.principals
-            and recipient in handoffs.bindings
+            and (recipient in handoffs.bindings or self._automatic_execution_receiver(recipient))
             and not native
         )
 
@@ -1399,7 +1421,9 @@ class TeamManager:
     def _inbox_only_reason(self, recipient, kind):
         if kind not in {"question", "work", "note"}:
             return "kind_not_waking"
-        if recipient not in self.config.visible_handoffs.bindings:
+        if recipient not in self.config.visible_handoffs.bindings and not (
+            self._automatic_execution_receiver(recipient)
+        ):
             return "no_visible_binding"
         return "no_wake_route"
 
