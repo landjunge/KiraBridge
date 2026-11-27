@@ -256,3 +256,114 @@ def test_auto_ack_by_inbox_read_closes_the_delivery_ticket(domain):
         "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
     ).fetchone()
     assert row["acknowledged"] is not None
+
+
+def _fail_ticket_once(domain, monkeypatch):
+    real = domain.bridge.messages.send
+
+    def refuse(*args, **kwargs):
+        raise BridgeError("receiver_unavailable", "draining")
+
+    monkeypatch.setattr(domain.bridge.messages, "send", refuse)
+    return real
+
+
+def test_replay_restores_a_ticket_lost_in_the_install_or_drain_window(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    real = _fail_ticket_once(domain, monkeypatch)
+    first = to_coordinator(domain, "lost-ticket")
+    assert tickets(domain) == []  # message stored, ticket refused (draining)
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    again = to_coordinator(domain, "lost-ticket")  # the caller retries with the same key
+    assert again["id"] == first["id"]
+    assert len(tickets(domain)) == 1
+    to_coordinator(domain, "lost-ticket")
+    assert len(tickets(domain)) == 1  # never a second one
+
+
+def test_restore_tickets_at_start_is_idempotent_and_skips_acknowledged_and_old(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    real = _fail_ticket_once(domain, monkeypatch)
+    open_one = to_coordinator(domain, "r-open")
+    acked = to_coordinator(domain, "r-acked")
+    old = to_coordinator(domain, "r-old")
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    domain.alias_ack("chatgpt", acked["id"])
+    domain.store.db.execute(
+        "UPDATE team_messages SET created=? WHERE id=?", (time.time() - 10**6, old["id"])
+    )
+    domain.restore_tickets()
+    domain.restore_tickets()
+    assert [t["idem"] for t in tickets(domain)] == ["team:" + open_one["id"]]
+
+
+def test_start_admits_a_pristine_queued_ticket_once_not_a_waiting_one(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    to_coordinator(domain, "pristine")
+    to_coordinator(domain, "waiting")
+    pristine, waiting = tickets(domain)
+    domain.store.db.execute(
+        "INSERT OR IGNORE INTO message_jobs(message_id,state) VALUES(?,'queued')", (pristine["id"],)
+    )
+    domain.store.db.execute(
+        "INSERT OR REPLACE INTO message_jobs(message_id,state,evidence) VALUES(?,'queued',?)",
+        (waiting["id"], '{"waiting_for_visible_target": true}'),
+    )
+    submitted = []
+    receiver = domain.bridge.message_receiver
+    monkeypatch.setattr(receiver, "_submit_new", lambda p, m: submitted.append(m))
+    receiver._admit_pristine_tickets()
+    assert submitted == [pristine["id"]]
+
+
+def test_team_prefix_idempotency_key_is_reserved_for_internal_tickets(domain):
+    with pytest.raises(ValueError):
+        MessageSend(
+            recipient="grok", conversation_id="c", idempotency_key="team:x", body="b", kind="note"
+        )
+    # the internal ticket path still works
+    wire(domain, "chatgpt")
+    to_coordinator(domain, "reserved-ok")
+    assert len(tickets(domain)) == 1
+
+
+def test_restore_tickets_failure_is_visible_not_swallowed(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    _fail_ticket_once(domain, monkeypatch)
+    sent = to_coordinator(domain, "restore-boom")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setattr(domain, "_delivery_ticket", boom)
+    domain.restore_tickets()
+    event = domain.store.db.execute(
+        "SELECT metadata FROM team_events WHERE kind='team.message_delivery_failed' "
+        "AND object_id=?",
+        (sent["id"],),
+    ).fetchone()
+    assert event is not None and "disk on fire" in event["metadata"]
+
+
+def test_double_start_restores_exactly_one_ticket_and_one_job(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    real = _fail_ticket_once(domain, monkeypatch)
+    to_coordinator(domain, "double")
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    domain.restore_tickets()
+    domain.restore_tickets()
+    assert len(tickets(domain)) == 1
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
+
+
+def test_ack_closes_only_the_ticket_of_that_sender_and_recipient(domain):
+    wire(domain, "chatgpt")
+    sent = to_coordinator(domain, "scoped")
+    ticket = tickets(domain)[0]
+    # a legacy message that merely uses the same idem text from another sender stays untouched
+    domain.store.db.execute("UPDATE messages SET sender='codex' WHERE id=?", (ticket["id"],))
+    domain.alias_ack("chatgpt", sent["id"])
+    row = domain.store.db.execute(
+        "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
+    ).fetchone()
+    assert row["acknowledged"] is None
