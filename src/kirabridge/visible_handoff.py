@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import re
 import time
+from contextvars import ContextVar
 
 from kirabridge.bridge_core.config import VisibleTerminalBinding
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
@@ -27,6 +28,8 @@ from kirabridge.visible_binding import (
 from kirabridge.visible_readiness import assess, input_view
 
 RETURN_OBSERVATION_TIMEOUT = 8.0
+# Start of the observation whose result record_presence is writing (monotonic presence).
+_OBSERVATION_STARTED: ContextVar = ContextVar("observation_started", default=None)
 # Two sweeper rounds. An older "available" observation is reported as aged.
 PRESENCE_FRESH_SECONDS = 180.0
 
@@ -447,17 +450,22 @@ class VisibleHandoffs:
 
         if state not in self.PRESENCE_STATES:
             raise ValueError(state)
-        now = time.time()
+        # Observation time, not write time: a slow earlier observation never overwrites a
+        # newer one (an older result is dropped), so sweeper and delivery cannot flap it.
+        now = _OBSERVATION_STARTED.get() or time.time()
         with self.store.transaction():
             previous = self.store.db.execute(
                 "SELECT state,evidence FROM receiver_presence WHERE target=?", (target,)
             ).fetchone()
-            self.store.db.execute(
+            written = self.store.db.execute(
                 "INSERT INTO receiver_presence VALUES(?,?,?,?,?) ON CONFLICT(target) DO UPDATE "
                 "SET state=excluded.state,binding=excluded.binding,"
-                "evidence=excluded.evidence,observed_at=excluded.observed_at",
+                "evidence=excluded.evidence,observed_at=excluded.observed_at "
+                "WHERE excluded.observed_at >= receiver_presence.observed_at",
                 (target, state, canonical(binding.model_dump()), canonical(evidence), now),
-            )
+            ).rowcount
+            if not written:
+                return
             if (
                 previous is None
                 or previous["state"] != state
@@ -476,6 +484,36 @@ class VisibleHandoffs:
                         "automatic_retry": False,
                     },
                 )
+
+    def record_unproven_presence(self, principal, target, state, binding, evidence):
+        """A timed-out or incomplete observation is not absence.
+
+        A previously observed `available` state for the same exact binding is kept
+        (state, binding and observed_at untouched, so freshness still ages honestly);
+        only the evidence notes the failed observation. Otherwise this is a normal
+        presence record. The next successful observation replaces the note.
+        """
+        import json
+
+        row = self.store.db.execute(
+            "SELECT state,binding,evidence FROM receiver_presence WHERE target=?", (target,)
+        ).fetchone()
+        if (
+            row is not None
+            and row["state"] == "available"
+            and json.loads(row["binding"]) == json.loads(canonical(binding.model_dump()))
+        ):
+            kept = {
+                **json.loads(row["evidence"]),
+                "last_unproven": {"reason": evidence.get("reason"), "at": time.time()},
+            }
+            with self.store.transaction():
+                self.store.db.execute(
+                    "UPDATE receiver_presence SET evidence=? WHERE target=?",
+                    (canonical(kept), target),
+                )
+            return
+        self.record_presence(principal, target, state, binding, evidence)
 
     def presence(self, target):
         import json
@@ -1191,6 +1229,16 @@ class VisibleHandoffs:
             raise
 
     async def refreshed_binding(self, principal, target, binding, *, only_candidate=None):
+        """Observe the binding; presence is stamped with the START of this observation."""
+        token = _OBSERVATION_STARTED.set(time.time())
+        try:
+            return await self._refreshed_binding(
+                principal, target, binding, only_candidate=only_candidate
+            )
+        finally:
+            _OBSERVATION_STARTED.reset(token)
+
+    async def _refreshed_binding(self, principal, target, binding, *, only_candidate=None):
         """Use the saved binding while its process lives. Replace only a dead unique agent.
 
         The returned session list is the catalog snapshot that proved the replacement.
@@ -1241,12 +1289,12 @@ class VisibleHandoffs:
         try:
             catalog = await self.sessions.catalog(principal)
         except BridgeError as error:
-            self.record_presence(
+            self.record_unproven_presence(
                 principal, target, "unknown", binding, {"reason": "catalog_" + error.code}
             )
             return binding, None
         if not catalog_can_replace(catalog):
-            self.record_presence(
+            self.record_unproven_presence(
                 principal, target, "unknown", binding, {"reason": "catalog_incomplete"}
             )
             return binding, None
@@ -1391,7 +1439,13 @@ class VisibleHandoffs:
             # Strict proof failed (e.g. an original PID number is occupied). A
             # legacy binding has no kernel generation, so nothing can be proven:
             # the operator must assign the receiver again, exactly, once.
-            self.record_presence(
+            # A selected() timeout never proves absence: keep an observed `available`.
+            record = (
+                self.record_unproven_presence
+                if selection_reason == "timeout"
+                else self.record_presence
+            )
+            record(
                 principal,
                 target,
                 "stale",
