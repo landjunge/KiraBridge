@@ -139,6 +139,7 @@ class MessageReceiver:
         self.direct.accepting = True
         self.messages.delivery_hook = self._submit_new
         self.worker = asyncio.create_task(self._loop())
+        self._admit_pristine_tickets()
 
     async def stop(self):
         self._stops_in_progress += 1
@@ -159,6 +160,37 @@ class MessageReceiver:
                             self.worker = None
         finally:
             self._stops_in_progress -= 1
+
+    def _admit_pristine_tickets(self):
+        """Tickets queued before a restart/drain are new authorizations, not old backlog.
+
+        The loop skips non-deferred queued visible jobs (old inventory). A team ticket that
+        never reached input and is younger than queue_stale_seconds is submitted once.
+        """
+        rows = self.bridge.store.db.execute(
+            "SELECT m.id,m.sender,j.evidence FROM messages m "
+            "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
+            "AND m.idem LIKE 'team:%' AND m.acknowledged IS NULL AND m.created>=? "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='messages' AND h.item_id=m.id)",
+            (time.time() - self.bridge.config.queue_stale_seconds,),
+        ).fetchall()
+        for row in rows:
+            if json.loads(row["evidence"] or "{}"):
+                continue  # already observed or waiting: the loop owns it
+            try:
+                self._submit_new(row["sender"], row["id"])
+            except Exception as error:  # noqa: BLE001 - visible, never silent
+                with self.bridge.store.transaction():
+                    self.bridge.store.audit(
+                        "message.ticket_admit_failed",
+                        row["sender"],
+                        None,
+                        {
+                            "message_id": row["id"],
+                            "error": f"{type(error).__name__}: {error}"[:300],
+                        },
+                    )
 
     def _submit_new(self, principal, message_id):
         row = self.bridge.store.db.execute(
@@ -1360,6 +1392,16 @@ class MessageReceiver:
                     "UPDATE message_jobs SET started=COALESCE(started,?) WHERE message_id=?",
                     (time.time(), message_id),
                 )
+            if str(message["idem"]).startswith("team:"):
+                # An acknowledgement (auto-ack, team ack) between the read-back and the input
+                # ends this delivery: the agent already handled the message.
+                current = self.bridge.store.db.execute(
+                    "SELECT acknowledged FROM messages WHERE id=?", (message_id,)
+                ).fetchone()
+                if current is not None and current["acknowledged"] is not None:
+                    raise BridgeError(
+                        "acknowledged_before_input", "Acknowledged before any input; not typed"
+                    )
             await progress(evidence)
             self.messages.mark_input_started(recipient, message_id)
             if delivery_event is not None:

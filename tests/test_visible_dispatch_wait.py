@@ -8,7 +8,7 @@ from test_visible_handoff import callback, visible  # noqa: F401
 
 from kirabridge.bridge_core.config import ReceiverConfig
 from kirabridge.bridge_core.models import AgentInput, BridgeError, canonical
-from kirabridge.message_manager import MessageSend
+from kirabridge.message_manager import MessageSend, internal_ticket_keys
 
 # Full boxed footer required by the Grok paste-proof geometry; local to the
 # dispatch test below so the shared simplified-box fixture stays untouched.
@@ -462,6 +462,11 @@ async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_
         assert reply["body"] == "independent review"
 
 
+def _ticket_message(**fields):
+    with internal_ticket_keys():
+        return MessageSend(**fields)
+
+
 async def test_team_ticket_is_read_back_internally_and_delivered_only_on_input(
     visible,
     http_bridge,
@@ -483,7 +488,7 @@ async def test_team_ticket_is_read_back_internally_and_delivered_only_on_input(
     await bridge.message_receiver.start()
     sent = bridge.messages.send(
         "chatgpt",
-        MessageSend(
+        _ticket_message(
             recipient="grok",
             conversation_id="team-tm-ticket1",
             idempotency_key="team:tm-ticket1",
@@ -513,7 +518,7 @@ def test_ticket_readback_does_not_mark_delivered_before_input(visible):
     bridge, _ = visible
     sent = bridge.messages.send(
         "chatgpt",
-        MessageSend(
+        _ticket_message(
             recipient="grok",
             conversation_id="team-tm-ticket2",
             idempotency_key="team:tm-ticket2",
@@ -542,7 +547,7 @@ def _ticket(bridge, key="team:tm-wait1"):
     )
     return bridge.messages.send(
         "chatgpt",
-        MessageSend(
+        _ticket_message(
             recipient="grok",
             conversation_id="team-" + key[5:],
             idempotency_key=key,
@@ -604,3 +609,87 @@ async def test_preflight_failure_keeps_a_waiting_job_deferred_and_the_deadline_a
     )
     receiver._preflight_failed(sent["id"], "grok", "peer_connection")
     assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "failed"
+
+
+async def test_ack_between_readback_and_input_means_no_input(
+    visible, http_bridge, config, monkeypatch
+):
+    """Auto-ack/team ack after claim_receipt but before the paste: nothing is typed."""
+    import asyncio
+
+    bridge, transport = visible
+    for identity in ["chatgpt", "grok"]:
+        config.principals[identity].token_env = "WAIT_TEST_" + identity.upper()
+        monkeypatch.setenv(config.principals[identity].token_env, identity + "-" + "x" * 48)
+    config.messaging.receivers["grok"] = ReceiverConfig(
+        cwd=config.principals["grok"].roots[0], timeout=3
+    )
+    fullbox_grok_insert(bridge, transport)
+    transport["text"] = GROK_EMPTY_FULL
+    real = bridge.messages.claim_receipt
+
+    def claim_then_ack(recipient, message_id):
+        row = real(recipient, message_id)
+        bridge.store.db.execute("UPDATE messages SET acknowledged=? WHERE id=?", (1.0, message_id))
+        return row
+
+    monkeypatch.setattr(bridge.messages, "claim_receipt", claim_then_ack)
+    await bridge.message_receiver.start()
+    sent = bridge.messages.send(
+        "chatgpt",
+        _ticket_message(
+            recipient="grok",
+            conversation_id="team-tm-race",
+            idempotency_key="team:tm-race",
+            kind="note",
+            body="x",
+            dispatch=True,
+            request_reply=False,
+        ),
+    )
+    async with asyncio.timeout(10):
+        while bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] in {
+            "queued",
+            "running",
+        }:
+            await asyncio.sleep(0.02)
+    assert transport["calls"] == []
+
+
+async def test_unknown_handoff_is_never_resent_after_presence_goes_stale(visible, monkeypatch):
+    """`visible_handoff_unknown` on a terminal-bound target: no second paste later."""
+    bridge, transport = visible
+    receiver = bridge.message_receiver
+    bridge.config.messaging.receivers["grok"] = ReceiverConfig(
+        cwd=bridge.config.principals["grok"].roots[0], timeout=3
+    )
+    sent = bridge.messages.send(
+        "chatgpt",
+        _ticket_message(
+            recipient="grok",
+            conversation_id="team-tm-unk",
+            idempotency_key="team:tm-unk",
+            kind="note",
+            body="x",
+            dispatch=True,
+            request_reply=False,
+        ),
+    )
+    with bridge.store.transaction():
+        receiver._finish(
+            sent["id"], "unknown", {"reason": "visible_handoff_unknown"}, "visible_handoff_unknown"
+        )
+    binding = bridge.config.visible_handoffs.bindings["grok"]
+    bridge.visible_handoffs.record_presence("chatgpt", "grok", "stale", binding, {"reason": "x"})
+    bridge.visible_handoffs.record_presence(
+        "chatgpt", "grok", "available", binding, {"reason": "m"}
+    )
+    submitted = []
+    monkeypatch.setattr(receiver, "_submit_new", lambda p, m: submitted.append(m))
+    receiver._admit_pristine_tickets()
+    processed = []
+    fake_receiver(monkeypatch, bridge, processed)
+    assert not await receiver._dispatch_next()
+    assert submitted == [] and processed == [] and transport["calls"] == []
+    state = bridge.messages.get("chatgpt", sent["id"])["processing"]["state"]
+    assert state == "unknown"
