@@ -1092,6 +1092,7 @@ class TeamManager:
             if addressed_role:
                 prior = self._previous(principal, request.team_id, "message", request)
                 if prior and not validate_only:
+                    self._ensure_ticket(principal, request, prior)
                     return self._message(request.team_id, prior)
             recipient = team["coordinator"] if addressed_role else request.recipient
             if not recipient:
@@ -1103,6 +1104,7 @@ class TeamManager:
                 return None
             prior = self._previous(principal, request.team_id, "message", request)
             if prior:
+                self._ensure_ticket(principal, request, prior)
                 return self._message(request.team_id, prior)
             if request.reply_to:
                 parent = self._message(request.team_id, request.reply_to)
@@ -1269,6 +1271,51 @@ class TeamManager:
             "SELECT team_id FROM team_messages WHERE id=?", (message_id,)
         ).fetchone()
         return None if row is None else self.ack(principal, row["team_id"], message_id)
+
+    def _ensure_ticket(self, principal, request, message_id):
+        """A replay (or restart) restores a missing delivery ticket; never a second one.
+
+        The ticket idem `team:<id>` makes this idempotent. Only unacknowledged waking kinds
+        whose recipient is a ticket target qualify, and only while the message is younger
+        than queue_stale_seconds (older backlog is inventory, not fresh authorization).
+        """
+        row = self.store.db.execute(
+            "SELECT recipient,kind,created,acknowledged FROM team_messages WHERE id=?",
+            (message_id,),
+        ).fetchone()
+        if (
+            row is None
+            or row["acknowledged"] is not None
+            or row["kind"] not in {"question", "work", "note"}
+            or row["created"] < time.time() - self.bridge.config.queue_stale_seconds
+            or self.store.db.execute(
+                "SELECT 1 FROM messages WHERE idem=?", (TICKET_PREFIX + message_id,)
+            ).fetchone()
+            or not self._ticket_target(principal, row["recipient"], request.team_id)
+        ):
+            return
+        self._delivery_ticket(principal, request, row["recipient"], message_id)
+
+    def restore_tickets(self):
+        """At start: give recent unacknowledged team messages without a ticket their ticket."""
+        from types import SimpleNamespace
+
+        rows = self.store.db.execute(
+            "SELECT id,team_id,sender,body,kind FROM team_messages WHERE acknowledged IS NULL "
+            "AND kind IN ('question','work','note') AND created>=? "
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.idem='team:'||team_messages.id) "
+            "ORDER BY seq",
+            (time.time() - self.bridge.config.queue_stale_seconds,),
+        ).fetchall()
+        for row in rows:
+            try:
+                self._ensure_ticket(
+                    row["sender"],
+                    SimpleNamespace(team_id=row["team_id"], body=row["body"], kind=row["kind"]),
+                    row["id"],
+                )
+            except Exception:  # noqa: BLE001 - one bad row must not stop the rest
+                continue
 
     def _ticket_target(self, principal, recipient, team_id=None):
         """True when the visible handoff machine delivers to this recipient (never Codex)."""

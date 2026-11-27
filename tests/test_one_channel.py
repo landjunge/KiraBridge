@@ -256,3 +256,61 @@ def test_auto_ack_by_inbox_read_closes_the_delivery_ticket(domain):
         "SELECT acknowledged FROM messages WHERE id=?", (ticket["id"],)
     ).fetchone()
     assert row["acknowledged"] is not None
+
+
+def _fail_ticket_once(domain, monkeypatch):
+    real = domain.bridge.messages.send
+
+    def refuse(*args, **kwargs):
+        raise BridgeError("receiver_unavailable", "draining")
+
+    monkeypatch.setattr(domain.bridge.messages, "send", refuse)
+    return real
+
+
+def test_replay_restores_a_ticket_lost_in_the_install_or_drain_window(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    real = _fail_ticket_once(domain, monkeypatch)
+    first = to_coordinator(domain, "lost-ticket")
+    assert tickets(domain) == []  # message stored, ticket refused (draining)
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    again = to_coordinator(domain, "lost-ticket")  # the caller retries with the same key
+    assert again["id"] == first["id"]
+    assert len(tickets(domain)) == 1
+    to_coordinator(domain, "lost-ticket")
+    assert len(tickets(domain)) == 1  # never a second one
+
+
+def test_restore_tickets_at_start_is_idempotent_and_skips_acknowledged_and_old(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    real = _fail_ticket_once(domain, monkeypatch)
+    open_one = to_coordinator(domain, "r-open")
+    acked = to_coordinator(domain, "r-acked")
+    old = to_coordinator(domain, "r-old")
+    monkeypatch.setattr(domain.bridge.messages, "send", real)
+    domain.alias_ack("chatgpt", acked["id"])
+    domain.store.db.execute(
+        "UPDATE team_messages SET created=? WHERE id=?", (time.time() - 10**6, old["id"])
+    )
+    domain.restore_tickets()
+    domain.restore_tickets()
+    assert [t["idem"] for t in tickets(domain)] == ["team:" + open_one["id"]]
+
+
+def test_start_admits_a_pristine_queued_ticket_once_not_a_waiting_one(domain, monkeypatch):
+    wire(domain, "chatgpt")
+    to_coordinator(domain, "pristine")
+    to_coordinator(domain, "waiting")
+    pristine, waiting = tickets(domain)
+    domain.store.db.execute(
+        "INSERT OR IGNORE INTO message_jobs(message_id,state) VALUES(?,'queued')", (pristine["id"],)
+    )
+    domain.store.db.execute(
+        "INSERT OR REPLACE INTO message_jobs(message_id,state,evidence) VALUES(?,'queued',?)",
+        (waiting["id"], '{"waiting_for_visible_target": true}'),
+    )
+    submitted = []
+    receiver = domain.bridge.message_receiver
+    monkeypatch.setattr(receiver, "_submit_new", lambda p, m: submitted.append(m))
+    receiver._admit_pristine_tickets()
+    assert submitted == [pristine["id"]]

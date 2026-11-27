@@ -1232,6 +1232,10 @@ class Bridge:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
+            try:
+                self.teams.restore_tickets()
+            except Exception:  # noqa: BLE001 - a restore fault never blocks start
+                pass
             if self.config.visible_handoffs.bindings and sys.platform == "darwin":
                 self._binding_task = asyncio.create_task(self._binding_refresher())
         except BaseException:
