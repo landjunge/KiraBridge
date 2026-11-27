@@ -526,6 +526,36 @@ async def test_watchdog_keeps_a_claimed_ambiguous_attempt_unknown(delivery, monk
     assert not direct.submit("chatgpt", sent["id"]) and not transport["calls"]
 
 
+async def test_watchdog_grants_a_fresh_window_once_a_message_is_claimed(delivery, monkeypatch):
+    """A slow readiness check must not starve the typing/confirmation phase.
+
+    In production, finding a ready terminal (dispatch_ready) can itself consume
+    most of the admission deadline. If the claim then lands just before that
+    deadline, the remaining confirmation step needs its own room to finish
+    instead of racing the leftovers of the readiness check. Before this fix,
+    a claim landing late still let the original deadline kill a confirmation
+    that was genuinely still in flight, producing an unretried delivery_timeout
+    even though nothing was actually stuck.
+    """
+    bridge, transport, direct, _, _ = delivery
+    direct.delivery_timeout = 0.05
+
+    async def slow_to_confirm(pool, message, run_id, *, delivery_event, delivery_binding=None):
+        # Confirmation lands after the original deadline would have expired,
+        # but well inside the one-time post-claim extension.
+        await asyncio.sleep(0.08)
+        delivery_event.set()
+        return {"success": True, "scope": "visible_input_delivery", "evidence": {}}
+
+    monkeypatch.setattr(bridge.message_receiver, "_process", slow_to_confirm)
+    sent = new_message(bridge)
+    direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+    current = job(bridge, sent)
+    assert current["state"] != "unknown"
+    assert current.get("error") != "delivery_timeout"
+
+
 async def test_delivery_deadline_does_not_cancel_a_sent_reply_waiter(delivery, monkeypatch):
     bridge, _, direct, _, _ = delivery
     direct.delivery_timeout = 0.02
