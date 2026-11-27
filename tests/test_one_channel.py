@@ -157,17 +157,17 @@ def test_the_local_binding_matches_the_claude_process(domain):
     assert not SessionManager.binding_matches(selected, binding, "grok")
 
 
-def test_message_to_the_live_coordinator_is_dispatched_but_stays_queued_when_dead(domain):
+def test_ticket_to_the_coordinator_always_gets_a_job_even_when_presence_is_not_live(domain):
     from kirabridge.bridge_core.models import canonical
 
     wire(domain, "grok")
     domain.config.team.coordinator_only_senders = ["chatgpt"]
     role(domain, "grok", "coordinator")
-    # Dead or unobserved pane: the hidden ticket exists but drives nothing.
+    # Dead or unobserved pane: presence flaps, so the ticket still gets its job and waits
+    # unsent in the receiver (it observes the exact binding itself before any input).
     domain.send("chatgpt", message(recipient="coordinator", idempotency_key="live0"))
     assert len(tickets(domain)) == 1
-    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 0
-    # A fresh, available presence of exactly the configured binding makes it a delivery.
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
     binding = domain.config.visible_handoffs.bindings["grok"]
     domain.store.db.execute(
         "INSERT INTO receiver_presence VALUES(?,?,?,?,?)",
@@ -175,7 +175,7 @@ def test_message_to_the_live_coordinator_is_dispatched_but_stays_queued_when_dea
     )
     domain.send("chatgpt", message(recipient="coordinator", idempotency_key="live1"))
     assert len(tickets(domain)) == 2
-    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
+    assert domain.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 2
 
 
 def test_tickets_never_appear_in_message_receive_get_or_overview(domain):

@@ -1120,6 +1120,24 @@ class MessageReceiver:
             if code != "peer_connection" or now >= deadline:
                 self._finish(message_id, "failed", evidence, code)
                 return
+            if self._deferred_unsent({"evidence": row["evidence"]}):
+                # Keep the deferred-unsent markers (and their reason): the loop must still
+                # pick this job up again, and the deadline below is then actually checked.
+                evidence = {
+                    **{
+                        key: previous[key]
+                        for key in (
+                            "session_scope",
+                            "waiting_for_visible_target",
+                            "waiting_message",
+                            "observation",
+                            "reason",
+                        )
+                        if key in previous
+                    },
+                    **{k: v for k, v in evidence.items() if k != "reason"},
+                    "receiver_reason": code,
+                }
             evidence["waiting_for_receiver"] = True
             evidence["receiver_retry"]["next_attempt_at"] = min(
                 deadline, now + min(30, 2 ** min(attempts, 5))
@@ -1155,7 +1173,8 @@ class MessageReceiver:
         # dispatched nor able to hide a newer eligible message.
         cutoff = self.bridge.config.messaging.separate_managed_after
         rows = self.bridge.store.db.execute(
-            "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,j.evidence FROM messages m "
+            "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,m.idem,j.evidence "
+            "FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=m.id) "
@@ -1226,6 +1245,15 @@ class MessageReceiver:
                     except BridgeError as exc:
                         if exc.code in self.WAIT_REASONS:
                             self._waiting(row["id"], exc.code, getattr(exc, "observation", None))
+                            continue
+                        observed = getattr(exc, "observation", None) or {}
+                        if (
+                            exc.code == "session_selection_changed"
+                            and str(row["idem"]).startswith("team:")
+                            and observed.get("state") in {"unknown", "stale"}
+                        ):
+                            # Unproven presence is not absence: a team ticket waits unsent.
+                            self._waiting(row["id"], "visible_target_unknown", observed)
                             continue
                         # Missing/stale targets retain the existing explicit failure path.
                 async with MCPClientPool(call_timeout=15) as pool:
