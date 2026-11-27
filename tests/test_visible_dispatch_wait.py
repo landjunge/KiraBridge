@@ -693,3 +693,37 @@ async def test_unknown_handoff_is_never_resent_after_presence_goes_stale(visible
     assert submitted == [] and processed == [] and transport["calls"] == []
     state = bridge.messages.get("chatgpt", sent["id"])["processing"]["state"]
     assert state == "unknown"
+
+
+async def test_worker_ticket_waits_in_the_inbox_while_busy_then_types_once(visible, monkeypatch):
+    """Codex worker ticket: busy_pattern keeps it unsent; ready delivers exactly once."""
+    bridge, transport = visible
+    transport["target"] = "codex"
+    transport["text"] = "Thinking…\nesc to interrupt\n› "
+    bridge.config.visible_handoffs.bindings["codex"].busy_pattern = "Thinking…"
+    bridge.config.messaging.receivers["codex"] = ReceiverConfig(
+        cwd=bridge.config.principals["codex"].roots[0], timeout=3
+    )
+    sent = bridge.messages.send(
+        "chatgpt",
+        _ticket_message(
+            recipient="codex",
+            conversation_id="team-tm-worker",
+            idempotency_key="team:tm-worker",
+            body="Worker ticket",
+            kind="work",
+            dispatch=True,
+            request_reply=False,
+        ),
+    )
+    processed = []
+    fake_receiver(monkeypatch, bridge, processed)
+    for _ in range(2):
+        assert not await bridge.message_receiver._dispatch_next()
+    job = bridge.messages.get("chatgpt", sent["id"])["processing"]
+    assert job["state"] == "queued" and job["evidence"]["waiting_for_visible_target"]
+    assert not transport["calls"] and not processed
+    transport["text"] = "› "
+    assert await bridge.message_receiver._dispatch_next()
+    assert not await bridge.message_receiver._dispatch_next()
+    assert processed == [sent["id"]]
