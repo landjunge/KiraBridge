@@ -246,3 +246,79 @@ async def test_running_team_work_is_not_reported_yet(relay_module, tmp_path):
     await relay.report("83d6b38e97ea", entry)
 
     assert td.board == [] and entry["status"] == "submitted"
+
+
+def test_unauthorized_backoff_doubles_to_cap_and_resets(relay_module):
+    seq, value = [], 0
+    for _ in range(8):
+        value = relay_module.next_backoff(value)
+        seq.append(value)
+    assert seq == [60, 120, 240, 480, 960, 1800, 1800, 1800]
+
+
+def test_is_unauthorized_sees_401_in_exception_groups(relay_module):
+    import httpx
+
+    request = httpx.Request("POST", "https://x")
+    error = httpx.HTTPStatusError(
+        "boom", request=request, response=httpx.Response(401, request=request)
+    )
+    assert relay_module.is_unauthorized(error)
+    assert relay_module.is_unauthorized(ExceptionGroup("g", [RuntimeError("a"), error]))
+    assert not relay_module.is_unauthorized(RuntimeError("offline"))
+
+
+def test_run_backs_off_on_401_and_resets_on_success(relay_module, monkeypatch):
+    import asyncio
+
+    import httpx
+
+    request = httpx.Request("POST", "https://x")
+    unauthorized = httpx.HTTPStatusError(
+        "401 Unauthorized", request=request, response=httpx.Response(401, request=request)
+    )
+    outcomes = [unauthorized, unauthorized, unauthorized, None, unauthorized]
+    sleeps = []
+
+    class Td:
+        async def close(self):
+            pass
+
+    relay = relay_module.Relay.__new__(relay_module.Relay)
+    relay.config, relay.td = {"poll_seconds": 60}, Td()
+
+    async def tick():
+        outcome = outcomes.pop(0)
+        if outcome:
+            raise outcome
+
+    async def sleep(seconds):
+        sleeps.append(seconds)
+        if not outcomes:
+            raise asyncio.CancelledError
+
+    relay.tick = tick
+    monkeypatch.setattr(relay_module.asyncio, "sleep", sleep)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(relay.run(False))
+    assert sleeps == [60, 120, 240, 60, 60]
+
+
+def test_log_rotation_is_configured(relay_module, tmp_path):
+    import logging
+
+    root = logging.getLogger()
+    saved = root.handlers[:], root.level
+    try:
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+        relay_module.setup_logging(str(tmp_path / "relay.log"))
+        rotating = [h for h in root.handlers if hasattr(h, "maxBytes")]
+        assert rotating and rotating[0].maxBytes == 5 * 1024 * 1024
+        assert rotating[0].backupCount == 3
+    finally:
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+            handler.close()
+        root.handlers[:] = saved[0]
+        root.setLevel(saved[1])
