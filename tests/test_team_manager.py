@@ -647,6 +647,58 @@ def test_concurrent_claim_is_exactly_once(domain, config):
     assert sum(value is not None for value in results) == 1
 
 
+def test_concurrent_identical_team_send_delivers_exactly_once(domain, config):
+    # Several processes racing on the same idempotency key (e.g. a retried client
+    # request) must produce exactly one team_messages row, never a duplicate delivery.
+    def send_one(_):
+        bridge = Bridge(config)
+        try:
+            return TeamManager(bridge).send("codex", message(idempotency_key="race"))
+        finally:
+            bridge.store.close()
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(send_one, range(4)))
+    ids = {result["id"] for result in results}
+    assert len(ids) == 1
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_messages WHERE id=?", (next(iter(ids)),)
+        ).fetchone()[0]
+        == 1
+    )
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_messages WHERE sender='codex' AND recipient='grok'"
+        ).fetchone()[0]
+        == 1
+    )
+
+
+def test_concurrent_distinct_team_sends_are_not_lost(domain, config):
+    # Distinct, explicitly addressed concurrent sends must all land; none may be
+    # dropped by the write path under contention.
+    def send_one(index):
+        bridge = Bridge(config)
+        try:
+            return TeamManager(bridge).send(
+                "codex", message(idempotency_key=f"distinct-{index}")
+            )
+        finally:
+            bridge.store.close()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(send_one, range(8)))
+    ids = {result["id"] for result in results}
+    assert len(ids) == 8
+    assert (
+        domain.store.db.execute(
+            "SELECT count(*) FROM team_messages WHERE sender='codex' AND recipient='grok'"
+        ).fetchone()[0]
+        == 8
+    )
+
+
 def test_task_request_is_sealed_before_submission_and_cannot_be_replaced(domain):
     item = domain.delegate("grok", work())
     claimed = domain.claim(item["id"])
