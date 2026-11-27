@@ -1237,7 +1237,7 @@ class TeamManager:
                 "SELECT coordinator FROM teams WHERE id=?", (team_id,)
             ).fetchone()
             recipient = row["coordinator"] if row else None
-        if not recipient or not self._ticket_target(principal, recipient):
+        if not recipient or not self._ticket_target(principal, recipient, team_id):
             return None
         try:
             stored = self.send(
