@@ -902,7 +902,9 @@ class MessageReceiver:
 
     def _delivery_evidenced(self, message_id, row):
         """True when a paste, receipt, or uncertain attempt is already recorded."""
-        if any(row[key] is not None for key in ("delivered", "receipt", "acknowledged")):
+        if any(row[key] is not None for key in ("delivered", "acknowledged")) or (
+            row["receipt"] is not None and not str(row["idem"]).startswith("team:")
+        ):
             return True
         job = self.bridge.store.db.execute(
             "SELECT started, evidence FROM message_jobs WHERE message_id=?",
@@ -1331,21 +1333,29 @@ class MessageReceiver:
                     (time.time(), message_id),
                 )
             await progress(evidence)
+            self.messages.mark_input_started(recipient, message_id)
             if delivery_event is not None:
                 delivery_event.set()
 
         try:
-            delivered = await call(
-                "message_receive",
-                {
-                    "after": message["seq"] - 1,
-                    "limit": 1,
-                    "conversation_id": message["conversation_id"],
-                },
-            )
-            if not delivered["messages"] or delivered["messages"][0]["id"] != message_id:
-                raise BridgeError("receiver_delivery", "Message was consumed by another client")
-            receipt = delivered["messages"][0]["receipt"]
+            if str(message["idem"]).startswith("team:"):
+                # Internal ticket: readers never see it, so read it back internally.
+                claimed = self.messages.claim_receipt(recipient, message_id)
+                if claimed is None:
+                    raise BridgeError("receiver_delivery", "Message was consumed by another client")
+                receipt = claimed["receipt"]
+            else:
+                delivered = await call(
+                    "message_receive",
+                    {
+                        "after": message["seq"] - 1,
+                        "limit": 1,
+                        "conversation_id": message["conversation_id"],
+                    },
+                )
+                if not delivered["messages"] or delivered["messages"][0]["id"] != message_id:
+                    raise BridgeError("receiver_delivery", "Message was consumed by another client")
+                receipt = delivered["messages"][0]["receipt"]
             separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
             visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             # The body is the complete authorized input on every receiver route.

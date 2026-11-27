@@ -654,6 +654,41 @@ class MessageManager:
             self.delivery_hook(principal, message_id)
         return self.get(principal, message_id)
 
+    def claim_receipt(self, recipient, message_id):
+        """Receiver-internal read-back of an internal delivery ticket.
+
+        Receive hides every `team:` ticket from readers, so the receiver cannot use it for
+        its own ticket. This issues the receipt without the filter and WITHOUT marking the
+        message delivered: delivered is set only when input actually starts
+        (`mark_input_started`). Returns the row, or None when it is gone or acknowledged.
+        """
+        with self.store.transaction():
+            row = self.store.db.execute(
+                "SELECT * FROM messages WHERE id=? AND recipient=? AND idem LIKE 'team:%' "
+                "AND acknowledged IS NULL",
+                (message_id, recipient),
+            ).fetchone()
+            if row is None:
+                return None
+            row = dict(row)
+            if row["receipt"] is None:
+                row["receipt"] = str(uuid.uuid4())
+                self.store.db.execute(
+                    "UPDATE messages SET receipt=? WHERE id=?", (row["receipt"], message_id)
+                )
+        return row
+
+    def mark_input_started(self, recipient, message_id):
+        """The ticket's input path starts now: this is the delivery."""
+        with self.store.transaction():
+            changed = self.store.db.execute(
+                "UPDATE messages SET delivered=? WHERE id=? AND recipient=? "
+                "AND idem LIKE 'team:%' AND delivered IS NULL",
+                (time.time(), message_id, recipient),
+            ).rowcount
+            if changed:
+                self._event(message_id, "message.delivered", recipient, {"input_started": True})
+
     def receive(self, principal, after=0, limit=20, conversation_id=None):
         self._identity(principal, "message.read")
         if conversation_id:
