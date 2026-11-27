@@ -1161,3 +1161,108 @@ async def test_rc59_destination_is_not_committed_if_original_reappears_finally(
     assert exc.value.code == "session_selection_changed"
     assert bridge.config.visible_handoffs.bindings["codex"] == original
     assert bridge.visible_handoffs.presence("codex")["state"] == "ambiguous"
+
+
+def _timeout_error():
+    error = BridgeError("session_observation_timeout", "Read-only observation timed out")
+    error.provider_error = {"phase": "native_process_catalog", "reason": "timeout"}
+    return error
+
+
+@pytest.mark.parametrize("catalog_failure", ["raises", "incomplete", "absence_unproven"])
+async def test_observation_timeout_keeps_available_and_next_success_refreshes(
+    visible, monkeypatch, catalog_failure
+):
+    """Timeouts are not absence: no flip to stale/unknown; observed_at is not refreshed."""
+    bridge, _ = visible
+    handoffs = bridge.visible_handoffs
+    binding = bridge.config.visible_handoffs.bindings["grok"]
+    handoffs.record_presence("chatgpt", "grok", "available", binding, {"reason": "matched"})
+    before = handoffs.presence("grok")
+    audits = bridge.store.db.execute("SELECT count(*) FROM audit").fetchone()[0]
+
+    async def selected(principal, pane, pid):
+        raise _timeout_error()
+
+    async def catalog(principal, *, transport=None):
+        if catalog_failure == "raises":
+            raise _timeout_error()
+        if catalog_failure == "incomplete":
+            return {"status": "available", "incomplete": True, "sessions": []}
+        return {"status": "available", "sessions": []}
+
+    async def prove(principal, original):
+        raise BridgeError("visible_absence_unproven", "Native observation timed out")
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected)
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", prove)
+    for _ in range(2):  # repeated observation, still no flip
+        await handoffs.refreshed_binding("chatgpt", "grok", binding)
+        now = handoffs.presence("grok")
+        assert now["state"] == "available"
+        assert now["evidence"]["last_unproven"]["reason"]
+    row = bridge.store.db.execute(
+        "SELECT observed_at FROM receiver_presence WHERE target='grok'"
+    ).fetchone()
+    assert row["observed_at"] is not None
+    assert bridge.store.db.execute("SELECT count(*) FROM audit").fetchone()[0] == audits
+    assert before["state"] == "available"
+
+    install_catalog(monkeypatch, bridge, [])  # selected() works again below
+
+    async def selected_ok(principal, pane, pid):
+        return {
+            "pane_id": pane,
+            "expected_pid": pid,
+            "agent_pid": binding.agent_pid,
+            "agent_candidate": "grok",
+            "identity_ambiguous": False,
+            "transport": "terminal_app",
+            "processes": [],
+        }
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected_ok)
+    monkeypatch.setattr(bridge.sessions, "binding_matches", lambda *a, **k: True)
+    await handoffs.refreshed_binding("chatgpt", "grok", binding)
+    assert "last_unproven" not in handoffs.presence("grok")["evidence"]
+
+
+async def test_genuine_absence_still_marks_stale(visible, monkeypatch):
+    """Only timeouts and incomplete observations are exempt from the downgrade."""
+    bridge, _ = visible
+    handoffs = bridge.visible_handoffs
+    binding = bridge.config.visible_handoffs.bindings["grok"]
+    handoffs.record_presence("chatgpt", "grok", "available", binding, {"reason": "matched"})
+    install_catalog(monkeypatch, bridge, [])
+
+    async def prove(principal, original):
+        raise BridgeError("visible_absence_unproven", "Original window still exists")
+
+    monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", prove)
+    await handoffs.refreshed_binding("chatgpt", "grok", binding)
+    assert handoffs.presence("grok")["state"] == "stale"
+
+
+async def test_older_observation_never_overwrites_a_newer_presence(visible):
+    """Presence carries observation time: a slow earlier result is dropped, not last-writer-wins."""
+    import time
+
+    from kirabridge.visible_handoff import _OBSERVATION_STARTED
+
+    bridge, _ = visible
+    handoffs = bridge.visible_handoffs
+    binding = bridge.config.visible_handoffs.bindings["grok"]
+    newer = time.time()
+    token = _OBSERVATION_STARTED.set(newer)
+    handoffs.record_presence("chatgpt", "grok", "available", binding, {"reason": "matched"})
+    _OBSERVATION_STARTED.reset(token)
+    token = _OBSERVATION_STARTED.set(newer - 30)  # observation started earlier, finished later
+    handoffs.record_presence("chatgpt", "grok", "stale", binding, {"reason": "late_result"})
+    _OBSERVATION_STARTED.reset(token)
+    now = handoffs.presence("grok")
+    assert now["state"] == "available" and now["reason"] == "matched"
+    row = bridge.store.db.execute(
+        "SELECT observed_at FROM receiver_presence WHERE target='grok'"
+    ).fetchone()
+    assert row["observed_at"] == newer
