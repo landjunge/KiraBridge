@@ -681,9 +681,7 @@ def test_concurrent_distinct_team_sends_are_not_lost(domain, config):
     def send_one(index):
         bridge = Bridge(config)
         try:
-            return TeamManager(bridge).send(
-                "codex", message(idempotency_key=f"distinct-{index}")
-            )
+            return TeamManager(bridge).send("codex", message(idempotency_key=f"distinct-{index}"))
         finally:
             bridge.store.close()
 
