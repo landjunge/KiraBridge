@@ -370,3 +370,5 @@ Nach verifizierter Installation behält der Installer höchstens 5 Rollback-Back
 Completion-Notices werden in kleinen Batches aufgeräumt: quittierte Notices werden 7 Tage nach der Quittierung gelöscht (nie unquittierte); Notices der unbeaufsichtigten Watch-Ziele `default` und `ki-gesamtabschluss-watch` gelten nach 24 h als quittiert, mit Audit-Eintrag samt Anzahl.
 Das Diagnose-Überlaufarchiv schließt sein Segment täglich, entfernt rotierte Segmente nach 7 Tagen (jede Entfernung als Anker in der Audit-Kette) und begrenzt Archiv-Schreibvorgänge auf 32 MiB pro Tag und Prozess; vorhandene Audit-Zeilen bleiben unberührt.
 Der Installer kopiert die Datenbank vor einem Upgrade nur noch, wenn das Zielrelease die `schema_version` (`PRAGMA user_version`) ändert; ein unbekanntes Schema sichert weiterhin. Rotationsvorschläge folgen nach dem offenen Aufbewahrungs-PR.
+
+`kirabridge migrate-layout` (nur Probelauf, `--apply` ist nicht freigegeben) meldet Alt- zu v1-Pfade, Größen, launchd-Plists und Konfigurationsverweise mit festen Pfaden sowie Risiken wie aktives WAL.

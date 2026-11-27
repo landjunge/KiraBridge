@@ -370,3 +370,5 @@ After a verified install the installer keeps at most 5 rollback backups (the act
 Completion notices are tidied in small batches: acknowledged notices are deleted 7 days after acknowledgement (never unacknowledged ones), and notices of the unattended watch targets `default` and `ki-gesamtabschluss-watch` are marked acknowledged after 24 h with an audit entry holding the count.
 The diagnostic overflow archive now closes its segment daily, removes rotated segments older than 7 days (each removal anchored in the audit chain) and caps archive writes at 32 MiB per day and process; existing audit rows are untouched.
 The installer now copies the database before an upgrade only when the target release changes its `schema_version` (`PRAGMA user_version`); an unknown schema still backs up. Rotation proposals follow after the open retention PR.
+
+`kirabridge migrate-layout` (dry-run only, `--apply` is not released) reports legacy to v1 paths, sizes, launchd plists and config references with fixed paths, and risks such as active WAL.

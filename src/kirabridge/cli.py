@@ -372,6 +372,13 @@ async def execute(args) -> None:
         else:
             emit({"present": credential_status()})
         return
+    if args.command == "migrate-layout":
+        from kirabridge import layout_migration
+
+        if args.apply:
+            raise SystemExit(layout_migration.APPLY_REFUSED)
+        emit(layout_migration.report())
+        return
     if args.command == "paths":
         out = central_paths.describe()
         if args.write_manifests:
@@ -1133,6 +1140,11 @@ def main() -> None:
         action="store_true",
         help="Create <FAMILY>/KiraBridge with tool.json and family.json (layout stays inactive)",
     )
+    migrate = sub.add_parser(
+        "migrate-layout", help="Report legacy -> v1 directory layout (dry-run only, no writes)"
+    )
+    migrate.add_argument("--dry-run", action="store_true", help="Default; changes nothing")
+    migrate.add_argument("--apply", action="store_true", help="Not released")
     family = sub.add_parser("family", help="Fixed native five-product window adapter; no Store")
     family_actions = family.add_subparsers(dest="action", required=True)
     family_actions.add_parser("registration", help="Print disabled registration; no writes")
