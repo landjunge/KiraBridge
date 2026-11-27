@@ -1086,6 +1086,7 @@ class TeamManager:
             request = request.model_copy(update={"recipient": "coordinator"})
         self._size(request.body, self.config.team.max_body_bytes)
         native_ping_enrolled = notified = False
+        wake = None
         with self.store.transaction():
             team = self._team(principal, request.team_id, "team.write", write=True)
             addressed_role = request.recipient == "coordinator"
@@ -1184,12 +1185,18 @@ class TeamManager:
                 notified = self.coordinator_roles.queue_notification(
                     principal, message_id, request.team_id, recipient
                 )
+                wake = ("waking", "coordinator_notification") if notified else None
         if native_ping_enrolled:
             self.bridge.team_dispatcher.wake_native_ping()
-        elif not notified:
-            self._delivery_ticket(principal, request, recipient, message_id)
+            wake = ("waking", "native_ping")
+        elif wake is None:
+            wake = self._delivery_ticket(principal, request, recipient, message_id)
+        if wake is None:
+            wake = ("inbox_only", self._inbox_only_reason(recipient, request.kind))
         self.wake.set()
         stored = self._message(request.team_id, message_id)
+        if request.kind in {"question", "work", "note"}:  # answers/results never wake
+            stored["wake_state"], stored["wake_reason"] = wake
         if notes:
             stored["limit_notes"] = notes
         return stored
@@ -1351,7 +1358,7 @@ class TeamManager:
         from kirabridge.message_manager import MessageSend, internal_ticket_keys
 
         if not self._ticket_target(principal, recipient, request.team_id):
-            return
+            return None
         try:
             with internal_ticket_keys():
                 ticket_message = MessageSend(
@@ -1373,9 +1380,19 @@ class TeamManager:
                 message_id,
                 error_code=exc.code,
             )
-            return
+            return ("failed", exc.code)
         if "id" in ticket and not ticket.get("message_buffer"):
             self.bridge.message_receiver.submit_threadsafe(principal, ticket["id"])
+        return ("waking", "delivery_ticket")
+
+    def _inbox_only_reason(self, recipient, kind):
+        if kind not in {"question", "work", "note"}:
+            return "kind_not_waking"
+        if recipient == "codex":
+            return "codex_wakes_only_as_coordinator"
+        if recipient not in self.config.visible_handoffs.bindings:
+            return "no_visible_binding"
+        return "no_wake_route"
 
     def messages(self, principal, team_id, after=0, limit=50):
         self._team(principal, team_id)

@@ -423,7 +423,10 @@ def test_confirmed_handoff_restarts_without_promoting_then_changes_role_route(do
         assert active["pending"] is None
         assert active["last_handoff"]["state"] == "accepted"
         assert role_message(reopened.teams, "new")["recipient"] == "grok"
-        assert role_message(reopened.teams, "old") == original
+        replayed = role_message(reopened.teams, "old")
+        assert {k: v for k, v in replayed.items() if not k.startswith("wake_")} == {
+            k: v for k, v in original.items() if not k.startswith("wake_")
+        }
         assert reopened.teams.request_coordinator_handoff("local", request)["state"] == "accepted"
         roles = reopened.teams.get("local", TEAM)["members"]
         assert roles["codex"]["role"] == "worker"
