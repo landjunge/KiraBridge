@@ -103,6 +103,15 @@ def test_prefixed_prompt_matches_its_original_body_only(delivery):
 
 
 def test_role_text_fixed_rules_short():
-    for term in ("Sonnet", "Opus nur", "schwierigen", "Teamkanal", "NICHTS selbst", "ChatGPT"):
+    for term in (
+        "Sonnet",
+        "Opus nur",
+        "schwierigen",
+        "Teamkanal",
+        "NICHTS selbst",
+        "ChatGPT",
+        "impeccable",
+        "design-taste-frontend",
+    ):
         assert term in ROLE_TEXT
     assert len(ROLE_TEXT) < 1500
