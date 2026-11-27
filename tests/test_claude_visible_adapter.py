@@ -139,3 +139,19 @@ def test_spinner_with_todo_list_and_hints_before_the_input_is_still_working():
     # The same layout without a live spinner (finished todo list) is ready.
     idle = text.replace("✻ Pondering… (34s · ↓ 1.2k tokens)", "  Klar")
     assert adapter.observe(idle, BINDING)["ready"]
+
+
+def test_local_alias_resolves_to_claude_adapter_everywhere():
+    """The coordinator principal `local` drives the Claude TUI (same table as process_is)."""
+    from kirabridge.session_manager import PROCESS_ALIASES, process_is
+    from kirabridge.visible_readiness import assess, input_view
+
+    assert adapter_for("local") is adapter_for("claude")
+    assert process_is({"name": "claude"}, "local")
+    assert PROCESS_ALIASES["local"] == "claude"
+    state = assess("local", EMPTY, BINDING)  # visible_readiness.py:18
+    assert state["ready"] and state["reason"] == "current_empty_widget"
+    assert input_view("local", EMPTY) == input_view("claude", EMPTY)
+    # visible_handoff.py:849 uses adapter_for(target).protocol_state(binding, observer)
+    assert asyncio.run(adapter_for("local").protocol_state(BINDING, None)) is None
+    assert adapter_for("nope").observe("", BINDING)["reason"] == "unsupported_cli_program"
