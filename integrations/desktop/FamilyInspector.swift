@@ -52,7 +52,7 @@ final class InspectorViewController: NSViewController {
         let a = agent
         subtitle.stringValue = a?.name ?? L("inspector.none")
         let rows: [(String, String)] = a == nil ? [] : [
-            ("inspector.state", a!.state), ("inspector.model", a!.model.isEmpty ? "—" : a!.model),
+            ("inspector.state", a!.stateText), ("inspector.model", a!.model.isEmpty ? "—" : a!.model),
             ("inspector.kind", a!.kind.isEmpty ? "—" : a!.kind), ("inspector.version", a!.version.isEmpty ? "—" : a!.version),
         ]
         for i in keys.indices {

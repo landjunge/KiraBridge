@@ -11,7 +11,7 @@ enum FamilyLayout {
     static let dividers: CGFloat = 2
     static let minWindowWidth: CGFloat = sidebarMin + mainMin + inspectorMin + dividers
     static let minWindowHeight: CGFloat = 600
-    static let headerHeight: CGFloat = 64
+    static let headerHeight: CGFloat = 68
     // Controls
     static let buttonHeight: CGFloat = 28, fieldHeight: CGFloat = 25
     static let rowHeight: CGFloat = 29, rowPitch: CGFloat = 34

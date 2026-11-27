@@ -85,6 +85,9 @@ enum FamilyLocalization {
         "inspector.permissions": ("Rechte und Freigaben", "Permissions and approvals"),
         "inspector.terminals": ("Erweiterte Konsole", "Advanced console"),
         "center.noMessages": ("Keine Nachrichten.", "No messages."),
+        "center.noAgents": ("Keine Agenten konfiguriert.", "No agents configured."),
+        "state.active": ("aktiv", "active"), "state.inactive": ("inaktiv", "inactive"),
+        "state.retired": ("außer Betrieb", "retired"),
     ]
 
     static func choose(_ code: String) {
@@ -412,7 +415,7 @@ final class FamilyHeaderView: LayoutView {
             let textX = self.products.frame.maxX + 29
             self.statusText.frame = NSRect(x: textX, y: 13,
                                            width: max(40, limit - restartWidth - 10 - textX), height: 16)
-            self.detail.frame = NSRect(x: 16, y: 45, width: rect.width - 32, height: 16)
+            self.detail.frame = NSRect(x: 16, y: 49, width: rect.width - 32, height: 16)
         }
     }
 

@@ -352,3 +352,5 @@ are errors. [Registration, exact JSON ABI and acceptance](docs/FAMILY-WINDOW-BRO
 remain separate from installation; current downloads are not changed by source.
 
 The native Postfach page shows the newest 30 team messages (it walks the 50-message pages to the end and keeps the tail) instead of the first page. Choosing the coordinator stays in the web console ("Erweitert"): it needs a handover with session, generation and revision, which the read-only native data access does not cover.
+
+The native sidebar rows are keyboard-operable (Up/Down/Home/End move, Return or Space select) with a selection bar and focus ring. Agent states are shown localized (active/inactive/retired), the overview list carries status dots and an empty state, and bridge reachability is shown once, in the header; the first overview card names the coordinator. The inbox poll re-reads the retained 30 messages, so acknowledgements update.

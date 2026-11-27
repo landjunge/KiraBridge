@@ -8,6 +8,12 @@ struct AgentInfo: Equatable {
     let id: String, name: String, state: String
     let active: Bool, retired: Bool, configured: Bool
     var model = "", kind = "", version = ""
+    /// Localized state; unknown values pass through unchanged.
+    var stateText: String {
+        let key = "state." + state
+        let text = L(key)
+        return text == key ? state : text
+    }
     var dotColor: NSColor {
         if retired || !configured { return Palette.muted }
         return active ? Palette.green : Palette.amber
