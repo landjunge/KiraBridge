@@ -43,10 +43,11 @@ final class MetricCard: SurfaceView {
     }
 }
 
-/// A flipped list with one scroll view; rows are fixed-height text lines.
+/// A flipped list with one scroll view; rows are fixed-height text lines, optionally led by a status dot.
 final class ListPage: LayoutView {
     let scroll = NSScrollView(), document = SurfaceView(frame: .zero)
-    private var lines: [NSTextField] = []
+    private var lines: [NSTextField] = [], dots: [SurfaceView?] = []
+    private var dotted = false
     override init(frame: NSRect) {
         super.init(frame: frame); color = Palette.surface
         scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
@@ -54,12 +55,19 @@ final class ListPage: LayoutView {
         addSubview(scroll)
     }
     required init?(coder: NSCoder) { fatalError() }
-    func setLines(_ items: [(String, NSColor)]) {
+    func setLines(_ items: [(String, NSColor)], dots colors: [NSColor?] = []) {
         lines.forEach { $0.removeFromSuperview() }
+        dots.forEach { $0?.removeFromSuperview() }
         lines = items.map { text, color in
             let f = NSTextField(labelWithString: text)
             f.font = .systemFont(ofSize: 12); f.textColor = color; f.lineBreakMode = .byTruncatingTail
             document.addSubview(f); return f
+        }
+        dotted = !colors.isEmpty
+        dots = items.indices.map { i in
+            guard i < colors.count, let color = colors[i] else { return nil }
+            let d = SurfaceView(frame: .zero); d.color = color; d.rounded = 3.5
+            document.addSubview(d); return d
         }
         needsLayout = true
     }
@@ -68,7 +76,10 @@ final class ListPage: LayoutView {
         let h = max(CGFloat(lines.count) * FamilyLayout.rowPitch, rect.height)
         document.frame = NSRect(x: 0, y: 0, width: rect.width, height: h)
         for (i, f) in lines.enumerated() {
-            f.frame = NSRect(x: 0, y: CGFloat(i) * FamilyLayout.rowPitch + 6, width: max(0, rect.width), height: 18)
+            let y = CGFloat(i) * FamilyLayout.rowPitch
+            let inset: CGFloat = dotted ? 17 : 0
+            dots[i]?.frame = NSRect(x: 0, y: y + 11, width: 7, height: 7)
+            f.frame = NSRect(x: inset, y: y + 6, width: max(0, rect.width - inset), height: 18)
         }
     }
 }
@@ -81,7 +92,6 @@ final class CenterViewController: NSViewController {
     private var refreshButton: NSButton!
     private var cards: [MetricCard] = []
     private let agentList = ListPage(frame: .zero), inboxList = ListPage(frame: .zero)
-    private let coordinatorLine = NSTextField(labelWithString: "")
     private let webHost = SurfaceView(frame: .zero)
     private var state = OverviewState()
     private(set) var page: Page = .overview
@@ -97,12 +107,11 @@ final class CenterViewController: NSViewController {
         tabs.selectedSegment = 0
         refreshButton = compactButton(L("center.refresh"), target: self, action: #selector(refreshPressed), symbol: "arrow.clockwise")
         for _ in 0..<3 { let c = MetricCard(frame: .zero); cards.append(c); root.addSubview(c) }
-        coordinatorLine.font = .systemFont(ofSize: 12); coordinatorLine.textColor = Palette.muted
         webHost.color = Palette.surface
         webView.translatesAutoresizingMaskIntoConstraints = true
         webView.autoresizingMask = [.width, .height]
         webHost.addSubview(webView)
-        for v in [tabs, refreshButton, coordinatorLine, agentList, inboxList, webHost] as [NSView] { root.addSubview(v) }
+        for v in [tabs, refreshButton, agentList, inboxList, webHost] as [NSView] { root.addSubview(v) }
         localize()
         root.arrange = { [weak self] r in self?.arrange(r) }
         show(.overview)
@@ -122,8 +131,7 @@ final class CenterViewController: NSViewController {
         for (i, c) in cards.enumerated() {
             c.frame = NSRect(x: pad + CGFloat(i) * (cw + gap), y: top, width: cw, height: 66)
         }
-        coordinatorLine.frame = NSRect(x: pad, y: top + 66 + 8, width: w, height: 17)
-        let listTop = top + 66 + 8 + 17 + 6
+        let listTop = top + 66 + 10
         let list = NSRect(x: pad, y: 0, width: w, height: max(0, r.height - listTop - pad))
         agentList.frame = NSRect(x: 0, y: listTop, width: r.width, height: list.height + pad)
         agentList.place(in: NSRect(x: pad, y: 0, width: w, height: list.height))
@@ -135,7 +143,7 @@ final class CenterViewController: NSViewController {
         page = p; tabs.selectedSegment = p.rawValue
         let native = p == .overview
         cards.forEach { $0.isHidden = !native }
-        coordinatorLine.isHidden = !native; agentList.isHidden = !native
+        agentList.isHidden = !native
         inboxList.isHidden = p != .inbox; webHost.isHidden = p != .advanced
         refreshButton.isHidden = p == .advanced
         view.needsLayout = true
@@ -155,14 +163,16 @@ final class CenterViewController: NSViewController {
     private func render() {
         guard isViewLoaded else { return }
         let activeCount = state.agents.filter { $0.active }.count
-        cards[0].title.stringValue = L("center.bridge")
-        cards[0].value.stringValue = state.bridgeRunning ? L("status.running") : L("status.unreachable")
+        // Bridge reachability lives in the header (one source); the first card names the coordinator.
+        cards[0].title.stringValue = L("center.coordinator")
+        cards[0].value.stringValue = state.coordinator
         cards[1].title.stringValue = L("center.agents")
         cards[1].value.stringValue = "\(activeCount) / \(state.agents.count)"
         cards[2].title.stringValue = L("center.pending")
         cards[2].value.stringValue = String(state.pending)
-        coordinatorLine.stringValue = L("center.coordinator") + ": " + state.coordinator
-        agentList.setLines(state.agents.map { ($0.name + "  ·  " + $0.state, $0.retired ? Palette.muted : Palette.accent) })
+        agentList.setLines(state.agents.isEmpty ? [(L("center.noAgents"), Palette.muted)]
+            : state.agents.map { ($0.name + "  ·  " + $0.stateText, $0.retired ? Palette.muted : Palette.accent) },
+            dots: state.agents.map { $0.dotColor })
         inboxList.setLines(state.inbox.isEmpty ? [(L("center.noMessages"), Palette.muted)]
             : state.inbox.map { ($0.sender + " → " + $0.recipient + "  ·  " + $0.body.replacingOccurrences(of: "\n", with: " "),
                                  $0.acknowledged ? Palette.muted : Palette.accent) })
@@ -180,26 +190,31 @@ final class CenterViewController: NSViewController {
     }
 
     /// The API pages oldest-first (limit 50), so walk the cursor to the end and keep the newest
-    /// `inboxLimit` rows. Later polls continue from the stored cursor instead of starting over.
+    /// `inboxLimit` rows. The next poll restarts at the first retained row, so those rows (and
+    /// their acknowledged state) are re-read; only the first poll walks the whole history.
     private static let inboxLimit = 30
-    private var inboxTeam = "", inboxCursor = 0
-    private var inboxRows: [[String: Any]] = []
-    private func newestMessages(_ api: ConsoleAPI, teamID: String, pages: Int = 0,
-                                completion: @escaping (Any?) -> Void) {
+    private var inboxTeam = "", inboxBase = 0
+    private func newestMessages(_ api: ConsoleAPI, teamID: String, completion: @escaping (Any?) -> Void) {
         DispatchQueue.main.async {
-            if teamID != self.inboxTeam { self.inboxTeam = teamID; self.inboxCursor = 0; self.inboxRows = [] }
-            api.get("/api/team/" + teamID + "/messages?limit=50&after=" + String(self.inboxCursor)) { payload in
-                DispatchQueue.main.async {
-                    let dict = payload as? [String: Any]
-                    guard let rows = dict?["messages"] as? [[String: Any]] else {
-                        return completion(self.inboxRows.isEmpty ? nil : ["messages": self.inboxRows])
-                    }
-                    self.inboxRows = Array((self.inboxRows + rows).suffix(Self.inboxLimit))
-                    self.inboxCursor = (dict?["next_cursor"] as? Int) ?? self.inboxCursor
-                    if rows.count == 50 && pages < 200 {
-                        self.newestMessages(api, teamID: teamID, pages: pages + 1, completion: completion)
-                    } else { completion(["messages": self.inboxRows]) }
+            if teamID != self.inboxTeam { self.inboxTeam = teamID; self.inboxBase = 0 }
+            self.walkMessages(api, teamID: teamID, after: self.inboxBase, collected: [], pages: 0, completion: completion)
+        }
+    }
+    private func walkMessages(_ api: ConsoleAPI, teamID: String, after: Int, collected: [[String: Any]], pages: Int,
+                              completion: @escaping (Any?) -> Void) {
+        api.get("/api/team/" + teamID + "/messages?limit=50&after=" + String(after)) { payload in
+            DispatchQueue.main.async {
+                let dict = payload as? [String: Any]
+                guard let rows = dict?["messages"] as? [[String: Any]] else {
+                    return completion(collected.isEmpty ? nil : ["messages": Array(collected.suffix(Self.inboxLimit))])
                 }
+                let all = collected + rows
+                if rows.count == 50, pages < 200, let next = dict?["next_cursor"] as? Int {
+                    return self.walkMessages(api, teamID: teamID, after: next, collected: all, pages: pages + 1, completion: completion)
+                }
+                let kept = Array(all.suffix(Self.inboxLimit))
+                if let first = kept.first?["seq"] as? Int { self.inboxBase = max(0, first - 1) }
+                completion(["messages": kept])
             }
         }
     }

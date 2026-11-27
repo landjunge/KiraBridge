@@ -3,6 +3,40 @@
 // when the rows do not fit; bottom buttons stay pinned.
 import AppKit
 
+/// One agent row: keyboard-focusable (Up/Down/Home/End move, Return/Space select) with a
+/// visible selection bar and a focus ring.
+final class AgentRowView: SurfaceView {
+    var onKey: ((Int) -> Void)?
+    var onChoose: (() -> Void)?
+    var isSelected = false { didSet { needsDisplay = true } }
+    override var acceptsFirstResponder: Bool { true }
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok { needsDisplay = true; scrollToVisible(bounds) }
+        return ok
+    }
+    override func resignFirstResponder() -> Bool { let ok = super.resignFirstResponder(); needsDisplay = true; return ok }
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 125: onKey?(1)
+        case 126: onKey?(-1)
+        case 119: onKey?(Int.max)
+        case 115: onKey?(Int.min)
+        case 36, 49, 76: onChoose?()
+        default: super.keyDown(with: event)
+        }
+    }
+    override func draw(_ dirtyRect: NSRect) {
+        (isSelected ? Palette.raised : Palette.surface).setFill()
+        bounds.fill()
+        if isSelected { Palette.brand.setFill(); NSRect(x: 0, y: 0, width: 3, height: bounds.height).fill() }
+        if window?.firstResponder === self {
+            NSColor.keyboardFocusIndicatorColor.setStroke()
+            let p = NSBezierPath(rect: bounds.insetBy(dx: 1, dy: 1)); p.lineWidth = 2; p.stroke()
+        }
+    }
+}
+
 final class AgentSidebarViewController: NSViewController {
     private(set) var agents: [AgentInfo] = []
     var api: ConsoleAPI?
@@ -12,10 +46,11 @@ final class AgentSidebarViewController: NSViewController {
     private var heading: NSTextField!
     private let scroll = NSScrollView()
     private let document = SurfaceView(frame: .zero)
-    private var rows: [SurfaceView] = [], names: [NSTextField] = [], states: [NSTextField] = []
+    private var rows: [AgentRowView] = [], names: [NSTextField] = [], states: [NSTextField] = []
     private var hostButton: NSButton!, settingsButton: NSButton!
     private var timer: Timer?
     private var selectedFirst = false
+    private(set) var selectedID: String?
 
     override func loadView() {
         let root = LayoutView(); root.color = Palette.surface; view = root
@@ -48,17 +83,22 @@ final class AgentSidebarViewController: NSViewController {
     func setAgents(_ list: [AgentInfo]) {
         guard isViewLoaded, list != agents else { return }
         agents = list
-        if let first = list.first, selectedFirst == false { selectedFirst = true; onSelect?(first) }
+        if let first = list.first, selectedFirst == false { selectedFirst = true; select(first) }
         rows.forEach { $0.removeFromSuperview() }
         rows = []; names = []; states = []
         for (i, agent) in list.enumerated() {
-            let row = SurfaceView(frame: .zero); row.color = Palette.surface
+            let row = AgentRowView(frame: .zero)
+            row.isSelected = agent.id == selectedID
+            row.setAccessibilityRole(.button)
+            row.setAccessibilityLabel(agent.name + ", " + agent.stateText)
+            row.onKey = { [weak self] delta in self?.move(from: i, delta) }
+            row.onChoose = { [weak self] in self?.select(agent) }
             let dot = SurfaceView(frame: NSRect(x: 14, y: 11, width: 7, height: 7))
             dot.color = agent.dotColor; dot.rounded = 3.5
             let name = NSTextField(labelWithString: agent.name)
             name.font = .systemFont(ofSize: 12); name.lineBreakMode = .byTruncatingTail
             name.textColor = agent.retired ? Palette.muted : Palette.accent
-            name.toolTip = agent.retired ? agent.name + " (" + agent.state + ")" : agent.name + " · " + agent.state
+            name.toolTip = agent.name + " · " + agent.stateText
             row.addSubview(dot); row.addSubview(name)
             row.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(rowClicked(_:))))
             row.identifier = NSUserInterfaceItemIdentifier(String(i))
@@ -69,7 +109,21 @@ final class AgentSidebarViewController: NSViewController {
 
     @objc private func rowClicked(_ g: NSClickGestureRecognizer) {
         guard let id = g.view?.identifier?.rawValue, let i = Int(id), agents.indices.contains(i) else { return }
-        onSelect?(agents[i])
+        view.window?.makeFirstResponder(rows[i])
+        select(agents[i])
+    }
+
+    private func select(_ agent: AgentInfo) {
+        selectedID = agent.id
+        for (i, row) in rows.enumerated() { row.isSelected = agents[i].id == agent.id }
+        onSelect?(agent)
+    }
+
+    private func move(from index: Int, _ delta: Int) {
+        guard !rows.isEmpty else { return }
+        let target = delta == Int.max ? rows.count - 1 : delta == Int.min ? 0 : min(max(index + delta, 0), rows.count - 1)
+        view.window?.makeFirstResponder(rows[target])
+        select(agents[target])
     }
 
     func startPolling(sample: Bool = false) {
