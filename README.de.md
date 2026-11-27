@@ -363,5 +363,7 @@ Die native Postfach-Seite zeigt die neuesten 30 Team-Nachrichten (sie blättert 
 
 Die Zeilen der nativen Seitenleiste sind per Tastatur bedienbar (Auf/Ab/Pos1/Ende bewegen, Return oder Leertaste wählen) mit Auswahlbalken und Fokusring. Agentenstatus erscheint lokalisiert (aktiv/inaktiv/außer Betrieb), die Übersichtsliste hat Statuspunkte und einen Leerzustand, die Bridge-Erreichbarkeit steht nur im Header; die erste Übersichtskarte nennt den Koordinator. Der Postfach-Abruf liest die behaltenen 30 Nachrichten neu, Bestätigungen aktualisieren sich.
 
+Das neue zentrale Pfadmodul `kirabridge.paths` löst das Layout directory-architecture-v1 unter `<FAMILY>/KiraBridge` auf, liefert aber bis zur Aktivierung durch eine Migration die Altpfade; `kirabridge paths` liest nur, `--write-manifests` schreibt allein `tool.json`/`family.json`.
+
 Nach verifizierter Installation behält der Installer höchstens 5 Rollback-Backups (das aktive plus die 4 jüngsten) und das aktive, das vorherige und ein weiteres Release, nie ein von einem Dienst genutztes.
 Completion-Notices werden in kleinen Batches aufgeräumt: quittierte Notices werden 7 Tage nach der Quittierung gelöscht (nie unquittierte); Notices der unbeaufsichtigten Watch-Ziele `default` und `ki-gesamtabschluss-watch` gelten nach 24 h als quittiert, mit Audit-Eintrag samt Anzahl.

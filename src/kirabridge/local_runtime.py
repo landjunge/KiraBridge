@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from kirabridge import paths as central_paths
 from kirabridge.bridge_core.config import Config, private_directory
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
@@ -21,7 +22,7 @@ LABEL = "com.kirabridge.bridge"
 
 
 def default_config() -> Path:
-    return Path.home() / ".config/kirabridge/config.toml"
+    return central_paths.config_file()
 
 
 def token_for(config: Config, principal: str) -> str:
@@ -81,7 +82,7 @@ def setup(workspace: str, destination: Path | None = None, *, install_wrapper: b
     root.mkdir(parents=True, exist_ok=True)
     root = root.resolve()
     state = (
-        Path.home() / ".local/share/kirabridge"
+        central_paths.data_dir()
         if destination == default_config()
         else destination.parent / "state"
     )

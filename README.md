@@ -363,5 +363,7 @@ The native Postfach page shows the newest 30 team messages (it walks the 50-mess
 
 The native sidebar rows are keyboard-operable (Up/Down/Home/End move, Return or Space select) with a selection bar and focus ring. Agent states are shown localized (active/inactive/retired), the overview list carries status dots and an empty state, and bridge reachability is shown once, in the header; the first overview card names the coordinator. The inbox poll re-reads the retained 30 messages, so acknowledgements update.
 
+The new central path module `kirabridge.paths` resolves the directory-architecture-v1 layout under `<FAMILY>/KiraBridge` but returns the legacy paths until a migration marks the layout active; `kirabridge paths` is read-only and `--write-manifests` only writes `tool.json`/`family.json`.
+
 After a verified install the installer keeps at most 5 rollback backups (the active one plus the 4 newest) and the active, previous and one spare release, never a release a service still uses.
 Completion notices are tidied in small batches: acknowledged notices are deleted 7 days after acknowledgement (never unacknowledged ones), and notices of the unattended watch targets `default` and `ki-gesamtabschluss-watch` are marked acknowledged after 24 h with an audit entry holding the count.

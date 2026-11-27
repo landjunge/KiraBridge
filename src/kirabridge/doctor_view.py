@@ -326,9 +326,11 @@ def agents_section(config, inventory):
 
 async def live_checks(config, principal, *, config_path, audit, agents, home=None):
     """Collect every section; daemon calls share one short-lived MCP connection."""
+    from kirabridge import paths as central_paths
     from kirabridge.local_runtime import MCPClientPool, connection_observer, peer
     from kirabridge.operator_control import release_identity
 
+    injected_home = home
     home = Path(home or Path.home())
     health, error, catalog, catalog_error = {}, None, {}, None
     try:
@@ -359,8 +361,16 @@ async def live_checks(config, principal, *, config_path, audit, agents, home=Non
             catalog,
             catalog_error,
             services=services,
-            relay_config=home / ".config/kirabridge/remote-relay.json",
-            relay_log=home / "Library/Logs/kirabridge-remote-relay.log",
+            relay_config=(
+                central_paths.relay_config_file()
+                if injected_home is None
+                else home / ".config/kirabridge/remote-relay.json"
+            ),
+            relay_log=(
+                central_paths.relay_log_file()
+                if injected_home is None
+                else home / "Library/Logs/kirabridge-remote-relay.log"
+            ),
         ),
         agents_section(config, agents),
     ]

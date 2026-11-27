@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
+from kirabridge import paths as central_paths
 from kirabridge.bridge_core.models import AgentToolGrant, BridgeError
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
 from kirabridge.openrouter_models import (
@@ -756,7 +757,7 @@ class Config(BaseModel):
     _source_path: str | None = PrivateAttr(default=None)
     _source_sha256: str | None = PrivateAttr(default=None)
     _effective_sha256: str | None = PrivateAttr(default=None)
-    data_dir: str = str(Path.home() / ".local/share/kirabridge")
+    data_dir: str = Field(default_factory=lambda: str(central_paths.data_dir()))
     concurrency: int = Field(default=2, ge=1, le=32)
     max_queued: int = Field(default=1000, ge=1, le=100000)
     # Concurrent direct-native admissions; distinct from the persisted task queue.
@@ -826,7 +827,7 @@ class Config(BaseModel):
 
 def load_config(path: str | None = None) -> Config:
     path = path or os.environ.get("KIRABRIDGE_CONFIG")
-    default = Path.home() / ".config/kirabridge/config.toml"
+    default = central_paths.config_file()
     if path is None and default.is_file():
         path = str(default)
     if path:
