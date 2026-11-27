@@ -177,9 +177,6 @@ class TeamConfig(BaseModel):
     max_hops: int = Field(default=6, ge=1, le=16)
     max_work_per_root: int = Field(default=32, ge=1, le=256)
     max_pending_per_member: int = Field(default=32, ge=1, le=1000)
-    # Principals whose messages always go to the coordinator and nowhere else (operator rule:
-    # ChatGPT writes only to the coordinator, who distributes). Empty = no restriction.
-    coordinator_only_senders: list[str] = Field(default_factory=list, max_length=16)
     # Members allowed to claim the coordinator role for themselves (needs team.manage as well).
     # Empty = nobody self-claims; the owner and the current coordinator can always switch roles.
     coordinator_candidates: list[str] = Field(default_factory=list, max_length=16)

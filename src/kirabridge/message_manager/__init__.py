@@ -379,11 +379,6 @@ class MessageManager:
                 "approval_required", "Messaging requires local automatic authorization"
             )
         requested_message = message
-        if (
-            principal in self.config.team.coordinator_only_senders
-            and message.recipient != "coordinator"
-        ):
-            message = message.model_copy(update={"recipient": "coordinator"})
         recipient_role = message.recipient if message.recipient == "coordinator" else None
         coordinator_route = None
         if recipient_role:
