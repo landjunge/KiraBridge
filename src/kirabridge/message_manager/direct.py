@@ -418,6 +418,16 @@ class DirectDelivery:
                 }
             if observation:
                 evidence["observation"] = observation
+            # Unproven presence (timeout/flapping) is not absence: a team ticket waits unsent.
+            unproven_ticket = (
+                code == "session_selection_changed"
+                and bool(
+                    bridge.store.db.execute(
+                        "SELECT 1 FROM messages WHERE id=? AND idem LIKE 'team:%'", (message_id,)
+                    ).fetchone()
+                )
+                and (observation or {}).get("state") in {"unknown", "stale"}
+            )
             assigned_native = (
                 row["recipient"] == "codex"
                 and bridge.config.visible_handoffs.native_codex is not None
@@ -426,13 +436,15 @@ class DirectDelivery:
             if (
                 not possible
                 and not assigned_native
-                and code in self.receiver.DEFER_UNSENT
+                and (code in self.receiver.DEFER_UNSENT or unproven_ticket)
                 and row["state"] == "queued"
                 and owned_run is None
             ):
                 # Nothing was inserted. Keep the body queued for the existing
                 # receiver loop; do not hold it and do not paste while busy.
-                self.receiver._waiting(message_id, code, observation)
+                self.receiver._waiting(
+                    message_id, "visible_target_unknown" if unproven_ticket else code, observation
+                )
                 return
             if (
                 not possible
