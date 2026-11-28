@@ -2521,8 +2521,9 @@ def rollback(args, *, _compensating=False):
         current.unlink()
     if readiness_error is not None:
         raise RuntimeError(
-            "Rollback: Kern (Launcher/Dienst) wiederherstellt, "
-            "Zusatzdienst-Bereitschaft fehlgeschlagen; Datensatz korrigiert"
+            "Launcher und Hauptdienst wiederhergestellt. "
+            "Der Rückweg ist gespeichert. "
+            f"Fehler bei der Wiederherstellung: {_safe_failure_detail(readiness_error)}"
         ) from readiness_error
     report_summary(
         "Vorherige Version wiederhergestellt",
