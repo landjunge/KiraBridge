@@ -1,0 +1,66 @@
+{
+  "scope": "INSTALLED PRODUCTION BRIDGE; principal=local; read-only only",
+  "checks": {
+    "discoverability": {
+      "tool_count": 86,
+      "capabilities_checked": 124,
+      "missing_tool_route": [],
+      "thin_description": [],
+      "ok": true
+    },
+    "bridge_health": {
+      "ok": true
+    },
+    "session_catalog": {
+      "ok": true
+    },
+    "task_list": {
+      "ok": true
+    },
+    "policy_inspect": {
+      "ok": true
+    },
+    "agent_status": {
+      "ok": true
+    },
+    "agent_inventory": {
+      "ok": true
+    },
+    "queue_catalog": {
+      "ok": true
+    },
+    "operation:system.info": {
+      "ok": true
+    },
+    "operation:windows.list": {
+      "ok": true
+    },
+    "operation:apps.list": {
+      "ok": true
+    },
+    "operation:process.list": {
+      "ok": true
+    },
+    "operation_catalog_resolves": {
+      "ok": true,
+      "resolved": [
+        "system.info",
+        "windows.list",
+        "apps.list",
+        "process.list"
+      ]
+    },
+    "terminal_control": {
+      "ok": true,
+      "state": "completed",
+      "exit_code": 0,
+      "output_matched": true
+    },
+    "clipboard_round_trip": {
+      "ok": true,
+      "restored": true
+    }
+  },
+  "duration_seconds": 17.94,
+  "all_ok": true
+}

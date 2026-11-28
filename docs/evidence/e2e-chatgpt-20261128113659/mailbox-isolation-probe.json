@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "value": {
+    "read_only": true,
+    "items": [],
+    "count": 0,
+    "next": {
+      "after_direct": 0,
+      "after_team": 0
+    },
+    "more": false,
+    "new_count": 0,
+    "acknowledged_by_read": {
+      "direct": [],
+      "team": []
+    },
+    "total": 0,
+    "unread_count": 0,
+    "notice": "one inbox: team_messages; message_receive/message_get/messages_overview are aliases"
+  }
+}

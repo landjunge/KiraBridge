@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "id": "e2e-clip-restore-429362c908cd",
+    "principal": "local",
+    "operation": "clipboard.write",
+    "args": {
+      "text": "kirabridge-e2e-test-0b277d09bb27"
+    },
+    "agent": null,
+    "parent_id": null,
+    "state": "completed",
+    "created": 1795862751.180962,
+    "updated": 1795862751.448256,
+    "accepted": 1795862751.1977699,
+    "started": 1795862751.245322,
+    "finished": 1795862751.448256,
+    "receipt": "6b7e2d2d-87d8-4e8d-91ff-91ddb6a1bb4f",
+    "evidence": {
+      "content_sha256": "69ca939d9e902ac815a13d1df6da3691d9c8c4adca24c5f5851bdeb810d2f450",
+      "write_readback_verified": true
+    },
+    "result": {
+      "content_sha256": "69ca939d9e902ac815a13d1df6da3691d9c8c4adca24c5f5851bdeb810d2f450",
+      "evidence": {
+        "content_sha256": "69ca939d9e902ac815a13d1df6da3691d9c8c4adca24c5f5851bdeb810d2f450",
+        "write_readback_verified": true
+      },
+      "success": true,
+      "verified": true,
+      "written_bytes": 32
+    },
+    "error": null,
+    "attempt": 1,
+    "request_sha256": "5d78462e226f3d6fff270ea9ab40e316809f5348192e91919cc70c1603fa885c"
+  }
+}

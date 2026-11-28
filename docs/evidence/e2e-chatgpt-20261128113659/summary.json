@@ -1,0 +1,33 @@
+{
+  "scope": "INSTALLED PRODUCTION BRIDGE; principal=chatgpt sending, local receiving; passive dispatch=false only",
+  "checks": {
+    "discoverability": {
+      "tool_count": 86,
+      "capabilities_checked": 125,
+      "missing_tool_route": [],
+      "thin_description": [],
+      "ok": true
+    },
+    "connection_check": {
+      "ok": true
+    },
+    "message_channel_status": {
+      "ok": true
+    },
+    "team_list": {
+      "ok": true
+    },
+    "agent_status": {
+      "ok": true
+    },
+    "mailbox_round_trip": {
+      "ok": true,
+      "message_id": "89148c5b-f784-4bec-ba23-8fac88fa23ab",
+      "delivered_to_recipient": true,
+      "isolation_clean": true,
+      "acknowledged": true
+    }
+  },
+  "duration_seconds": 1.7,
+  "all_ok": true
+}

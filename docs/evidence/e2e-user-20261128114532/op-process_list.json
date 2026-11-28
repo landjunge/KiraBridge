@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "id": "e2e-48f4894d37e73dd2",
+    "principal": "local",
+    "operation": "process.list",
+    "args": {},
+    "agent": null,
+    "parent_id": null,
+    "state": "completed",
+    "created": 1795862745.923142,
+    "updated": 1795862746.0010371,
+    "accepted": 1795862745.9395,
+    "started": 1795862745.985155,
+    "finished": 1795862746.0010371,
+    "receipt": "e05a1d81-bbbf-4fd8-9143-cf03fe9f8d67",
+    "evidence": {
+      "operation_returned": true
+    },
+    "result": {
+      "processes": []
+    },
+    "error": null,
+    "attempt": 1,
+    "request_sha256": "686675bff7cca916954d5906390d2ab3c35fdb8884552f556795157673ddb929",
+    "local_approval_url": "http://127.0.0.1:8766/",
+    "approval_required": false,
+    "approval_mode": "automatic",
+    "completion_channel": {
+      "target": "default",
+      "receive_tool": "completion_receive",
+      "ack_tool": "completion_ack",
+      "assistant_wakeup": "not_provided_by_current_transport",
+      "source_id": "e2e-48f4894d37e73dd2"
+    }
+  }
+}

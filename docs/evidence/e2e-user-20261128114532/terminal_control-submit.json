@@ -1,0 +1,54 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "id": "e2e-term-73c075df93c0",
+    "principal": "local",
+    "operation": "terminal.visible",
+    "args": {
+      "argv": [
+        "/bin/echo",
+        "kirabridge-e2e-test-73c075df93c0"
+      ],
+      "create_if_needed": true,
+      "cwd": "/Users/landjunge",
+      "expected_pid": null,
+      "pane_id": null,
+      "timeout": 20.0
+    },
+    "agent": null,
+    "parent_id": null,
+    "state": "running",
+    "created": 1795862746.093675,
+    "updated": 1795862747.2506711,
+    "accepted": 1795862746.110601,
+    "started": 1795862747.2506711,
+    "finished": null,
+    "receipt": "2e701db6-f0ca-43bc-9b85-b3e96764de85",
+    "evidence": {
+      "execution_route": "visible_terminal",
+      "expected_pid": 64658,
+      "pane_id": "terminal:18663:ttys002",
+      "tty": "/dev/ttys002"
+    },
+    "result": null,
+    "error": null,
+    "attempt": 1,
+    "request_sha256": "45d7a60e8633eaed0d214d6b0eeacc0ebc4572eafe487bdb94e1731a71202140",
+    "delivery": {
+      "status": "input_attempted",
+      "automatic_retry": false,
+      "scope": "native input observation; input_attempted is not confirmed delivery"
+    },
+    "local_approval_url": "http://127.0.0.1:8766/",
+    "approval_required": false,
+    "approval_mode": "automatic",
+    "completion_channel": {
+      "target": "default",
+      "receive_tool": "completion_receive",
+      "ack_tool": "completion_ack",
+      "assistant_wakeup": "not_provided_by_current_transport",
+      "source_id": "e2e-term-73c075df93c0"
+    }
+  }
+}

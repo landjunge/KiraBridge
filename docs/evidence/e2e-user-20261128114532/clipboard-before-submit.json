@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "id": "e2e-clip-before-429362c908cd",
+    "principal": "local",
+    "operation": "clipboard.read",
+    "args": {
+      "max_bytes": 65536
+    },
+    "agent": null,
+    "parent_id": null,
+    "state": "completed",
+    "created": 1795862750.331271,
+    "updated": 1795862750.5025868,
+    "accepted": 1795862750.347987,
+    "started": 1795862750.392961,
+    "finished": 1795862750.5025868,
+    "receipt": "cd7727e6-8637-465f-b461-459d8f5792ba",
+    "evidence": {
+      "operation_returned": true
+    },
+    "result": {
+      "bytes": 32,
+      "format": "text/plain;charset=utf-8",
+      "text": "kirabridge-e2e-test-0b277d09bb27"
+    },
+    "error": null,
+    "attempt": 1,
+    "request_sha256": "21836500bdc66f6999900d1422031b86e9e0b709783d8f9e486fe3bece888bc3"
+  }
+}

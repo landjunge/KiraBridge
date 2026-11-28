@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "seq": 730,
+    "id": "89148c5b-f784-4bec-ba23-8fac88fa23ab",
+    "conversation_id": "e2e-mailbox-1d1509952277",
+    "position": 1,
+    "sender": "chatgpt",
+    "recipient": "local",
+    "kind": "note",
+    "body": "[E2E-TEST] mailbox round trip 1d1509952277 — safe to ignore/delete",
+    "reply_to": null,
+    "task_id": null,
+    "depth": 0,
+    "request_reply": false,
+    "created": 1795862221.749495,
+    "delivered": 1795862221.965568,
+    "receipt": "9132479d-e36a-4207-83ef-8883a1f80843",
+    "acknowledged": 1795862221.988343,
+    "processing": null,
+    "processing_route": "external_client_inbox"
+  }
+}

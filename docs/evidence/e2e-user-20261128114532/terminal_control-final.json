@@ -1,0 +1,60 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "id": "e2e-term-73c075df93c0",
+    "principal": "local",
+    "operation": "terminal.visible",
+    "args": {
+      "argv": [
+        "/bin/echo",
+        "kirabridge-e2e-test-73c075df93c0"
+      ],
+      "create_if_needed": true,
+      "cwd": "/Users/landjunge",
+      "expected_pid": null,
+      "pane_id": null,
+      "timeout": 20.0
+    },
+    "agent": null,
+    "parent_id": null,
+    "state": "completed",
+    "created": 1795862746.093675,
+    "updated": 1795862749.9520571,
+    "accepted": 1795862746.110601,
+    "started": 1795862747.2506711,
+    "finished": 1795862749.9520571,
+    "receipt": "2e701db6-f0ca-43bc-9b85-b3e96764de85",
+    "evidence": {
+      "automatic_retry": false,
+      "exit_code": 0,
+      "tty_checked_in_window": true,
+      "visible_window_confirmed": true
+    },
+    "result": {
+      "evidence": {
+        "automatic_retry": false,
+        "exit_code": 0,
+        "tty_checked_in_window": true,
+        "visible_window_confirmed": true
+      },
+      "execution_route": "visible_terminal",
+      "exit_code": 0,
+      "expected_pid": 64658,
+      "output_scope": "visible screen; includes prompt/history",
+      "pane_id": "terminal:18663:ttys002",
+      "success": true,
+      "terminal_output": "Last login: Fri Nov 27 20:11:16 on ttys002\n/Users/landjunge/.zshrc:source:2: no such file or directory: /Users/landjunge/.openclaw/completions/openclaw.zsh\nlandjunge@landjungeMac ~ % B=/tmp/kb-build-20261127/extracted/KiraBridge\nshasum -a 256 /tmp/kb-build-20261127/KiraBridge-macos.tar.gz\n/usr/local/opt/python@3.11/bin/python3.11 $B/installer/install.py install --bundle $B --desktop --require-visible-terminal\n\n94f078ef451a3db285927aedca142b7e359a3f40a72a00c2e243064ea577f3d6  /tmp/kb-build-20261127/KiraBridge-macos.tar.gz\n/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/tmp/kb-build-20261127/extracted/KiraBridge/installer/install.py': [Errno 2] No such file or directory\nlandjunge@landjungeMac ~ % cd /tmp/kb-build-20261127\nmkdir -p extracted && tar -xzf KiraBridge-macos.tar.gz -C extracted\nB=/tmp/kb-build-20261127/extracted/KiraBridge\n/usr/local/opt/python@3.11/bin/python3.11 $B/installer/install.py install --bundle $B --desktop --require-visible-terminal\n\n⠀⠀⢸⡇⠀⢠⡜⠃⠀⠀⠘⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡟⠛⠛⢣⡄⠀⠀⠀⠀⠀⠀⠀⠀⠘⠃⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n⠀⠀⢸⣧⡜⠃⠀⠀⠀⠘⢻⡇⠀⠀⢸⣧⡜⠛⢣⡄⠀⠘⠛⠛⢣⡄⢸⣧⣤⣤⡜⠃⢸⣧⡜⠛⢣⡄⠀⠘⢻⡇⠀⠀⢠⡜⠛⢣⣼⡇⢠⡜⠛⠛⢻⡇⢠⡜⠛⠛⢣⡄\n⠀⠀⢸⡇⠘⢣⡄⠀⠀⠀⢸⡇⠀⠀⢸⡇⠀⠀⠀⠀⢠⡜⠛⠛⢻⡇⢸⡇⠀⠀⢸⡇⢸⡇⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⢸⡇⠀⢠⣼⡇⠘⢣⣤⣤⣼⡇⢸⡟⠛⠛⠛⠃\n⠀⠀⠘⠃⠀⠀⠘⠃⠀⠘⠛⠛⠃⠀⠘⠃⠀⠀⠀⠀⠀⠘⠛⠛⠛⠃⠘⠛⠛⠛⠃⠀⠘⠃⠀⠀⠀⠀⠀⠘⠛⠛⠃⠀⠀⠘⠛⠃⠘⠃⢠⡄⠀⠀⢸⡇⠀⠘⠛⠛⠃⠀\n⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n\n  KiraBridge · Installation                                        0.8.0rc81 · adacba8\n  ────────────────────────────────────────────────────────────────────────────────────\n\n  1  Paket prüfen\n     ✓ Prüfsummen stimmen\n       1394 Dateien · Version 0.8.0rc81 · Quelle adacba801c30\n     ✓ ThreadDesk-Bibliothek vorhanden\n       ~/.local/share/kirabridge/install/shared/threaddesk-235d643\n     ✓ Laufzeit eingerichtet\n       ~/.local/share/kirabridge/install/releases/0.8.0rc81-adacba801c30\n       bisherige Installation unverändert\n\n  2  Sichern und umschalten\n     ✓ Rückweg gesichert\n       ~/.local/share/kirabridge/install/backups/20261127-201516-f2598e22\n       Konfiguration und Zugangsdaten bleiben erhalten\n     ! 2 unbekannte Reservierung(en) übersprungen: 2469426d-3f5c-4a88-8c28-e0fe5bfb6549,\n       b1e473eb-0926-4e18-adcc-1d977305488b; kein Neuversand\n     ✓ Keine laufende Arbeit\n       Unter Schreibsperre geprüft: 0 Aufträge, 0 Empfängerjobs\n     ✓ Dienst läuft\n       Version 0.8.0rc81 · PID 66898\n     ✓ Desktop-App, Konsole und Dienste aktualisiert\n\n  3  Abschlussprüfung\n     ✓ KiraBridge\n       4 Prüfungen in Ordnung\n     ✓ Dienste\n       3 Prüfungen in Ordnung\n     ! ThreadDesk: ThreadDesk lokal nicht erreichbar\n       BridgeError\n     ! ThreadDesk: Noch keine erfolgreiche Serverabfrage gefunden\n       /Users/landjunge/Library/Logs/kirabridge-remote-relay.log\n     ✓ Agenten\n       10 Prüfungen in Ordnung\n\n  ────────────────────────────────────────────────────────────────────────────────────\n  ✓ KiraBridge 0.8.0rc81 ist installiert\n    Quellstand   adacba801c30\n    Erhalten     Konfiguration, Zugangsdaten und Rechte\n    ThreadDesk   threaddesk-235d643\n    Rückweg      ~/.local/share/kirabridge/install/backups/20261127-201516-f2598e22\n\nlandjunge@landjungeMac kb-build-20261127 % /bin/zsh -f /Users/landjunge/.local/share/kirabridge/visible-commands/09087ad469d13b04bc5a9e87547f0f98/command.zsh\nkirabridge-e2e-test-7bd7b65f7b59\nlandjunge@landjungeMac kb-build-20261127 % /bin/zsh -f /Users/landjunge/.local/share/kirabridge/visible-commands/d40dbaa3a5011f3dafca00f517f5f2d7/command.zsh\nkirabridge-e2e-test-85d99ed08f09\nlandjunge@landjungeMac kb-build-20261127 % /bin/zsh -f /Users/landjunge/.local/share/kirabridge/visible-commands/4810b7400dd250c183cca35307fec623/command.zsh\nkirabridge-e2e-test-73c075df93c0\nlandjunge@landjungeMac kb-build-20261127 % \n",
+      "terminal_target": {
+        "preserved_existing_input_issue": null,
+        "route": "existing_visible_shell"
+      },
+      "terminated": false,
+      "timed_out": false,
+      "tty": "/dev/ttys002"
+    },
+    "error": null,
+    "attempt": 1,
+    "request_sha256": "45d7a60e8633eaed0d214d6b0eeacc0ebc4572eafe487bdb94e1731a71202140"
+  }
+}

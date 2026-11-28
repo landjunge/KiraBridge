@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "value": {
+    "principal": "chatgpt",
+    "device": "desktop",
+    "mode": "text",
+    "device_mode_source": "caller_report",
+    "transport_receipt": true,
+    "terminal_transport": "available",
+    "terminal_count": 4,
+    "dispatcher_active": true,
+    "permission_scope": "same_for_all_devices_and_modes"
+  }
+}

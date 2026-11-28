@@ -1,0 +1,899 @@
+{
+  "ok": true,
+  "value": {
+    "name": "KiraBridge",
+    "discovery": {
+      "version": "0.8.0rc81",
+      "instance_id": "1b8610cb240d4add986b1374b9b3a74d",
+      "principal": "local",
+      "revision": "d3cc6ec548b90e5cab69be7cb74549b656f4d752f046b792b897ab6cc44e53fb",
+      "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+      "platform": {
+        "schema_version": 1,
+        "provider_id": "macos.existing_native",
+        "provider_version": "1",
+        "host": {
+          "platform": "darwin",
+          "os_version": "15.7.4",
+          "os_build": "24G517",
+          "architecture": "x86_64",
+          "process": {
+            "pid": 8153,
+            "executable": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc81-adacba801c30/source/.venv/bin/python"
+          }
+        },
+        "capabilities": {
+          "files": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "not_checked_by_technical_probe"
+          },
+          "processes": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "not_checked_by_technical_probe"
+          },
+          "terminal_app": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "not_checked_by_technical_probe"
+          },
+          "clipboard": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "not_checked_by_technical_probe"
+          },
+          "desktop_session": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "not_checked_by_technical_probe",
+            "support": "ioreg_key_compatibility_heuristic"
+          },
+          "system_reports": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "not_checked_by_technical_probe"
+          },
+          "system": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "apps": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "accessibility": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "windows": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "capture": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "14.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "notifications": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "preferences": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "keyboard": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          },
+          "mouse": {
+            "available": true,
+            "reason": "available",
+            "minimum_os": "12.0",
+            "permission_scope": "executing_native_app_worker; checked for every operation",
+            "permission_requested_automatically": false,
+            "provider_revision": "6210534bad3ff6286bcaf174f880f7c6bf946a257b92325a4c94b5095c191550"
+          }
+        },
+        "permissions": [],
+        "authorization": "existing_principal_policy_and_target_guards",
+        "revision": "a967ceb2ca84736a95a1b8ccd75886479a59ccb604fbb6b9566b773c6fd98b8e"
+      },
+      "capabilities": [
+        "accessibility.action",
+        "accessibility.inspect",
+        "accessibility.set",
+        "accessibility.status",
+        "admin.execute",
+        "agent.execute",
+        "agent.inspect",
+        "agent.local_tools",
+        "agent.status",
+        "app.focus",
+        "apps.inspect",
+        "apps.launch",
+        "apps.list",
+        "apps.quit",
+        "autonext.control",
+        "bridge.health",
+        "capture.display",
+        "capture.window",
+        "clipboard.info",
+        "clipboard.read",
+        "clipboard.write",
+        "connection.check",
+        "file.delete",
+        "file.image",
+        "file.list",
+        "file.mkdir",
+        "file.move",
+        "file.read",
+        "file.write",
+        "files.abort",
+        "files.inspect",
+        "files.inventory",
+        "files.pause",
+        "files.prepare",
+        "files.status",
+        "files.transfer",
+        "handoff.answer",
+        "handoff.decide",
+        "handoff.inbox",
+        "handoff.issue",
+        "handoff.reconcile",
+        "handoff.start",
+        "handoff.status",
+        "keyboard.action",
+        "keyboard.chord",
+        "keyboard.control",
+        "keyboard.execute",
+        "keyboard.inspect",
+        "keyboard.key",
+        "keyboard.profiles.delete",
+        "keyboard.profiles.get",
+        "keyboard.profiles.list",
+        "keyboard.profiles.manage",
+        "keyboard.profiles.put",
+        "keyboard.profiles.read",
+        "keyboard.profiles.resolve",
+        "keyboard.sequence",
+        "keyboard.shortcuts.discover",
+        "keyboard.shortcuts.read",
+        "keyboard.system_inventory",
+        "keyboard.system_key",
+        "keyboard.text",
+        "logs.live",
+        "message.ack",
+        "message.read",
+        "message.send",
+        "mouse.click",
+        "mouse.move",
+        "mouse.scroll",
+        "notifications.post",
+        "notifications.status",
+        "observations.read",
+        "platform.status",
+        "policy.inspect",
+        "preferences.read",
+        "preferences.reset",
+        "preferences.write",
+        "process.inspect",
+        "process.list",
+        "process.output",
+        "process.terminate",
+        "queue.control",
+        "session.catalog",
+        "session.close",
+        "session.focus",
+        "session.input",
+        "session.inspect",
+        "session.open",
+        "session.read",
+        "system.displays",
+        "system.info",
+        "system.permission_request",
+        "system.permissions",
+        "system.process",
+        "system.processes",
+        "system.report",
+        "system.signal",
+        "system.volumes",
+        "task.cancel",
+        "task.read",
+        "team.manage",
+        "team.read",
+        "team.write",
+        "terminal.execute",
+        "terminal.visible",
+        "threaddesk.dynamic",
+        "threaddesk.knowledge",
+        "threaddesk.manage",
+        "threaddesk.read",
+        "windows.app.focus",
+        "windows.app.launch",
+        "windows.app.list",
+        "windows.console.handoff",
+        "windows.console.status",
+        "windows.focus",
+        "windows.inspect",
+        "windows.keyboard.inspect",
+        "windows.keyboard.sequence",
+        "windows.keyboard.shortcut",
+        "windows.keyboard.text",
+        "windows.list",
+        "windows.window.control",
+        "windows.window.list",
+        "workflow.stop"
+      ],
+      "refresh": {
+        "on": [
+          "connection",
+          "version",
+          "instance",
+          "permissions",
+          "terminal_session",
+          "platform"
+        ],
+        "tools_list": "explicit tools/list is fresh; stdio call schemas cached <=30s with epoch/notification invalidation",
+        "client_action": "Refresh tools/list and operation_catalog when revision changes; never replay writes"
+      },
+      "file_transfer": {
+        "enabled": true,
+        "source_access": "explicit host-selected file params or authorized exports; no Library-wide enumeration",
+        "prepare_permission": {
+          "principal": "local",
+          "operation": "files.prepare",
+          "authorized": true,
+          "automatic": true,
+          "approval_required": false,
+          "reason": "level_automatic",
+          "missing_capabilities": [],
+          "standing_exception": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "permission_level": "full",
+          "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+          "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+          "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+        },
+        "transfer_permission": {
+          "principal": "local",
+          "operation": "files.transfer",
+          "authorized": true,
+          "automatic": true,
+          "approval_required": false,
+          "reason": "level_automatic",
+          "missing_capabilities": [],
+          "standing_exception": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "permission_level": "full",
+          "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+          "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+          "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+        },
+        "inspect_permission": {
+          "principal": "local",
+          "operation": "files.inventory",
+          "authorized": true,
+          "automatic": true,
+          "approval_required": false,
+          "reason": "level_automatic",
+          "missing_capabilities": [],
+          "standing_exception": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "permission_level": "full",
+          "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+          "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+          "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+        },
+        "receiver_protocol": "threaddesk.library.receive.v1",
+        "receiver_availability": "not_probed",
+        "success_condition": "stored plus validated durable receipt; transferred bytes alone are not import success"
+      },
+      "keyboard": {
+        "tool": "keyboard_control",
+        "operation": "keyboard.control",
+        "profile_required": false,
+        "event_subscription_required": false,
+        "target_selection": "application name, exact PID/start pair, or fresh foreground app",
+        "target_inspection": "automatic before native input",
+        "permission": {
+          "principal": "local",
+          "operation": "keyboard.control",
+          "authorized": true,
+          "automatic": true,
+          "approval_required": false,
+          "reason": "level_automatic",
+          "missing_capabilities": [],
+          "standing_exception": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "permission_level": "full",
+          "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+          "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+          "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+        },
+        "os_permission_requested_automatically": false,
+        "success_scope": "native posting evidence; application processing is not confirmed"
+      },
+      "direct_terminal": {
+        "tool": "terminal_control",
+        "operation": "terminal.visible",
+        "legacy_terminal_execute_route": "managed_process",
+        "rule_scope": "ChatGPT direct KiraBridge terminal control; not internal Codex/Grok execution",
+        "selection": "confirmed idle visible shell; otherwise a separate visible window",
+        "create_if_needed_scope": "macOS visible window only",
+        "hidden_fallback": false,
+        "permission": {
+          "principal": "local",
+          "operation": "terminal.visible",
+          "authorized": true,
+          "automatic": true,
+          "approval_required": false,
+          "reason": "level_automatic",
+          "missing_capabilities": [],
+          "standing_exception": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "permission_level": "full",
+          "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+          "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+          "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+        },
+        "new_window_permission": {
+          "principal": "local",
+          "operation": "session.open",
+          "authorized": true,
+          "automatic": true,
+          "approval_required": false,
+          "reason": "level_automatic",
+          "missing_capabilities": [],
+          "standing_exception": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "permission_level": "full",
+          "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+          "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+          "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+        },
+        "window_authorization": "approved exact task or existing automatic grant; no second local-only token",
+        "threaddesk": "separate optional access path; never a direct-terminal substitute"
+      },
+      "terminal_observation": {
+        "transport": "terminal_app",
+        "status": "available",
+        "ui_window_count": 1,
+        "sessions": [
+          {
+            "pane_id": "terminal:18663:ttys002",
+            "window_id": 18663,
+            "visual_window_id": 16978,
+            "tab_index": 1,
+            "tab_count": 4,
+            "tab_selected": true,
+            "miniaturized": false,
+            "ui_window_count": 1,
+            "identity_ambiguous": false,
+            "selection_ambiguous": false,
+            "expected_pid": 64658,
+            "legacy_expected_pid": 64655,
+            "process_owner_verified": true,
+            "tty": "/dev/ttys002",
+            "transport": "terminal_app",
+            "busy": false,
+            "agent_identity_verified": false,
+            "processes": [
+              {
+                "pid": 64658,
+                "ppid": 64655,
+                "name": "-zsh",
+                "image": "-zsh"
+              }
+            ],
+            "agent_identity_scope": "current-user OS process observation, not cryptographic identity",
+            "session_key": "/dev/ttys002:64658",
+            "view_id": 18663,
+            "view_count": 1,
+            "duplicate_view": false
+          },
+          {
+            "pane_id": "terminal:16978:ttys001",
+            "window_id": 16978,
+            "visual_window_id": 16978,
+            "tab_index": 2,
+            "tab_count": 4,
+            "tab_selected": false,
+            "miniaturized": false,
+            "ui_window_count": 1,
+            "identity_ambiguous": false,
+            "selection_ambiguous": false,
+            "expected_pid": 25431,
+            "legacy_expected_pid": 25427,
+            "process_owner_verified": true,
+            "tty": "/dev/ttys001",
+            "transport": "terminal_app",
+            "busy": true,
+            "agent_identity_verified": false,
+            "processes": [
+              {
+                "pid": 25431,
+                "ppid": 25427,
+                "name": "-zsh",
+                "image": "-zsh"
+              },
+              {
+                "pid": 25445,
+                "ppid": 25431,
+                "name": "claude",
+                "image": "claude"
+              },
+              {
+                "pid": 40898,
+                "ppid": 25445,
+                "name": "caffeinate",
+                "image": "caffeinate"
+              }
+            ],
+            "agent_identity_scope": "current-user OS process observation, not cryptographic identity",
+            "agent_candidate": "claude",
+            "agent_pid": 25445,
+            "cli_adapter": {
+              "interface_version": 1,
+              "program": "claude",
+              "capabilities": {
+                "text": true,
+                "separate_return": false,
+                "return_to_input": false,
+                "slash_commands": [],
+                "softwrap": false,
+                "cwd_proof": false,
+                "bound_turn": false,
+                "bound_reply": false
+              },
+              "scope": "program semantics, not permission or runtime readiness"
+            },
+            "configured_binding_current": false,
+            "agent_activity": "not_probed",
+            "busy_scope": "transport process presence; not an agent-turn activity result",
+            "session_key": "/dev/ttys001:25431",
+            "view_id": 16978,
+            "view_count": 1,
+            "duplicate_view": false
+          },
+          {
+            "pane_id": "terminal:16980:ttys003",
+            "window_id": 16980,
+            "visual_window_id": 16978,
+            "tab_index": 3,
+            "tab_count": 4,
+            "tab_selected": false,
+            "miniaturized": false,
+            "ui_window_count": 1,
+            "identity_ambiguous": false,
+            "selection_ambiguous": false,
+            "expected_pid": 25434,
+            "legacy_expected_pid": 25430,
+            "process_owner_verified": true,
+            "tty": "/dev/ttys003",
+            "transport": "terminal_app",
+            "busy": true,
+            "agent_identity_verified": false,
+            "processes": [
+              {
+                "pid": 25434,
+                "ppid": 25430,
+                "name": "-zsh",
+                "image": "-zsh"
+              },
+              {
+                "pid": 25447,
+                "ppid": 25434,
+                "name": "qwen",
+                "image": "/Users/landjunge/.local/lib/qwen-code/node/bin/node"
+              }
+            ],
+            "agent_identity_scope": "current-user OS process observation, not cryptographic identity",
+            "agent_candidate": "qwen",
+            "agent_pid": 25447,
+            "cli_adapter": {
+              "interface_version": 1,
+              "program": "qwen",
+              "capabilities": {
+                "text": false,
+                "separate_return": false,
+                "return_to_input": false,
+                "slash_commands": [],
+                "softwrap": false,
+                "cwd_proof": false,
+                "bound_turn": false,
+                "bound_reply": false
+              },
+              "scope": "program semantics, not permission or runtime readiness"
+            },
+            "configured_binding_current": true,
+            "agent_activity": "not_probed",
+            "busy_scope": "transport process presence; not an agent-turn activity result",
+            "session_key": "/dev/ttys003:25434",
+            "view_id": 16980,
+            "view_count": 1,
+            "duplicate_view": false
+          },
+          {
+            "pane_id": "terminal:18519:ttys000",
+            "window_id": 18519,
+            "visual_window_id": 16978,
+            "tab_index": 4,
+            "tab_count": 4,
+            "tab_selected": false,
+            "miniaturized": false,
+            "ui_window_count": 1,
+            "identity_ambiguous": false,
+            "selection_ambiguous": false,
+            "expected_pid": 90555,
+            "legacy_expected_pid": 90553,
+            "process_owner_verified": true,
+            "tty": "/dev/ttys000",
+            "transport": "terminal_app",
+            "busy": true,
+            "agent_identity_verified": false,
+            "processes": [
+              {
+                "pid": 90555,
+                "ppid": 90553,
+                "name": "-zsh",
+                "image": "-zsh"
+              },
+              {
+                "pid": 90567,
+                "ppid": 90555,
+                "name": "codex",
+                "image": "codex"
+              }
+            ],
+            "agent_identity_scope": "current-user OS process observation, not cryptographic identity",
+            "agent_candidate": "codex",
+            "agent_pid": 90567,
+            "cli_adapter": {
+              "interface_version": 1,
+              "program": "codex",
+              "capabilities": {
+                "text": true,
+                "separate_return": true,
+                "return_to_input": true,
+                "slash_commands": [
+                  "/status",
+                  "/model",
+                  "/resume"
+                ],
+                "softwrap": true,
+                "cwd_proof": true,
+                "bound_turn": true,
+                "bound_reply": true
+              },
+              "scope": "program semantics, not permission or runtime readiness"
+            },
+            "configured_binding_current": true,
+            "agent_activity": "not_probed",
+            "busy_scope": "transport process presence; not an agent-turn activity result",
+            "session_key": "/dev/ttys000:90555",
+            "view_id": 18519,
+            "view_count": 1,
+            "duplicate_view": false
+          }
+        ],
+        "transport_errors": {
+          "tmux": {
+            "code": "session_transport_unavailable"
+          }
+        },
+        "truncated": false,
+        "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
+        "observed_at": 1795862678.0484412,
+        "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+        "revision": "a5166cba1aaf410ab2a98af8c9949d52ae2ebaba878f582fdd547b4d80be5f2b",
+        "freshness": "cached",
+        "usable_for_input": false
+      }
+    },
+    "version": "0.8.0rc81",
+    "api_version": "1",
+    "dispatcher_active": true,
+    "chatgpt_integration": "unverified",
+    "task_submission": {
+      "events_subscription_required": false,
+      "preferred_tools": [
+        "action_request",
+        "action_submit"
+      ],
+      "result_tools": [
+        "task_get",
+        "task_events",
+        "read_query"
+      ],
+      "legacy_connector_schema": "If a cached task_* connector requires completion_subscription, the root value empty string is accepted as no subscription; use fresh action_* schemas after metadata refresh."
+    },
+    "completion_channel": {
+      "receive_tool": "completion_receive",
+      "ack_tool": "completion_ack",
+      "default_target": "default",
+      "mode": "durable_inbox_with_waiting_consumer",
+      "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport"
+    },
+    "local_approval_url": "http://127.0.0.1:8766/",
+    "approval_mode": "automatic",
+    "permission_level": "full",
+    "permission_label": "Voll erlaubt",
+    "permission_detail": {
+      "label": "Voll erlaubt",
+      "exceptions": [],
+      "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+      "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe"
+    },
+    "approval_required": false,
+    "approval_required_scope": "default execution; inspect each operation permission_decision",
+    "effective_approval_mode": "automatic",
+    "session_input_policy": {
+      "enabled": false,
+      "timeout_seconds": 60.0,
+      "principals": []
+    },
+    "terminal_access": {
+      "host_platform": "macos",
+      "policy_authorized": true,
+      "discovery_allowed": true,
+      "read_allowed": true,
+      "catalog_decision": {
+        "principal": "local",
+        "operation": "session.catalog",
+        "authorized": true,
+        "automatic": true,
+        "approval_required": false,
+        "reason": "level_automatic",
+        "missing_capabilities": [],
+        "standing_exception": false,
+        "buffer_enabled": false,
+        "buffer_required": false,
+        "permission_level": "full",
+        "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+        "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+        "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+      },
+      "read_decision": {
+        "principal": "local",
+        "operation": "session.read",
+        "authorized": true,
+        "automatic": true,
+        "approval_required": false,
+        "reason": "level_automatic",
+        "missing_capabilities": [],
+        "standing_exception": false,
+        "buffer_enabled": false,
+        "buffer_required": false,
+        "permission_level": "full",
+        "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+        "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+        "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+      },
+      "read_approval_required": false,
+      "input_allowed": true,
+      "input_approval_required": false,
+      "input_decision": {
+        "principal": "local",
+        "operation": "session.input",
+        "authorized": true,
+        "automatic": true,
+        "approval_required": false,
+        "reason": "level_automatic",
+        "missing_capabilities": [],
+        "standing_exception": false,
+        "buffer_enabled": false,
+        "buffer_required": false,
+        "permission_level": "full",
+        "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+        "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+        "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+      },
+      "additional_input_buffer_enabled": false,
+      "session_input_policy_meaning": "optional_confirmation_buffer_not_terminal_enable_switch",
+      "availability": "not_probed",
+      "catalog_tool": "session_catalog",
+      "read_tool": "session_read",
+      "input_operation": "session.input",
+      "direct_command_tool": "terminal_control",
+      "direct_command_operation": "terminal.visible",
+      "direct_command_availability": "not_probed",
+      "direct_command_decision": {
+        "principal": "local",
+        "operation": "terminal.visible",
+        "authorized": true,
+        "automatic": true,
+        "approval_required": false,
+        "reason": "level_automatic",
+        "missing_capabilities": [],
+        "standing_exception": false,
+        "buffer_enabled": false,
+        "buffer_required": false,
+        "permission_level": "full",
+        "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+        "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+        "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+      },
+      "new_window_decision": {
+        "principal": "local",
+        "operation": "session.open",
+        "authorized": true,
+        "automatic": true,
+        "approval_required": false,
+        "reason": "level_automatic",
+        "missing_capabilities": [],
+        "standing_exception": false,
+        "buffer_enabled": false,
+        "buffer_required": false,
+        "permission_level": "full",
+        "config_revision": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+        "permission_revision": "614ff5346a65711617db8e3516e58f886c0c682dfdc9a11502dd9428249ec9fe",
+        "config_file_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4"
+      },
+      "runtime_requirements": [
+        "interactive macOS desktop",
+        "Terminal.app automation",
+        "fresh window/TTY/PID identity",
+        "confirmed empty shell input"
+      ],
+      "alternative_terminal_route": null,
+      "grant_is_not_runtime_readiness": true,
+      "cached_client_catalog_query": {
+        "operation": "session.catalog"
+      },
+      "cached_client_task_operations": [
+        "session.catalog",
+        "session.read"
+      ],
+      "cached_client_task_tool": "task_request",
+      "cached_client_read_query": {
+        "operation": "session.read",
+        "pane_id": "FROM_CATALOG",
+        "expected_pid": "FROM_CATALOG"
+      },
+      "description": "Terminalrechte sind erteilt. Vorhandene Fenster über den Katalog auswählen; Lesen und Eingabe verwenden Fenster-ID, TTY und PID. Ein ausgeschalteter Zusatzpuffer deaktiviert den Terminalzugriff nicht."
+    },
+    "automatic_operations": [],
+    "voice_messaging": {
+      "release_required": false,
+      "timeout_seconds": 60.0
+    },
+    "visible_handoffs": {
+      "enabled": true,
+      "allow_interim_messages": true,
+      "bindings": {
+        "local": {
+          "pane_id": "terminal:16978:ttys001",
+          "expected_pid": 25431,
+          "agent_pid": 25445,
+          "ready_pattern": "❯",
+          "busy_pattern": "esc to interrupt",
+          "codex_thread_id": null,
+          "codex_rollout_path": null
+        },
+        "codex": {
+          "pane_id": "terminal:18519:ttys000",
+          "expected_pid": 90555,
+          "agent_pid": 90567,
+          "ready_pattern": "(?m)^\\s*›(?: Ask Codex to do anything)?\\s*$",
+          "busy_pattern": "\\[stop\\]|esc to interrupt|Thinking…|Working…|Back to bottom|enter/esc latest",
+          "codex_thread_id": null,
+          "codex_rollout_path": null
+        },
+        "qwen": {
+          "pane_id": "terminal:16980:ttys003",
+          "expected_pid": 25434,
+          "agent_pid": 25447,
+          "ready_pattern": "Type your request",
+          "busy_pattern": "esc to cancel",
+          "codex_thread_id": null,
+          "codex_rollout_path": null
+        }
+      },
+      "native_codex": null
+    },
+    "identity": {
+      "name": "Daniel",
+      "role": "human"
+    },
+    "voice_message_gate": false,
+    "shared_conversation_id": "eve-kira-shared",
+    "eve_instructions": "Eve übermittelt ausschließlich Daniels Diktat unverändert. Explizite Nutzeraufträge ohne zusätzliches Sondertoken weitergeben; normale Berechtigungen bleiben erforderlich.",
+    "health_scope": "liveness and authentication; use bridge_readiness for prerequisites",
+    "runtime": {
+      "instance_id": "1b8610cb240d4add986b1374b9b3a74d",
+      "version": "0.8.0rc81",
+      "pid": 8153,
+      "started_at": "2026-11-28T02:05:35.985293+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "e70949def8df80fcc9a5426e166fb976b2301340d863286261290cd4cc2d51c4",
+      "effective_config_sha256": "8e252e26ec14a193a5ccf070248a426896dc0c122d9a77ae28c974b3c9074f5f",
+      "source_tree_sha256": "d8f83efae609e2273f3d3679ccdecee007ef9cfb92a83a31e1d147e3bb24f3cd",
+      "source_file_count": 262,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc81-adacba801c30/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "operations": {
+      "protocol": 1,
+      "status": "not_probed",
+      "maintenance": null,
+      "accepting_new_work": null
+    },
+    "desktop_last_observation": {
+      "state": "available",
+      "observed_at": 1795862708.2566872,
+      "scope": "macOS console availability, not permission or agent readiness"
+    },
+    "output_history": {
+      "status": "not_probed"
+    },
+    "diagnostics_storage": {
+      "recording": "not_probed"
+    },
+    "message_peers": [
+      "codex",
+      "grok",
+      "chatgpt",
+      "opencode",
+      "gemini",
+      "claude",
+      "copilot",
+      "grok_app",
+      "remote",
+      "qwen",
+      "qwen2",
+      "qwen3"
+    ],
+    "message_receiver_active": true,
+    "health_detail": {
+      "included": false,
+      "request": "bridge_health(include_diagnostics=true)",
+      "readiness": "not_checked"
+    },
+    "message_receiver_scope": "bridge_dispatcher_for_configured_receivers"
+  }
+}

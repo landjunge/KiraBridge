@@ -1,0 +1,273 @@
+{
+  "ok": true,
+  "value": {
+    "api_version": "1",
+    "principal": "chatgpt",
+    "peers": [
+      "local",
+      "codex",
+      "grok",
+      "opencode",
+      "gemini",
+      "claude",
+      "copilot",
+      "grok_app",
+      "remote",
+      "qwen",
+      "qwen2",
+      "qwen3"
+    ],
+    "approval_mode": "automatic",
+    "receiver_configured": false,
+    "receiver_active": false,
+    "receiver_status_scope": "authenticated_principal_inbox",
+    "dispatcher_active": true,
+    "peer_receivers": {
+      "local": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "visible_terminal",
+          "state": "available",
+          "reason": "matched",
+          "observed_age_seconds": 22
+        }
+      },
+      "codex": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "visible_terminal",
+          "state": "available",
+          "reason": "matched",
+          "observed_age_seconds": 22
+        }
+      },
+      "grok": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "opencode": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "gemini": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "claude": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "copilot": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "grok_app": {
+        "receiver_configured": false,
+        "receiver_active": false,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "remote": {
+        "receiver_configured": false,
+        "receiver_active": false,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "qwen": {
+        "receiver_configured": true,
+        "receiver_active": true,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "visible_terminal",
+          "state": "available",
+          "reason": "matched",
+          "observed_age_seconds": 22
+        }
+      },
+      "qwen2": {
+        "receiver_configured": false,
+        "receiver_active": false,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      },
+      "qwen3": {
+        "receiver_configured": false,
+        "receiver_active": false,
+        "route": {
+          "known_ready": false,
+          "effect_point": "exact_target_revalidated_before_input",
+          "kind": "no_visible_binding",
+          "state": "not_applicable"
+        }
+      }
+    },
+    "session_scope": "existing_visible_terminal",
+    "visible_handoffs": {
+      "enabled": true,
+      "allow_interim_messages": true,
+      "bindings": {
+        "local": {
+          "pane_id": "terminal:16978:ttys001",
+          "expected_pid": 25431,
+          "agent_pid": 25445,
+          "ready_pattern": "❯",
+          "busy_pattern": "esc to interrupt",
+          "codex_thread_id": null,
+          "codex_rollout_path": null
+        },
+        "codex": {
+          "pane_id": "terminal:18519:ttys000",
+          "expected_pid": 90555,
+          "agent_pid": 90567,
+          "ready_pattern": "(?m)^\\s*›(?: Ask Codex to do anything)?\\s*$",
+          "busy_pattern": "\\[stop\\]|esc to interrupt|Thinking…|Working…|Back to bottom|enter/esc latest",
+          "codex_thread_id": null,
+          "codex_rollout_path": null
+        },
+        "qwen": {
+          "pane_id": "terminal:16980:ttys003",
+          "expected_pid": 25434,
+          "agent_pid": 25447,
+          "ready_pattern": "Type your request",
+          "busy_pattern": "esc to cancel",
+          "codex_thread_id": null,
+          "codex_rollout_path": null
+        }
+      },
+      "native_codex": null
+    },
+    "binding_runtime_status": "not_probed",
+    "native_codex_route": {
+      "configured": false,
+      "recipient": "codex",
+      "scope": "new_direct_messages_to_assigned_root",
+      "session_scope": "existing_native_codex_root",
+      "validation": "fresh_host_and_root_on_each_attempt",
+      "automatic_history_retry": false
+    },
+    "existing_session_attached": false,
+    "attachment_meaning": "no_persistent_agent_protocol_attachment; exact_existing_UI_target_revalidated_on_each_action",
+    "interactive_session_access": {
+      "mode": "on_demand_exact_target",
+      "catalog_tool": "session_catalog",
+      "read_tool": "session_read",
+      "open_tool": "session_open",
+      "input_operation": "session.input"
+    },
+    "jobs": {},
+    "team_return_path": {
+      "delivery_mode": "passive_pull",
+      "pull_tools": [
+        "team_messages",
+        "team_message_ack"
+      ],
+      "push": {
+        "team_reply_push": "not_supported",
+        "events_sidecar_scope": "task_completion_only",
+        "host_subscription": "not_verified",
+        "external_dependency": "A ChatGPT host MCP Events subscription with a verified webhook callback, plus a recipient-scoped team-reply event contract; neither exists today"
+      },
+      "ack_semantics": "explicit addressed-recipient team_message_ack only; storage, retrieval, webhook receipt and processing are separate facts and never imply ACK",
+      "state": "observed",
+      "teams": 1,
+      "incoming": {
+        "unacknowledged": 3,
+        "unacknowledged_replies": 0,
+        "references": [
+          {
+            "team_id": "kirabridge-team",
+            "message_id": "tm-1b717b83e5454a5d88e66a9e361fd880",
+            "seq": 1065,
+            "sender": "local",
+            "kind": "note",
+            "reply_to": null,
+            "created": 1795861228.981754
+          },
+          {
+            "team_id": "kirabridge-team",
+            "message_id": "tm-519d549a30ef476f88d290c02ddcaefb",
+            "seq": 1066,
+            "sender": "local",
+            "kind": "note",
+            "reply_to": null,
+            "created": 1795861505.356351
+          },
+          {
+            "team_id": "kirabridge-team",
+            "message_id": "tm-61b202c1ffa64745b3351a92e62c5bcc",
+            "seq": 1067,
+            "sender": "local",
+            "kind": "note",
+            "reply_to": null,
+            "created": 1795861754.567945
+          }
+        ],
+        "references_truncated": false
+      },
+      "outgoing": {
+        "sent": 64,
+        "recipient_acknowledged": 24,
+        "awaiting_recipient_ack": 40
+      }
+    },
+    "limits": {
+      "max_body_bytes": 16384,
+      "max_pending_per_recipient": 100,
+      "max_total": 10000,
+      "max_conversation_messages": 64,
+      "max_reply_depth": 8,
+      "max_runs_per_conversation": 16,
+      "max_runs_per_hour": 24,
+      "separate_managed_after": null
+    }
+  }
+}
