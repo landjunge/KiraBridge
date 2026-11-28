@@ -57,6 +57,48 @@ def test_working_pending_input_and_unknown_frames_fail_closed():
     assert adapter.observe(EMPTY + "\x07", BINDING)["reason"] == "unsupported_control_sequence"
 
 
+def screen_with_standing_footer_hint(rows, status="✻ Waiting for 3 background agents to finish"):
+    """Current Claude Code releases show a standing "esc to interrupt" keybinding
+    hint in the footer at ALL times (idle or not) -- unlike the RC45-era `screen()`
+    fixture above, whose footer never carried that phrase. Live-found 2026-11-28:
+    matching binding.busy_pattern (default includes "esc to interrupt") against
+    this footer made KiraBridge see every idle, empty composer as "working"
+    forever, so a message addressed to this session was never delivered."""
+    return "\n".join(
+        [
+            "⏺ Earlier answer.",
+            "",
+            status,
+            RULE,
+            *rows,
+            RULE,
+            "  ⏵⏵ auto mode on · 1 shell · esc to interrupt · ← 2 agents · ↓ to manage",
+        ]
+    )
+
+
+def test_ready_on_empty_composer_despite_standing_esc_to_interrupt_footer_hint():
+    """Regression test for the 2026-11-28 message-wakeup finding: a standing
+    footer hint must never be read as "busy" on its own. Busy is decided only
+    by the actual live spinner/elapsed-time line, which this idle fixture has
+    none of."""
+    adapter = adapter_for("claude")
+    idle = screen_with_standing_footer_hint(["❯ " + " " * 40])
+    state = adapter.observe(idle, BINDING)
+    assert state["ready"] and state["state"] == "ready"
+    assert state["reason"] == "current_empty_widget"
+
+
+def test_still_working_with_standing_footer_hint_when_the_live_spinner_is_present():
+    """The footer-exclusion fix must not weaken real busy detection: an actual
+    live spinner line still means "working", footer hint or not."""
+    adapter = adapter_for("claude")
+    working = screen_with_standing_footer_hint(
+        ["❯ "], status="✳ Galloping… (45s · ↓ 3.0k tokens)"
+    )
+    assert adapter.observe(working, BINDING)["state"] == "working"
+
+
 def test_wrapped_insertion_verified_without_whitespace_and_collapsed_paste_refused():
     adapter = adapter_for("claude")
     text = "P2 Abnahme: TextEdit neues Dokument und Terminal-Uebergabe bitte bestaetigen."

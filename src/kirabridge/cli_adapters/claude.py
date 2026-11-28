@@ -14,7 +14,6 @@ from .contract import Capabilities
 
 _RULE = re.compile(r"[ \t]*─{3,}(?: [^─\n]{1,120} ─+)?[ \t]*")
 _PROMPT = "❯"
-_SPINNER = re.compile(r"[ \t]*[✻✽✶✳✢·*] ")
 _LIVE_SPINNER = re.compile(r"^[ \t]*[✻✽✶✳✢·*] \S+… \(", re.M)
 _OUTPUT = "⏺"
 
@@ -100,12 +99,18 @@ class ClaudeCodeAdapter:
             above, rows, footer = found
             first = rows[0].replace(" ", " ").rstrip()
             empty = len(rows) == 1 and bool(re.fullmatch(binding.ready_pattern, first.strip()))
-            # Only the block after the last output, and the footer; quoted output never counts.
+            # Only the block after the last output; quoted output never counts.
+            # The footer is deliberately excluded from the busy_pattern match: current
+            # Claude Code releases show a standing "esc to interrupt" keybinding hint in
+            # the footer at all times, not only while a turn is running, so matching
+            # binding.busy_pattern (default includes "esc to interrupt") against the
+            # footer falsely classified a genuinely idle, empty composer as "working"
+            # forever -- the session never got ready and never received automatic
+            # input (KiraBridge message-wakeup issue, found live 2026-11-28). The live
+            # spinner line (with its elapsed-time counter) is the only signal that
+            # actually disappears once a turn ends, so it alone decides "busy" here.
             block = live_block(above)
-            status = [line for line in block if _SPINNER.match(line)] + footer
-            busy = (
-                binding.busy_pattern and re.search(binding.busy_pattern, "\n".join(status), re.I)
-            ) or _LIVE_SPINNER.search("\n".join(block))
+            busy = _LIVE_SPINNER.search("\n".join(block))
             state, reason = (
                 ("input_not_empty", "existing_input_must_not_be_overwritten")
                 if not empty
