@@ -345,6 +345,7 @@ async def test_new_message_roundtrip_leaves_old_jobs_untouched(bridge, config, m
 async def test_timeout_and_restart_do_not_replay_unknown_or_held_jobs(bridge, config, monkeypatch):
     from kirabridge.bridge_core.bridge import Bridge
     from kirabridge.bridge_core.config import ReceiverConfig
+
     _parties(config)
     held_id, unknown_id = _plant_old(bridge)
 
