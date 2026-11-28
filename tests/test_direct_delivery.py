@@ -473,6 +473,117 @@ async def test_watchdog_requeues_an_unsent_timeout_and_delivers_once(delivery, m
     assert transport["calls"] == ["insert", "return"]
 
 
+@pytest.mark.parametrize(
+    "code,phase",
+    [
+        ("session_observation_timeout", "native_process_catalog"),
+        ("session_observation_invalid", "native_process_catalog"),
+        ("visible_absence_unproven", None),
+    ],
+)
+async def test_preclaim_observation_timeout_defers_with_bounded_backoff_then_expires(
+    delivery, monkeypatch, code, phase
+):
+    """Codex's diagnosis: a pure read-only pre-claim observation failure (no claim, no
+    input) -- a timeout, an invalid process catalog, or an unproven absence -- must no
+    longer fail instantly. It waits, with a capped backoff and a fixed retry deadline
+    -- never endlessly -- then finalizes once that deadline passes.
+    """
+    bridge, transport, direct, connected, _ = delivery
+
+    async def refuse(*args):
+        error = BridgeError(code, "Read-only terminal observation failed")
+        if phase is not None:
+            error.provider_error = {"phase": phase, "reason": "timeout"}
+        raise error
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", refuse)
+    sent = new_message(bridge)
+    direct.submit("chatgpt", sent["id"])
+    await direct.wait_delivery(sent["id"])
+    current = job(bridge, sent)
+    assert current["state"] == "queued" and current["claimed"] is None
+    assert current["evidence"]["waiting_for_visible_target"] is True
+    assert current["evidence"]["reason"] == code
+    assert current["evidence"]["terminal_input_attempted"] is False
+    if phase is not None:
+        assert current["evidence"]["observation"]["phase"] == phase
+    retry = current["evidence"]["observation_retry"]
+    assert retry["attempts"] == 1
+    assert retry["deadline"] > time.time()
+    assert time.time() < retry["next_attempt_at"] <= retry["deadline"]
+    assert not transport["calls"] and not connected
+    assert not bridge.store.db.execute(
+        "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (sent["id"],)
+    ).fetchone()
+
+    # A retry deadline, not an endless wait: once it has passed, the next
+    # observation failure must finalize the job instead of deferring again.
+    expired = dict(current["evidence"])
+    expired["observation_retry"] = {**retry, "deadline": time.time() - 1}
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET evidence=? WHERE message_id=?",
+        (canonical(expired), sent["id"]),
+    )
+    later_error = BridgeError(code, "failed again")
+    if phase is not None:
+        later_error.provider_error = {"phase": "native_shell_snapshot", "reason": "timeout"}
+    bridge.message_receiver._waiting(sent["id"], code, direct._observation(later_error))
+    finalized = job(bridge, sent)
+    assert finalized["state"] == "failed"
+    assert finalized["error"] == code
+    assert finalized["evidence"]["terminal_input_attempted"] is False
+    assert finalized["evidence"]["automatic_retry"] is False
+    if phase is not None:
+        assert finalized["evidence"]["observation"]["phase"] == "native_shell_snapshot"
+    assert (
+        bridge.store.db.execute(
+            "SELECT reason FROM queue_holds WHERE queue_id='messages' AND item_id=?",
+            (sent["id"],),
+        ).fetchone()[0]
+        == "direct_admission_rejected"
+    )
+    assert not transport["calls"] and not connected
+
+
+@pytest.mark.parametrize(
+    "code,phase",
+    [
+        ("session_observation_timeout", "native_process_identity"),
+        ("session_observation_invalid", "native_process_catalog"),
+        ("visible_absence_unproven", None),
+    ],
+)
+async def test_postclaim_observation_timeout_stays_an_unretried_failure(
+    delivery, monkeypatch, code, phase
+):
+    """Unlike the pre-claim case above, an observation failure that happens after the
+    job was claimed (started/receipt/terminal_input_attempted=unconfirmed) must stay
+    exactly as final and unretried as the existing #337 delivery_timeout behavior,
+    for every sibling of this error class.
+    """
+    bridge, transport, direct, _, _ = delivery
+
+    async def raise_after_claim(pool, message, run_id, *, delivery_event, delivery_binding=None):
+        error = BridgeError(code, "Read-only terminal observation failed")
+        if phase is not None:
+            error.provider_error = {"phase": phase, "reason": "timeout"}
+        raise error
+
+    monkeypatch.setattr(bridge.message_receiver, "_process", raise_after_claim)
+    sent = new_message(bridge)
+    direct.submit("chatgpt", sent["id"])
+    await settled(direct)
+    current = job(bridge, sent)
+    assert current["claimed"] is not None  # proves this happened after claim
+    assert current["state"] == "unknown" and current["error"] == code
+    assert current["evidence"]["terminal_input_attempted"] == "unconfirmed"
+    assert current["evidence"]["automatic_retry"] is False
+    assert "observation_retry" not in current["evidence"]
+    assert not direct.submit("chatgpt", sent["id"])
+    assert not transport["calls"]
+
+
 async def test_old_unsent_message_is_delivered_once_but_evidenced_input_stays_blocked(
     delivery, monkeypatch
 ):
