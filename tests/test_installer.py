@@ -668,6 +668,7 @@ def test_previous_health_waits_for_read_only_status_after_transient_timeout(
     calls = []
 
     def status(release, config, *args, timeout):
+        assert args == ("service", "status")
         calls.append(timeout)
         if len(calls) == 1:
             raise installer.subprocess.TimeoutExpired("status", timeout)
@@ -691,7 +692,7 @@ def test_previous_health_default_allows_slow_status_under_load(installer, monkey
 
     def status(release, config, *args, timeout):
         seen.append(timeout)
-        return {"version": "0.8.0rc58"}  # answers after >8s in real life; 30s budget applies
+        return {"version": "0.8.0rc58"}
 
     monkeypatch.setattr(installer, "cli", status)
     health = installer.wait_previous_health(tmp_path / "release", tmp_path / "config")
@@ -719,6 +720,40 @@ def test_previous_health_timeout_is_bounded_and_does_not_switch(installer, monke
         installer.wait_previous_health(tmp_path / "release", tmp_path / "config", seconds=1)
     assert len(calls) == 2
     assert calls[-1] == pytest.approx(0.5)
+
+
+def test_target_readiness_checks_health_without_agent_inventory(installer, monkeypatch, tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text('host = "127.0.0.1"\n')
+    release = tmp_path / "release"
+    source = {
+        "source_package_path": str(release / "kirabridge"),
+        "source_tree_sha256": "a" * 64,
+        "source_file_count": 1,
+    }
+    health = {
+        "version": "0.8.0rc83",
+        "dispatcher_active": True,
+        "runtime": {**source, "config_sha256": installer.sha(config)},
+    }
+
+    def status(target, path, *args, timeout):
+        assert (target, path) == (release, config)
+        assert args == ("service", "status")
+        assert 0 < timeout <= 1
+        return health
+
+    monkeypatch.setattr(installer, "cli", status)
+    assert (
+        installer.wait_health(
+            SimpleNamespace(config=config),
+            release,
+            health["version"],
+            expected_source=source,
+            seconds=1,
+        )
+        == health
+    )
 
 
 @pytest.mark.parametrize(

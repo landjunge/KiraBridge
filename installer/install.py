@@ -702,7 +702,7 @@ def wait_previous_health(release, config, *, seconds=60):
     deadline = time.monotonic() + seconds
     while (remaining := deadline - time.monotonic()) > 0:
         try:
-            health = cli(release, config, "status", timeout=min(30, remaining))
+            health = cli(release, config, "service", "status", timeout=min(30, remaining))
             if isinstance(health, dict) and isinstance(health.get("version"), str):
                 return health
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
@@ -1836,9 +1836,11 @@ def wait_health(args, release, version, *, expected_source=None, seconds=None):
     window = READINESS_SECONDS if seconds is None else seconds
     deadline = time.monotonic() + window
     last = "no status response observed"
-    while time.monotonic() < deadline:
+    while (remaining := deadline - time.monotonic()) > 0:
         try:
-            health = cli(release, args.config, "status", timeout=8)
+            # Public CLI status also probes the agent inventory. Daemon readiness
+            # depends on the authenticated health response, independent of CLI discovery.
+            health = cli(release, args.config, "service", "status", timeout=min(8, remaining))
             if (
                 health.get("version") == version
                 and health.get("dispatcher_active")
@@ -1854,7 +1856,9 @@ def wait_health(args, release, version, *, expected_source=None, seconds=None):
             )
         except (RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
             last = f"{type(exc).__name__}: {exc}"[:300]
-        time.sleep(0.5)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(0.5, remaining))
     logs = service_log_tail(args)
     message = f"New daemon readiness not proven within {window:g} seconds ({last})"
     raise RuntimeError(message + (f"\nService log:\n{logs}" if logs else ""))
@@ -2081,7 +2085,7 @@ def activate(args, release):
             previous_health = wait_previous_health(release, args.config)
         else:
             try:
-                previous_health = cli(release, args.config, "status", timeout=8)
+                previous_health = cli(release, args.config, "service", "status", timeout=8)
             except (RuntimeError, subprocess.TimeoutExpired, ValueError):
                 previous_health = None
         if previous_health and not was_loaded:
