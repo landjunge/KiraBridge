@@ -157,6 +157,9 @@ async def accept(root):
             "code": getattr(exc, "code", None),
             "message": str(exc),
         }
+        observation = (getattr(exc, "provider_error", None) or {}).get("window_observation")
+        if isinstance(observation, dict):
+            evidence["error"]["window_observation"] = observation
         raise
     finally:
         if tty is not None and tty not in previous_ttys:

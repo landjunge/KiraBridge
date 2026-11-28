@@ -6,7 +6,7 @@ from test_terminal_window_creation import TITLE, product  # noqa: F401
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 
 
-def with_dialog(fixture, *, other_space=False, change=None):
+def with_dialog(fixture, *, other_space=False, overlap=False, change=None):
     scene, transport, events, receipt, created = fixture
     if other_space:
         scene.already_isolated = True
@@ -14,6 +14,8 @@ def with_dialog(fixture, *, other_space=False, change=None):
         scene.groups = lambda: [group for group in groups() if group[0] != 231]
     original_request = transport.system_transport.request
     dialog_token = "e" * 32
+    position, size = ([0, 0], [800, 600]) if overlap else ([200, 100], [500, 300])
+    bounds = dict(zip(("X", "Y", "Width", "Height"), position + size, strict=True))
 
     async def request(operation, arguments, **kwargs):
         token = "f" * 32 if change == "anchor" and scene.phase != "baseline" else dialog_token
@@ -26,8 +28,8 @@ def with_dialog(fixture, *, other_space=False, change=None):
                 role="AXWindow",
                 subrole="AXDialog",
                 title="Profile",
-                position=[400 if change == "geometry" else 200, 100],
-                size=[500, 300],
+                position=[400, 100] if change == "geometry" else position,
+                size=size,
             )
             return value
         value = await original_request(operation, arguments, **kwargs)
@@ -41,7 +43,7 @@ def with_dialog(fixture, *, other_space=False, change=None):
                     "on_screen": True,
                     "title_available": True,
                     "title": "Profile",
-                    "bounds": {"X": 200, "Y": 100, "Width": 500, "Height": 300},
+                    "bounds": bounds,
                 }
             )
             value["total"] = value["next_offset"] = len(value["windows"])
@@ -55,9 +57,15 @@ def with_dialog(fixture, *, other_space=False, change=None):
     return scene, transport, events, receipt, created
 
 
-@pytest.mark.parametrize("other_space", [True, False])
-async def test_open_preserves_dialog_and_separate_owned_tty(product, other_space):  # noqa: F811
-    _, transport, events, _, created = with_dialog(product, other_space=other_space)
+@pytest.mark.parametrize("other_space,overlap", [(True, False), (False, False), (False, True)])
+async def test_open_preserves_dialog_and_separate_owned_tty(
+    product,  # noqa: F811
+    other_space,
+    overlap,
+):
+    _, transport, events, _, created = with_dialog(
+        product, other_space=other_space, overlap=overlap
+    )
     result = await transport.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert result["separate_window"]
     assert result["physical_window"]["cg_window_id"] != 912

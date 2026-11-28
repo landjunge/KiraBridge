@@ -105,7 +105,18 @@ async def test_same_host_reflow_or_resize_binds_identity_and_preserves_fresh_lay
 
 
 @pytest.mark.parametrize(
-    "change", ["foreign_bounds", "reused_radio", "radio", "extra", "ambiguous", "reused_cg"]
+    "change",
+    [
+        "foreign_bounds",
+        "reused_radio",
+        "radio",
+        "extra",
+        "ambiguous",
+        "reused_cg",
+        "distinct_title",
+        "duplicate_title",
+        "zero_geometry",
+    ],
 )
 def test_shared_host_reflow_never_adopts_foreign_or_unbound_surfaces(change):
     proof = TerminalWindowProof(object(), object(), "chatgpt")
@@ -135,11 +146,32 @@ def test_shared_host_reflow_never_adopts_foreign_or_unbound_surfaces(change):
         current["cg"].append({"window_id": 999, "bounds": dict(own_cg["bounds"])})
     elif change == "ambiguous":
         other_cg["bounds"] = dict(old_host_cg["bounds"])
+    elif change in {"distinct_title", "duplicate_title"}:
+        other_cg["bounds"] = current["cg"][1]["bounds"] = dict(old_host_cg["bounds"])
+        old_host_cg["title"] = host["title"] = "private host title"
+        other_cg["title"] = host["title"] if change == "duplicate_title" else "other private title"
+    elif change == "zero_geometry":
+        host["position"] = [110, 20]
     elif change == "reused_cg":
         own_cg["window_id"] = 888
         current["cg"][1]["window_id"] = 999
-    with pytest.raises(BridgeError):
+    if change == "distinct_title":
+        assert proof.bind_shared_host(current, own_cg, own, original) == "same_ax_window"
+        return
+    with pytest.raises(BridgeError) as error:
         proof.bind_shared_host(current, own_cg, own, original)
+    if change in {"ambiguous", "duplicate_title", "zero_geometry"}:
+        observation = error.value.window_observation
+        expected_count = 0 if change == "zero_geometry" else 2
+        assert observation["before_geometry_match_count"] == expected_count
+        assert observation["before_host_match_count"] == expected_count
+        assert observation["before_standard_cg_window_count"] == 2
+        assert observation["before_cg_surfaces"][0] == {
+            "window_id": 231,
+            "position": [0, 0],
+            "size": [800, 600],
+        }
+        assert "private" not in json.dumps(observation)
 
 
 @pytest.mark.parametrize("value", [["raw title", 20], [True, 20], [float("nan"), 20], [1]])

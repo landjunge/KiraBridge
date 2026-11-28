@@ -533,12 +533,36 @@ class TerminalWindowProof:
             "Shared host retained tab identities changed",
             observation=observation,
         )
-        old_cg = [
+        dialog_ids = {
+            group["dialog_cg_id"] for group in self.before["ax"] if "dialog_cg_id" in group
+        }
+        terminal_surfaces = [
+            window for window in self.before["cg"] if window["window_id"] not in dialog_ids
+        ]
+        same_geometry = [
             window
-            for window in self.before["cg"]
+            for window in terminal_surfaces
             if host["position"] == [window["bounds"]["X"], window["bounds"]["Y"]]
             and host["size"] == [window["bounds"]["Width"], window["bounds"]["Height"]]
         ]
+        old_cg = same_geometry
+        if len(same_geometry) > 1 and host.get("title"):
+            # The retained radios already bind the host. Title is used only to
+            # distinguish different old CG surfaces at the same exact geometry.
+            old_cg = [window for window in same_geometry if window.get("title") == host["title"]]
+        observation.update(
+            before_standard_cg_window_count=len(terminal_surfaces),
+            before_geometry_match_count=len(same_geometry),
+            before_host_match_count=len(old_cg),
+            before_cg_surfaces=[
+                {
+                    "window_id": window["window_id"],
+                    "position": geometry_pair([window["bounds"]["X"], window["bounds"]["Y"]]),
+                    "size": geometry_pair([window["bounds"]["Width"], window["bounds"]["Height"]]),
+                }
+                for window in terminal_surfaces[:12]
+            ],
+        )
         require(
             len(old_cg) == 1,
             "Pre-open host CG geometry is ambiguous",
