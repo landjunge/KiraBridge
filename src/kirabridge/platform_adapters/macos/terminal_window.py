@@ -291,6 +291,7 @@ class TerminalWindowProof:
         if len(ax_windows) != ax_list_count:
             raise inventory_pending()
         groups, minimized = [], []
+        dialog_ids = set()
         for window in ax_windows:
             observed = await self.ax(window["element_token"])
             element = observed["element"]
@@ -302,14 +303,38 @@ class TerminalWindowProof:
                 continue
             require(
                 element["role"] == "AXWindow"
-                and element.get("subrole") == "AXStandardWindow"
+                and element.get("subrole") in {"AXStandardWindow", "AXDialog"}
                 and element.get("minimized") is False
                 and element.get("title_truncated") is False,
                 "Native AX window is incomplete",
             )
+            group = {
+                "token": observed["element_token"],
+                "title": element["title"],
+                "position": element.get("position"),
+                "size": element.get("size"),
+                "radios": None,
+            }
+            if element["subrole"] == "AXDialog":
+                # Dialogs may share the Terminal app and its on-screen CG layer,
+                # but they cannot own a TTY or take part in tab detachment.
+                surfaces = [
+                    surface["window_id"]
+                    for surface in windows
+                    if surface["title"] == group["title"]
+                    and [surface["bounds"]["X"], surface["bounds"]["Y"]] == group["position"]
+                    and [surface["bounds"]["Width"], surface["bounds"]["Height"]] == group["size"]
+                ]
+                require(
+                    len(surfaces) == 1 and surfaces[0] not in dialog_ids,
+                    "Native dialog surface is not uniquely bound",
+                )
+                dialog_ids.add(surfaces[0])
+                group["dialog_cg_id"] = surfaces[0]
+                groups.append(group)
+                continue
             tabs = [child for child in observed["children"] if child["role"] == "AXTabGroup"]
             require(len(tabs) <= 1, "Native AX tab group is ambiguous")
-            radios = None
             if tabs:
                 members = await self.ax(tabs[0]["element_token"])
                 require(
@@ -328,15 +353,8 @@ class TerminalWindowProof:
                     radios and len({r["token"] for r in radios}) == len(radios),
                     "Native AX tab membership is incomplete",
                 )
-            groups.append(
-                {
-                    "token": observed["element_token"],
-                    "title": element["title"],
-                    "position": element.get("position"),
-                    "size": element.get("size"),
-                    "radios": radios,
-                }
-            )
+                group["radios"] = radios
+            groups.append(group)
         tokens = [r["token"] for group in groups for r in group["radios"] or []]
         require(len(tokens) == len(set(tokens)), "Native AX radio appears in several groups")
         if len(groups) != len(windows):
@@ -383,12 +401,15 @@ class TerminalWindowProof:
 
     @staticmethod
     def own(snapshot, *, nonce=None, binding=None):
+        groups = [w for w in snapshot["ax"] if "dialog_cg_id" not in w]
+        dialog_ids = {w["dialog_cg_id"] for w in snapshot["ax"] if "dialog_cg_id" in w}
+        surfaces = [w for w in snapshot["cg"] if w["window_id"] not in dialog_ids]
         if binding is None:
-            cg = [w for w in snapshot["cg"] if w["title"].count(nonce) == 1]
-            ax = [w for w in snapshot["ax"] if w["title"].count(nonce) == 1]
+            cg = [w for w in surfaces if w["title"].count(nonce) == 1]
+            ax = [w for w in groups if w["title"].count(nonce) == 1]
         else:
-            cg = [w for w in snapshot["cg"] if w["window_id"] == binding["cg_window_id"]]
-            ax = [w for w in snapshot["ax"] if w["token"] == binding["ax_window_token"]]
+            cg = [w for w in surfaces if w["window_id"] == binding["cg_window_id"]]
+            ax = [w for w in groups if w["token"] == binding["ax_window_token"]]
         require(len(cg) == len(ax) == 1, "Created native window is missing or ambiguous")
         cg, ax = cg[0], ax[0]
         require(
@@ -418,7 +439,9 @@ class TerminalWindowProof:
                 continue
             matches = [g for g in after["ax"] if g["token"] == original["token"]]
             require(
-                len(matches) == 1 and self.members(matches[0]) == self.members(original),
+                len(matches) == 1
+                and self.members(matches[0]) == self.members(original)
+                and matches[0].get("dialog_cg_id") == original.get("dialog_cg_id"),
                 "Original native AX group was replaced",
             )
 
@@ -440,7 +463,13 @@ class TerminalWindowProof:
                     ]
                 ),
                 "ax": sorted(
-                    [[g["token"], self.members(g)] for g in snapshot["ax"] if g is not own]
+                    [
+                        [g["token"], g["dialog_cg_id"], self.members(g)]
+                        if "dialog_cg_id" in g
+                        else [g["token"], self.members(g)]
+                        for g in snapshot["ax"]
+                        if g is not own
+                    ]
                 ),
                 "minimized": sorted(item["token"] for item in snapshot.get("minimized", [])),
             }
@@ -464,7 +493,9 @@ class TerminalWindowProof:
             hosts = [
                 group
                 for group in self.before["ax"]
-                if group["radios"] is None and group["token"] not in current_tokens
+                if "dialog_cg_id" not in group
+                and group["radios"] is None
+                and group["token"] not in current_tokens
             ]
             hidden_host = True
         require(
@@ -582,6 +613,7 @@ class TerminalWindowProof:
                     g
                     for g in after["ax"]
                     if g is not new_own
+                    and "dialog_cg_id" not in g
                     and (
                         g["token"] == hidden_host["token"] and self.members(g) in (None, original)
                         if hidden_host
