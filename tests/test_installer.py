@@ -1346,7 +1346,9 @@ def test_rollback_corrects_active_identity_even_when_tunnel_restart_fails(
     monkeypatch.setattr(installer, "stop_service", lambda args: None)
     monkeypatch.setattr(installer, "start_service", lambda args: None)
     monkeypatch.setattr(installer, "loaded", lambda args: False)
-    monkeypatch.setattr(installer, "_restart_owned_tunnel", lambda agents: "Neustart fehlgeschlagen")
+    monkeypatch.setattr(
+        installer, "_restart_owned_tunnel", lambda agents: "Neustart fehlgeschlagen"
+    )
     monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
     monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
 
@@ -1366,6 +1368,202 @@ def test_rollback_corrects_active_identity_even_when_tunnel_restart_fails(
     assert checkpoint["rollback_core_restored"] is True
     assert checkpoint["backup"] == str(backup)
     assert checkpoint["previous"] == previous
+
+
+def test_rollback_walks_nested_chain_past_failed_intermediate_targets(
+    installer, monkeypatch, tmp_path
+):
+    """When today's failed install is itself on top of other failed
+    installs, the immediate "previous" link can be another target that
+    never actually ran. current.json must settle on the identity that
+    matches the core files really restored, walking past every link
+    already marked rollback_core_restored (meaning its own core was
+    already redirected further back at an earlier run), not just one
+    step."""
+    from contextlib import nullcontext
+
+    prefix = tmp_path / "install"
+    backup = prefix / "backups/b1"
+    backup.mkdir(parents=True)
+    config = tmp_path / "config.toml"
+    config.write_text("")
+    launcher = tmp_path / "bin/kirabridge"
+    launcher.parent.mkdir()
+    launcher.write_text("new launcher")
+    plist = tmp_path / "service.plist"
+    plist.write_text("new plist")
+    (backup / "launcher.before").write_text("old launcher")
+    (backup / "service.before.plist").write_text("old plist")
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="launchd",
+    )
+    # The actually-running release, three "previous" links down, never
+    # itself rolled back.
+    genuinely_running = {
+        "version": "0.8.0rc81",
+        "commit": "adacba",
+        "source_commit": "adacba",
+        "lock_sha256": "rc81-lock",
+        "native_app_required": False,
+        "release": str(prefix / "releases/0.8.0rc81-adacba"),
+    }
+    # Two failed intermediate targets, each already corrected onto the one
+    # below it by an earlier rollback run (rollback_core_restored=True),
+    # but still carrying their OWN (wrong) version identity.
+    intermediate_2 = {
+        "version": "0.8.0rc83",
+        "commit": "98e4e6",
+        "rollback_core_restored": True,
+        "release": str(prefix / "releases/0.8.0rc83-98e4e6"),
+        "previous": genuinely_running,
+    }
+    intermediate_1 = {
+        "version": "0.8.0rc83",
+        "commit": "1b9a7d",
+        "rollback_core_restored": True,
+        "release": str(prefix / "releases/0.8.0rc83-1b9a7d"),
+        "previous": intermediate_2,
+    }
+    active = {
+        "version": "0.8.0rc83",
+        "commit": "741d15",
+        "source_commit": "741d15",
+        "lock_sha256": "new-lock",
+        "native_app_required": False,
+        "release": str(prefix / "releases/0.8.0rc83-741d15"),
+        "backup": str(backup),
+        "config": str(config),
+        "launcher": str(launcher),
+        "plist": str(plist),
+        "service": "launchd",
+        "installed_wrapper_sha256": installer.sha(launcher),
+        "installed_plist_sha256": installer.sha(plist),
+        "had_wrapper": True,
+        "had_plist": True,
+        "was_loaded": False,
+        "previous": intermediate_1,
+        "aux_services": [],
+    }
+    current = prefix / "current.json"
+    installer.jwrite(current, active)
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda args: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda args: None)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *args: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda config: nullcontext())
+    monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    monkeypatch.setattr(installer, "start_service", lambda args: None)
+    monkeypatch.setattr(installer, "loaded", lambda args: False)
+    monkeypatch.setattr(
+        installer, "_restart_owned_tunnel", lambda agents: "Neustart fehlgeschlagen"
+    )
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
+
+    installer.rollback(args)
+
+    checkpoint = json.loads(current.read_text())
+    # Identity must land on the release three links down, not the
+    # immediate (also failed) previous target.
+    assert checkpoint["version"] == "0.8.0rc81"
+    assert checkpoint["commit"] == "adacba"
+    assert checkpoint["release"] == genuinely_running["release"]
+
+
+def test_rollback_corrects_identity_when_readiness_check_raises(installer, monkeypatch, tmp_path):
+    """A readiness check that raises (TimeoutExpired/RuntimeError from
+    wait_health) instead of failing gracefully must not skip the identity
+    correction: the core (launcher/plist) is already restored by that
+    point, so current.json must be fixed up before the error is
+    re-raised to the caller."""
+    from contextlib import nullcontext
+
+    prefix = tmp_path / "install"
+    backup = prefix / "backups/b1"
+    backup.mkdir(parents=True)
+    config = tmp_path / "config.toml"
+    config.write_text("")
+    launcher = tmp_path / "bin/kirabridge"
+    launcher.parent.mkdir()
+    launcher.write_text("new launcher")
+    plist = tmp_path / "service.plist"
+    plist.write_text("new plist")
+    (backup / "launcher.before").write_text("old launcher")
+    (backup / "service.before.plist").write_text("old plist")
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="launchd",
+    )
+    previous = {
+        "version": "0.8.0rc81",
+        "commit": "aaaa",
+        "source_commit": "aaaa",
+        "lock_sha256": "old-lock",
+        "native_app_required": False,
+        "release": str(prefix / "releases/0.8.0rc81-aaaa"),
+    }
+    active = {
+        "version": "0.8.0rc83",
+        "commit": "bbbb",
+        "source_commit": "bbbb",
+        "lock_sha256": "new-lock",
+        "native_app_required": False,
+        "release": str(prefix / "releases/0.8.0rc83-bbbb"),
+        "backup": str(backup),
+        "config": str(config),
+        "launcher": str(launcher),
+        "plist": str(plist),
+        "service": "launchd",
+        "installed_wrapper_sha256": installer.sha(launcher),
+        "installed_plist_sha256": installer.sha(plist),
+        "had_wrapper": True,
+        "had_plist": True,
+        "was_loaded": True,
+        "previous_version": "0.8.0rc81",
+        "previous": previous,
+        "aux_services": [],
+    }
+    current = prefix / "current.json"
+    installer.jwrite(current, active)
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda args: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda args: None)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *args: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda config: nullcontext())
+    monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    monkeypatch.setattr(installer, "start_service", lambda args: None)
+    monkeypatch.setattr(installer, "loaded", lambda args: False)
+    monkeypatch.setattr(installer, "_restart_owned_tunnel", lambda agents: None)
+    monkeypatch.setattr(installer, "restore_aux_services", lambda active, current: True)
+
+    def _boom(*a, **kw):
+        raise subprocess.TimeoutExpired(cmd="kirabridge status", timeout=30)
+
+    monkeypatch.setattr(installer, "wait_health", _boom)
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        installer.rollback(args)
+
+    assert isinstance(excinfo.value.__cause__, subprocess.TimeoutExpired)
+
+    # Core files really are the old (previous) version.
+    assert launcher.read_text() == "old launcher"
+    assert plist.read_text() == "old plist"
+
+    checkpoint = json.loads(current.read_text())
+    # Identity must match what is actually running even though the
+    # readiness check raised instead of failing gracefully.
+    assert checkpoint["version"] == "0.8.0rc81"
+    assert checkpoint["commit"] == "aaaa"
+    assert checkpoint["release"] == previous["release"]
+    assert checkpoint["rollback_core_restored"] is True
 
 
 def test_queue_holds_block_unsafe_downgrade_before_service_switch(

@@ -2410,34 +2410,76 @@ def rollback(args, *, _compensating=False):
                 and _systemctl(args, "enable", "--runtime", "--", args.plist.name).returncode
             ):
                 raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
-    aux_services_restored = restore_aux_services(active, current)
-    # Legacy transactions have no desktop service row, so restart the tunnel here.
-    # A changed desktop ChatGPT row owns its own stop/reload during restore().
-    tunnel_restarted = True
-    if (
-        args.service == "launchd"
-        and LABEL == "com.kirabridge.bridge"
-        and not _desktop_chatgpt_owned(active)
+    # A single step into "previous" is not always enough to describe what is
+    # actually running: today's failed attempt may itself sit on top of
+    # other failed attempts, so "previous" can be another target that never
+    # actually ran either. Each such already-corrected link is marked
+    # rollback_core_restored=True by the block below (on whichever past run
+    # processed it), which means its own core files were already redirected
+    # to ITS "previous" at that time. Walk past every such link to the first
+    # one that was never itself rolled back - that is the record whose
+    # identity matches the launcher and plist actually sitting on disk right
+    # now, and the one readiness must be checked against below.
+    restored_identity = active.get("previous")
+    while (
+        restored_identity
+        and restored_identity.get("rollback_core_restored")
+        and restored_identity.get("previous")
     ):
-        note = _restart_owned_tunnel(args.plist.parent)
-        if note:
-            tunnel_restarted = False
-            report("warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note)
-    if active.get("desktop"):
-        desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
-    if active["was_loaded"] and active.get("previous_version"):
-        previous_release = (active.get("previous") or {}).get("release")
-        if previous_release:
-            wait_health(args, Path(previous_release), active["previous_version"])
-        else:
-            # An existing manually installed service may have no versioned
-            # release record. Its authenticated pre-switch source is the target.
-            wait_health(
-                args,
-                Path(active["release"]),
-                active["previous_version"],
-                expected_source=active.get("previous_source", {}),
-            )
+        restored_identity = restored_identity["previous"]
+    # The readiness/aux-restore work below can fail two ways: gracefully
+    # (aux_services_restored / tunnel_restarted come back False) or by
+    # raising (wait_health's TimeoutExpired/RuntimeError, a desktop restore
+    # error, ...). Either way the core (launcher + plist, and thus the
+    # running service) is already restored above, so the identity
+    # correction further down must run regardless of which of the two
+    # happened. Capture a raised exception instead of letting it skip the
+    # correction, and re-raise it only after current.json has been fixed up.
+    aux_services_restored = True
+    tunnel_restarted = True
+    readiness_error = None
+    try:
+        aux_services_restored = restore_aux_services(active, current)
+        # Legacy transactions have no desktop service row, so restart the tunnel here.
+        # A changed desktop ChatGPT row owns its own stop/reload during restore().
+        if (
+            args.service == "launchd"
+            and LABEL == "com.kirabridge.bridge"
+            and not _desktop_chatgpt_owned(active)
+        ):
+            note = _restart_owned_tunnel(args.plist.parent)
+            if note:
+                tunnel_restarted = False
+                report(
+                    "warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note
+                )
+        if active.get("desktop"):
+            desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
+        if active["was_loaded"] and active.get("previous_version"):
+            # Check readiness against the release the core files were really
+            # redirected to (possibly several "previous" links down), not
+            # necessarily the immediate one, which may itself be a failed
+            # target that never actually ran.
+            restored_release = restored_identity.get("release") if restored_identity else None
+            if restored_release:
+                wait_health(
+                    args,
+                    Path(restored_release),
+                    restored_identity.get("version", active["previous_version"]),
+                )
+            else:
+                # An existing manually installed service may have no versioned
+                # release record. Its authenticated pre-switch source is the target.
+                wait_health(
+                    args,
+                    Path(active["release"]),
+                    active["previous_version"],
+                    expected_source=active.get("previous_source", {}),
+                )
+    except Exception as exc:  # noqa: BLE001 - re-raised below, after the fix-up
+        readiness_error = exc
+        aux_services_restored = False
+        tunnel_restarted = False
     # Keep the complete active recovery record (backup path, aux_services
     # bookkeeping, etc.) until every affected component is restored; a later
     # rollback retry needs it. But the identity fields below describe which
@@ -2447,7 +2489,7 @@ def rollback(args, *, _compensating=False):
     # current.json report a version that was never running, while the real
     # (previous) version stayed in service underneath it.
     if not aux_services_restored or not tunnel_restarted:
-        if active.get("previous"):
+        if restored_identity:
             for key in (
                 "version",
                 "commit",
@@ -2460,8 +2502,8 @@ def rollback(args, *, _compensating=False):
                 "threaddesk",
                 "release",
             ):
-                if key in active["previous"]:
-                    active[key] = active["previous"][key]
+                if key in restored_identity:
+                    active[key] = restored_identity[key]
                 else:
                     active.pop(key, None)
             jwrite(current, active)
@@ -2471,10 +2513,15 @@ def rollback(args, *, _compensating=False):
             "Zusatzdienste noch nicht vollständig zurückgesetzt",
             detail="Der Rückweg bleibt für eine spätere Wiederherstellung gespeichert",
         )
-    elif active["previous"]:
-        jwrite(current, active["previous"])
+    elif restored_identity:
+        jwrite(current, restored_identity)
     else:
         current.unlink()
+    if readiness_error is not None:
+        raise RuntimeError(
+            "Rollback: Kern (Launcher/Dienst) wiederherstellt, "
+            "Zusatzdienst-Bereitschaft fehlgeschlagen; Datensatz korrigiert"
+        ) from readiness_error
     report_summary(
         "Vorherige Version wiederhergestellt",
         [
