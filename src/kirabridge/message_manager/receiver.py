@@ -47,15 +47,10 @@ class MessageReceiver:
         "visible_target_scrolled",
         "visible_target_unknown",
     }
-    # Busy or not ready, and no input was attempted. Wrong window, a draft,
-    # a locked Mac, and permission failures stay permanent refusals.
-    DEFER_UNSENT = {
-        "session_busy",
-        "visible_target_busy",
-        "visible_target_not_ready",
-        "visible_target_working",
-        "visible_target_scrolled",
-        "visible_target_unknown",
+    # Busy or not ready, and no input was attempted: defer and retry automatically.
+    # A wrong window and permission failures stay permanent refusals. Every
+    # WAIT_REASONS code belongs here too, so the two sets cannot drift apart again.
+    DEFER_UNSENT = WAIT_REASONS | {
         "execution_busy",
         "delivery_timeout",
     }

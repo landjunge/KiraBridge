@@ -279,7 +279,6 @@ async def test_coordinator_handoff_during_visible_preinput_callback_is_refused(
     "code",
     [
         "session_selection_changed",
-        "desktop_locked",
         "forbidden",
     ],
 )
@@ -320,6 +319,9 @@ async def test_blocked_target_fails_once_without_claim_or_private_error_text(
         "visible_target_working",
         "visible_target_unknown",
         "session_busy",
+        "desktop_locked",
+        "desktop_session_inactive",
+        "visible_input_not_empty",
     ],
 )
 async def test_unsent_preinput_stays_queued_until_the_bound_composer_is_ready(
