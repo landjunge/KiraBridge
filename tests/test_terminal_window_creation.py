@@ -537,6 +537,44 @@ async def test_existing_terminal_in_other_space_activates_once_then_only_bounded
     assert events == []
 
 
+@pytest.mark.parametrize("settles", [True, False])
+async def test_space_activation_retries_when_cg_arrives_before_ax(product, settles):
+    from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+    _, leaf, events, _, _ = product
+    native_request = leaf.system_transport.request
+    reads = 0
+
+    async def request(operation, arguments, **kwargs):
+        nonlocal reads
+        value = await native_request(operation, arguments, **kwargs)
+        if operation == "windows.list":
+            reads += 1
+            if reads == 1:
+                value.update(windows=[], total=0, next_offset=0)
+            if reads < 3 or not settles:
+                value["accessibility_windows"] = []
+        elif operation == "accessibility.inspect" and (reads < 3 or not settles):
+            value.update(children=[], total_children=0)
+        return value
+
+    leaf.system_transport.request = request
+    leaf.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    proof = TerminalWindowProof(leaf, leaf.system_transport, "chatgpt")
+    if settles:
+        await proof.prepare()
+        assert reads == 3
+        assert len(proof.before["cg"]) == len(proof.before["ax"]) == 1
+    else:
+        with pytest.raises(BridgeError) as error:
+            await proof.prepare()
+        assert reads == 4
+        assert error.value.code == "session_window_inventory_pending"
+    leaf.native.assert_awaited_once()
+    assert "app.activate()" in leaf.native.await_args.args[0]
+    assert events == []
+
+
 @pytest.mark.parametrize("swapped", [False, True])
 async def test_one_confirmed_move_allows_either_split_surface_to_keep_shared_cg(product, swapped):
     scene, leaf, events, _, created = product

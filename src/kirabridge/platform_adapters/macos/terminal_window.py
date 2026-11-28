@@ -389,9 +389,15 @@ class TerminalWindowProof:
                 and activated.get("pid") == self.app["pid"],
                 "Existing Terminal activation is unconfirmed; never repeat",
             )
-            for _ in range(3):
+            for attempt in range(3):
                 await asyncio.sleep(0.15)
-                self.before = await self.snapshot()
+                try:
+                    self.before = await self.snapshot()
+                except BridgeError as error:
+                    # On a Space switch the new CG surfaces can arrive before AX.
+                    if error.code != "session_window_inventory_pending" or attempt == 2:
+                        raise
+                    continue
                 if self.before["cg"] or self.before["ax"]:
                     break
         require(
