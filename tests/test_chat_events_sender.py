@@ -1,15 +1,76 @@
 """The launchd completion sender must start from the release venv with the current config."""
 
+import importlib.util
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from kirabridge.event_push import EventError
 
 SERVE = Path(__file__).parents[1] / "integrations/chat-events/serve.py"
+
+
+@pytest.mark.parametrize("persistent", [False, True])
+async def test_sender_recovers_after_exhausted_transient_startup_probes(
+    tmp_path, monkeypatch, persistent
+):
+    spec = importlib.util.spec_from_file_location("chat_events_test", SERVE)
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    original_asyncio = adapter.asyncio
+    calls, delays = [], []
+
+    async def wait_backend_ready(call):
+        calls.append(call)
+        if len(calls) == 1:
+            raise EventError("backend_startup_unavailable")
+
+    async def sleep(delay):
+        delays.append(delay)
+
+    monkeypatch.setattr(adapter, "wait_backend_ready", wait_backend_ready)
+    monkeypatch.setattr(
+        adapter,
+        "asyncio",
+        SimpleNamespace(
+            sleep=sleep, create_task=original_asyncio.create_task, gather=original_asyncio.gather
+        ),
+    )
+    config = tmp_path / "config.toml"
+    config.write_text(
+        f'data_dir = "{tmp_path / "data"}"\n'
+        '[principals.chatgpt]\ntoken_env = "KB_EVENTS_TEST_TOKEN"\n'
+        'capabilities = ["bridge.health", "task.read"]\n'
+    )
+    monkeypatch.setenv("KB_EVENTS_TEST_TOKEN", "t" * 48)
+    state = tmp_path / "event-state"
+    *_, lifecycle = adapter.make_sender(
+        adapter.load_config(str(config)), "chatgpt", state, [], persistent=persistent
+    )
+    if not persistent:
+        with pytest.raises(EventError, match="backend_startup_unavailable"):
+            async with lifecycle(None):
+                pytest.fail("embedded sender unexpectedly started")
+        assert len(calls) == 1
+        assert delays == []
+        return
+
+    async with lifecycle(None) as worker:
+        assert not worker.done()
+    assert len(calls) == 2
+    assert delays == [15]
+    with sqlite3.connect(state / "events.sqlite3") as db:
+        observations = db.execute("SELECT kind FROM observations ORDER BY seq").fetchall()
+    assert observations == [("worker_waiting",), ("worker_ready",)]
 
 
 def test_sender_only_starts_with_current_config_structure(tmp_path):

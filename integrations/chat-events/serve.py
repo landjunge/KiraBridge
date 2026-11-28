@@ -109,7 +109,16 @@ RECEIPT_TOOL = {
 }
 
 
-def make_sender(config, principal, state, allowed_hosts, *, sender=None, external_sender=False):
+def make_sender(
+    config,
+    principal,
+    state,
+    allowed_hosts,
+    *,
+    sender=None,
+    external_sender=False,
+    persistent=False,
+):
     """Persistent sender without the MCP-2 SDK, so it runs in the release venv."""
     if "task.read" not in config.principals[principal].capabilities:
         raise RuntimeError("existing_task_read_permission_required")
@@ -159,7 +168,20 @@ def make_sender(config, principal, state, allowed_hosts, *, sender=None, externa
     async def lifespan(server):
         task = None
         try:
-            await wait_backend_ready(backend.call)
+            waiting = False
+            while True:
+                try:
+                    await wait_backend_ready(backend.call)
+                    break
+                except EventError as exc:
+                    if not persistent or exc.reason != "backend_startup_unavailable":
+                        raise
+                    if not waiting:
+                        journal.observe("worker_waiting", reason=exc.reason)
+                        waiting = True
+                    await asyncio.sleep(15)
+            if waiting:
+                journal.observe("worker_ready", reason="backend_available")
             if not external_sender:
                 task = asyncio.create_task(worker())
             yield task
@@ -351,7 +373,9 @@ async def make_server(
 async def main_async(args):
     config = load_config(str(args.config))
     if args.sender_only:
-        *_, lifecycle = make_sender(config, args.principal, args.state, args.allow_callback_host)
+        *_, lifecycle = make_sender(
+            config, args.principal, args.state, args.allow_callback_host, persistent=True
+        )
         async with lifecycle(None) as worker:
             await worker
         raise RuntimeError("completion_event_sender_stopped")

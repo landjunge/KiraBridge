@@ -51,6 +51,7 @@ class Wire:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            limit=1024 * 1024,  # tools/list is one JSON line and exceeds asyncio's 64 KiB default.
         )
 
     async def close(self):
@@ -381,10 +382,13 @@ async def run(args):
                     await wire.close()
                     closed_at = time.time()
                     assert bridge.store.get(task_id)["state"] in {"queued", "accepted", "running"}
-                    await bridge.tasks.wait("local", task_id)
+                    task = await bridge.tasks.wait("local", task_id)
                     offline_delivery = await wait_delivery(state, task_id)
                     assert offline_delivery["assistant_receipt"] is None
-                    finished_at = bridge.store.get(task_id)["finished"]
+                    finished_at = task["finished"]
+                    assert task["state"] == "completed" and finished_at is not None, (
+                        f"Reconnect fixture ended in {task['state']}: {task['error']}"
+                    )
                     with sqlite3.connect(state / "events.sqlite3") as journal:
                         accepted_at = journal.execute(
                             "SELECT at FROM observations WHERE kind='webhook_accepted' "

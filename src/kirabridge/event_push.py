@@ -19,7 +19,7 @@ import secrets
 import socket
 import sqlite3
 import time
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -149,24 +149,30 @@ class WebhookSender:
 
 async def wait_backend_ready(call, *, sleep=asyncio.sleep):
     """Bounded startup retries for read-only health; never replay a task call."""
-    async with asyncio.timeout(25):
-        for attempt in range(6):
-            try:
-                result = await call("bridge_health", {})
-            except (
-                httpx.ConnectError,
-                httpx.ReadError,
-                httpx.RemoteProtocolError,
-                httpx.ReadTimeout,
-            ):
-                if attempt == 5:
-                    raise EventError("backend_startup_unavailable") from None
-                await sleep(min(0.5 * 2**attempt, 4))
-                continue
-            data = result.get("structuredContent") or {}
-            if result.get("isError") or data.get("error") or not data.get("dispatcher_active"):
-                raise EventError("backend_readiness_failed")
-            return
+    try:
+        async with asyncio.timeout(25):
+            for attempt in range(6):
+                try:
+                    result = await call("bridge_health", {})
+                except (httpx.NetworkError, httpx.RemoteProtocolError, httpx.TimeoutException):
+                    pass
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code not in {429, 502, 503, 504}:
+                        raise EventError("backend_readiness_failed") from None
+                else:
+                    data = result.get("structuredContent") or {}
+                    if (
+                        result.get("isError")
+                        or data.get("error")
+                        or not data.get("dispatcher_active")
+                    ):
+                        raise EventError("backend_readiness_failed")
+                    return
+                if attempt < 5:
+                    await sleep(min(0.5 * 2**attempt, 4))
+    except TimeoutError:
+        pass
+    raise EventError("backend_startup_unavailable")
 
 
 SCHEMA = """
@@ -513,12 +519,15 @@ class EventPush:
         )
 
     def collect(self):
-        with sqlite3.connect(f"file:{self.source_db}?mode=ro", uri=True) as source:
+        subscriptions = self.db.execute(
+            "SELECT * FROM subscriptions WHERE principal=? AND state='active' AND expires>?",
+            (self.principal, time.time()),
+        ).fetchall()
+        if not subscriptions:
+            return
+        source_uri = self.source_db.absolute().as_uri() + "?mode=ro"
+        with closing(sqlite3.connect(source_uri, uri=True)) as source:
             source.row_factory = sqlite3.Row
-            subscriptions = self.db.execute(
-                "SELECT * FROM subscriptions WHERE principal=? AND state='active' AND expires>?",
-                (self.principal, time.time()),
-            ).fetchall()
             for sub in subscriptions:
                 notices = source.execute(
                     "SELECT * FROM completion_notices WHERE principal=? "

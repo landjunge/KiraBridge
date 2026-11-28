@@ -24,6 +24,7 @@ async def main():
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=1024 * 1024,  # tools/list is one JSON line and exceeds asyncio's 64 KiB default.
     )
     methods = ["server/discover", "events/list", "tools/list"]
     output = {

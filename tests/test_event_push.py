@@ -419,6 +419,30 @@ async def test_backend_startup_has_finite_attempt_budget():
     assert calls == ["bridge_health"] * 6
 
 
+async def test_backend_startup_retries_http_overload():
+    from kirabridge.event_push import wait_backend_ready
+
+    calls = []
+
+    async def call(method, arguments):
+        calls.append((method, arguments))
+        if len(calls) == 1:
+            request = httpx.Request("POST", "http://127.0.0.1/mcp")
+            httpx.Response(429, request=request).raise_for_status()
+        return {"structuredContent": {"dispatcher_active": True}}
+
+    async def sleep(seconds):
+        assert seconds == 0.5
+
+    await wait_backend_ready(call, sleep=sleep)
+    assert calls == [("bridge_health", {})] * 2
+
+
+def test_idle_sender_does_not_open_unavailable_completion_database(push, tmp_path):
+    push.source_db = tmp_path / "not-created" / "bridge.sqlite3"
+    push.collect()
+
+
 async def test_backend_auth_error_is_not_retried():
     from kirabridge.event_push import wait_backend_ready
 
