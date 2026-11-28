@@ -17,7 +17,9 @@ import shlex
 import sqlite3
 import sys
 import time
+from contextlib import closing
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
@@ -34,8 +36,9 @@ META = {
 
 
 class Wire:
-    def __init__(self, python, config, state):
+    def __init__(self, python, config, state, *, legacy=False):
         self.python, self.config, self.state = python, config, state
+        self.legacy = legacy
         self.seq = 0
         self.methods = []
 
@@ -76,8 +79,10 @@ class Wire:
             "jsonrpc": "2.0",
             "id": self.seq,
             "method": method,
-            "params": {**(params or {}), "_meta": META},
+            "params": params or {},
         }
+        if not self.legacy:
+            data["params"] = {**data["params"], "_meta": META}
         self.child.stdin.write((json.dumps(data) + "\n").encode())
         await self.child.stdin.drain()
         async with asyncio.timeout(15):
@@ -204,6 +209,95 @@ async def wait_delivery(state, task_id):
             await asyncio.sleep(0.05)
 
 
+async def accept_initialized_events(python, config, state):
+    """The installed ChatGPT connector previously negotiated this protocol version."""
+    wire = Wire(python, config, state, legacy=True)
+    await wire.start()
+    try:
+        initialized = await wire.rpc(
+            "initialize",
+            {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": META["io.modelcontextprotocol/clientInfo"],
+            },
+        )
+        assert initialized["protocolVersion"] == "2025-11-25"
+        assert initialized["capabilities"]["events"] == {}
+        assert "tools" in initialized["capabilities"]
+        wire.child.stdin.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
+        await wire.child.stdin.drain()
+
+        events = await wire.rpc("events/list")
+        assert [event["name"] for event in events["events"]] == ["kirabridge.task.completed"]
+        status = await wire.call("bridge_health", {})
+        assert not status.get("isError") and status["structuredContent"]["dispatcher_active"]
+        await accept_forwarded_alias(wire)
+        delivery = {"mode": "webhook", "url": "https://callbacks.example.test/legacy"}
+        event = {
+            "name": "kirabridge.task.completed",
+            "arguments": {"task_id": "legacy-negotiated-event"},
+        }
+        subscription = await wire.rpc(
+            "events/subscribe",
+            {
+                **event,
+                "delivery": {
+                    **delivery,
+                    "secret": "whsec_" + base64.b64encode(secrets.token_bytes(32)).decode(),
+                },
+            },
+        )
+        with closing(sqlite3.connect(state / "events.sqlite3")) as journal:
+            assert journal.execute(
+                "SELECT task_id, state FROM subscriptions WHERE id=?", (subscription["id"],)
+            ).fetchone() == (event["arguments"]["task_id"], "active")
+        await wire.rpc("events/unsubscribe", {**event, "delivery": delivery})
+        with closing(sqlite3.connect(state / "events.sqlite3")) as journal:
+            assert journal.execute(
+                "SELECT state FROM subscriptions WHERE id=?", (subscription["id"],)
+            ).fetchone() == ("stopped",)
+            assert journal.execute(
+                "SELECT subscription_id, event_id, reason FROM observations "
+                "WHERE kind='rpc_initialize'"
+            ).fetchall() == [(None, None, None)]
+        return {
+            "protocol": initialized["protocolVersion"],
+            "capabilities": list(initialized["capabilities"]),
+            "methods": wire.methods,
+        }
+    finally:
+        await wire.close()
+
+
+async def accept_forwarded_alias(wire):
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+    }
+    catalog = AsyncMock(return_value={"tools": [{"name": "fixture_read", "inputSchema": schema}]})
+    peer = AsyncMock(return_value={"success": True, "value": "isolated fixture"})
+    with (
+        patch("kirabridge.threaddesk_dynamic.catalog", catalog),
+        patch("kirabridge.threaddesk_dynamic.call", peer),
+    ):
+        tools = await wire.rpc("tools/list")
+        alias = next(tool for tool in tools["tools"] if tool["name"] == "td_fixture_read")
+        assert alias["inputSchema"] == schema
+        rejected = await wire.call(alias["name"], {"id": 1})
+        assert rejected["isError"] and peer.await_count == 0
+        result = await wire.call(alias["name"], {"id": "isolated"})
+        assert not result.get("isError") and result["structuredContent"]["success"]
+        call = peer.await_args.args
+        assert call[1:] == ("local", "fixture_read", {"id": "isolated"}, None)
+        catalog.return_value = {"tools": []}
+        stale = await wire.call(alias["name"], {"id": "isolated"})
+        assert stale["isError"] and peer.await_count == 1
+        assert stale["structuredContent"]["error"]["code"] == "threaddesk_tool_denied"
+
+
 async def run(args):
     root = args.output.absolute()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -247,6 +341,11 @@ async def run(args):
             + "\n"
         )
         config_file.chmod(0o600)
+        evidence["initialized_events"] = await accept_initialized_events(
+            args.adapter_python, config_file, root / "legacy-event-state"
+        )
+        evidence["tests"].append("actual SDK2 initialized MCP Events and ordinary health tool")
+        evidence["tests"].append("dynamic alias advertised, validated, forwarded and revoked live")
         wire = (
             TunnelWire(args.adapter_python, config_file, state, args.tunnel_client)
             if args.tunnel_client

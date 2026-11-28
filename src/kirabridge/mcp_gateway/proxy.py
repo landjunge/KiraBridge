@@ -3,16 +3,28 @@
 import asyncio
 import json
 import time
-from copy import deepcopy
 
 from jsonschema import ValidationError
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
-from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
+from mcp.types import CallToolResult, TextContent, Tool
 
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.local_runtime import connection_observer, peer
 from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.mcp_gateway.proxy_contract import (
+    PROXY_INSTRUCTIONS,
+    dynamic_call_arguments,
+    dynamic_tool_definition,
+    read_dynamic_catalog,
+    require_dynamic_tool,
+)
+from kirabridge.mcp_gateway.proxy_contract import (
+    dynamic_input_schema as dynamic_input_schema,
+)
+from kirabridge.mcp_gateway.proxy_contract import (
+    dynamic_tool_name as dynamic_tool_name,
+)
 from kirabridge.mcp_gateway.schema_validation import (
     SchemaValidatorCache,
     explicit_scalar_const_types,
@@ -20,27 +32,6 @@ from kirabridge.mcp_gateway.schema_validation import (
 from kirabridge.mcp_gateway.timing import ToolSpan, instrument_server
 
 SCHEMA_CACHE_SECONDS = 30.0
-PROXY_INSTRUCTIONS = (
-    "Direct ChatGPT terminal work uses terminal_control (terminal.visible): an idle confirmed "
-    "visible shell on macOS "
-    "or a fresh owned PTY on Linux; never type into a busy/unconfirmed window or use a hidden "
-    "fallback. This rule is separate from internal Codex/Grok execution and ThreadDesk. "
-    "Refresh tools/list and operation_catalog after connection, version or session changes; "
-    "compare discovery.revision. Check each permission_decision; request local approval only "
-    "when approval_required is true. For known schemas, call directly; otherwise select only "
-    "needed operations in operation_catalog. Batch independent reads with read_queries or "
-    "read_query tool.batch and "
-    "prefer structured results. Submit writes once; for pending work observe the same task_id, "
-    "never replay an uncertain request. Completed inline results need no poll. Terminal input "
-    "requires an exact pane_id and expected_pid. session.input sends literal text; "
-    "use one keyboard_sequence call for physical keys. Posting input does not prove app "
-    "processing. "
-    "Receipts do not prove execution or completion. Keep completion_receive active and ack only "
-    "after processing; ChatGPT chats are not awakened automatically. Use team tools for "
-    "addressed role-based work. Agent/CLI handoffs require assigned existing visible windows; "
-    "no background fallback. Historical buffers never auto-release. Eve relays Daniel's "
-    "dictation unchanged."
-)
 
 
 class DaemonConnection:
@@ -165,43 +156,6 @@ class DaemonConnection:
         return tools
 
 
-def dynamic_tool_name(name):
-    """One "td_" namespace: ThreadDesk command tools already carry it (no td_td_*)."""
-    return name if name.startswith("td_") else "td_" + name
-
-
-def dynamic_input_schema(item):
-    """Mutation envelopes keep the peer schema intact and cannot collide with its fields."""
-    if not item.get("requires_operation_id", False):
-        return item["inputSchema"]
-    schema = item["inputSchema"]
-    if schema.get("$id") in (None, "", "#"):
-        # Keep peer-root pointers rooted at the peer, not this host envelope.
-        schema = deepcopy(schema)
-        schema["$id"] = "urn:kirabridge:threaddesk-input:" + digest(schema)
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "operation_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"},
-            "arguments": schema,
-        },
-        "required": ["operation_id", "arguments"],
-    }
-
-
-def dynamic_call_arguments(item, arguments):
-    if not item.get("requires_operation_id", False):
-        return {"name": item["name"], "arguments": arguments}
-    if (
-        not isinstance(arguments, dict)
-        or set(arguments) != {"operation_id", "arguments"}
-        or not isinstance(arguments.get("arguments"), dict)
-    ):
-        raise BridgeError("invalid_arguments", "Use the advertised mutation envelope")
-    return {"name": item["name"], **arguments}
-
-
 async def connect_stdio(config, principal, *, task_policy=None):
     async with MCPClientPool(observer=connection_observer(config, principal)) as pool:
         await pool.connect(peer(config, principal))
@@ -227,88 +181,17 @@ async def connect_stdio(config, principal, *, task_policy=None):
                     except Exception:
                         downstream.discard(session)
 
-        dynamic_problem = {}
-
-        def dynamic_unavailable(code, message, diagnostic=None):
-            dynamic_problem.clear()
-            dynamic_problem.update(code=code, message=message, diagnostic=diagnostic)
-            return {}
-
-        async def dynamic_catalog():
-            """Only the configured peer can advertise new read tools; failures stay isolated."""
-            try:
-                result = await connection.call_tool("threaddesk_dynamic_catalog", {})
-                data = result.structuredContent
-                if isinstance(data, dict) and isinstance(data.get("error"), dict):
-                    error = data["error"]
-                    return dynamic_unavailable(
-                        str(error.get("code") or "threaddesk_catalog_failed"),
-                        str(error.get("message") or "ThreadDesk catalog could not be read"),
-                        data.get("diagnostic"),
-                    )
-                if result.isError or not isinstance(data, dict):
-                    return dynamic_unavailable(
-                        "threaddesk_catalog_failed", "ThreadDesk catalog could not be read"
-                    )
-                entries = data.get("tools")
-                if not isinstance(entries, list) or len(entries) > 256:
-                    return dynamic_unavailable(
-                        "threaddesk_catalog_failed", "ThreadDesk catalog was not usable"
-                    )
-                names = {}
-                for item in entries:
-                    if not isinstance(item, dict):
-                        continue
-                    name = item.get("name")
-                    schema = item.get("inputSchema")
-                    if (
-                        isinstance(name, str)
-                        and name.startswith(
-                            tuple("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-                        )
-                        and name.replace("_", "").replace("-", "").isalnum()
-                        and len(name) <= 64
-                        and isinstance(schema, dict)
-                    ):
-                        names.setdefault(dynamic_tool_name(name), item)
-                dynamic_problem.clear()
-                return names
-            except Exception as exc:
-                # A missing/offline optional ThreadDesk cannot break core Bridge tools.
-                return dynamic_unavailable(
-                    "threaddesk_catalog_failed",
-                    f"ThreadDesk catalog read failed: {type(exc).__name__}",
-                )
-
         @server.list_tools()
         async def list_tools():
             downstream.add(server.request_context.session)
             baseline = list(await connection.list_tools())
             known = {tool.name for tool in baseline}
-            discovered = (
-                await dynamic_catalog()
-                if task_policy is None or any(name.startswith("td_") for name in task_policy.tools)
-                else {}
-            )
-            for name, item in discovered.items():
-                if name in known:
-                    continue
-                baseline.append(
-                    Tool(
-                        name=name,
-                        description="ThreadDesk: " + (item.get("description") or ""),
-                        inputSchema=dynamic_input_schema(item),
-                        annotations=ToolAnnotations(
-                            **item.get(
-                                "annotations",
-                                {
-                                    "readOnlyHint": True,
-                                    "destructiveHint": False,
-                                    "openWorldHint": False,
-                                },
-                            )
-                        ),
-                    )
+            if task_policy is None or any(name.startswith("td_") for name in task_policy.tools):
+                discovered, _ = await read_dynamic_catalog(connection.call_tool)
+                baseline.extend(
+                    Tool(**dynamic_tool_definition(name, item))
+                    for name, item in discovered.items()
+                    if name not in known
                 )
             await changed()
             return (
@@ -364,23 +247,7 @@ async def connect_stdio(config, principal, *, task_policy=None):
                         )
                 if name.startswith("td_"):
                     # Re-list to reject stale tool names and changes after discovery.
-                    discovered = await dynamic_catalog()
-                    item = discovered.get(name)
-                    if item is None and dynamic_problem:
-                        # Say why the catalog is missing instead of claiming the tool is denied.
-                        unavailable = BridgeError(
-                            "threaddesk_catalog_unavailable",
-                            dynamic_problem["message"],
-                        )
-                        unavailable.diagnostic = {
-                            **(dynamic_problem["diagnostic"] or {}),
-                            "cause_code": dynamic_problem["code"],
-                            "cause": dynamic_problem["message"],
-                            "automatic_retry": False,
-                        }
-                        raise unavailable
-                    if item is None:
-                        raise BridgeError("threaddesk_tool_denied", "Dynamic tool is unavailable")
+                    item = await require_dynamic_tool(connection.call_tool, name)
                     result = await connection.call_tool(
                         "threaddesk_dynamic_call",
                         dynamic_call_arguments(item, arguments or {}),

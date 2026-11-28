@@ -20,9 +20,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import httpx  # noqa: E402
+from jsonschema import ValidationError  # noqa: E402
 
 from kirabridge import event_queue  # noqa: E402
 from kirabridge.bridge_core.config import load_config  # noqa: E402
+from kirabridge.bridge_core.models import BridgeError  # noqa: E402
 from kirabridge.event_push import (  # noqa: E402
     EventError,
     EventJournal,
@@ -30,6 +32,16 @@ from kirabridge.event_push import (  # noqa: E402
     WebhookSender,
     wait_backend_ready,
 )
+from kirabridge.mcp_gateway.proxy_contract import (  # noqa: E402
+    PROXY_INSTRUCTIONS,
+    dynamic_call_arguments,
+    dynamic_input_schema,
+    dynamic_tool_definition,
+    read_dynamic_catalog,
+    require_dynamic_tool,
+)
+from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache  # noqa: E402
+from kirabridge.technical_entries import proxy_retention  # noqa: E402
 
 
 def credentials(config, principal):
@@ -212,14 +224,23 @@ async def make_server(
     push, backend, journal, lifespan = make_sender(
         config, principal, state, allowed_hosts, sender=sender, external_sender=external_sender
     )
+    input_validators = SchemaValidatorCache()
 
     async def listed(ctx, params):
         listing = await backend.rpc("tools/list", {})
+        baseline = listing["tools"]
+        known = {tool["name"] for tool in baseline}
+        aliases, _ = await read_dynamic_catalog(backend.call)
         # Existing tools keep exactly the backend contract. Optional Events must
         # never add fields or prerequisites to normal task_request/task_submit.
         return {
             "tools": [
-                *listing["tools"],
+                *baseline,
+                *(
+                    dynamic_tool_definition(name, item)
+                    for name, item in aliases.items()
+                    if name not in known
+                ),
                 RECEIPT_TOOL,
                 {
                     "name": "event_queue_entries",
@@ -270,6 +291,43 @@ async def make_server(
             "cacheScope": "private",
         }
 
+    async def forward_tool(name, arguments):
+        retained = proxy_retention(config, name, arguments)
+        if retained is not None:
+            result = await backend.call("threaddesk_dynamic_call", retained)
+        elif name.startswith("td_"):
+            # Metadata may have changed after tools/list. Discover afresh and let
+            # the authenticated daemon authorize and execute the exact peer call.
+            try:
+                item = await require_dynamic_tool(backend.call, name)
+                input_validators.validate(arguments, dynamic_input_schema(item))
+                forwarded = dynamic_call_arguments(item, arguments)
+            except ValidationError as exc:
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": f"Input validation error: {exc.message}"}],
+                }
+            except BridgeError as exc:
+                data = {"error": {"code": exc.code}}
+                if hasattr(exc, "diagnostic"):
+                    data["diagnostic"] = exc.diagnostic
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": json.dumps(data)}],
+                    "structuredContent": data,
+                }
+            result = await backend.call("threaddesk_dynamic_call", forwarded)
+        else:
+            return await backend.call(name, arguments)
+        value = result.get("structuredContent")
+        if isinstance(value, dict) and "error" in value:
+            return {
+                "isError": True,
+                "content": [{"type": "text", "text": json.dumps(value)}],
+                "structuredContent": value,
+            }
+        return result
+
     async def called(ctx, params):
         arguments = dict(params.arguments or {})
         if params.name in {"event_queue_entries", "event_queue_control"}:
@@ -312,7 +370,7 @@ async def make_server(
             }
         if params.name in {"task_request", "task_submit", "action_request", "action_submit"}:
             arguments = push.route_submission(arguments)
-        result = await backend.call(params.name, arguments)
+        result = await forward_tool(params.name, arguments)
         return {**result, "resultType": "complete"}
 
     server = Server(
@@ -321,7 +379,8 @@ async def make_server(
         lifespan=lifespan,
         on_list_tools=listed,
         on_call_tool=called,
-        instructions="Normal task submission works without an Events subscription. "
+        instructions=PROXY_INSTRUCTIONS
+        + " Normal task submission works without an Events subscription. "
         "For optional chat push, first subscribe in THIS chat to kirabridge.task.completed "
         "with the exact chosen task_id, then use the existing completion_target field "
         "with push:<verified-subscription-id>. Do not invent a subscription. "
@@ -330,8 +389,6 @@ async def make_server(
     )
 
     async def events(ctx, params):
-        if ctx.protocol_version != "2026-07-28":
-            raise EventError("mcp_2026_07_28_required")
         journal.observe("rpc_" + ctx.method.replace("/", "_"))
         data = params.model_dump(by_alias=True, exclude={"meta"})
         if ctx.method == "events/list":
@@ -352,11 +409,11 @@ async def make_server(
     async def event_extension(ctx, call_next):
         try:
             result = await call_next(ctx)
-            if ctx.method == "server/discover":
-                # Draft Events is not yet a typed core SDK capability. Add it after
-                # the SDK's core schema serialization, without faking a legacy initialize.
+            if ctx.method in {"initialize", "server/discover"}:
+                # The SDK validates negotiation before this extension advertises
+                # Events on both initialized and per-request protocol versions.
                 result["capabilities"]["events"] = {}
-                journal.observe("rpc_server_discover")
+                journal.observe("rpc_" + ctx.method.replace("/", "_"))
             return result
         except EventError as exc:
             journal.observe("request_rejected", reason=exc.reason)
