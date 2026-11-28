@@ -38,6 +38,32 @@ normally idle) → receive → acknowledge. This is the direct regression check
 for "one mailbox per participant": an addressed message must land in that
 recipient's mailbox only, never broadcast.
 
+It runs a second, separate regression check (`recipient_not_rewritten_check`)
+for a real past incident: `chatgpt` sends a message explicitly addressed to
+`codex` (not the coordinator), and the test asserts the recorded recipient is
+still `codex`, the message lands in `codex`'s own mailbox, and never leaks
+into the coordinator's (`local`) mailbox. This was broken until 2026-11-27
+(commit `41648f9`, "Remove coordinator-only-senders recipient rewrite"):
+`team_manager`/`message_manager` silently rewrote any explicit recipient to
+"coordinator" for messages sent by `chatgpt`, which once delivered a message
+addressed to `codex` to the coordinator instead.
+
+## Storage/data-growth audit
+
+`scripts/accept_storage_growth_audit.py` is a separate, read-only report (not
+a pass/fail suite): sizes of every KiraBridge data/config/log/release/backup
+directory, `bridge.sqlite3`'s notable table row counts (including unacked
+`completion_notices`), a size-sorted breakdown of `~/.config/kirabridge`'s own
+subdirectories (surfaces stale per-session repair/rollback snapshots
+directly, which is where unexpected growth usually hides), and an observed
+(not judged) snapshot of the shared family directory layout. It never
+deletes, moves, or compacts anything — any cleanup decision needs the
+operator's own word first.
+
+```sh
+python3 scripts/accept_storage_growth_audit.py --output docs/evidence/storage-audit-$(date +%Y%m%d%H%M%S)
+```
+
 ## What they deliberately never do
 
 Neither suite opens a visible window, posts an OS notification, moves the

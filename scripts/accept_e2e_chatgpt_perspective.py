@@ -7,7 +7,9 @@ connection would, covering:
      round trip (send as chatgpt -> read as the recipient -> ack), which is
      also a direct regression check for "one mailbox per participant" (a
      message addressed to one principal must land in THAT principal's own
-     mailbox and nowhere else).
+     mailbox and nowhere else); plus a second, separate regression check
+     that an explicit recipient is never silently rewritten to the
+     coordinator (the real incident fixed 2026-11-27 in commit 41648f9).
   2. discoverability ("Auffindbarkeit"): does `tools/list` expose a tool for
      every capability the chatgpt principal holds, each with a substantive
      description.
@@ -166,6 +168,86 @@ async def mailbox_round_trip(pool, root: Path) -> dict:
     }
 
 
+THIRD_PARTY_RECIPIENT = "codex"
+
+
+async def recipient_not_rewritten_check(pool, root: Path) -> dict:
+    """Regression test for a real incident (fixed 2026-11-27, commit 41648f9
+    "Remove coordinator-only-senders recipient rewrite"): team_manager and
+    message_manager used to silently rewrite any explicit recipient to
+    "coordinator" for messages sent by chatgpt. A message explicitly
+    addressed to THIRD_PARTY_RECIPIENT (not RECIPIENT, which is the
+    coordinator role in this suite's own config) must land only in that
+    third party's own mailbox — never in the coordinator's ("local")."""
+    run_tag = secrets.token_hex(6)
+    conversation_id = "e2e-recip-" + run_tag
+    body = f"[E2E-TEST] recipient-rewrite-check {run_tag} — safe to ignore/delete"
+
+    sent = await call_tool(
+        pool, SENDER, "message_send",
+        {
+            "message": {
+                "recipient": THIRD_PARTY_RECIPIENT,
+                "conversation_id": conversation_id,
+                "idempotency_key": conversation_id,
+                "kind": "note",
+                "body": body,
+                "dispatch": False,
+                "request_reply": False,
+            }
+        },
+    )
+    save(root, "recipient-send", sent)
+    if not sent["ok"]:
+        return {"ok": False, "stage": "send", "detail": sent}
+    message_id = sent["value"]["id"]
+    recorded_recipient = sent["value"].get("recipient")
+
+    third_party_inbox = await call_tool(pool, THIRD_PARTY_RECIPIENT, "team_messages", {"after": 0, "limit": 50})
+    save(root, "recipient-third-party-inbox", third_party_inbox)
+    delivered_to_third_party = False
+    if third_party_inbox["ok"]:
+        items = third_party_inbox["value"].get("items") or []
+        delivered_to_third_party = any(item.get("id") == message_id for item in items)
+
+    coordinator_inbox = await call_tool(pool, RECIPIENT, "team_messages", {"after": 0, "limit": 50})
+    save(root, "recipient-coordinator-inbox", coordinator_inbox)
+    leaked_to_coordinator = False
+    if coordinator_inbox["ok"]:
+        items = coordinator_inbox["value"].get("items") or []
+        leaked_to_coordinator = any(item.get("id") == message_id for item in items)
+
+    received = await call_tool(pool, THIRD_PARTY_RECIPIENT, "message_receive", {"after": 0})
+    save(root, "recipient-receive", received)
+    receipt = None
+    if received["ok"]:
+        for item in received["value"].get("messages") or []:
+            if item.get("id") == message_id:
+                receipt = item.get("receipt")
+                break
+    acked = {"ok": False}
+    if receipt:
+        acked = await call_tool(
+            pool, THIRD_PARTY_RECIPIENT, "message_ack",
+            {"message_id": message_id, "receipt": receipt},
+        )
+        save(root, "recipient-ack", acked)
+
+    return {
+        "ok": (
+            recorded_recipient == THIRD_PARTY_RECIPIENT
+            and delivered_to_third_party
+            and not leaked_to_coordinator
+            and acked["ok"]
+        ),
+        "message_id": message_id,
+        "recorded_recipient": recorded_recipient,
+        "delivered_to_third_party": delivered_to_third_party,
+        "leaked_to_coordinator": leaked_to_coordinator,
+        "acknowledged": acked["ok"],
+    }
+
+
 async def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
@@ -184,6 +266,7 @@ async def main():
     async with MCPClientPool(call_timeout=20) as pool:
         await pool.connect(replace(peer(config, SENDER), id=SENDER))
         await pool.connect(replace(peer(config, RECIPIENT), id=RECIPIENT))
+        await pool.connect(replace(peer(config, THIRD_PARTY_RECIPIENT), id=THIRD_PARTY_RECIPIENT))
 
         disc = await check_discoverability(pool, config, root)
         results["checks"]["discoverability"] = disc
@@ -210,6 +293,15 @@ async def main():
         print(
             f"mailbox_round_trip: delivered={mailbox['delivered_to_recipient']} "
             f"isolation_clean={mailbox['isolation_clean']} acknowledged={mailbox['acknowledged']}",
+            flush=True,
+        )
+
+        recipient_check = await recipient_not_rewritten_check(pool, root)
+        results["checks"]["recipient_not_rewritten"] = recipient_check
+        print(
+            f"recipient_not_rewritten: recorded={recipient_check.get('recorded_recipient')} "
+            f"delivered_to_third_party={recipient_check.get('delivered_to_third_party')} "
+            f"leaked_to_coordinator={recipient_check.get('leaked_to_coordinator')}",
             flush=True,
         )
 
