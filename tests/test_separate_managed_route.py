@@ -34,6 +34,43 @@ def test_only_messages_at_or_after_the_cutoff_are_eligible(tmp_path):
     assert separate_managed_eligible(config, 1_001) is True
 
 
+def test_explicit_managed_team_worker_uses_its_receiver_without_global_cutoff(tmp_path):
+    config = Config(
+        data_dir=str(tmp_path),
+        messaging={"receivers": {"claude": {"cwd": str(tmp_path)}}},
+        team={
+            "workers": {
+                "claude": {
+                    "agent": "claude",
+                    "cwd": str(tmp_path),
+                    "execution_scope": "separate_managed_session",
+                }
+            }
+        },
+    )
+    assert separate_managed_eligible(config, 10_000, "claude") is True
+    assert separate_managed_eligible(config, 10_000, "codex") is False
+    config.messaging.receivers.pop("claude")
+    assert separate_managed_eligible(config, 10_000, "claude") is False
+
+
+def test_visible_team_worker_stays_on_visible_route(tmp_path):
+    config = Config(
+        data_dir=str(tmp_path),
+        messaging={"receivers": {"claude": {"cwd": str(tmp_path)}}},
+        team={
+            "workers": {
+                "claude": {
+                    "agent": "claude",
+                    "cwd": str(tmp_path),
+                    "execution_scope": "existing_visible_terminal",
+                }
+            }
+        },
+    )
+    assert separate_managed_eligible(config, 10_000, "claude") is False
+
+
 class _Visible:
     def __init__(self):
         self.calls = 0
@@ -308,7 +345,6 @@ async def test_new_message_roundtrip_leaves_old_jobs_untouched(bridge, config, m
 async def test_timeout_and_restart_do_not_replay_unknown_or_held_jobs(bridge, config, monkeypatch):
     from kirabridge.bridge_core.bridge import Bridge
     from kirabridge.bridge_core.config import ReceiverConfig
-
     _parties(config)
     held_id, unknown_id = _plant_old(bridge)
 
