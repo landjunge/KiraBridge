@@ -229,6 +229,62 @@ async def new_native_selection(bridge, monkeypatch, row):
     monkeypatch.setattr(bridge.sessions.terminal_app, "input_columns", no_geometry)
 
 
+async def test_local_selection_preserves_claude_identity_for_paste_and_return(
+    visible,  # noqa: F811
+    monkeypatch,
+):
+    from kirabridge.session_manager import SessionManager
+
+    bridge, _ = visible
+    sessions = bridge.sessions
+    row = new_row()
+    row["processes"][1].update(name="claude", image="/bin/claude")
+    await new_native_selection(bridge, monkeypatch, row)
+    binding = bridge.config.visible_handoffs.bindings["codex"].model_copy(
+        update={
+            "pane_id": row["pane_id"],
+            "expected_pid": 900,
+            "agent_pid": 901,
+            "ready_pattern": "❯",
+            "busy_pattern": "esc to interrupt",
+        }
+    )
+    monkeypatch.setattr(sessions, "agent_registry", lambda: ({"claude": None}, {"local": binding}))
+    assert sessions.describe([row])[0]["configured_binding_current"] is True
+    assert sessions.explicit_agent_binding(row) == ("local", binding)
+    assert sessions.assigned_agent(row) == "claude"
+    other = {**row, "pane_id": "terminal:203:ttys006"}
+    assert sessions.describe([other])[0]["configured_binding_current"] is False
+    with pytest.raises(BridgeError, match="operator-configured"):
+        sessions.explicit_agent_binding(other)
+    calls = []
+
+    async def read(pane):
+        return "─────\n❯ \n─────\n esc to interrupt"
+
+    async def insert(pane, text, *, agent_target, **guards):
+        assert agent_target == "claude"
+        calls.append(("paste", pane, guards["identity_guard"][901]))
+
+    async def press_return(pane, **guards):
+        calls.append(("return", pane, guards["identity_guard"][901]))
+
+    monkeypatch.setattr(sessions.terminal_app, "read", read)
+    monkeypatch.setattr(sessions.terminal_app, "insert", insert)
+    monkeypatch.setattr(sessions.terminal_app, "press_return", press_return)
+    monkeypatch.setattr(sessions, "readiness", bridge.visible_handoffs.observe_readiness)
+    args = SessionInput(pane_id=row["pane_id"], expected_pid=900, text="literal", submit=False)
+    async with sessions.agent_selection("chatgpt", "local", binding):
+        await SessionManager.insert(sessions, "chatgpt", args)
+        await SessionManager.press_return(
+            sessions, "chatgpt", row["pane_id"], 900, expected_screen="literal"
+        )
+    assert [call[0] for call in calls] == ["paste", "return"]
+    assert all(
+        pane == row["pane_id"] and identity.endswith("/bin/claude") for _, pane, identity in calls
+    )
+
+
 async def test_explicit_current_agent_handle_enters_current_window_without_mutating_default(
     visible,  # noqa: F811
     config,

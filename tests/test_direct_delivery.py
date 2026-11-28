@@ -548,6 +548,42 @@ async def test_preclaim_observation_timeout_defers_with_bounded_backoff_then_exp
     assert not transport["calls"] and not connected
 
 
+async def test_deferred_observation_retry_keeps_deadline_across_claim(delivery, monkeypatch):
+    bridge, transport, direct, _, pool = delivery
+    receiver = bridge.message_receiver
+    code = "session_observation_timeout"
+    sent = new_message(bridge)
+    receiver._waiting(sent["id"], code)
+    before = job(bridge, sent)["evidence"]["observation_retry"]
+
+    async def ready(*args):
+        pass
+
+    async def fail_before_input(*args, **kwargs):
+        error = BridgeError(code, "Read-only terminal observation failed")
+        error.provider_error = {"phase": "native_process_catalog", "reason": "timeout"}
+        raise error
+
+    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", ready)
+    monkeypatch.setattr(bridge.agents, "execute", fail_before_input)
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", pool)
+    monkeypatch.setattr("kirabridge.message_manager.receiver.peer", lambda _, name: name)
+
+    # Advance beyond the initial backoff but within the original retry budget.
+    now = before["next_attempt_at"] + 1
+    monkeypatch.setattr("kirabridge.message_manager.receiver.time.time", lambda: now)
+    assert await receiver._dispatch_next("grok", include_visible=False)
+    waiting = job(bridge, sent)
+    after = waiting["evidence"]["observation_retry"]
+    assert waiting["state"] == "queued"
+    assert after["first_failure_at"] == before["first_failure_at"]
+    assert after["deadline"] == before["deadline"]
+    assert after["attempts"] == 2
+    assert waiting["evidence"]["observation"] == {"phase": "native_process_catalog"}
+    assert waiting["evidence"]["terminal_input_attempted"] is False
+    assert not transport["calls"]
+
+
 @pytest.mark.parametrize(
     "code,phase",
     [

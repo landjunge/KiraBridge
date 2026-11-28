@@ -832,7 +832,8 @@ class MessageReceiver:
         config = self.bridge.config.messaging
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
-                "SELECT m.* FROM messages m JOIN message_jobs j ON j.message_id=m.id "
+                "SELECT m.*,j.evidence AS job_evidence "
+                "FROM messages m JOIN message_jobs j ON j.message_id=m.id "
                 "WHERE m.id=? AND j.state='queued' "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                 "h.queue_id='messages' AND h.item_id=m.id)",
@@ -840,6 +841,8 @@ class MessageReceiver:
             ).fetchone()
             if not row:
                 return None
+            row = dict(row)
+            previous = json.loads(row.pop("job_evidence"))
             if not self.bridge.store.can_claim(row["created"]):
                 return None
             if row["acknowledged"]:
@@ -928,6 +931,9 @@ class MessageReceiver:
                 if self.bridge.config.visible_handoffs.enabled
                 else "separate_managed_session"
             )
+            claim_evidence = {"session_scope": scope, **noted}
+            if "observation_retry" in previous:
+                claim_evidence["observation_retry"] = previous["observation_retry"]
             self.bridge.store.db.execute(
                 "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=?,"
                 "execution_cwd=? "
@@ -935,7 +941,7 @@ class MessageReceiver:
                 (
                     run_id,
                     time.time(),
-                    canonical({"session_scope": scope, **noted}),
+                    canonical(claim_evidence),
                     config.receivers[row["recipient"]].cwd,
                     message_id,
                 ),
@@ -951,7 +957,7 @@ class MessageReceiver:
                     **({"interim_delivery": True} if direct and interim else {}),
                 },
             )
-            return dict(row), run_id
+            return row, run_id
 
     def _delivery_evidenced(self, message_id, row):
         """True when a paste, receipt, or uncertain attempt is already recorded."""
@@ -1181,7 +1187,7 @@ class MessageReceiver:
                         message_id, "message.waiting_for_visible_target", "local", evidence
                     )
 
-    def _queue_unsent(self, message_id, reason, run_id, state):
+    def _queue_unsent(self, message_id, reason, run_id, state, *, observation=None):
         """Only without input or with a recorded preinput abort; never replay uncertainty."""
         if reason not in self.WAIT_REASONS or state not in {"running", "failed"}:
             return False
@@ -1226,7 +1232,7 @@ class MessageReceiver:
             self.bridge.store.audit(
                 "message.unsent_requeued", "local", None, {"message_id": message_id, **evidence}
             )
-            self._waiting(message_id, reason)
+            self._waiting(message_id, reason, observation)
         return True
 
     def resume_unsent(self, message_id):
@@ -1280,6 +1286,7 @@ class MessageReceiver:
                             "waiting_for_visible_target",
                             "waiting_message",
                             "observation",
+                            "observation_retry",
                             "reason",
                         )
                         if key in previous
@@ -1707,7 +1714,13 @@ class MessageReceiver:
             if (
                 delivery_event is None
                 and isinstance(exc, BridgeError)
-                and self._queue_unsent(message_id, exc.code, run_id, "running")
+                and self._queue_unsent(
+                    message_id,
+                    exc.code,
+                    run_id,
+                    "running",
+                    observation=self.direct._observation(exc),
+                )
             ):
                 return  # Readiness changed before any input attempt.
             state = (

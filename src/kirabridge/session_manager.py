@@ -319,15 +319,13 @@ class SessionManager:
             )
             if len(observed) == 1:
                 process = observed[0]
-                binding = bindings.get(process["name"])
+                _, binding = self._exact_agent_binding(row, process["name"], bindings)
                 row["agent_candidate"] = process["name"]
                 row["agent_pid"] = process["pid"]
                 from kirabridge.cli_adapters import default_registry
 
                 row["cli_adapter"] = default_registry().describe(process["name"])
-                row["configured_binding_current"] = bool(
-                    binding and self.binding_matches(row, binding, process["name"])
-                )
+                row["configured_binding_current"] = binding is not None
                 row["agent_activity"] = "not_probed"
                 row["busy_scope"] = "transport process presence; not an agent-turn activity result"
             elif observed:
@@ -357,13 +355,16 @@ class SessionManager:
                 "visible_target_ambiguous", "Multiple CLI agents in selected terminal"
             )
         process = matches[0]
-        original = bindings.get(process["name"])
+        target, original = self._exact_agent_binding(selected, process["name"], bindings)
+        if original is None:
+            target = process["name"]
+            original = bindings.get(target)
         if original is None or not selected["pane_id"].startswith("terminal:"):
             raise BridgeError(
                 "visible_target_missing",
                 "Agent needs an operator-configured visible input contract",
             )
-        changed = not self.binding_matches(selected, original, process["name"])
+        changed = not self.binding_matches(selected, original, target)
         updates = {
             "pane_id": selected["pane_id"],
             "expected_pid": selected["expected_pid"],
@@ -372,7 +373,17 @@ class SessionManager:
         if changed:
             # A restarted/different process is not the previous Codex thread.
             updates.update(codex_thread_id=None, codex_rollout_path=None)
-        return process["name"], original.model_copy(update=updates)
+        return target, original.model_copy(update=updates)
+
+    def _exact_agent_binding(self, selected, name, bindings):
+        # An alias is scoped to its configured pane and process pair. Only the
+        # actual program's own binding can serve as a template for another pane.
+        candidates = (name, *(target for target, alias in PROCESS_ALIASES.items() if alias == name))
+        for target in candidates:
+            binding = bindings.get(target)
+            if binding is not None and self.binding_matches(selected, binding, target):
+                return target, binding
+        return None, None
 
     @asynccontextmanager
     async def agent_selection(self, principal, target, binding):
@@ -889,11 +900,10 @@ class SessionManager:
             raise BridgeError("visible_target_ambiguous", "Multiple CLI agents in this terminal")
         process = matches[0]
         selection = self.current_selection()
-        binding = (
-            selection[1]
-            if selection and selection[0] == process["name"]
-            else bindings.get(process["name"])
-        )
+        if selection and process_is(process, selection[0]):
+            binding = selection[1]
+        else:
+            _, binding = self._exact_agent_binding(selected, process["name"], bindings)
         if (
             not binding
             or binding.pane_id != selected.get("pane_id")
