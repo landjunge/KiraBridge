@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: landjunge/ThreadDesk
-          ref: 235d6439ef7c9846223b7f02bfc33d56ea11b556
+          ref: abb8fa5ace1e25de9c48ad693201fa780344ae09
           path: .ci-threaddesk
           persist-credentials: false
       - name: Check out fixed M4 ThreadDesk source for remote R2 and R3
