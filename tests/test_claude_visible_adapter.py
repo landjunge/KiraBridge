@@ -93,9 +93,7 @@ def test_still_working_with_standing_footer_hint_when_the_live_spinner_is_presen
     """The footer-exclusion fix must not weaken real busy detection: an actual
     live spinner line still means "working", footer hint or not."""
     adapter = adapter_for("claude")
-    working = screen_with_standing_footer_hint(
-        ["❯ "], status="✳ Galloping… (45s · ↓ 3.0k tokens)"
-    )
+    working = screen_with_standing_footer_hint(["❯ "], status="✳ Galloping… (45s · ↓ 3.0k tokens)")
     assert adapter.observe(working, BINDING)["state"] == "working"
 
 

@@ -119,12 +119,16 @@ def config_subdirectory_breakdown():
         return []
     entries = []
     for child in root.iterdir():
-        entries.append({
-            "name": child.name,
-            "bytes": du(child) if child.is_dir() else (child.stat().st_size if child.is_file() else None),
-            "is_dir": child.is_dir(),
-            "mtime": child.stat().st_mtime,
-        })
+        entries.append(
+            {
+                "name": child.name,
+                "bytes": du(child)
+                if child.is_dir()
+                else (child.stat().st_size if child.is_file() else None),
+                "is_dir": child.is_dir(),
+                "mtime": child.stat().st_mtime,
+            }
+        )
     entries.sort(key=lambda e: e["bytes"] or 0, reverse=True)
     return entries
 
@@ -157,7 +161,11 @@ def main():
             continue
         sizes[name] = {"path": str(path), "bytes": du(path)}
     logs_bytes, logs_detail = kirabridge_logs_size()
-    sizes["kirabridge_logs"] = {"path": str(HOME / "Library/Logs/kirabridge*"), "bytes": logs_bytes, "files": logs_detail}
+    sizes["kirabridge_logs"] = {
+        "path": str(HOME / "Library/Logs/kirabridge*"),
+        "bytes": logs_bytes,
+        "files": logs_detail,
+    }
     report["directory_sizes"] = sizes
 
     report["db_file_bytes"] = DB_PATH.stat().st_size if DB_PATH.exists() else None
@@ -177,7 +185,14 @@ def main():
         print(f"  {name}: {human(info['bytes'])}  ({info['path']})")
     print(f"\nbridge.sqlite3 Dateigröße: {human(report['db_file_bytes'])}")
     print("\n=== Auffällige Tabellen (Zeilenanzahl) ===")
-    for t in ("audit", "events", "completion_notices", "messages", "team_messages", "message_events"):
+    for t in (
+        "audit",
+        "events",
+        "completion_notices",
+        "messages",
+        "team_messages",
+        "message_events",
+    ):
         if t in table_counts:
             print(f"  {t}: {table_counts[t]}")
     print(f"\ncompletion_notices unquittiert: {extra.get('completion_notices_unacknowledged')}")
@@ -187,9 +202,11 @@ def main():
     print(f"\n=== Backups ({len(report['backups'])}) ===")
     for b in report["backups"]:
         print(f"  {b['name']}: {human(b['bytes'])}")
-    print(f"\n=== ~/.config/kirabridge nach Größe (Top 10 von {len(report['config_subdirectory_breakdown'])}) ===")
+    config_entries = report["config_subdirectory_breakdown"]
+    print(f"\n=== ~/.config/kirabridge nach Größe (Top 10 von {len(config_entries)}) ===")
     import datetime
-    for e in report["config_subdirectory_breakdown"][:10]:
+
+    for e in config_entries[:10]:
         age = datetime.datetime.fromtimestamp(e["mtime"]).strftime("%Y-%m-%d")
         print(f"  {e['name']}: {human(e['bytes'])}  (zuletzt geändert {age})")
     print("\n=== Verzeichnisarchitektur (nur beobachtet, nicht bewertet) ===")

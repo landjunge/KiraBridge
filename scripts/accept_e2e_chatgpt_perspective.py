@@ -32,6 +32,7 @@ import argparse
 import asyncio
 import json
 import secrets
+import sys
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -62,9 +63,10 @@ async def call_tool(pool, who, tool, args):
         result = await pool.call(who, tool, args)
     except Exception as exc:
         return {"ok": False, "error": repr(exc)}
-    if result.isError:
-        return {"ok": False, "error": result.structuredContent}
-    return {"ok": True, "value": result.structuredContent}
+    value = result.structuredContent
+    if result.isError or not isinstance(value, dict) or value.get("error"):
+        return {"ok": False, "error": value}
+    return {"ok": True, "value": value}
 
 
 async def check_discoverability(pool, config, root: Path) -> dict:
@@ -93,6 +95,62 @@ async def check_discoverability(pool, config, root: Path) -> dict:
     return result
 
 
+async def read_test_note(pool, root: Path, label, recipient, message) -> tuple[bool, bool]:
+    message_id = message["id"]
+    after = message["seq"] - 1
+    inbox = await call_tool(
+        pool,
+        recipient,
+        "team_messages",
+        {"after_direct": after, "after": 2**63 - 1, "limit": 1, "body_chars": 0},
+    )
+    save(root, f"{label}-inbox", inbox)
+    if not inbox["ok"]:
+        return False, False
+    matched = any(
+        item.get("id") == message_id and item.get("to") == recipient
+        for item in inbox["value"].get("items", [])
+    )
+    if not matched:
+        return False, False
+
+    if message["seq"] in inbox["value"].get("acknowledged_by_read", {}).get("direct", []):
+        # The inbox read already acknowledged this note for a configured observer/coordinator.
+        acked = await call_tool(pool, recipient, "message_get", {"message_id": message_id})
+    else:
+        received = await call_tool(
+            pool,
+            recipient,
+            "message_receive",
+            {"after": after, "limit": 1, "conversation_id": message["conversation_id"]},
+        )
+        save(root, f"{label}-receive", received)
+        if not received["ok"]:
+            return True, False
+        receipt = next(
+            (
+                item.get("receipt")
+                for item in received["value"].get("messages", [])
+                if item.get("id") == message_id
+            ),
+            None,
+        )
+        if not receipt:
+            return True, False
+        acked = await call_tool(
+            pool, recipient, "message_ack", {"message_id": message_id, "receipt": receipt}
+        )
+    save(root, f"{label}-ack", acked)
+    return True, bool(acked["ok"] and acked["value"].get("acknowledged"))
+
+
+def message_is_hidden(result) -> bool:
+    if result["ok"]:
+        return False
+    error = result.get("error")
+    return isinstance(error, dict) and error.get("error", {}).get("code") == "not_found"
+
+
 async def mailbox_round_trip(pool, root: Path) -> dict:
     run_tag = secrets.token_hex(6)
     conversation_id = "e2e-mailbox-" + run_tag
@@ -117,54 +175,28 @@ async def mailbox_round_trip(pool, root: Path) -> dict:
     save(root, "mailbox-send", sent)
     if not sent["ok"]:
         return {"ok": False, "stage": "send", "detail": sent}
-    message_id = sent["value"]["id"]
-
-    recipient_inbox = await call_tool(pool, RECIPIENT, "team_messages", {"after": 0, "limit": 50})
-    save(root, "mailbox-recipient-inbox", recipient_inbox)
-    delivered_to_recipient = False
-    if recipient_inbox["ok"]:
-        items = recipient_inbox["value"].get("messages") or recipient_inbox["value"].get("items") or []
-        delivered_to_recipient = any(
-            isinstance(item, dict) and item.get("id") == message_id for item in items
-        )
+    message = sent["value"]
+    delivered_to_recipient, acknowledged = await read_test_note(
+        pool, root, "mailbox-recipient", RECIPIENT, message
+    )
 
     isolation_clean = None
     try:
         await pool.connect(replace(peer(load_config(), ISOLATION_PROBE), id=ISOLATION_PROBE))
-        probe_inbox = await call_tool(pool, ISOLATION_PROBE, "team_messages", {"after": 0, "limit": 50})
-        save(root, "mailbox-isolation-probe", probe_inbox)
-        if probe_inbox["ok"]:
-            items = probe_inbox["value"].get("messages") or probe_inbox["value"].get("items") or []
-            leaked = any(isinstance(item, dict) and item.get("id") == message_id for item in items)
-            isolation_clean = not leaked
+        result = await call_tool(
+            pool, ISOLATION_PROBE, "message_get", {"message_id": message["id"]}
+        )
+        save(root, "mailbox-isolation-probe", result)
+        isolation_clean = message_is_hidden(result)
     except Exception as exc:
         save(root, "mailbox-isolation-probe", {"skipped": True, "reason": repr(exc)})
 
-    # message_get alone never populates delivered/receipt; only the
-    # receive-side call actually marks a passive (dispatch=false) post as
-    # delivered, which is what hands back the receipt needed to ack it.
-    received = await call_tool(pool, RECIPIENT, "message_receive", {"after": 0})
-    save(root, "mailbox-receive", received)
-    receipt = None
-    if received["ok"]:
-        for item in received["value"].get("messages") or []:
-            if item.get("id") == message_id:
-                receipt = item.get("receipt")
-                break
-    acked = {"ok": False}
-    if receipt:
-        acked = await call_tool(
-            pool, RECIPIENT, "message_ack",
-            {"message_id": message_id, "receipt": receipt},
-        )
-        save(root, "mailbox-ack", acked)
-
     return {
-        "ok": delivered_to_recipient and acked["ok"] and isolation_clean is not False,
-        "message_id": message_id,
+        "ok": delivered_to_recipient and acknowledged and isolation_clean is not False,
+        "message_id": message["id"],
         "delivered_to_recipient": delivered_to_recipient,
         "isolation_clean": isolation_clean,
-        "acknowledged": acked["ok"],
+        "acknowledged": acknowledged,
     }
 
 
@@ -184,7 +216,9 @@ async def recipient_not_rewritten_check(pool, root: Path) -> dict:
     body = f"[E2E-TEST] recipient-rewrite-check {run_tag} — safe to ignore/delete"
 
     sent = await call_tool(
-        pool, SENDER, "message_send",
+        pool,
+        SENDER,
+        "message_send",
         {
             "message": {
                 "recipient": THIRD_PARTY_RECIPIENT,
@@ -200,51 +234,26 @@ async def recipient_not_rewritten_check(pool, root: Path) -> dict:
     save(root, "recipient-send", sent)
     if not sent["ok"]:
         return {"ok": False, "stage": "send", "detail": sent}
-    message_id = sent["value"]["id"]
-    recorded_recipient = sent["value"].get("recipient")
-
-    third_party_inbox = await call_tool(pool, THIRD_PARTY_RECIPIENT, "team_messages", {"after": 0, "limit": 50})
-    save(root, "recipient-third-party-inbox", third_party_inbox)
-    delivered_to_third_party = False
-    if third_party_inbox["ok"]:
-        items = third_party_inbox["value"].get("items") or []
-        delivered_to_third_party = any(item.get("id") == message_id for item in items)
-
-    coordinator_inbox = await call_tool(pool, RECIPIENT, "team_messages", {"after": 0, "limit": 50})
-    save(root, "recipient-coordinator-inbox", coordinator_inbox)
-    leaked_to_coordinator = False
-    if coordinator_inbox["ok"]:
-        items = coordinator_inbox["value"].get("items") or []
-        leaked_to_coordinator = any(item.get("id") == message_id for item in items)
-
-    received = await call_tool(pool, THIRD_PARTY_RECIPIENT, "message_receive", {"after": 0})
-    save(root, "recipient-receive", received)
-    receipt = None
-    if received["ok"]:
-        for item in received["value"].get("messages") or []:
-            if item.get("id") == message_id:
-                receipt = item.get("receipt")
-                break
-    acked = {"ok": False}
-    if receipt:
-        acked = await call_tool(
-            pool, THIRD_PARTY_RECIPIENT, "message_ack",
-            {"message_id": message_id, "receipt": receipt},
-        )
-        save(root, "recipient-ack", acked)
+    message = sent["value"]
+    recorded_recipient = message.get("recipient")
+    delivered_to_third_party, acknowledged = await read_test_note(
+        pool, root, "recipient-third-party", THIRD_PARTY_RECIPIENT, message
+    )
+    coordinator = await call_tool(pool, RECIPIENT, "message_get", {"message_id": message["id"]})
+    save(root, "recipient-coordinator-visibility", coordinator)
 
     return {
         "ok": (
             recorded_recipient == THIRD_PARTY_RECIPIENT
             and delivered_to_third_party
-            and not leaked_to_coordinator
-            and acked["ok"]
+            and message_is_hidden(coordinator)
+            and acknowledged
         ),
-        "message_id": message_id,
+        "message_id": message["id"],
         "recorded_recipient": recorded_recipient,
         "delivered_to_third_party": delivered_to_third_party,
-        "leaked_to_coordinator": leaked_to_coordinator,
-        "acknowledged": acked["ok"],
+        "leaked_to_coordinator": coordinator["ok"],
+        "acknowledged": acknowledged,
     }
 
 
@@ -277,7 +286,9 @@ async def main():
             flush=True,
         )
 
-        conn = await call_tool(pool, SENDER, "connection_check", {"device": "desktop", "mode": "text"})
+        conn = await call_tool(
+            pool, SENDER, "connection_check", {"device": "desktop", "mode": "text"}
+        )
         save(root, "connection_check", conn)
         results["checks"]["connection_check"] = {"ok": conn["ok"]}
         print("connection_check:", "ok" if conn["ok"] else conn.get("error"), flush=True)
@@ -291,8 +302,9 @@ async def main():
         mailbox = await mailbox_round_trip(pool, root)
         results["checks"]["mailbox_round_trip"] = mailbox
         print(
-            f"mailbox_round_trip: delivered={mailbox['delivered_to_recipient']} "
-            f"isolation_clean={mailbox['isolation_clean']} acknowledged={mailbox['acknowledged']}",
+            f"mailbox_round_trip: delivered={mailbox.get('delivered_to_recipient')} "
+            f"isolation_clean={mailbox.get('isolation_clean')} "
+            f"acknowledged={mailbox.get('acknowledged')}",
             flush=True,
         )
 
@@ -309,7 +321,8 @@ async def main():
     results["all_ok"] = all(c.get("ok") for c in results["checks"].values())
     save(root, "summary", results)
     print(json.dumps({"all_ok": results["all_ok"]}, ensure_ascii=False), flush=True)
+    return 0 if results["all_ok"] else 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

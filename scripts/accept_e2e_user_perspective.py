@@ -125,9 +125,11 @@ async def check_operation_catalog_resolves(pool, root: Path) -> dict:
     resolved = []
     if res["ok"]:
         try:
-            payload = json.loads(res["value"]["content"][0]["text"]) if isinstance(
-                res["value"], dict
-            ) and "content" in res["value"] else res["value"]
+            payload = (
+                json.loads(res["value"]["content"][0]["text"])
+                if isinstance(res["value"], dict) and "content" in res["value"]
+                else res["value"]
+            )
             ops = payload.get("operations", payload)
             resolved = [op for op in GENERIC_OPERATIONS if op in ops]
         except Exception:
@@ -160,7 +162,9 @@ async def check_terminal_control(pool, root: Path) -> dict:
     marker = f"kirabridge-e2e-test-{tag}"
     run_id = "e2e-term-" + tag
     submitted = await call_tool(
-        pool, PRINCIPAL, "terminal_control",
+        pool,
+        PRINCIPAL,
+        "terminal_control",
         {
             "argv": ["/bin/echo", marker],
             "cwd": str(Path.home()),
@@ -181,7 +185,9 @@ async def check_terminal_control(pool, root: Path) -> dict:
     result = task.get("result") or {}
     output = json.dumps(task)
     return {
-        "ok": task.get("state") == "completed" and result.get("exit_code") == 0 and marker in output,
+        "ok": task.get("state") == "completed"
+        and result.get("exit_code") == 0
+        and marker in output,
         "state": task.get("state"),
         "exit_code": result.get("exit_code"),
         "output_matched": marker in output,
@@ -191,7 +197,9 @@ async def check_terminal_control(pool, root: Path) -> dict:
 async def clipboard_write(pool, root, tag, label, text):
     run_id = "e2e-clip-" + label + "-" + tag
     submitted = await call_tool(
-        pool, PRINCIPAL, "clipboard_write",
+        pool,
+        PRINCIPAL,
+        "clipboard_write",
         {"task_id": run_id, "idempotency_key": run_id, "text": text},
     )
     save(root, "clipboard-" + label + "-submit", submitted)
@@ -204,7 +212,9 @@ async def clipboard_write(pool, root, tag, label, text):
 async def clipboard_read(pool, root, tag, label):
     run_id = "e2e-clip-" + label + "-" + tag
     submitted = await call_tool(
-        pool, PRINCIPAL, "clipboard_read",
+        pool,
+        PRINCIPAL,
+        "clipboard_read",
         {"task_id": run_id, "idempotency_key": run_id},
     )
     save(root, "clipboard-" + label + "-submit", submitted)
@@ -240,7 +250,8 @@ async def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
-        "--interactive", action="store_true",
+        "--interactive",
+        action="store_true",
         help="Also run terminal_control + clipboard round trip (visible on screen).",
     )
     args = parser.parse_args()
