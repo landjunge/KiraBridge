@@ -2454,9 +2454,7 @@ def rollback(args, *, _compensating=False):
             note = _restart_owned_tunnel(args.plist.parent)
             if note:
                 tunnel_restarted = False
-                report(
-                    "warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note
-                )
+                report("warn", f"Zusatzdienst {TUNNEL_LABEL.removeprefix(AUX_PREFIX)}", detail=note)
         if active.get("desktop"):
             desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
         if active["was_loaded"] and active.get("previous_version"):
