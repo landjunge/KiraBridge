@@ -337,19 +337,31 @@ class DirectDelivery:
             self._settle(message_id, "delivery_timeout", uncertain=False)
             event.set()
 
-    @staticmethod
-    def _observation(error):
+    # The only phases a read-only pre-claim terminal observation can report
+    # (platform_adapters/terminal_app.py's _process_observation_timeout). Whitelisted
+    # so a future diagnosis can tell the three observation steps apart without ever
+    # persisting free-form provider_error content.
+    _OBSERVATION_PHASES = {
+        "native_process_catalog",
+        "native_shell_snapshot",
+        "native_process_identity",
+    }
+
+    @classmethod
+    def _observation(cls, error):
         value = getattr(error, "observation", None)
-        if not isinstance(value, dict):
-            return None
         result = {}
-        for key in ("state", "reason", "target", "handoff_id", "handoff_state", "message_id"):
-            item = value.get(key)
-            if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", item):
-                result[key] = item
-        for key in ("ready", "input_empty"):
-            if type(value.get(key)) is bool:
-                result[key] = value[key]
+        if isinstance(value, dict):
+            for key in ("state", "reason", "target", "handoff_id", "handoff_state", "message_id"):
+                item = value.get(key)
+                if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", item):
+                    result[key] = item
+            for key in ("ready", "input_empty"):
+                if type(value.get(key)) is bool:
+                    result[key] = value[key]
+        provider = getattr(error, "provider_error", None)
+        if isinstance(provider, dict) and provider.get("phase") in cls._OBSERVATION_PHASES:
+            result["phase"] = provider["phase"]
         return result or None
 
     def fail(self, message_id, error):

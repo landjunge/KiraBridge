@@ -48,6 +48,9 @@ class MessageReceiver:
         "visible_input_not_empty",
         "visible_target_scrolled",
         "visible_target_unknown",
+        "session_observation_timeout",
+        "session_observation_invalid",
+        "visible_absence_unproven",
     }
     # Busy or not ready, and no input was attempted: defer and retry automatically.
     # A wrong window and permission failures stay permanent refusals. Every
@@ -55,7 +58,25 @@ class MessageReceiver:
     DEFER_UNSENT = WAIT_REASONS | {
         "execution_busy",
         "delivery_timeout",
+        "session_observation_timeout",
+        "session_observation_invalid",
+        "visible_absence_unproven",
     }
+    # The pure pre-claim OS-observation class: a read-only probe
+    # (native_process_catalog/native_shell_snapshot/native_process_identity in
+    # platform_adapters/terminal_app.py -- catalog(), process_identity(), process_ids())
+    # that times out, returns an unparseable/invalid inventory, or cannot prove a PID's
+    # absence. None of the three ever proves an input attempt. Unlike the other
+    # DEFER_UNSENT reasons above (which legitimately wait for an external state change
+    # with no deadline of their own), these get a bounded number of backed-off retries
+    # instead of an unbounded wait, so a persistently broken probe still surfaces as a
+    # final failure rather than hiding forever.
+    OBSERVATION_RETRY_CODES = {
+        "session_observation_timeout",
+        "session_observation_invalid",
+        "visible_absence_unproven",
+    }
+    OBSERVATION_RETRY_WINDOW = 120.0
 
     def __init__(self, bridge):
         self.bridge = bridge
@@ -1016,34 +1037,130 @@ class MessageReceiver:
             ).fetchone()
         )
 
+    def _observation_retry_expired(self, message_id, reason, observation, retry):
+        """Bounded-retry deadline reached: finalize instead of waiting forever.
+
+        Mirrors the direct-admission failure in DirectDelivery._settle (hold placed,
+        job finished as failed) so a persistently broken observation surfaces the
+        same way the original unbounded-wait case would have, once its budget runs out.
+        """
+        with self.bridge.store.transaction():
+            row = self.bridge.store.db.execute(
+                "SELECT state FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if not row or row["state"] != "queued":
+                return
+            message_row = self.bridge.store.db.execute(
+                "SELECT sender FROM messages WHERE id=?", (message_id,)
+            ).fetchone()
+            evidence = {
+                "reason": reason,
+                "phase": "direct_admission",
+                "terminal_input_attempted": False,
+                "automatic_retry": False,
+                "observation_retry": retry,
+            }
+            if observation is not None:
+                evidence["observation"] = observation
+            if not self.bridge.store.db.execute(
+                "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?",
+                (message_id,),
+            ).fetchone():
+                self.bridge.queues._place_hold(
+                    message_row["sender"], "messages", message_id, "direct_admission_rejected"
+                )
+                self.bridge.store.audit(
+                    "queue.admission_rejected",
+                    message_row["sender"],
+                    None,
+                    {
+                        "queue": "messages",
+                        "item_id": message_id,
+                        "source": "direct_admission_rejected",
+                        "terminal_input_attempted": False,
+                        "history_preserved": True,
+                    },
+                )
+            self._finish(message_id, "failed", evidence, reason)
+
     def _waiting(self, message_id, reason, observation=None):
-        """A pre-dispatch observation is not a failed turn or an input attempt."""
-        evidence = {
-            "session_scope": "existing_visible_terminal",
-            "waiting_for_visible_target": True,
-            "reason": reason,
-            "terminal_input_attempted": False,
-            "waiting_message": {
-                "session_busy": "Die Sitzung ist belegt; die Nachricht wartet ohne Eingabe.",
-                "visible_target_busy": "Eine frühere Übergabe muss noch abgeglichen werden.",
-                "visible_target_not_ready": "Das Agentenfenster ist noch nicht eingabebereit.",
-                "desktop_locked": "Mac gesperrt; die Nachricht wartet ohne Eingabe.",
-                "desktop_session_inactive": "Die Mac-Sitzung ist nicht am Bildschirm aktiv.",
-                "visible_target_working": "Der angebundene Agent arbeitet; Nachricht wartet.",
-                "visible_input_not_empty": "Vorhandener Eingabetext wird nicht überschrieben.",
-                "visible_target_scrolled": "Zur aktuellen Eingabeansicht zurückkehren.",
-                "visible_target_unknown": "Bereitschaft nicht eindeutig; Diagnose ansehen.",
-                "execution_busy": "Ein früherer Lauf ist noch offen; die Nachricht wartet.",
-                "delivery_timeout": "Die Zustellung wartete ohne Eingabe und wird erneut geprüft.",
-            }[reason],
-        }
-        if observation is not None:
-            evidence["observation"] = observation
+        """A pre-dispatch observation is not a failed turn or an input attempt.
+
+        Most reasons here wait for an external state change with no deadline of
+        their own (a busy session, a locked Mac): the state will eventually move.
+        A reason in OBSERVATION_RETRY_CODES is different -- a technical read-only
+        probe failure with no proof it will ever clear -- so it gets the same
+        no-input deferral but bounded: a capped exponential backoff and a fixed
+        retry deadline (OBSERVATION_RETRY_WINDOW), after which it is finished as
+        a final failure instead of waiting forever.
+        """
+        now = time.time()
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
                 "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
             ).fetchone()
             previous = json.loads(row["evidence"]) if row else {}
+            retry = None
+            if reason in self.OBSERVATION_RETRY_CODES:
+                saved = previous.get("observation_retry") or {}
+                first = saved.get("first_failure_at", now)
+                attempts = saved.get("attempts", 0) + 1
+                deadline = saved.get("deadline", first + self.OBSERVATION_RETRY_WINDOW)
+                if now >= deadline:
+                    retry = {
+                        "first_failure_at": first,
+                        "attempts": attempts,
+                        "deadline": deadline,
+                    }
+                    self._observation_retry_expired(message_id, reason, observation, retry)
+                    return
+                retry = {
+                    "first_failure_at": first,
+                    "attempts": attempts,
+                    "deadline": deadline,
+                    "next_attempt_at": min(deadline, now + min(30, 2 ** min(attempts, 5))),
+                }
+            evidence = {
+                "session_scope": "existing_visible_terminal",
+                "waiting_for_visible_target": True,
+                "reason": reason,
+                "terminal_input_attempted": False,
+                "waiting_message": {
+                    "session_busy": "Die Sitzung ist belegt; die Nachricht wartet ohne Eingabe.",
+                    "visible_target_busy": "Eine frühere Übergabe muss noch abgeglichen werden.",
+                    "visible_target_not_ready": (
+                        "Das Agentenfenster ist noch nicht eingabebereit."
+                    ),
+                    "desktop_locked": "Mac gesperrt; die Nachricht wartet ohne Eingabe.",
+                    "desktop_session_inactive": "Die Mac-Sitzung ist nicht am Bildschirm aktiv.",
+                    "visible_target_working": "Der angebundene Agent arbeitet; Nachricht wartet.",
+                    "visible_input_not_empty": (
+                        "Vorhandener Eingabetext wird nicht überschrieben."
+                    ),
+                    "visible_target_scrolled": "Zur aktuellen Eingabeansicht zurückkehren.",
+                    "visible_target_unknown": "Bereitschaft nicht eindeutig; Diagnose ansehen.",
+                    "execution_busy": "Ein früherer Lauf ist noch offen; die Nachricht wartet.",
+                    "delivery_timeout": (
+                        "Die Zustellung wartete ohne Eingabe und wird erneut geprüft."
+                    ),
+                    "session_observation_timeout": (
+                        "Die reine Beobachtung war zu langsam; "
+                        "wird ohne Eingabe befristet erneut versucht."
+                    ),
+                    "session_observation_invalid": (
+                        "Die reine Prozessbeobachtung war unvollständig; "
+                        "wird ohne Eingabe befristet erneut versucht."
+                    ),
+                    "visible_absence_unproven": (
+                        "Die reine Abwesenheitsprüfung war nicht belastbar; "
+                        "wird ohne Eingabe befristet erneut versucht."
+                    ),
+                }[reason],
+            }
+            if retry is not None:
+                evidence["observation_retry"] = retry
+            if observation is not None:
+                evidence["observation"] = observation
             if "receiver_retry" in previous:
                 evidence["receiver_retry"] = previous["receiver_retry"]
 
@@ -1253,6 +1370,11 @@ class MessageReceiver:
                 continue
             if self._deferred_unsent(row) and self._recipient_turn_open(row["recipient"]):
                 continue
+            observation_retry = json.loads(row["evidence"]).get("observation_retry")
+            if observation_retry and time.time() < observation_retry.get("next_attempt_at", 0):
+                # Bounded backoff for a technical observation failure: do not
+                # re-probe faster than the capped exponential delay allows.
+                continue
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue
             try:
@@ -1278,9 +1400,9 @@ class MessageReceiver:
                         )
                     except BridgeError as exc:
                         if exc.code in self.WAIT_REASONS:
-                            self._waiting(row["id"], exc.code, getattr(exc, "observation", None))
+                            self._waiting(row["id"], exc.code, self.direct._observation(exc))
                             continue
-                        observed = getattr(exc, "observation", None) or {}
+                        observed = self.direct._observation(exc) or {}
                         if (
                             exc.code == "session_selection_changed"
                             and str(row["idem"]).startswith("team:")
