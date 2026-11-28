@@ -144,6 +144,7 @@ class NativeSystemTransport:
         self.closed = False
         self.active_request = None
         self._keyboard_commit_attempts = 0
+        self._verified_binary_cache = None
 
     def snapshot_metadata(self):
         """No app launch, framework/API call, permission probe or user-content read."""
@@ -175,7 +176,7 @@ class NativeSystemTransport:
                 raise ValueError("Native protocol metadata mismatch")
             executable = self.app_path / "Contents/MacOS/KiraBridge"
             if verify_binary:
-                binary, file_identity = _private_file(executable, 32 * 1024 * 1024)
+                binary_sha256, file_identity = self._verified_binary_sha256(executable)
             else:
                 file_identity = _private_stat(executable, 32 * 1024 * 1024)
             if not file_identity.st_mode & 0o111:
@@ -203,7 +204,6 @@ class NativeSystemTransport:
                 ),
             }
             if verify_binary:
-                binary_sha256 = hashlib.sha256(binary).hexdigest()
                 result["binary_sha256"] = binary_sha256
                 if (
                     self.expected_binary_sha256 is not None
@@ -221,6 +221,30 @@ class NativeSystemTransport:
             return result
         except (OSError, ValueError, TypeError, RecursionError, plistlib.InvalidFileException):
             return {"available": False, "reason": "native_app_protocol_unavailable"}
+
+    def _verified_binary_sha256(self, executable):
+        """Reuse the last verified digest while the executable's stat identity holds.
+
+        Every native request and every discovery snapshot called this with
+        ``verify_binary=True``, which used to re-read and re-hash the whole
+        (up to 32 MB) native binary from disk on the event loop thread each
+        time, even though the file only ever changes on a real reinstall.
+        Under load that synchronous read+hash repeatedly stalled the event
+        loop long enough to make the whole bridge appear hung. A stat-only
+        probe (cheap, no content read) decides whether the cached digest is
+        still valid; ``_private_file`` below still re-checks identity around
+        its own read, so a file that changes is always re-verified fresh.
+        """
+        stat_only = _private_stat(executable, 32 * 1024 * 1024)
+        identity = _stat_identity(stat_only)
+        cached = self._verified_binary_cache
+        if cached is not None and cached[0] == identity:
+            return cached[1], stat_only
+        binary, file_identity = _private_file(executable, 32 * 1024 * 1024)
+        identity = _stat_identity(file_identity)
+        digest = hashlib.sha256(binary).hexdigest()
+        self._verified_binary_cache = (identity, digest)
+        return digest, file_identity
 
     def _provider_generation(self, info, file_identity):
         value = {

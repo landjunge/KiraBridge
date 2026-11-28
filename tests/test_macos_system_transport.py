@@ -651,6 +651,53 @@ def test_installed_binary_digest_pin_refuses_replaced_code_even_with_same_plist(
     assert worker.snapshot_metadata()["available"] is False and worker.process is None
 
 
+def test_repeated_snapshot_metadata_reuses_digest_of_an_unchanged_binary(tmp_path, monkeypatch):
+    """Every native request and every discovery snapshot calls this with verify_binary=True.
+
+    Re-reading and re-hashing the whole native binary from disk on every single
+    call blocked the event loop long enough to make the bridge appear hung
+    under load (observed 28.11.2026). An unchanged binary must be hashed once.
+    """
+    monkeypatch.setattr(native.sys, "platform", "darwin")
+    app = make_app(tmp_path)
+    worker = native.NativeSystemTransport(app, expected_commit=COMMIT)
+    private_file = native._private_file
+    read_calls = []
+
+    def record_file(path, limit):
+        read_calls.append(Path(path))
+        return private_file(path, limit)
+
+    monkeypatch.setattr(native, "_private_file", record_file)
+    first = worker.snapshot_metadata()
+    second = worker.snapshot_metadata()
+    binary_reads = [path for path in read_calls if path.name == "KiraBridge"]
+    assert len(binary_reads) == 1, "unchanged native binary must be read/hashed only once"
+    assert first["binary_sha256"] == second["binary_sha256"]
+    assert second["binary_sha256"] == hashlib.sha256(b"test native executable").hexdigest()
+    assert worker.process is None
+
+
+def test_snapshot_metadata_detects_a_binary_replaced_after_a_cached_digest(tmp_path, monkeypatch):
+    """The cache introduced for the hang above must never return a stale digest."""
+    monkeypatch.setattr(native.sys, "platform", "darwin")
+    app = make_app(tmp_path)
+    executable = app / "Contents/MacOS/KiraBridge"
+    worker = native.NativeSystemTransport(app, expected_commit=COMMIT)
+    first = worker.snapshot_metadata()
+    assert first["binary_sha256"] == hashlib.sha256(b"test native executable").hexdigest()
+    executable.write_bytes(b"replaced native executable, deliberately a different length")
+    second = worker.snapshot_metadata()
+    assert (
+        second["binary_sha256"]
+        == hashlib.sha256(
+            b"replaced native executable, deliberately a different length"
+        ).hexdigest()
+    )
+    assert second["binary_sha256"] != first["binary_sha256"]
+    assert worker.process is None
+
+
 @pytest.mark.parametrize(
     "unsafe", ["old_protocol", "boolean_protocol", "symlink", "writable", "missing"]
 )
