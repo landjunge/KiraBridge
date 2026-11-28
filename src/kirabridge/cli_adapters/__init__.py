@@ -91,9 +91,16 @@ def default_registry():
         from .codex import CodexAdapter
         from .grok import GrokBuildAdapter
         from .opencode import OpenCodeAdapter
+        from .qwen import QwenCodeAdapter
 
         _default = AdapterRegistry(
-            [CodexAdapter(), GrokBuildAdapter(), ClaudeCodeAdapter(), OpenCodeAdapter()]
+            [
+                CodexAdapter(),
+                GrokBuildAdapter(),
+                ClaudeCodeAdapter(),
+                OpenCodeAdapter(),
+                QwenCodeAdapter(),
+            ]
         )
     return _default
 
