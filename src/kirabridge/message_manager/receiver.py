@@ -23,16 +23,18 @@ from kirabridge.message_manager import MessageSend
 from kirabridge.team_manager.coordinator_prefix import with_role
 
 
-def separate_managed_eligible(config, created: float) -> bool:
-    """True only for messages created at or after an explicit operator cutoff.
-
-    The default cutoff is unset, so existing visible delivery stays unchanged.
-    Holds, unknown jobs and older rows are not made eligible by this check.
-    """
+def separate_managed_eligible(config, created: float, recipient: str | None = None) -> bool:
+    """Check the explicit cutoff or the recipient's explicitly managed team route."""
     cutoff = config.messaging.separate_managed_after
-    if cutoff is None:
-        return False
-    return float(created) >= float(cutoff)
+    if cutoff is not None and float(created) >= float(cutoff):
+        return True
+    worker = config.team.workers.get(recipient) if recipient is not None else None
+    return bool(
+        worker is not None
+        and worker.agent == recipient
+        and worker.execution_scope == "separate_managed_session"
+        and recipient in config.messaging.receivers
+    )
 
 
 class MessageReceiver:
@@ -194,10 +196,10 @@ class MessageReceiver:
 
     def _submit_new(self, principal, message_id):
         row = self.bridge.store.db.execute(
-            "SELECT created FROM messages WHERE id=?", (message_id,)
+            "SELECT created,recipient FROM messages WHERE id=?", (message_id,)
         ).fetchone()
         if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
-            self.bridge.config, row["created"]
+            self.bridge.config, row["created"], row["recipient"]
         ):
             self.direct.submit(principal, message_id)
 
@@ -222,8 +224,11 @@ class MessageReceiver:
             return result
         identifier = result["id"]
         job = result.get("processing")
+        message_row = self.bridge.store.db.execute(
+            "SELECT recipient FROM messages WHERE id=?", (identifier,)
+        ).fetchone()
         visible = self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
-            self.bridge.config, result["created"]
+            self.bridge.config, result["created"], message_row["recipient"]
         )
         if not job or not visible:
             return result
@@ -902,7 +907,7 @@ class MessageReceiver:
                 "existing_native_codex_root"
                 if native
                 else "separate_managed_session"
-                if separate_managed_eligible(self.bridge.config, row["created"])
+                if separate_managed_eligible(self.bridge.config, row["created"], row["recipient"])
                 else "existing_visible_terminal"
                 if self.bridge.config.visible_handoffs.enabled
                 else "separate_managed_session"
@@ -1243,7 +1248,9 @@ class MessageReceiver:
             if (
                 not include_visible
                 and self.bridge.config.visible_handoffs.enabled
-                and not separate_managed_eligible(self.bridge.config, row["created"])
+                and not separate_managed_eligible(
+                    self.bridge.config, row["created"], row["recipient"]
+                )
                 and not self._deferred_unsent(row)
             ):
                 # Old visible backlog is inventory, never fresh authorization.
@@ -1268,7 +1275,7 @@ class MessageReceiver:
                 if now < retry.get("next_attempt_at", 0):
                     continue
                 if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
-                    self.bridge.config, row["created"]
+                    self.bridge.config, row["created"], row["recipient"]
                 ):
                     try:
                         await self.bridge.visible_handoffs.dispatch_ready(
@@ -1426,7 +1433,9 @@ class MessageReceiver:
                 if not delivered["messages"] or delivered["messages"][0]["id"] != message_id:
                     raise BridgeError("receiver_delivery", "Message was consumed by another client")
                 receipt = delivered["messages"][0]["receipt"]
-            separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
+            separate_managed = separate_managed_eligible(
+                self.bridge.config, message["created"], message["recipient"]
+            )
             visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             # The body is the complete authorized input on every receiver route.
             # Routing, parent IDs and receipts stay in durable transport metadata.
