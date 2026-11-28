@@ -2438,9 +2438,34 @@ def rollback(args, *, _compensating=False):
                 active["previous_version"],
                 expected_source=active.get("previous_source", {}),
             )
-    # Keep the complete active recovery record until every affected component
-    # is restored. Desktop failure must not erase its transaction checkpoint.
+    # Keep the complete active recovery record (backup path, aux_services
+    # bookkeeping, etc.) until every affected component is restored; a later
+    # rollback retry needs it. But the identity fields below describe which
+    # release is actually active, and the core (launcher + plist, and thus the
+    # running service) is already restored at this point regardless of aux
+    # service state. Leaving them at the failed target release here made
+    # current.json report a version that was never running, while the real
+    # (previous) version stayed in service underneath it.
     if not aux_services_restored or not tunnel_restarted:
+        if active.get("previous"):
+            for key in (
+                "version",
+                "commit",
+                "source_commit",
+                "lock_sha256",
+                "native_app_required",
+                "native_app",
+                "files",
+                "file_modes",
+                "threaddesk",
+                "release",
+            ):
+                if key in active["previous"]:
+                    active[key] = active["previous"][key]
+                else:
+                    active.pop(key, None)
+            jwrite(current, active)
+            jwrite(backup / "transaction.json", active)
         report(
             "warn",
             "Zusatzdienste noch nicht vollständig zurückgesetzt",

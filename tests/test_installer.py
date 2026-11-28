@@ -1282,6 +1282,92 @@ def test_rollback_retains_core_checkpoint_until_tunnel_restart_succeeds(
     assert not current.exists()
 
 
+def test_rollback_corrects_active_identity_even_when_tunnel_restart_fails(
+    installer, monkeypatch, tmp_path
+):
+    """current.json must report the version actually running (core already
+    restored), not the failed target, even while aux/tunnel recovery is
+    still pending and the transaction stays open for a later retry."""
+    from contextlib import nullcontext
+
+    prefix = tmp_path / "install"
+    backup = prefix / "backups/b1"
+    backup.mkdir(parents=True)
+    config = tmp_path / "config.toml"
+    config.write_text("")
+    launcher = tmp_path / "bin/kirabridge"
+    launcher.parent.mkdir()
+    launcher.write_text("new launcher")
+    plist = tmp_path / "service.plist"
+    plist.write_text("new plist")
+    (backup / "launcher.before").write_text("old launcher")
+    (backup / "service.before.plist").write_text("old plist")
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=launcher,
+        plist=plist,
+        service="launchd",
+    )
+    previous = {
+        "version": "0.8.0rc81",
+        "commit": "aaaa",
+        "source_commit": "aaaa",
+        "lock_sha256": "old-lock",
+        "native_app_required": False,
+        "release": str(prefix / "releases/0.8.0rc81-aaaa"),
+    }
+    active = {
+        "version": "0.8.0rc83",
+        "commit": "bbbb",
+        "source_commit": "bbbb",
+        "lock_sha256": "new-lock",
+        "native_app_required": False,
+        "release": str(prefix / "releases/0.8.0rc83-bbbb"),
+        "backup": str(backup),
+        "config": str(config),
+        "launcher": str(launcher),
+        "plist": str(plist),
+        "service": "launchd",
+        "installed_wrapper_sha256": installer.sha(launcher),
+        "installed_plist_sha256": installer.sha(plist),
+        "had_wrapper": True,
+        "had_plist": True,
+        "was_loaded": False,
+        "previous": previous,
+        "aux_services": [],
+    }
+    current = prefix / "current.json"
+    installer.jwrite(current, active)
+    monkeypatch.setattr(installer, "require_visible_terminal", lambda args: None)
+    monkeypatch.setattr(installer, "validate_service_owner", lambda args: None)
+    monkeypatch.setattr(installer, "require_queue_compatibility", lambda *args: None)
+    monkeypatch.setattr(installer, "idle_guard", lambda config: nullcontext())
+    monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    monkeypatch.setattr(installer, "start_service", lambda args: None)
+    monkeypatch.setattr(installer, "loaded", lambda args: False)
+    monkeypatch.setattr(installer, "_restart_owned_tunnel", lambda agents: "Neustart fehlgeschlagen")
+    monkeypatch.setattr(installer, "report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(installer, "report_summary", lambda *args, **kwargs: None)
+
+    installer.rollback(args)
+
+    # Core files really are the old version.
+    assert launcher.read_text() == "old launcher"
+    assert plist.read_text() == "old plist"
+
+    checkpoint = json.loads(current.read_text())
+    # Identity fields must match what is actually running, not the failed target.
+    assert checkpoint["version"] == "0.8.0rc81"
+    assert checkpoint["commit"] == "aaaa"
+    assert checkpoint["release"] == previous["release"]
+    # Bookkeeping needed for a later retry of the still-pending tunnel restore
+    # must survive untouched.
+    assert checkpoint["rollback_core_restored"] is True
+    assert checkpoint["backup"] == str(backup)
+    assert checkpoint["previous"] == previous
+
+
 def test_queue_holds_block_unsafe_downgrade_before_service_switch(
     installer, bridge, config, tmp_path, monkeypatch
 ):
