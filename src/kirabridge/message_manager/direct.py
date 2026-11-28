@@ -54,6 +54,13 @@ class DirectDelivery:
         "native_codex_rpc_rejected",
         "native_codex_scope_changed",
         "coordinator_route_changed",
+        # execution_busy is only ever raised before a claim, so this is
+        # currently inert; it guards against a future move earlier that
+        # would silently lose its pre-input treatment. delivery_timeout is
+        # deliberately NOT here: the watchdog can raise it after a claim
+        # (test_watchdog_keeps_a_claimed_ambiguous_attempt_unknown), where
+        # it must stay ambiguous ("unknown"), not a certain pre-input non-send.
+        "execution_busy",
     }
 
     def __init__(self, receiver):
