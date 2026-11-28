@@ -1248,7 +1248,9 @@ class MessageReceiver:
             if (
                 not include_visible
                 and self.bridge.config.visible_handoffs.enabled
-                and not separate_managed_eligible(self.bridge.config, row["created"], row["recipient"])
+                and not separate_managed_eligible(
+                    self.bridge.config, row["created"], row["recipient"]
+                )
                 and not self._deferred_unsent(row)
             ):
                 # Old visible backlog is inventory, never fresh authorization.
